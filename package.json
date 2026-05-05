@@ -1,0 +1,25 @@
+{
+  "name": "finagent",
+  "version": "0.1.0",
+  "private": true,
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "bun run vite:dev",
+    "vite:dev": "cd apps/electron && bunx vite",
+    "build": "bun run build:packages && bun run build:electron",
+    "build:packages": "bun run --filter './packages/*' build",
+    "build:electron": "cd apps/electron && bunx vite build",
+    "typecheck": "bun run --filter './**' typecheck",
+    "lint": "bun run --filter './**' lint"
+  },
+  "devDependencies": {
+    "typescript": "^5.6.0",
+    "bun-types": "^1.0.0"
+  },
+  "dependencies": {
+    "vite": "^8.0.10"
+  }
+}

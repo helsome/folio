@@ -1,0 +1,17 @@
+node_modules
+
+# Build outputs
+dist
+apps/*/dist
+packages/*/dist
+
+# Local environment
+.env
+.env.*
+
+# Claude local session artifacts
+.claude/logs
+.claude/session-context-*.md
+
+# OS/editor noise
+.DS_Store

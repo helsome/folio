@@ -1,0 +1,30 @@
+{
+  "compilerOptions": {
+    "target": "ES2022",
+    "module": "ESNext",
+    "moduleResolution": "bundler",
+    "lib": ["ES2022", "dom"],
+    "strict": true,
+    "esModuleInterop": true,
+    "skipLibCheck": true,
+    "forceConsistentCasingInFileNames": true,
+    "resolveJsonModule": true,
+    "allowSyntheticDefaultImports": true,
+    "jsx": "react-jsx",
+    "declaration": true,
+    "declarationMap": true,
+    "sourceMap": true,
+    "outDir": "./dist",
+    "paths": {
+      "@finagent/core": ["./packages/core/src"],
+      "@finagent/shared": ["./packages/shared/src"],
+      "@finagent/ui": ["./packages/ui/src"],
+      "@finagent/pi-extension": ["./packages/pi-extension/src"],
+      "@finagent/longbridge-tools": ["./packages/longbridge-tools/src"],
+      "@finagent/skill-hub": ["./packages/skill-hub/src"]
+    },
+    "types": ["bun-types"]
+  },
+  "include": ["packages/*/src", "apps/*/src"],
+  "exclude": ["node_modules", "dist"]
+}

@@ -1,0 +1,51 @@
+{
+  "permissions": {
+    "allow": [
+      // Development commands
+      "bun:*",
+      "npm:*",
+      "npx:*",
+      "pnpm:*",
+      "yarn:*",
+
+      // Git operations
+      "git:*",
+
+      // Electron build
+      "electron-builder:*",
+
+      // File system operations for development
+      "read:*/**",
+      "write:*/**",
+
+      // Network for development servers
+      "network:localhost:5173",
+      "network:localhost:8080",
+      "network:localhost:9222"
+    ],
+    "deny": [
+      // Explicitly deny dangerous operations
+      "sudo:*",
+      "chmod:*",
+      "rm -rf /**"
+    ]
+  },
+
+  "env": {
+    "DEBUG": "false",
+    "NODE_ENV": "development"
+  },
+
+  "hooks": {
+    "session-start": {
+      "enabled": true,
+      "script": ".claude/hooks/session-start.js"
+    }
+  },
+
+  "completion": {
+    "showPlanOnStop": true,
+    "showTodosOnStop": true,
+    "showGitStatusOnStop": true
+  }
+}
