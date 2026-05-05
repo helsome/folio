@@ -7,12 +7,12 @@ export type ErrorCode =
   | 'LONGBRIDGE_UNKNOWN';
 
 export class LongBridgeError extends Error {
-  constructor(
-    message: string,
-    public code: ErrorCode
-  ) {
+  code: ErrorCode;
+
+  constructor(message: string, code: ErrorCode) {
     super(message);
     this.name = 'LongBridgeError';
+    this.code = code;
   }
 }
 

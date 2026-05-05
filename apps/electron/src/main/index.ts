@@ -1,9 +1,12 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
-import { join } from 'path';
-import { AgentGateway, toIpcResult } from './agentGateway';
+import { dirname, join } from 'path';
+import { fileURLToPath } from 'url';
+import { AgentGateway, toIpcResult } from './agentGateway.ts';
 
 let mainWindow: BrowserWindow | null = null;
 const agentGateway = new AgentGateway();
+const __dirname = dirname(fileURLToPath(import.meta.url));
+const isDev = !app.isPackaged;
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -13,7 +16,7 @@ function createWindow() {
     minHeight: 600,
     titleBarStyle: 'hiddenInset',
     webPreferences: {
-      preload: join(__dirname, '../preload/index.js'),
+      preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: true,
@@ -21,7 +24,7 @@ function createWindow() {
   });
 
   // Load the app
-  if (process.env.NODE_ENV === 'development') {
+  if (isDev) {
     mainWindow.loadURL('http://localhost:5173');
     mainWindow.webContents.openDevTools();
   } else {

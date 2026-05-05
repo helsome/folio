@@ -1,22 +1,22 @@
-export { executeLongBridge } from './executor';
-export type { ExecutorOptions } from './executor';
+export { executeLongBridge } from './executor.ts';
+export type { ExecutorOptions } from './executor.ts';
 
-export { getLongBridgeStatus } from './status';
-export type { LongBridgeStatus, LongBridgeStatusValue } from './status';
+export { getLongBridgeStatus } from './status.ts';
+export type { LongBridgeStatus, LongBridgeStatusValue } from './status.ts';
 
-export { validateSymbol, validateSymbolOrThrow } from './validator';
+export { validateSymbol, validateSymbolOrThrow } from './validator.ts';
 
-export { LongBridgeError, isLongBridgeError } from './errors';
-export type { ErrorCode } from './errors';
+export { LongBridgeError, isLongBridgeError } from './errors.ts';
+export type { ErrorCode } from './errors.ts';
 
-export { parseQuoteResponse, parsePortfolioResponse, parseKlineResponse, parseIntradayResponse } from './parser';
+export { parseQuoteResponse, parsePortfolioResponse, parseKlineResponse, parseIntradayResponse } from './parser.ts';
 
-export { getQuote, getQuotes } from './tools/quote';
-export type { GetQuoteOptions } from './tools/quote';
+export { getQuote, getQuotes } from './tools/quote.ts';
+export type { GetQuoteOptions } from './tools/quote.ts';
 
-export { getKline, getIntraday } from './tools/kline';
-export type { GetKlineOptions, GetIntradayOptions } from './tools/kline';
+export { getKline, getIntraday } from './tools/kline.ts';
+export type { GetKlineOptions, GetIntradayOptions } from './tools/kline.ts';
 
-export { getPortfolio, getPositions, getCash } from './tools/portfolio';
+export { getPortfolio, getPositions, getCash } from './tools/portfolio.ts';
 
 export type { Quote, Portfolio, Position, Kline, IntradayData } from '@finagent/core';

@@ -1,5 +1,5 @@
-import { executeLongBridge } from '../executor';
-import { parsePortfolioResponse } from '../parser';
+import { executeLongBridge } from '../executor.ts';
+import { parsePortfolioResponse } from '../parser.ts';
 import type { Portfolio } from '@finagent/core';
 
 export async function getPortfolio(): Promise<Portfolio> {

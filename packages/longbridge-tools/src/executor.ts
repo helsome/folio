@@ -1,5 +1,5 @@
 import { execa } from 'execa';
-import { LongBridgeError, isLongBridgeError } from './errors';
+import { LongBridgeError, isLongBridgeError } from './errors.ts';
 
 export interface ExecutorOptions {
   timeout?: number;

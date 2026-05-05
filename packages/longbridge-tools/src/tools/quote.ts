@@ -1,6 +1,6 @@
-import { executeLongBridge } from '../executor';
-import { validateSymbolOrThrow } from '../validator';
-import { parseQuoteResponse } from '../parser';
+import { executeLongBridge } from '../executor.ts';
+import { validateSymbolOrThrow } from '../validator.ts';
+import { parseQuoteResponse } from '../parser.ts';
 import type { Quote } from '@finagent/core';
 
 export interface GetQuoteOptions {
@@ -23,5 +23,7 @@ export async function getQuotes(symbols: string[]): Promise<Quote[]> {
     ...symbols,
     '--format', 'json',
   ]);
-  return JSON.parse(output).map(parseQuoteResponse);
+  const parsed = JSON.parse(output);
+  const items = Array.isArray(parsed) ? parsed : [parsed];
+  return items.map((item) => parseQuoteResponse(JSON.stringify(item)));
 }

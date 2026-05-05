@@ -14,9 +14,9 @@ interface Tool {
   ) => Promise<{ content: Array<{ type: string; text: string }> }>;
 }
 
-import { getQuoteTool } from './tools/getQuote';
-import { getPortfolioTool } from './tools/getPortfolio';
-import { getKlineTool, getIntradayTool } from './tools/getKline';
+import { getQuoteTool } from './tools/getQuote.ts';
+import { getPortfolioTool } from './tools/getPortfolio.ts';
+import { getKlineTool, getIntradayTool } from './tools/getKline.ts';
 
 // Tool registry
 export const tools: Tool[] = [
@@ -27,9 +27,9 @@ export const tools: Tool[] = [
 ];
 
 // Export individual tools
-export { getQuoteTool } from './tools/getQuote';
-export { getPortfolioTool } from './tools/getPortfolio';
-export { getKlineTool, getIntradayTool } from './tools/getKline';
+export { getQuoteTool } from './tools/getQuote.ts';
+export { getPortfolioTool } from './tools/getPortfolio.ts';
+export { getKlineTool, getIntradayTool } from './tools/getKline.ts';
 
 // Register all tools with Pi Agent
 export function registerTools(agent: { registerTool: (tool: Tool) => void }) {

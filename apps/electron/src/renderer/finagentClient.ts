@@ -1,11 +1,16 @@
 import type { ApiResult } from '@finagent/core';
-import type { FinagentClient } from '@finagent/ui';
+import { fallbackClient, type FinagentClient } from '@finagent/ui';
 
 function ipcResult<T>(promise: Promise<unknown>): Promise<ApiResult<T>> {
   return promise as Promise<ApiResult<T>>;
 }
 
-export const finagentClient: FinagentClient = {
+function createElectronClient(): FinagentClient {
+  if (!window.electronAPI) {
+    return fallbackClient;
+  }
+
+  return {
   window: {
     minimize: () => window.electronAPI.window.minimize(),
     maximize: () => window.electronAPI.window.maximize(),
@@ -28,4 +33,7 @@ export const finagentClient: FinagentClient = {
     load: () => ipcResult(window.electronAPI.alerts.load()),
     save: (alerts) => ipcResult(window.electronAPI.alerts.save(alerts)),
   },
-};
+  };
+}
+
+export const finagentClient: FinagentClient = createElectronClient();

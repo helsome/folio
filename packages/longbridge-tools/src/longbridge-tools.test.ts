@@ -1,5 +1,5 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
-import { LongBridgeError } from './errors';
+import { LongBridgeError } from './errors.ts';
 
 type ExecaResult = { stdout: string };
 type ExecaHandler = (
@@ -38,6 +38,19 @@ const quoteJson = JSON.stringify({
   open: 194,
   prev_close: 194.25,
 });
+
+const longBridgeQuoteArrayJson = JSON.stringify([
+  {
+    symbol: 'AAPL.US',
+    last: '276.830',
+    high: '280.630',
+    low: '274.860',
+    open: '279.655',
+    prev_close: '280.140',
+    volume: 46668401,
+    timestamp: '2026-05-05 12:36:35',
+  },
+]);
 
 const portfolioJson = JSON.stringify({
   total_value: 10000,
@@ -137,6 +150,20 @@ describe('LongBridge errors', () => {
         code: 'LONGBRIDGE_PARSE_FAILURE',
       });
     }
+  });
+});
+
+describe('LongBridge parsing', () => {
+  it('parses LongBridge quote array responses with string prices', () => {
+    expect(parseQuoteResponse(longBridgeQuoteArrayJson)).toMatchObject({
+      symbol: 'AAPL.US',
+      lastPrice: 276.83,
+      prevClose: 280.14,
+      high: 280.63,
+      low: 274.86,
+      open: 279.655,
+      volume: 46668401,
+    });
   });
 });
 

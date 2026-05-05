@@ -1,5 +1,5 @@
-import { executeLongBridge } from './executor';
-import { LongBridgeError } from './errors';
+import { executeLongBridge } from './executor.ts';
+import { LongBridgeError } from './errors.ts';
 
 export type LongBridgeStatusValue =
   | 'available'

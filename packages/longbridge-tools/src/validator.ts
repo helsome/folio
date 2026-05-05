@@ -1,4 +1,4 @@
-import { LongBridgeError } from './errors';
+import { LongBridgeError } from './errors.ts';
 
 // Symbol format: AAPL.US, 0700.HK, 600519.SH, 0388.HK, etc.
 // Allow 1-5 chars of A-Z and 0-9

@@ -1,6 +1,6 @@
-import { executeLongBridge } from '../executor';
-import { validateSymbolOrThrow } from '../validator';
-import { parseKlineResponse, parseIntradayResponse } from '../parser';
+import { executeLongBridge } from '../executor.ts';
+import { validateSymbolOrThrow } from '../validator.ts';
+import { parseKlineResponse, parseIntradayResponse } from '../parser.ts';
 import type { Kline, IntradayData } from '@finagent/core';
 
 const VALID_PERIODS = ['1m', '5m', '15m', '1h', '1d', '1w'] as const;

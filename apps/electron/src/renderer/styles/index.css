@@ -1,6 +1,6 @@
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import "tailwindcss";
+@source "../../../../../packages/ui/src";
+@source "../";
 
 :root {
   --bg-primary: 0.98 0.01 250;
