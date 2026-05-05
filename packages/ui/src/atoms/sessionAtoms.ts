@@ -47,6 +47,9 @@ export const addMessageAtom = atom(
       updatedAt: Date.now(),
     };
     set(sessionAtomFamily(sessionId), updatedSession);
+    set(sessionsAtom, (sessions) =>
+      sessions.map((session) => session.id === sessionId ? updatedSession : session)
+    );
   }
 );
 
@@ -58,11 +61,15 @@ export const updateSessionStatusAtom = atom(
     if (!sessionId) return;
 
     const session = get(sessionAtomFamily(sessionId));
-    set(sessionAtomFamily(sessionId), {
+    const updatedSession = {
       ...session,
       status,
       updatedAt: Date.now(),
-    });
+    };
+    set(sessionAtomFamily(sessionId), updatedSession);
+    set(sessionsAtom, (sessions) =>
+      sessions.map((item) => item.id === sessionId ? updatedSession : item)
+    );
   }
 );
 
@@ -78,6 +85,7 @@ export const createSessionAtom = atom(
       createdAt: Date.now(),
       updatedAt: Date.now(),
     };
+    set(sessionAtomFamily(newSession.id), newSession);
     set(sessionsAtom, (sessions) => [...sessions, newSession]);
     set(activeSessionIdAtom, newSession.id);
     return newSession;

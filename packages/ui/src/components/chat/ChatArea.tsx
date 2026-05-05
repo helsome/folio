@@ -39,7 +39,10 @@ export const ChatArea: React.FC = () => {
     setIsLoading(true);
 
     try {
-      const response = await client.agent.send(input.trim());
+      const response = await client.agent.send({
+        sessionId: activeSessionId,
+        content: input.trim(),
+      });
 
       const assistantMessage: Message = {
         id: crypto.randomUUID(),

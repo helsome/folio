@@ -1,6 +1,7 @@
 import React, { createContext, useContext } from 'react';
 import type {
   AgentResponse,
+  AgentRequest,
   Alert,
   ApiResult,
   Kline,
@@ -21,7 +22,7 @@ export interface WindowControlsClient {
 export interface FinagentClient {
   window?: WindowControlsClient;
   agent: {
-    send: (content: string) => Promise<ApiResult<AgentResponse>>;
+    send: (request: string | AgentRequest) => Promise<ApiResult<AgentResponse>>;
     getTools: () => Promise<ApiResult<ToolDefinition[]>>;
   };
   market: {

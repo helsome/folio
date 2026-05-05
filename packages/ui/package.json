@@ -25,6 +25,7 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
+    "test": "bun test",
     "typecheck": "tsc --noEmit"
   }
 }
