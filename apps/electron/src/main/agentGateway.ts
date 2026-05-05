@@ -1,13 +1,7 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { app } from 'electron';
-import { tools, type Tool } from '@finagent/pi-extension';
-import {
-  getKline,
-  getLongBridgeStatus,
-  getPortfolio,
-  getQuote,
-} from '@finagent/longbridge-tools';
+import { LocalFinanceAgentBackend, MarketDataService } from '@finagent/shared';
 
 type IpcSuccess<T> = { ok: true; data: T };
 type IpcFailure = {
@@ -21,81 +15,31 @@ type IpcFailure = {
 
 export type IpcResult<T> = IpcSuccess<T> | IpcFailure;
 
-type ToolName = 'get_quote' | 'get_portfolio' | 'get_kline' | 'get_intraday';
-type ToolResult = Awaited<ReturnType<Tool['execute']>>;
-
-interface AgentReply {
-  content: string;
-  tool?: ToolName;
-  toolName?: ToolName;
-  result?: ToolResult;
-  details?: ToolResult;
-}
-
 interface KlineRequest {
   symbol: string;
   period?: string;
   limit?: number;
 }
 
-const SUPPORTED_TOOL_NAMES: ToolName[] = [
-  'get_quote',
-  'get_portfolio',
-  'get_kline',
-  'get_intraday',
-];
-
-const SYMBOL_REGEX = /\b[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)\b/i;
-const FRIENDLY_UNSUPPORTED =
-  '当前 MVP 支持 quote/行情/价格、K-line/K线 和 portfolio/持仓/组合 查询。请带上标的代码，例如 AAPL.US 或 0700.HK。';
-
 export class AgentGateway {
-  private readonly registry = new Map<ToolName, Tool>();
-
-  constructor() {
-    for (const tool of tools) {
-      if (SUPPORTED_TOOL_NAMES.includes(tool.name as ToolName)) {
-        this.registry.set(tool.name as ToolName, tool);
-      }
-    }
-  }
+  private readonly marketData = new MarketDataService();
+  private readonly backend = new LocalFinanceAgentBackend({
+    marketData: this.marketData,
+  });
 
   getTools() {
-    return SUPPORTED_TOOL_NAMES.map((name) => this.registry.get(name))
-      .filter((tool): tool is Tool => Boolean(tool))
-      .map((tool) => ({
-        name: tool.name,
-        label: tool.label,
-        description: tool.description,
-        parameters: tool.parameters,
-      }));
+    return this.backend.getTools();
   }
 
-  async send(message: unknown): Promise<AgentReply> {
-    const text = extractMessageText(message);
-    const symbol = extractSymbol(text);
-    const normalized = text.toLowerCase();
-
-    if (hasAny(text, ['portfolio', '持仓', '组合'])) {
-      const result = await this.callTool('get_portfolio', {});
-      return toAgentReply('get_portfolio', result);
-    }
-
-    if (symbol && (normalized.includes('kline') || text.includes('K线') || text.includes('k线'))) {
-      const result = await this.callTool('get_kline', { symbol });
-      return toAgentReply('get_kline', result);
-    }
-
-    if (symbol && hasAny(text, ['quote', '行情', '价格'])) {
-      const result = await this.callTool('get_quote', { symbol });
-      return toAgentReply('get_quote', result);
-    }
-
-    return { content: FRIENDLY_UNSUPPORTED };
+  async send(message: unknown) {
+    return this.backend.send({
+      sessionId: extractSessionId(message),
+      content: extractMessageText(message),
+    });
   }
 
   getQuote(symbol: unknown) {
-    return getQuote(requireString(symbol, 'symbol'));
+    return this.marketData.getQuote(requireString(symbol, 'symbol'));
   }
 
   getKline(input: unknown) {
@@ -112,7 +56,7 @@ export class AgentGateway {
       payload.limit = request.limit;
     }
 
-    return getKline({
+    return this.marketData.getKline({
       symbol: payload.symbol,
       period: payload.period as '1m' | '5m' | '15m' | '1h' | '1d' | '1w' | undefined,
       limit: payload.limit,
@@ -120,11 +64,11 @@ export class AgentGateway {
   }
 
   getPortfolio() {
-    return getPortfolio();
+    return this.marketData.getPortfolio();
   }
 
   async getLongBridgeStatus() {
-    const status = await getLongBridgeStatus();
+    const status = await this.marketData.getLongBridgeStatus();
     const message = status.available
       ? 'LongBridge CLI is installed and authenticated.'
       : status.error?.message ?? 'LongBridge CLI is not ready.';
@@ -159,14 +103,6 @@ export class AgentGateway {
     return alerts;
   }
 
-  private async callTool(name: ToolName, params: Record<string, unknown>) {
-    const tool = this.registry.get(name);
-    if (!tool) {
-      throw createCodeError('TOOL_NOT_FOUND', `Tool is not registered: ${name}`);
-    }
-
-    return tool.execute(`${name}-${Date.now()}`, params, new AbortController().signal);
-  }
 }
 
 function getLongBridgeStatusAction(status: string) {
@@ -248,30 +184,14 @@ function extractMessageText(message: unknown): string {
   return '';
 }
 
-function extractSymbol(text: string) {
-  return text.match(SYMBOL_REGEX)?.[0].toUpperCase();
-}
-
-function hasAny(text: string, needles: string[]) {
-  const normalized = text.toLowerCase();
-  return needles.some((needle) => normalized.includes(needle.toLowerCase()));
-}
-
-function extractToolText(result: ToolResult) {
-  return result.content
-    .filter((item) => item.type === 'text')
-    .map((item) => item.text)
-    .join('\n');
-}
-
-function toAgentReply(toolName: ToolName, result: ToolResult): AgentReply {
-  return {
-    content: extractToolText(result),
-    tool: toolName,
-    toolName,
-    result,
-    details: result,
-  };
+function extractSessionId(message: unknown): string | undefined {
+  if (message && typeof message === 'object') {
+    const record = message as Record<string, unknown>;
+    if (typeof record.sessionId === 'string') {
+      return record.sessionId;
+    }
+  }
+  return undefined;
 }
 
 function requireString(value: unknown, field: string) {

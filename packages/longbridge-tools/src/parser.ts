@@ -33,13 +33,14 @@ interface RawPortfolioResponse {
 }
 
 interface RawKlineResponse {
-  symbol: string;
-  timestamp: number;
-  open: number;
-  high: number;
-  low: number;
-  close: number;
-  volume: number;
+  symbol?: string;
+  timestamp?: number | string;
+  time?: number | string;
+  open: number | string;
+  high: number | string;
+  low: number | string;
+  close: number | string;
+  volume: number | string;
 }
 
 export function parseQuoteResponse(output: string): Quote {
@@ -101,17 +102,17 @@ export function parsePortfolioResponse(output: string): Portfolio {
   }
 }
 
-export function parseKlineResponse(output: string): Kline[] {
+export function parseKlineResponse(output: string, fallbackSymbol = ''): Kline[] {
   try {
     const data: RawKlineResponse[] = JSON.parse(output);
     return data.map((k) => ({
-      symbol: k.symbol,
-      timestamp: k.timestamp,
-      open: k.open,
-      high: k.high,
-      low: k.low,
-      close: k.close,
-      volume: k.volume,
+      symbol: k.symbol ?? fallbackSymbol,
+      timestamp: toTimestamp(k.timestamp ?? k.time),
+      open: toNumber(k.open, 'open'),
+      high: toNumber(k.high, 'high'),
+      low: toNumber(k.low, 'low'),
+      close: toNumber(k.close, 'close'),
+      volume: toNumber(k.volume, 'volume'),
     }));
   } catch (e) {
     throw new LongBridgeError(`Failed to parse kline response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');

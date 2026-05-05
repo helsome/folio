@@ -130,8 +130,43 @@ export interface LongBridgeStatus {
 export interface AgentResponse {
   content: string;
   toolName?: string;
+  tool?: string;
+  result?: unknown;
   details?: unknown;
+  toolCalls?: ToolCallRecord[];
+  session?: AgentSessionSnapshot;
 }
+
+export interface AgentRequest {
+  sessionId?: string;
+  content: string;
+  createdAt?: number;
+}
+
+export interface AgentSessionSnapshot {
+  id: string;
+  recentSymbols: string[];
+  lastIntent?: string;
+  lastError?: ApiError;
+  toolCalls: ToolCallRecord[];
+}
+
+export interface ToolCallRecord {
+  id: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  startedAt: number;
+  completedAt?: number;
+  status: 'success' | 'error';
+  error?: ApiError;
+}
+
+export interface AgentBackend {
+  getTools: () => ToolDefinition[];
+  send: (request: AgentRequest | string) => Promise<AgentResponse>;
+}
+
+export type AgentBackendProvider = 'local' | 'pi-runtime';
 
 export interface KlineRequest {
   symbol: string;

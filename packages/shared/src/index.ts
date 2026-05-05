@@ -100,4 +100,11 @@ export function getStoragePath(filename: string): string {
 }
 
 // Re-export storage utilities
-export { loadAlerts, saveAlerts, addAlert, removeAlert, updateAlert } from './storage/alerts';
+export { loadAlerts, saveAlerts, addAlert, removeAlert, updateAlert } from './storage/alerts.ts';
+export {
+  createAgentBackend,
+  LocalFinanceAgentBackend,
+  FinanceToolRegistry,
+  MarketDataService,
+  routeFinanceIntent,
+} from './agent/backend-factory.ts';

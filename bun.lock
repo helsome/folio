@@ -69,6 +69,9 @@
       "name": "@finagent/shared",
       "version": "0.1.0",
       "dependencies": {
+        "@finagent/core": "workspace:*",
+        "@finagent/longbridge-tools": "workspace:*",
+        "@finagent/pi-extension": "workspace:*",
         "zod": "^3.23.0",
       },
       "devDependencies": {

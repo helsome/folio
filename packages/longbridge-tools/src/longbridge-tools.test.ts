@@ -21,6 +21,7 @@ mock.module('execa', () => ({
 const {
   executeLongBridge,
   getLongBridgeStatus,
+  getKline,
   getPortfolio,
   getQuote,
   parseQuoteResponse,
@@ -69,6 +70,30 @@ const portfolioJson = JSON.stringify({
   ],
 });
 
+const klineJson = JSON.stringify([
+  {
+    symbol: 'AAPL.US',
+    timestamp: 1710000000,
+    open: 190,
+    high: 200,
+    low: 180,
+    close: 195,
+    volume: 12345,
+  },
+]);
+
+const longBridgeKlineJson = JSON.stringify([
+  {
+    close: '278.780',
+    high: '279.750',
+    low: '276.440',
+    open: '277.750',
+    time: '2025-12-10 05:00:00',
+    turnover: '9200505094.000',
+    volume: '33038318',
+  },
+]);
+
 beforeEach(() => {
   execaMock.mockClear();
   execaHandler = async () => ({ stdout: '' });
@@ -91,6 +116,16 @@ describe('LongBridge command execution', () => {
     await getPortfolio();
 
     expect(execaMock).toHaveBeenCalledWith('longbridge', ['portfolio', '--format', 'json'], {
+      timeout: 30000,
+    });
+  });
+
+  it('does not pass unsupported limit arguments to the kline command', async () => {
+    execaHandler = async () => ({ stdout: klineJson });
+
+    await getKline({ symbol: 'AAPL.US', period: '1d', limit: 5 });
+
+    expect(execaMock).toHaveBeenCalledWith('longbridge', ['kline', 'AAPL.US', '--period', '1d', '--format', 'json'], {
       timeout: 30000,
     });
   });
@@ -190,6 +225,21 @@ describe('LongBridge parsing', () => {
       open: 279.655,
       volume: 46668401,
     });
+  });
+
+  it('parses LongBridge kline array responses with string prices', async () => {
+    execaHandler = async () => ({ stdout: longBridgeKlineJson });
+
+    await expect(getKline({ symbol: 'AAPL.US', period: '1d', limit: 1 })).resolves.toEqual([
+      expect.objectContaining({
+        symbol: 'AAPL.US',
+        open: 277.75,
+        high: 279.75,
+        low: 276.44,
+        close: 278.78,
+        volume: 33038318,
+      }),
+    ]);
   });
 });
 

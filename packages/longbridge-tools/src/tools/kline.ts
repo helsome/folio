@@ -20,10 +20,8 @@ export async function getKline(options: GetKlineOptions): Promise<Kline[]> {
   const args = ['kline', symbol, '--period', period, '--format', 'json'];
   if (start) args.push('--start', String(start));
   if (end) args.push('--end', String(end));
-  args.push('--limit', String(limit));
-
   const output = await executeLongBridge(args);
-  return parseKlineResponse(output);
+  return parseKlineResponse(output, symbol).slice(-limit);
 }
 
 export interface GetIntradayOptions {
