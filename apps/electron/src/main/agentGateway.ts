@@ -130,9 +130,7 @@ export class AgentGateway {
       : status.error?.message ?? 'LongBridge CLI is not ready.';
     const action = status.available
       ? undefined
-      : status.status === 'not_installed'
-      ? 'Install LongBridge CLI, then run longbridge auth login.'
-      : 'Run longbridge auth login and retry.';
+      : getLongBridgeStatusAction(status.status);
 
     return {
       ...status,
@@ -169,6 +167,22 @@ export class AgentGateway {
 
     return tool.execute(`${name}-${Date.now()}`, params, new AbortController().signal);
   }
+}
+
+function getLongBridgeStatusAction(status: string) {
+  if (status === 'not_installed') {
+    return 'Install LongBridge CLI, then run longbridge auth login.';
+  }
+  if (status === 'not_authed') {
+    return 'Run longbridge auth login and retry.';
+  }
+  if (status === 'rate_limited') {
+    return 'Wait a moment before retrying LongBridge requests.';
+  }
+  if (status === 'timeout') {
+    return 'Check your network connection and retry.';
+  }
+  return 'Check LongBridge CLI status and retry.';
 }
 
 export function toIpcError(error: unknown): IpcFailure['error'] {

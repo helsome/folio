@@ -44,9 +44,22 @@ export function normalizeLongBridgeError(error: unknown): LongBridgeError {
       return new LongBridgeError('LongBridge command timed out', 'LONGBRIDGE_TIMEOUT');
     }
     if (
+      details.includes('429002') ||
+      details.includes('rate limited') ||
+      details.includes('request is limited') ||
+      details.includes('slow down request frequency')
+    ) {
+      return new LongBridgeError(
+        'LongBridge API rate limit reached. Wait a moment and retry.',
+        'LONGBRIDGE_RATE_LIMITED'
+      );
+    }
+    if (
       details.includes('not authenticated') ||
+      details.includes('authentication failed') ||
       details.includes('auth required') ||
       details.includes('unauthorized') ||
+      details.includes('oauth failed') ||
       details.includes('please login') ||
       details.includes('please log in')
     ) {

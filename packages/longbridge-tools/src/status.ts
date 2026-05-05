@@ -5,6 +5,7 @@ export type LongBridgeStatusValue =
   | 'available'
   | 'not_installed'
   | 'not_authed'
+  | 'rate_limited'
   | 'timeout'
   | 'unknown';
 
@@ -26,6 +27,9 @@ function errorStatus(error: LongBridgeError): Pick<LongBridgeStatus, 'status' | 
   if (error.code === 'LONGBRIDGE_NOT_AUTHED') {
     return { status: 'not_authed', error: { code: error.code, message: error.message } };
   }
+  if (error.code === 'LONGBRIDGE_RATE_LIMITED') {
+    return { status: 'rate_limited', error: { code: error.code, message: error.message } };
+  }
   if (error.code === 'LONGBRIDGE_TIMEOUT') {
     return { status: 'timeout', error: { code: error.code, message: error.message } };
   }
@@ -46,7 +50,7 @@ export async function getLongBridgeStatus(): Promise<LongBridgeStatus> {
   }
 
   try {
-    await executeLongBridge(['portfolio', '--format', 'json'], { timeout: 5000 });
+    await executeLongBridge(['quote', 'AAPL.US', '--format', 'json'], { timeout: 5000 });
     return {
       installed: true,
       authed: true,
@@ -55,9 +59,10 @@ export async function getLongBridgeStatus(): Promise<LongBridgeStatus> {
     };
   } catch (error) {
     const status = errorStatus(error as LongBridgeError);
+    const authed = status.status === 'rate_limited';
     return {
       installed: true,
-      authed: false,
+      authed,
       available: false,
       ...status,
     };

@@ -57,10 +57,11 @@ const LongBridgeBanner: React.FC = () => {
 
   const message = error ?? status?.message ?? 'LongBridge CLI status is unavailable.';
   const action = status?.action ?? 'Install LongBridge CLI and run longbridge auth login.';
+  const title = status?.status === 'rate_limited' ? 'LongBridge paused: ' : 'LongBridge setup needed: ';
 
   return (
     <div className="border-b border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-[oklch(var(--text-primary))]">
-      <span className="font-medium">LongBridge setup needed: </span>
+      <span className="font-medium">{title}</span>
       <span>{message}</span>
       <span className="ml-2 text-[oklch(var(--text-secondary))]">{action}</span>
     </div>

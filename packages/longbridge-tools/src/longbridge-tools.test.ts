@@ -140,6 +140,32 @@ describe('LongBridge errors', () => {
     });
   });
 
+  it('normalizes OAuth authentication failures', async () => {
+    execaHandler = async () => {
+      throw Object.assign(new Error('Command failed'), {
+        stderr: 'Authentication failed: OAuth failed: failed to bind callback server on port 60355',
+      });
+    };
+
+    await expect(executeLongBridge(['quote', 'AAPL.US', '--format', 'json'])).rejects.toMatchObject({
+      name: 'LongBridgeError',
+      code: 'LONGBRIDGE_NOT_AUTHED',
+    });
+  });
+
+  it('normalizes LongBridge rate limit failures', async () => {
+    execaHandler = async () => {
+      throw Object.assign(new Error('Command failed'), {
+        stderr: 'Error: API error (code 429002): api request is limited, please slow down request frequency',
+      });
+    };
+
+    await expect(executeLongBridge(['quote', 'AAPL.US', '--format', 'json'])).rejects.toMatchObject({
+      name: 'LongBridgeError',
+      code: 'LONGBRIDGE_RATE_LIMITED',
+    });
+  });
+
   it('normalizes parse failures', () => {
     expect(() => parseQuoteResponse('not json')).toThrow(LongBridgeError);
     try {
@@ -171,7 +197,7 @@ describe('LongBridge status', () => {
   it('reports available when the CLI is installed and auth check succeeds', async () => {
     execaHandler = async (_command, args) => {
       if (args[0] === '--version') return { stdout: 'longbridge 1.0.0' };
-      if (args[0] === 'portfolio') return { stdout: portfolioJson };
+      if (args[0] === 'quote') return { stdout: longBridgeQuoteArrayJson };
       throw new Error(`Unexpected args: ${args.join(' ')}`);
     };
 
@@ -182,7 +208,7 @@ describe('LongBridge status', () => {
       status: 'available',
     });
     expect(execaMock).toHaveBeenNthCalledWith(1, 'longbridge', ['--version'], { timeout: 5000 });
-    expect(execaMock).toHaveBeenNthCalledWith(2, 'longbridge', ['portfolio', '--format', 'json'], {
+    expect(execaMock).toHaveBeenNthCalledWith(2, 'longbridge', ['quote', 'AAPL.US', '--format', 'json'], {
       timeout: 5000,
     });
   });
@@ -218,6 +244,23 @@ describe('LongBridge status', () => {
       available: false,
       status: 'not_authed',
       error: { code: 'LONGBRIDGE_NOT_AUTHED' },
+    });
+  });
+
+  it('reports rate limited without suggesting authentication is missing', async () => {
+    execaHandler = async (_command, args) => {
+      if (args[0] === '--version') return { stdout: 'longbridge 1.0.0' };
+      throw Object.assign(new Error('Command failed'), {
+        stderr: 'Error: API error (code 429002): api request is limited, please slow down request frequency',
+      });
+    };
+
+    await expect(getLongBridgeStatus()).resolves.toMatchObject({
+      installed: true,
+      authed: true,
+      available: false,
+      status: 'rate_limited',
+      error: { code: 'LONGBRIDGE_RATE_LIMITED' },
     });
   });
 });

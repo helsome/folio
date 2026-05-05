@@ -78,7 +78,7 @@ export const fetchQuoteAtom = atom(
         loading: false,
         error: errorMessage,
       }));
-      throw error;
+      return null;
     }
   }
 );

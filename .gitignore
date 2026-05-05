@@ -11,6 +11,7 @@ packages/*/dist
 
 # Claude local session artifacts
 .claude/logs
+**/.claude/logs
 .claude/session-context-*.md
 
 # OS/editor noise
