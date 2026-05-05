@@ -1,4 +1,5 @@
 export * from './atoms';
+export * from './client';
 export * from './components/primitives/Button';
 export * from './components/primitives/Input';
 export * from './components/primitives/Dialog';

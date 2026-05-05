@@ -7,10 +7,21 @@ export interface ElectronAPI {
     close: () => Promise<void>;
     isMaximized: () => Promise<boolean>;
   };
-  piAgent: {
+  agent: {
     send: (message: unknown) => Promise<unknown>;
-    getTools: () => Promise<unknown[]>;
-    onResponse: (callback: (response: unknown) => void) => () => void;
+    getTools: () => Promise<unknown>;
+  };
+  market: {
+    getQuote: (symbol: string) => Promise<unknown>;
+    getKline: (request: { symbol: string; period?: string; limit?: number }) => Promise<unknown>;
+    getPortfolio: () => Promise<unknown>;
+  };
+  longbridge: {
+    getStatus: () => Promise<unknown>;
+  };
+  alerts: {
+    load: () => Promise<unknown>;
+    save: (alerts: unknown) => Promise<unknown>;
   };
 }
 
@@ -21,14 +32,22 @@ const electronAPI: ElectronAPI = {
     close: () => ipcRenderer.invoke('window:close'),
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
   },
-  piAgent: {
-    send: (message: unknown) => ipcRenderer.invoke('pi-agent:send', message),
-    getTools: () => ipcRenderer.invoke('pi-agent:getTools'),
-    onResponse: (callback: (response: unknown) => void) => {
-      const handler = (_event: Electron.IpcRendererEvent, response: unknown) => callback(response);
-      ipcRenderer.on('pi-agent:response', handler);
-      return () => ipcRenderer.removeListener('pi-agent:response', handler);
-    },
+  agent: {
+    send: (message: unknown) => ipcRenderer.invoke('agent:send', message),
+    getTools: () => ipcRenderer.invoke('agent:getTools'),
+  },
+  market: {
+    getQuote: (symbol: string) => ipcRenderer.invoke('market:getQuote', symbol),
+    getKline: (request: { symbol: string; period?: string; limit?: number }) =>
+      ipcRenderer.invoke('market:getKline', request),
+    getPortfolio: () => ipcRenderer.invoke('market:getPortfolio'),
+  },
+  longbridge: {
+    getStatus: () => ipcRenderer.invoke('longbridge:getStatus'),
+  },
+  alerts: {
+    load: () => ipcRenderer.invoke('alerts:load'),
+    save: (alerts: unknown) => ipcRenderer.invoke('alerts:save', alerts),
   },
 };
 

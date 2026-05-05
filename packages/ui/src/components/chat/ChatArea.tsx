@@ -1,11 +1,13 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { useAtom, useSetAtom } from 'jotai';
-import { activeMessagesAtom, addMessageAtom, activeSessionIdAtom, createSessionAtom } from '@finagent/ui';
+import { activeMessagesAtom, addMessageAtom, activeSessionIdAtom, createSessionAtom } from '../../atoms';
+import { useFinagentClient } from '../../client';
 import { MessageList } from './MessageList';
 import { Button } from '../primitives/Button';
 import type { Message } from '@finagent/core';
 
 export const ChatArea: React.FC = () => {
+  const client = useFinagentClient();
   const [messages] = useAtom(activeMessagesAtom);
   const addMessage = useSetAtom(addMessageAtom);
   const [activeSessionId] = useAtom(activeSessionIdAtom);
@@ -37,17 +39,14 @@ export const ChatArea: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // TODO: Send to Pi Agent
-      const response = await window.electronAPI?.piAgent.send({
-        type: 'chat',
-        content: input.trim(),
-      });
+      const response = await client.agent.send(input.trim());
 
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: typeof response === 'string' ? response : JSON.stringify(response),
+        content: response.ok ? response.data.content : response.error.message,
         timestamp: Date.now(),
+        toolName: response.ok ? response.data.toolName : undefined,
       };
 
       addMessage(assistantMessage);

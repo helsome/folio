@@ -4,6 +4,9 @@
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
+  "scripts": {
+    "test": "bun test"
+  },
   "exports": {
     ".": "./src/index.ts"
   },

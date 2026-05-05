@@ -1,6 +1,6 @@
 import { atom } from 'jotai';
-import { atomFamily } from 'jotai/utils';
 import type { Portfolio } from '@finagent/core';
+import type { FinagentClient } from '../client';
 
 const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
@@ -20,7 +20,7 @@ export const portfolioCacheAtom = atom<PortfolioCache>({
 
 export const fetchPortfolioAtom = atom(
   null,
-  async (get, set) => {
+  async (_get, set, client: FinagentClient) => {
     set(portfolioCacheAtom, (cache) => ({
       ...cache,
       loading: true,
@@ -28,8 +28,11 @@ export const fetchPortfolioAtom = atom(
     }));
 
     try {
-      const { getPortfolio } = await import('@finagent/longbridge-tools');
-      const portfolio = await getPortfolio();
+      const result = await client.market.getPortfolio();
+      if (!result.ok) {
+        throw new Error(result.error.message);
+      }
+      const portfolio = result.data;
 
       set(portfolioCacheAtom, {
         data: portfolio,

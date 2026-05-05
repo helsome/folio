@@ -6,13 +6,16 @@ import {
   fetchQuoteAtom,
   addToWatchlistAtom,
   removeFromWatchlistAtom,
-} from '@finagent/ui';
+} from '../../atoms';
+import { useFinagentClient } from '../../client';
 import { StockCard } from './StockCard';
 import { Input } from '../primitives/Input';
 import { Button } from '../primitives/Button';
-import { validateSymbol } from '@finagent/longbridge-tools';
+
+const SYMBOL_REGEX = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
 
 export const Watchlist: React.FC = () => {
+  const client = useFinagentClient();
   const [watchlist] = useAtom(watchlistAtom);
   const addSymbol = useSetAtom(addToWatchlistAtom);
   const removeSymbol = useSetAtom(removeFromWatchlistAtom);
@@ -25,7 +28,7 @@ export const Watchlist: React.FC = () => {
     const symbol = newSymbol.trim().toUpperCase();
     if (!symbol) return;
 
-    if (!validateSymbol(symbol)) {
+    if (!SYMBOL_REGEX.test(symbol)) {
       setError('Invalid symbol format. Use: AAPL.US, 0700.HK');
       return;
     }
@@ -77,6 +80,7 @@ export const Watchlist: React.FC = () => {
           <WatchlistItem
             key={symbol}
             symbol={symbol}
+            client={client}
             onRemove={() => removeSymbol(symbol)}
           />
         ))}
@@ -93,19 +97,20 @@ export const Watchlist: React.FC = () => {
 
 interface WatchlistItemProps {
   symbol: string;
+  client: ReturnType<typeof useFinagentClient>;
   onRemove: () => void;
 }
 
-const WatchlistItem: React.FC<WatchlistItemProps> = ({ symbol, onRemove }) => {
-  const [cache, setCache] = useAtom(quoteCacheAtomFamily(symbol));
+const WatchlistItem: React.FC<WatchlistItemProps> = ({ symbol, client, onRemove }) => {
+  const [cache] = useAtom(quoteCacheAtomFamily(symbol));
   const fetchQuote = useSetAtom(fetchQuoteAtom);
 
   useEffect(() => {
-    fetchQuote(symbol);
+    fetchQuote({ client, symbol });
     // Refresh every 30 seconds
-    const interval = setInterval(() => fetchQuote(symbol), 30000);
+    const interval = setInterval(() => fetchQuote({ client, symbol }), 30000);
     return () => clearInterval(interval);
-  }, [symbol, fetchQuote]);
+  }, [client, symbol, fetchQuote]);
 
   if (cache.loading && !cache.data) {
     return (

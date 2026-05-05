@@ -3,6 +3,7 @@ export type ErrorCode =
   | 'LONGBRIDGE_NOT_AUTHED'
   | 'LONGBRIDGE_TIMEOUT'
   | 'INVALID_SYMBOL'
+  | 'LONGBRIDGE_PARSE_FAILURE'
   | 'LONGBRIDGE_UNKNOWN';
 
 export class LongBridgeError extends Error {

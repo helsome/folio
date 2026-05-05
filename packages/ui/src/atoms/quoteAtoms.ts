@@ -1,6 +1,7 @@
 import { atom } from 'jotai';
 import { atomFamily } from 'jotai/utils';
 import type { Quote } from '@finagent/core';
+import type { FinagentClient } from '../client';
 
 const CACHE_TTL = 30 * 1000; // 30 seconds
 
@@ -46,7 +47,8 @@ export const removeFromWatchlistAtom = atom(
 // Fetch quote action
 export const fetchQuoteAtom = atom(
   null,
-  async (get, set, symbol: string) => {
+  async (_get, set, input: { client: FinagentClient; symbol: string }) => {
+    const { client, symbol } = input;
     // Set loading state
     set(quoteCacheAtomFamily(symbol), (cache) => ({
       ...cache,
@@ -55,8 +57,11 @@ export const fetchQuoteAtom = atom(
     }));
 
     try {
-      const { getQuote } = await import('@finagent/longbridge-tools');
-      const quote = await getQuote(symbol);
+      const result = await client.market.getQuote(symbol);
+      if (!result.ok) {
+        throw new Error(result.error.message);
+      }
+      const quote = result.data;
 
       set(quoteCacheAtomFamily(symbol), {
         data: quote,

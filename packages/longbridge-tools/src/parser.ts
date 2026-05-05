@@ -57,7 +57,7 @@ export function parseQuoteResponse(output: string): Quote {
       prevClose: data.prev_close,
     };
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse quote response: ${output}`, 'LONGBRIDGE_UNKNOWN');
+    throw new LongBridgeError(`Failed to parse quote response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
   }
 }
 
@@ -79,7 +79,10 @@ export function parsePortfolioResponse(output: string): Portfolio {
       })),
     };
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse portfolio response: ${output}`, 'LONGBRIDGE_UNKNOWN');
+    throw new LongBridgeError(
+      `Failed to parse portfolio response: ${output}`,
+      'LONGBRIDGE_PARSE_FAILURE'
+    );
   }
 }
 
@@ -96,7 +99,7 @@ export function parseKlineResponse(output: string): Kline[] {
       volume: k.volume,
     }));
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse kline response: ${output}`, 'LONGBRIDGE_UNKNOWN');
+    throw new LongBridgeError(`Failed to parse kline response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
   }
 }
 
@@ -110,6 +113,9 @@ export function parseIntradayResponse(output: string): IntradayData[] {
       volume: d.volume,
     }));
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse intraday response: ${output}`, 'LONGBRIDGE_UNKNOWN');
+    throw new LongBridgeError(
+      `Failed to parse intraday response: ${output}`,
+      'LONGBRIDGE_PARSE_FAILURE'
+    );
   }
 }

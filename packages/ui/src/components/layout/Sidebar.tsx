@@ -4,8 +4,7 @@ import {
   sessionsAtom,
   activeSessionIdAtom,
   createSessionAtom,
-  watchlistAtom,
-} from '@finagent/ui';
+} from '../../atoms';
 import { Watchlist } from '../stock/Watchlist';
 
 export const Sidebar: React.FC = () => {

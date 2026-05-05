@@ -6,7 +6,8 @@ import {
   toggleAlertAtom,
   removeAlertAtom,
   addAlertAtom,
-} from '@finagent/ui';
+} from '../../atoms';
+import { useFinagentClient } from '../../client';
 import { AlertCard } from './AlertCard';
 import { AlertForm } from './AlertForm';
 import { Button } from '../primitives/Button';
@@ -14,6 +15,7 @@ import { Dialog } from '../primitives/Dialog';
 import type { Alert } from '@finagent/core';
 
 export const AlertList: React.FC = () => {
+  const client = useFinagentClient();
   const [state] = useAtom(alertStateAtom);
   const loadAlerts = useSetAtom(loadAlertsAtom);
   const toggleAlert = useSetAtom(toggleAlertAtom);
@@ -23,8 +25,8 @@ export const AlertList: React.FC = () => {
   const [showForm, setShowForm] = useState(false);
 
   useEffect(() => {
-    loadAlerts();
-  }, [loadAlerts]);
+    loadAlerts(client);
+  }, [client, loadAlerts]);
 
   const handleCreateAlert = (alertData: Omit<Alert, 'id' | 'createdAt' | 'triggered'>) => {
     const alert: Alert = {
@@ -33,7 +35,7 @@ export const AlertList: React.FC = () => {
       createdAt: Date.now(),
       triggered: false,
     };
-    addAlert(alert);
+    addAlert({ client, alert });
     setShowForm(false);
   };
 
@@ -84,8 +86,8 @@ export const AlertList: React.FC = () => {
               <AlertCard
                 key={alert.id}
                 alert={alert}
-                onToggle={() => toggleAlert(alert.id)}
-                onRemove={() => removeAlert(alert.id)}
+                onToggle={() => toggleAlert({ client, alertId: alert.id })}
+                onRemove={() => removeAlert({ client, alertId: alert.id })}
               />
             ))}
           </>
@@ -101,8 +103,8 @@ export const AlertList: React.FC = () => {
               <AlertCard
                 key={alert.id}
                 alert={alert}
-                onToggle={() => toggleAlert(alert.id)}
-                onRemove={() => removeAlert(alert.id)}
+                onToggle={() => toggleAlert({ client, alertId: alert.id })}
+                onRemove={() => removeAlert({ client, alertId: alert.id })}
               />
             ))}
           </>

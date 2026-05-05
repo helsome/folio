@@ -1,7 +1,9 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { join } from 'path';
+import { AgentGateway, toIpcResult } from './agentGateway';
 
 let mainWindow: BrowserWindow | null = null;
+const agentGateway = new AgentGateway();
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -60,14 +62,35 @@ ipcMain.handle('window:close', () => mainWindow?.close());
 
 ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized());
 
-// Pi Agent communication IPC
-ipcMain.handle('pi-agent:send', async (_event, message: unknown) => {
-  // TODO: Integrate with Pi Agent
-  console.log('Pi Agent message:', message);
-  return { success: true };
-});
+// Finance Agent MVP IPC
+ipcMain.handle('agent:send', async (_event, message: unknown) =>
+  toIpcResult(() => agentGateway.send(message))
+);
 
-ipcMain.handle('pi-agent:getTools', async () => {
-  // TODO: Return registered tools from pi-extension
-  return [];
-});
+ipcMain.handle('agent:getTools', async () =>
+  toIpcResult(() => agentGateway.getTools())
+);
+
+ipcMain.handle('market:getQuote', async (_event, symbol: unknown) =>
+  toIpcResult(() => agentGateway.getQuote(symbol))
+);
+
+ipcMain.handle('market:getKline', async (_event, request: unknown) =>
+  toIpcResult(() => agentGateway.getKline(request))
+);
+
+ipcMain.handle('market:getPortfolio', async () =>
+  toIpcResult(() => agentGateway.getPortfolio())
+);
+
+ipcMain.handle('longbridge:getStatus', async () =>
+  toIpcResult(() => agentGateway.getLongBridgeStatus())
+);
+
+ipcMain.handle('alerts:load', async () =>
+  toIpcResult(() => agentGateway.loadAlerts())
+);
+
+ipcMain.handle('alerts:save', async (_event, alerts: unknown) =>
+  toIpcResult(() => agentGateway.saveAlerts(alerts))
+);

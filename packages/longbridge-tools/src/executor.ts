@@ -1,5 +1,5 @@
 import { execa } from 'execa';
-import { LongBridgeError } from './errors';
+import { LongBridgeError, isLongBridgeError } from './errors';
 
 export interface ExecutorOptions {
   timeout?: number;
@@ -17,17 +17,44 @@ export async function executeLongBridge(
     });
     return stdout;
   } catch (error) {
-    if (error instanceof Error) {
-      if (error.message.includes('ENOENT')) {
-        throw new LongBridgeError('Run installation script', 'LONGBRIDGE_NOT_INSTALLED');
-      }
-      if (error.message.includes('timeout')) {
-        throw new LongBridgeError('Check network or retry', 'LONGBRIDGE_TIMEOUT');
-      }
-      if (error.message.includes('not authenticated')) {
-        throw new LongBridgeError('Run longbridge auth login', 'LONGBRIDGE_NOT_AUTHED');
-      }
-    }
-    throw error;
+    throw normalizeLongBridgeError(error);
   }
+}
+
+interface ExecaLikeError extends Error {
+  code?: string;
+  timedOut?: boolean;
+  stderr?: string;
+  stdout?: string;
+}
+
+export function normalizeLongBridgeError(error: unknown): LongBridgeError {
+  if (isLongBridgeError(error)) {
+    return error;
+  }
+
+  if (error instanceof Error) {
+    const execaError = error as ExecaLikeError;
+    const details = `${error.message}\n${execaError.stderr ?? ''}\n${execaError.stdout ?? ''}`.toLowerCase();
+
+    if (execaError.code === 'ENOENT' || details.includes('enoent')) {
+      return new LongBridgeError('LongBridge CLI is not installed or not on PATH', 'LONGBRIDGE_NOT_INSTALLED');
+    }
+    if (execaError.timedOut || details.includes('timed out') || details.includes('timeout')) {
+      return new LongBridgeError('LongBridge command timed out', 'LONGBRIDGE_TIMEOUT');
+    }
+    if (
+      details.includes('not authenticated') ||
+      details.includes('auth required') ||
+      details.includes('unauthorized') ||
+      details.includes('please login') ||
+      details.includes('please log in')
+    ) {
+      return new LongBridgeError('LongBridge authentication is required', 'LONGBRIDGE_NOT_AUTHED');
+    }
+
+    return new LongBridgeError(error.message, 'LONGBRIDGE_UNKNOWN');
+  }
+
+  return new LongBridgeError('Unknown LongBridge failure', 'LONGBRIDGE_UNKNOWN');
 }

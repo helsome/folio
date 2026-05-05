@@ -102,6 +102,43 @@ export interface ToolDefinition {
   parameters: Record<string, unknown>;
 }
 
+export interface ApiError {
+  code: string;
+  message: string;
+  action?: string;
+}
+
+export type ApiResult<T> =
+  | { ok: true; data: T }
+  | { ok: false; error: ApiError };
+
+export interface LongBridgeStatus {
+  installed: boolean;
+  authed?: boolean;
+  authenticated: boolean;
+  available: boolean;
+  status?: string;
+  code?: string;
+  error?: {
+    code: string;
+    message: string;
+  };
+  message: string;
+  action?: string;
+}
+
+export interface AgentResponse {
+  content: string;
+  toolName?: string;
+  details?: unknown;
+}
+
+export interface KlineRequest {
+  symbol: string;
+  period?: '1m' | '5m' | '15m' | '1h' | '1d' | '1w';
+  limit?: number;
+}
+
 export interface Skill {
   id: string;
   name: string;

@@ -1,11 +1,18 @@
 import { atom } from 'jotai';
-import { atomFamily } from 'jotai/utils';
 import type { Alert } from '@finagent/core';
+import type { FinagentClient } from '../client';
 
 interface AlertState {
   alerts: Alert[];
   loading: boolean;
   error: string | null;
+}
+
+async function persistAlerts(client: FinagentClient, alerts: Alert[]): Promise<void> {
+  const result = await client.alerts.save(alerts);
+  if (!result.ok) {
+    throw new Error(result.error.message);
+  }
 }
 
 export const alertStateAtom = atom<AlertState>({
@@ -17,35 +24,32 @@ export const alertStateAtom = atom<AlertState>({
 // Add new alert
 export const addAlertAtom = atom(
   null,
-  (get, set, alert: Alert) => {
-    set(alertStateAtom, (state) => ({
-      ...state,
-      alerts: [...state.alerts, alert],
-    }));
+  async (get, set, input: { client: FinagentClient; alert: Alert }) => {
+    const nextAlerts = [...get(alertStateAtom).alerts, input.alert];
+    set(alertStateAtom, (state) => ({ ...state, alerts: nextAlerts }));
+    await persistAlerts(input.client, nextAlerts);
   }
 );
 
 // Remove alert
 export const removeAlertAtom = atom(
   null,
-  (get, set, alertId: string) => {
-    set(alertStateAtom, (state) => ({
-      ...state,
-      alerts: state.alerts.filter((a) => a.id !== alertId),
-    }));
+  async (get, set, input: { client: FinagentClient; alertId: string }) => {
+    const nextAlerts = get(alertStateAtom).alerts.filter((a) => a.id !== input.alertId);
+    set(alertStateAtom, (state) => ({ ...state, alerts: nextAlerts }));
+    await persistAlerts(input.client, nextAlerts);
   }
 );
 
 // Toggle alert enabled state
 export const toggleAlertAtom = atom(
   null,
-  (get, set, alertId: string) => {
-    set(alertStateAtom, (state) => ({
-      ...state,
-      alerts: state.alerts.map((a) =>
-        a.id === alertId ? { ...a, enabled: !a.enabled } : a
-      ),
-    }));
+  async (get, set, input: { client: FinagentClient; alertId: string }) => {
+    const nextAlerts = get(alertStateAtom).alerts.map((alert) =>
+      alert.id === input.alertId ? { ...alert, enabled: !alert.enabled } : alert
+    );
+    set(alertStateAtom, (state) => ({ ...state, alerts: nextAlerts }));
+    await persistAlerts(input.client, nextAlerts);
   }
 );
 
@@ -65,16 +69,17 @@ export const triggerAlertAtom = atom(
 // Load alerts from storage
 export const loadAlertsAtom = atom(
   null,
-  async (get, set) => {
+  async (_get, set, client: FinagentClient) => {
     set(alertStateAtom, (state) => ({ ...state, loading: true, error: null }));
 
     try {
-      // Dynamic import to avoid circular deps
-      const { loadAlerts } = await import('@finagent/shared');
-      const alerts = await loadAlerts();
+      const result = await client.alerts.load();
+      if (!result.ok) {
+        throw new Error(result.error.message);
+      }
 
       set(alertStateAtom, {
-        alerts,
+        alerts: result.data,
         loading: false,
         error: null,
       });
@@ -91,11 +96,13 @@ export const loadAlertsAtom = atom(
 // Save alerts to storage
 export const saveAlertsAtom = atom(
   null,
-  async (get, set) => {
+  async (get, set, client: FinagentClient) => {
     const state = get(alertStateAtom);
     try {
-      const { saveAlerts } = await import('@finagent/shared');
-      await saveAlerts(state.alerts);
+      const result = await client.alerts.save(state.alerts);
+      if (!result.ok) {
+        throw new Error(result.error.message);
+      }
     } catch (error) {
       set(alertStateAtom, (state) => ({
         ...state,

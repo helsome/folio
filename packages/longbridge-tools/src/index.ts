@@ -1,6 +1,9 @@
 export { executeLongBridge } from './executor';
 export type { ExecutorOptions } from './executor';
 
+export { getLongBridgeStatus } from './status';
+export type { LongBridgeStatus, LongBridgeStatusValue } from './status';
+
 export { validateSymbol, validateSymbolOrThrow } from './validator';
 
 export { LongBridgeError, isLongBridgeError } from './errors';

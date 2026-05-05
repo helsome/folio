@@ -1,24 +1,26 @@
 import React, { useState, useEffect } from 'react';
+import { useFinagentClient } from '../../client';
 
 export const TitleBar: React.FC = () => {
+  const client = useFinagentClient();
   const [isMaximized, setIsMaximized] = useState(false);
 
   useEffect(() => {
     const checkMaximized = async () => {
-      if (window.electronAPI?.window) {
-        const maximized = await window.electronAPI.window.isMaximized();
+      if (client.window) {
+        const maximized = await client.window.isMaximized();
         setIsMaximized(maximized);
       }
     };
     checkMaximized();
-  }, []);
+  }, [client]);
 
-  const handleMinimize = () => window.electronAPI?.window.minimize();
+  const handleMinimize = () => client.window?.minimize();
   const handleMaximize = async () => {
-    await window.electronAPI?.window.maximize();
+    await client.window?.maximize();
     setIsMaximized(!isMaximized);
   };
-  const handleClose = () => window.electronAPI?.window.close();
+  const handleClose = () => client.window?.close();
 
   return (
     <header
