@@ -46,6 +46,10 @@ app.on('window-all-closed', () => {
   }
 });
 
+app.on('before-quit', () => {
+  void agentGateway.dispose();
+});
+
 app.on('activate', () => {
   if (BrowserWindow.getAllWindows().length === 0) {
     createWindow();

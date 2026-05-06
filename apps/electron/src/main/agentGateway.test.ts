@@ -30,19 +30,24 @@ class FakeMarketDataService {
 }
 
 class FakeLocalFinanceAgentBackend {
-  private readonly options: { marketData: FakeMarketDataService };
-
-  constructor(options: { marketData: FakeMarketDataService }) {
-    this.options = options;
-  }
-
-  getTools() {
-    return [{ name: 'get_quote', label: 'Get Quote', description: 'Quote', parameters: {} }];
+  async getTools() {
+    return {
+      ok: true,
+      data: [{ name: 'get_quote', label: 'Get Quote', description: 'Quote', parameters: {} }],
+    };
   }
 
   async send(request: unknown) {
     lastBackendRequest = request;
-    return { content: 'ok' };
+    return {
+      ok: true,
+      data: {
+        answer: 'ok',
+        content: 'ok',
+        toolCalls: [],
+        sessionSnapshot: { id: 's1', recentSymbols: [], toolCalls: [] },
+      },
+    };
   }
 }
 
@@ -59,7 +64,7 @@ mock.module('@finagent/shared', () => ({
       lastMarketData = this;
     }
   },
-  LocalFinanceAgentBackend: FakeLocalFinanceAgentBackend,
+  createAgentBackend: () => new FakeLocalFinanceAgentBackend(),
 }));
 
 const { AgentGateway } = await import('./agentGateway.ts');

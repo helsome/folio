@@ -3,8 +3,9 @@ import type {
   AgentRequest,
   AgentResponse,
   AgentSessionSnapshot,
-  ApiError,
+  ApiResult,
   ToolCallRecord,
+  ToolDefinition,
 } from '@finagent/core';
 import { FinanceToolRegistry, type FinanceToolName } from './finance-tool-registry.ts';
 import { routeFinanceIntent, unsupportedFinanceMessage } from './intent-router.ts';
@@ -29,20 +30,26 @@ export class LocalFinanceAgentBackend implements AgentBackend {
     this.now = options.now ?? Date.now;
   }
 
-  getTools() {
-    return this.registry.getTools();
+  async getTools(): Promise<ApiResult<ToolDefinition[]>> {
+    return { ok: true, data: this.registry.getTools() };
   }
 
-  async send(request: AgentRequest | string): Promise<AgentResponse> {
-    const normalized = normalizeAgentRequest(request);
-    const session = this.getSession(normalized.sessionId ?? 'default');
-    const routed = routeFinanceIntent(normalized.content, session);
+  async send(request: AgentRequest): Promise<ApiResult<AgentResponse>> {
+    const session = this.getSession(request.sessionId);
+    const routed = routeFinanceIntent(request.content, session);
 
     if (routed.intent === 'unsupported') {
       session.lastIntent = routed.intent;
+      const content = unsupportedFinanceMessage();
       return {
-        content: unsupportedFinanceMessage(),
-        session,
+        ok: true,
+        data: {
+          answer: content,
+          content,
+          session,
+          sessionSnapshot: session,
+          toolCalls: [],
+        },
       };
     }
 
@@ -59,9 +66,10 @@ export class LocalFinanceAgentBackend implements AgentBackend {
       if (routed.symbol) {
         rememberSymbol(session, routed.symbol);
       }
-      const response = composeToolResponse(toolName, result, toolCall);
+      toolCall.result = result.details;
+      const response = composeToolResponse(toolName, result, toolCall, session);
       response.session = session;
-      return response;
+      return { ok: true, data: response };
     } catch (error) {
       const apiError = toApiError(error);
       toolCall.status = 'error';
@@ -69,11 +77,16 @@ export class LocalFinanceAgentBackend implements AgentBackend {
       toolCall.error = apiError;
       session.lastError = apiError;
       return {
-        content: apiError.message,
-        tool: toolName,
-        toolName,
-        toolCalls: [toolCall],
-        session,
+        ok: true,
+        data: {
+          answer: apiError.message,
+          content: apiError.message,
+          tool: toolName,
+          toolName,
+          toolCalls: [toolCall],
+          session,
+          sessionSnapshot: session,
+        },
       };
     }
   }
@@ -106,13 +119,6 @@ export class LocalFinanceAgentBackend implements AgentBackend {
       status: 'success',
     };
   }
-}
-
-function normalizeAgentRequest(request: AgentRequest | string): AgentRequest {
-  if (typeof request === 'string') {
-    return { content: request };
-  }
-  return request;
 }
 
 function intentToToolName(intent: 'quote' | 'kline' | 'portfolio' | 'intraday'): FinanceToolName {

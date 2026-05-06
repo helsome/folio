@@ -1,23 +1,27 @@
 import { Type } from '@sinclair/typebox';
 import { getQuote } from '@finagent/longbridge-tools';
+import { normalizeSymbol, validateParams } from './validation.ts';
+
+const getQuoteParameters = Type.Object({
+  symbol: Type.String({
+    description: 'Stock symbol in format: AAPL.US, TSLA.US, 0700.HK, 600519.SH',
+    examples: ['AAPL.US', 'TSLA.US', '0700.HK'],
+  }),
+});
 
 export const getQuoteTool = {
   name: 'get_quote',
   label: 'Get Quote',
   description: 'Get real-time stock quote for a given symbol. Returns price, change, volume, and other quote data.',
-  parameters: Type.Object({
-    symbol: Type.String({
-      description: 'Stock symbol in format: AAPL.US, TSLA.US, 0700.HK, 600519.SH',
-      examples: ['AAPL.US', 'TSLA.US', '0700.HK'],
-    }),
-  }),
+  parameters: getQuoteParameters,
 
   async execute(
     toolCallId: string,
-    params: { symbol: string },
+    rawParams: { symbol: string },
     signal: AbortSignal
   ) {
-    const quote = await getQuote(params.symbol);
+    const params = validateParams<{ symbol: string }>(getQuoteParameters, rawParams);
+    const quote = await getQuote(normalizeSymbol(params.symbol));
 
     const changeEmoji = quote.change >= 0 ? '📈' : '📉';
     const changeStr = quote.change >= 0

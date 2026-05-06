@@ -119,10 +119,13 @@ describe('LocalFinanceAgentBackend', () => {
   it('answers quote requests and records session context', async () => {
     const backend = createBackend();
 
-    const response = await backend.send({
+    const result = await backend.send({
       sessionId: 's1',
       content: 'AAPL.US quote',
     });
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    const response = result.data;
 
     expect(response.toolName).toBe('get_quote');
     expect(response.content).toContain('AAPL.US');
@@ -138,8 +141,11 @@ describe('LocalFinanceAgentBackend', () => {
     const backend = createBackend();
 
     await backend.send({ sessionId: 's1', content: 'AAPL.US quote' });
-    const response = await backend.send({ sessionId: 's1', content: '看下走势' });
+    const result = await backend.send({ sessionId: 's1', content: '看下走势' });
 
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    const response = result.data;
     expect(response.toolName).toBe('get_kline');
     expect(response.content).toContain('AAPL.US K-Line');
   });
@@ -147,8 +153,11 @@ describe('LocalFinanceAgentBackend', () => {
   it('returns the MVP boundary for unsupported requests', async () => {
     const backend = createBackend();
 
-    const response = await backend.send('hello');
+    const result = await backend.send({ sessionId: 'default', content: 'hello' });
 
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    const response = result.data;
     expect(response.content).toContain('当前 MVP 支持');
     expect(response.toolName).toBeUndefined();
   });

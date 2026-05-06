@@ -1,7 +1,8 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { app } from 'electron';
-import { LocalFinanceAgentBackend, MarketDataService } from '@finagent/shared';
+import type { AgentBackend, AgentResponse, ApiResult, ToolDefinition } from '@finagent/core';
+import { createAgentBackend, MarketDataService } from '@finagent/shared';
 
 type IpcSuccess<T> = { ok: true; data: T };
 type IpcFailure = {
@@ -23,19 +24,27 @@ interface KlineRequest {
 
 export class AgentGateway {
   private readonly marketData = new MarketDataService();
-  private readonly backend = new LocalFinanceAgentBackend({
-    marketData: this.marketData,
+  private readonly backend: AgentBackend = createAgentBackend({
+    provider: readAgentProvider(),
+    piRuntime: {
+      marketData: this.marketData,
+    },
   });
 
-  getTools() {
+  getTools(): Promise<ApiResult<ToolDefinition[]>> {
     return this.backend.getTools();
   }
 
-  async send(message: unknown) {
+  async send(message: unknown): Promise<ApiResult<AgentResponse>> {
     return this.backend.send({
-      sessionId: extractSessionId(message),
+      sessionId: extractSessionId(message) ?? 'default',
       content: extractMessageText(message),
+      context: extractContext(message),
     });
+  }
+
+  async dispose() {
+    await this.backend.dispose?.();
   }
 
   getQuote(symbol: unknown) {
@@ -161,7 +170,11 @@ export function toIpcError(error: unknown): IpcFailure['error'] {
 
 export async function toIpcResult<T>(operation: () => Promise<T> | T): Promise<IpcResult<T>> {
   try {
-    return { ok: true, data: await operation() };
+    const result = await operation();
+    if (isApiResult<T>(result)) {
+      return result;
+    }
+    return { ok: true, data: result };
   } catch (error) {
     return { ok: false, error: toIpcError(error) };
   }
@@ -192,6 +205,31 @@ function extractSessionId(message: unknown): string | undefined {
     }
   }
   return undefined;
+}
+
+function extractContext(message: unknown): Record<string, unknown> | undefined {
+  if (message && typeof message === 'object') {
+    const context = (message as Record<string, unknown>).context;
+    if (context && typeof context === 'object' && !Array.isArray(context)) {
+      return context as Record<string, unknown>;
+    }
+  }
+  return undefined;
+}
+
+function readAgentProvider() {
+  const provider = process.env.FINAGENT_AGENT_PROVIDER;
+  if (provider === 'local' || provider === 'pi-runtime') return provider;
+  return undefined;
+}
+
+function isApiResult<T>(value: unknown): value is ApiResult<T> {
+  return Boolean(
+    value &&
+      typeof value === 'object' &&
+      'ok' in value &&
+      typeof (value as { ok?: unknown }).ok === 'boolean'
+  );
 }
 
 function requireString(value: unknown, field: string) {

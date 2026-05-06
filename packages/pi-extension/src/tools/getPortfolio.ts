@@ -1,17 +1,21 @@
 import { Type } from '@sinclair/typebox';
 import { getPortfolio } from '@finagent/longbridge-tools';
+import { validateParams } from './validation.ts';
+
+const getPortfolioParameters = Type.Object({});
 
 export const getPortfolioTool = {
   name: 'get_portfolio',
   label: 'Get Portfolio',
   description: 'Get current portfolio holdings, cash balance, and total value.',
-  parameters: Type.Object({}),
+  parameters: getPortfolioParameters,
 
   async execute(
     toolCallId: string,
-    _params: Record<string, never>,
+    rawParams: Record<string, never>,
     signal: AbortSignal
   ) {
+    validateParams<Record<string, never>>(getPortfolioParameters, rawParams);
     const portfolio = await getPortfolio();
 
     const positionsText = portfolio.positions.length > 0

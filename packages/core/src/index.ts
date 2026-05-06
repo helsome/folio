@@ -128,18 +128,22 @@ export interface LongBridgeStatus {
 }
 
 export interface AgentResponse {
+  answer: string;
   content: string;
   toolName?: string;
   tool?: string;
   result?: unknown;
   details?: unknown;
   toolCalls?: ToolCallRecord[];
+  sessionSnapshot: AgentSessionSnapshot;
   session?: AgentSessionSnapshot;
+  trace?: AgentTraceEvent[];
 }
 
 export interface AgentRequest {
-  sessionId?: string;
+  sessionId: string;
   content: string;
+  context?: Record<string, unknown>;
   createdAt?: number;
 }
 
@@ -159,14 +163,25 @@ export interface ToolCallRecord {
   completedAt?: number;
   status: 'success' | 'error';
   error?: ApiError;
+  result?: unknown;
+  trace?: AgentTraceEvent[];
 }
 
 export interface AgentBackend {
-  getTools: () => ToolDefinition[];
-  send: (request: AgentRequest | string) => Promise<AgentResponse>;
+  getTools: () => Promise<ApiResult<ToolDefinition[]>>;
+  send: (request: AgentRequest) => Promise<ApiResult<AgentResponse>>;
+  dispose?: () => Promise<void>;
 }
 
 export type AgentBackendProvider = 'local' | 'pi-runtime';
+
+export interface AgentTraceEvent {
+  id: string;
+  type: string;
+  timestamp: number;
+  message?: string;
+  data?: unknown;
+}
 
 export interface KlineRequest {
   symbol: string;
