@@ -74,20 +74,18 @@ Claude: [Uses LongBridge skill to fetch quote]
 
 ## 3. Finance Agent Integration
 
-Finance Agent uses LongBridge CLI through the `longbridge-tools` package.
+Finance Agent uses LongBridge CLI through the `longbridge-tools` package. The Electron main process calls it through `MarketDataService` in `@finagent/shared`, so Watchlist and Chat share caching, request coalescing, and normalized errors.
 
 ### Architecture
 
 ```
 ┌─────────────────────────────────────┐
-│      Pi Agent Extension             │
-│  packages/pi-extension/src/         │
+│      Local Finance Agent Backend    │
+│  packages/shared/src/agent/         │
 │                                     │
-│  Tools:                             │
-│  - get_quote                        │
-│  - get_kline                        │
-│  - get_portfolio                    │
-│  - create_alert                     │
+│  - IntentRouter                     │
+│  - FinanceToolRegistry              │
+│  - MarketDataService                │
 └─────────────┬───────────────────────┘
               │ execa (safe)
               ▼
@@ -132,7 +130,7 @@ LongBridge uses a specific symbol format:
 longbridge quote SYMBOL --format json
 
 # K-line (candlestick) data
-longbridge kline SYMBOL --period 1d --json
+longbridge kline SYMBOL --period 1d --format json
 
 # Intraday minute data
 longbridge intraday SYMBOL --json

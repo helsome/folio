@@ -22,6 +22,20 @@ When starting work on this project, Claude Code will automatically:
 
 Finance Agent uses a **Skill Hub** system for extensibility:
 
+The current MVP agent path is intentionally deterministic:
+
+```
+Renderer ChatArea
+  -> FinagentClient
+  -> Electron preload IPC
+  -> AgentGateway
+  -> LocalFinanceAgentBackend
+  -> IntentRouter / FinanceToolRegistry / MarketDataService
+  -> longbridge-tools
+```
+
+Do not put Node, Electron, or LongBridge imports in `packages/ui`. UI code talks only through `FinagentClient`.
+
 ### Skill Types
 
 | Type | Description | Example |
@@ -32,9 +46,12 @@ Finance Agent uses a **Skill Hub** system for extensibility:
 
 ### Adding a New Skill
 
-1. **Define Skill** in `packages/skill-hub/src/skills/`
-2. **Register Tool** (if Tool type) in Pi Agent extension
-3. **Add to UI** (if needs UI) in `packages/ui/src/components/`
+1. **Define types** in `packages/core/src/index.ts` if the behavior changes the public contract.
+2. **Add data access** in `packages/longbridge-tools` when a new LongBridge command is needed.
+3. **Expose tool behavior** through `packages/shared/src/agent/FinanceToolRegistry`.
+4. **Route user language** in `packages/shared/src/agent/intent-router.ts`.
+5. **Register Pi-compatible metadata** in `packages/pi-extension` when the tool should appear in the tool list or future Pi runtime.
+6. **Add UI** in `packages/ui` only through `FinagentClient`.
 
 ### Example: Adding a Tool Skill
 
@@ -116,17 +133,17 @@ For each task:
 Follow this pattern for any new feature:
 
 ```
-1. Types (packages/core/src/types/)
+1. Types (packages/core/src/index.ts)
    ↓
-2. Tool/Logic (packages/longbridge-tools/ or packages/shared/)
+2. LongBridge wrapper or shared business logic
    ↓
-3. Extension (packages/pi-extension/src/tools/)
+3. Agent backend route/registry/composer
    ↓
-4. UI Component (packages/ui/src/components/)
+4. Pi-compatible tool metadata, if needed
    ↓
-5. Integration (apps/electron/src/renderer/)
+5. UI component or atom, through FinagentClient
    ↓
-6. Tests
+6. Tests and Electron smoke
 ```
 
 ### 4. Code Template
@@ -134,38 +151,28 @@ Follow this pattern for any new feature:
 #### LongBridge Tool Template
 
 ```typescript
-// packages/longbridge-tools/src/commands/get-quote.ts
-import { execLongBridge } from '../executor';
-import { validateSymbol } from '../validator';
+// packages/longbridge-tools/src/tools/quote.ts
+import { executeLongBridge } from '../executor.ts';
+import { validateSymbolOrThrow } from '../validator.ts';
 import type { Quote } from '@finagent/core';
 
 export async function getQuote(symbol: string): Promise<Quote> {
-  // Validate symbol first
-  if (!validateSymbol(symbol)) {
-    throw new Error('INVALID_SYMBOL');
-  }
-
-  try {
-    const output = await execLongBridge(['quote', symbol]);
-    const data = JSON.parse(output);
-    return parseQuote(data);
-  } catch (error) {
-    if (error.message.includes('ENOENT')) {
-      throw new Error('LONGBRIDGE_NOT_INSTALLED');
-    }
-    throw error;
-  }
+  validateSymbolOrThrow(symbol);
+  const output = await executeLongBridge(['quote', symbol, '--format', 'json']);
+  return parseQuoteResponse(output);
 }
+```
 
-function parseQuote(data: any): Quote {
+#### Agent Backend Template
+
+```typescript
+// packages/shared/src/agent/finance-tool-registry.ts
+if (input.name === 'get_quote') {
+  const symbol = requireSymbol(input.args.symbol);
+  const quote = await this.marketData.getQuote(symbol);
   return {
-    symbol: data.symbol,
-    name: data.name,
-    price: data.price,
-    change: data.change,
-    changeRate: data.change_rate,
-    volume: data.volume,
-    timestamp: data.timestamp,
+    content: [{ type: 'text', text: formatQuote(quote) }],
+    details: quote,
   };
 }
 ```
@@ -291,17 +298,20 @@ describe('execLongBridge', () => {
 
 ### Task: Add New Quote Field
 
-1. **Update types** (`packages/core/src/types/quote.ts`)
+1. **Update types** (`packages/core/src/index.ts`)
 2. **Update parser** (`packages/longbridge-tools/src/parser.ts`)
-3. **Update tool** (`packages/pi-extension/src/tools/get-quote.ts`)
-4. **Update UI** (`packages/ui/src/components/stock/QuoteCard.tsx`)
+3. **Update response formatting** (`packages/shared/src/agent/finance-tool-registry.ts`)
+4. **Update UI** (`packages/ui/src/components/stock/QuoteCard.tsx`) if visual display changes
 
 ### Task: Add New LongBridge Command
 
 1. **Add to API reference** (`docs/api-reference.md`)
-2. **Create executor wrapper** (`packages/longbridge-tools/src/commands/`)
-3. **Register as Pi Agent tool** (`packages/pi-extension/src/tools/`)
-4. **Add UI component if needed**
+2. **Create wrapper** (`packages/longbridge-tools/src/tools/`)
+3. **Add parser and tests** (`packages/longbridge-tools/src/parser.ts`)
+4. **Register in FinanceToolRegistry** (`packages/shared/src/agent/finance-tool-registry.ts`)
+5. **Route language in IntentRouter** (`packages/shared/src/agent/intent-router.ts`)
+6. **Register as Pi-compatible tool metadata** (`packages/pi-extension/src/tools/`) if needed
+7. **Add UI component if needed**
 
 ### Task: Create New UI Component
 

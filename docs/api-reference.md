@@ -72,7 +72,7 @@ longbridge quote TSLA.US --format json
 ### 2. K-Line (K线数据)
 
 ```bash
-longbridge kline SYMBOL --period PERIOD --adjust ADJUST --json
+longbridge kline SYMBOL --period PERIOD --format json
 ```
 
 **Parameters:**
@@ -83,7 +83,7 @@ longbridge kline SYMBOL --period PERIOD --adjust ADJUST --json
 
 **Example:**
 ```bash
-longbridge kline TSLA.US --period 1d --json
+longbridge kline TSLA.US --period 1d --format json
 ```
 
 **Output:**

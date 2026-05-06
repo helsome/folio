@@ -27,16 +27,20 @@ Finance Agent is a desktop application that combines AI conversational interface
 │  ┌───────────────────────────────────────────────────────────────┐     │
 │  │                      MAIN PROCESS                               │     │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │     │
-│  │  │   Window     │  │   Alert     │  │   Cache     │              │     │
-│  │  │  Manager     │  │   Engine    │  │   Layer     │              │     │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘              │     │
+│  │  │   Window    │  │ AgentGateway│  │ Local JSON  │              │     │
+│  │  │  Manager    │  │ IPC Adapter │  │  Storage    │              │     │
+│  │  └─────────────┘  └──────┬──────┘  └─────────────┘              │     │
 │  └───────────────────────────────────────────────────────────────┘     │
-│                               │ JSONL RPC (stdio)                     │
+│                               │ shared package API                    │
 │  ┌───────────────────────────────────────────────────────────────┐     │
-│  │                     PI AGENT BACKEND                            │     │
+│  │                  FINANCE AGENT BACKEND                          │     │
 │  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │     │
-│  │  │    AI      │  │   Tools     │  │   Skills    │              │     │
-│  │  │   Loop     │  │  Registry   │  │   Loader    │              │     │
+│  │  │AgentBackend │  │ Intent     │  │ Response    │              │     │
+│  │  │  Factory    │  │ Router     │  │ Composer    │              │     │
+│  │  └─────────────┘  └──────┬──────┘  └─────────────┘              │     │
+│  │  ┌─────────────┐  ┌──────▼──────┐  ┌─────────────┐              │     │
+│  │  │ Session     │  │ FinanceTool │  │ MarketData  │              │     │
+│  │  │ Context     │  │ Registry    │  │ Service     │              │     │
 │  │  └─────────────┘  └─────────────┘  └─────────────┘              │     │
 │  └───────────────────────────────────────────────────────────────┘     │
 │                               │ execa (safe)                         │
@@ -69,16 +73,21 @@ Finance Agent is a desktop application that combines AI conversational interface
 | **Preload** | TypeScript | Secure IPC bridge (contextBridge) |
 | **Renderer** | React + TypeScript | UI rendering, state management, user input |
 
-### 2.2 Pi Agent Process
+### 2.2 Agent Backend
 
-| Process | Language | Responsibility |
-|---------|----------|----------------|
-| **Pi Agent** | Node.js/TypeScript | AI conversation loop, tool execution |
-| **Extension** | TypeScript | Custom tools (get_quote, get_kline, etc.) |
+| Component | Language | Responsibility |
+|-----------|----------|----------------|
+| **AgentGateway** | Electron main + TypeScript | IPC adapter, ApiResult wrapping, local alert storage |
+| **LocalFinanceAgentBackend** | TypeScript | MVP agent backend, deterministic intent routing, session context |
+| **MarketDataService** | TypeScript | LongBridge access, TTL cache, in-flight request coalescing |
+| **FinanceToolRegistry** | TypeScript | Tool metadata and tool execution boundary |
+| **pi-extension** | TypeScript | Pi-compatible tool definitions and metadata |
 
 **Communication:**
-- Main Process ↔ Pi Agent: JSONL RPC over stdio
-- Pi Agent → LongBridge CLI: execa
+- Renderer ↔ Main Process: whitelisted IPC via preload.
+- Main Process → Agent Backend: in-process `@finagent/shared` API.
+- Agent Backend → LongBridge CLI: `longbridge-tools` using `execa` array arguments.
+- Future Pi runtime: `AgentBackend` already supports a `pi-runtime` provider slot, but no JSONL/stdio process is launched in the MVP.
 
 ---
 
@@ -96,6 +105,7 @@ finagent/
 │   │
 │   ├── shared/                 # Business logic
 │   │   └── src/
+│   │       ├── agent/          # AgentBackend, router, registry, market service
 │   │       ├── config/         # Zod-validated configuration
 │   │       ├── credentials/    # Token storage (Keychain)
 │   │       └── sessions/       # Session management
@@ -109,7 +119,7 @@ finagent/
 │   │       ├── styles/         # Tailwind CSS v4 + OKLCH theme
 │   │       └── lib/             # cn() utility, layout constants
 │   │
-│   ├── pi-extension/           # Pi Agent extension
+│   ├── pi-extension/           # Pi-compatible tool metadata
 │   │   └── src/
 │   │       ├── index.ts         # Extension entry point
 │   │       ├── tools/          # Tool registrations
@@ -117,24 +127,20 @@ finagent/
 │   │       │   ├── get-kline.ts
 │   │       │   ├── get-portfolio.ts
 │   │       │   └── ...
-│   │       ├── commands/        # Slash commands
-│   │       └── events/          # Event handlers
 │   │
 │   └── longbridge-tools/       # LongBridge CLI wrapper
 │       └── src/
 │           ├── executor.ts       # Safe execa wrapper
-│           ├── parser.ts         # JSON output parser
-│           ├── validator.ts     # Symbol validation
-│           └── cache.ts         # Response caching
+│           ├── parser.ts       # JSON output parser
+│           ├── validator.ts    # Symbol validation
+│           └── tools/          # quote/kline/portfolio wrappers
 │
 └── apps/
     └── electron/                # Electron desktop app
         └── src/
             ├── main/             # Main process
-            │   ├── index.ts      # Window management
-            │   ├── ipc.ts        # IPC handlers
-            │   ├── alert-engine.ts  # Background alert service
-            │   └── tray.ts      # System tray
+            │   ├── index.ts      # Window + IPC handler registration
+            │   └── agentGateway.ts  # IPC-to-backend adapter
             │
             ├── preload/         # Preload scripts
             │   └── index.ts      # contextBridge API
@@ -157,31 +163,45 @@ finagent/
 
 ## 4. Data Flow
 
-### 4.1 Quote Query Flow
+### 4.1 Chat Quote Query Flow
 
 ```
 User: "What's the price of TSLA?"
     ↓
-InputBar sends message
+ChatArea sends { sessionId, content }
     ↓
-Pi Agent receives message
+FinagentClient invokes agent:send through preload IPC
     ↓
-AI decides to call get_quote tool
+AgentGateway forwards to LocalFinanceAgentBackend
     ↓
-pi-extension/get-quote.ts executes
+IntentRouter classifies quote and extracts TSLA.US
     ↓
-longbridge-tools/executor.ts calls CLI
+FinanceToolRegistry calls MarketDataService.getQuote()
+    ↓
+MarketDataService cache/coalescing, then longbridge-tools executor
     ↓
 longbridge quote TSLA.US --format json
     ↓
-JSON parsed and returned
+Parser normalizes JSON, ResponseComposer formats text
     ↓
-Pi Agent formats response
-    ↓
-Renderer displays QuoteCard
+Renderer appends assistant message
 ```
 
-### 4.2 Alert Trigger Flow
+### 4.2 Follow-up Query Flow
+
+```
+User: "AAPL.US quote"
+    ↓
+LocalFinanceAgentBackend records AAPL.US in session.recentSymbols
+    ↓
+User: "show chart"
+    ↓
+IntentRouter uses the active session context to infer AAPL.US
+    ↓
+get_kline executes through the shared MarketDataService
+```
+
+### 4.3 Alert Trigger Flow
 
 ```
 AlertEngine (every 60s)
@@ -292,62 +312,26 @@ await execa('longbridge', ['quote', symbol, '--format', 'json']);
 
 ## 7. Key Design Patterns
 
-### 7.1 Factory Pattern for Tools
+### 7.1 Agent Backend Factory Pattern
 
 ```typescript
-// packages/pi-extension/src/tools/base.ts
-export interface ToolDefinition {
-  name: string;
-  description: string;
-  parameters: TSchema;
-  execute: (params: any) => Promise<ToolResult>;
-}
-
-// Tool factory
-export function createMarketTool(tool: ToolDefinition) {
-  return {
-    ...tool,
-    beforeExecute: validateSymbol,
-    execute: async (params) => {
-      const result = await execLongBridge(tool.command, params);
-      return tool.parser(result);
-    },
-  };
+// packages/shared/src/agent/backend-factory.ts
+export function createAgentBackend(options = {}): AgentBackend {
+  const provider = options.provider ?? 'local';
+  if (provider === 'local') {
+    return new LocalFinanceAgentBackend();
+  }
+  throw new Error('Pi runtime backend is not wired yet. Use provider: local.');
 }
 ```
 
-### 7.2 Cache Pattern
+### 7.2 Market Data Cache Pattern
 
 ```typescript
-// packages/longbridge-tools/src/cache.ts
-interface CacheEntry<T> {
-  data: T;
-  timestamp: number;
-  ttl: number;
-}
-
-class DataCache {
-  private cache = new Map<string, CacheEntry<any>>();
-
-  get<T>(key: string): T | null {
-    const entry = this.cache.get(key);
-    if (!entry) return null;
-    if (Date.now() > entry.timestamp + entry.ttl) {
-      this.cache.delete(key);
-      return null;
-    }
-    return entry.data;
-  }
-
-  set<T>(key: string, data: T, ttl: number): void {
-    this.cache.set(key, { data, timestamp: Date.now(), ttl });
-  }
-}
-
-// Cache strategies
-const quoteCache = new DataCache();  // 30s TTL
-const klineCache = new DataCache(); // 5min TTL
-const portfolioCache = new DataCache(); // 2min TTL
+// packages/shared/src/agent/market-data-service.ts
+await marketData.getQuote('AAPL.US');      // 30s TTL
+await marketData.getKline({ symbol });     // 5min TTL
+await marketData.getPortfolio();           // 60s TTL
 ```
 
 ---
@@ -367,7 +351,7 @@ const portfolioCache = new DataCache(); // 2min TTL
 
 When user clicks minimize to tray:
 1. Window hides (not closed)
-2. Pi Agent continues running
+2. Agent backend remains in Electron main
 3. Alert Engine continues monitoring
 4. System notifications remain active
 
@@ -377,10 +361,12 @@ When user clicks minimize to tray:
 
 ### 9.1 Adding New LongBridge Commands
 
-1. Add to `packages/longbridge-tools/src/commands/`
-2. Register tool in `packages/pi-extension/src/tools/`
-3. Add UI component if needed in `packages/ui/`
-4. Update PRD if feature is significant
+1. Add a wrapper in `packages/longbridge-tools/src/tools/`
+2. Add parser/error coverage in `packages/longbridge-tools/src/parser.ts` and tests
+3. Expose the behavior through `packages/shared/src/agent/finance-tool-registry.ts`
+4. Add intent routing in `packages/shared/src/agent/intent-router.ts`
+5. Register Pi-compatible metadata in `packages/pi-extension/src/tools/` if the tool should be discoverable
+6. Add UI through `FinagentClient` if needed
 
 ### 9.2 Adding New UI Components
 
@@ -397,7 +383,8 @@ When user clicks minimize to tray:
 |--------|----------|
 | Quote data | 30-second cache |
 | K-line data | 5-minute cache |
-| Portfolio data | 2-minute cache |
+| Portfolio data | 60-second cache |
+| In-flight market requests | Same-key requests share one Promise |
 | Alert polling | 60-second interval |
 | Session loading | Lazy load messages |
 
