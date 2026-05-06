@@ -1,6 +1,6 @@
 import type { AgentSessionSnapshot } from '@finagent/core';
 
-export type FinanceIntent = 'quote' | 'kline' | 'portfolio' | 'intraday' | 'unsupported';
+export type FinanceIntent = 'quote' | 'kline' | 'portfolio' | 'portfolio_risk' | 'intraday' | 'unsupported';
 
 export interface RoutedIntent {
   intent: FinanceIntent;
@@ -20,6 +20,10 @@ export function routeFinanceIntent(
   const normalized = text.toLowerCase();
   const explicitSymbol = extractSymbol(text);
   const symbol = explicitSymbol ?? session?.recentSymbols[0];
+
+  if (hasAny(text, ['risk', '风险', '波动', 'volatility']) && hasAny(text, ['portfolio', '持仓', '组合'])) {
+    return { intent: 'portfolio_risk', text };
+  }
 
   if (hasAny(text, ['portfolio', '持仓', '组合'])) {
     return { intent: 'portfolio', text };

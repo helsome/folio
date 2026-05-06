@@ -8,6 +8,7 @@ interface TurnCardProps {
 export const TurnCard: React.FC<TurnCardProps> = ({ message }) => {
   const isUser = message.role === 'user';
   const isTool = message.role === 'tool';
+  const toolCalls = message.toolCalls ?? [];
 
   return (
     <div
@@ -30,6 +31,34 @@ export const TurnCard: React.FC<TurnCardProps> = ({ message }) => {
         <div className="prose prose-sm max-w-none">
           {message.content}
         </div>
+        {!isUser && toolCalls.length > 0 && (
+          <div className="mt-3 border-t border-[oklch(var(--bg-primary))] pt-2">
+            <div className="text-xs font-medium text-[oklch(var(--text-secondary))]">
+              Tool calls
+            </div>
+            <div className="mt-1 space-y-1">
+              {toolCalls.map((toolCall) => (
+                <div
+                  key={toolCall.id}
+                  className="flex items-center justify-between gap-3 rounded bg-[oklch(var(--bg-primary))] px-2 py-1 text-xs"
+                >
+                  <span className="truncate font-mono text-[oklch(var(--text-primary))]">
+                    {toolCall.toolName}
+                  </span>
+                  <span
+                    className={
+                      toolCall.status === 'success'
+                        ? 'text-green-600 dark:text-green-400'
+                        : 'text-red-600 dark:text-red-400'
+                    }
+                  >
+                    {toolCall.status}
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
         <div className={`text-xs mt-1 ${isUser ? 'text-white/70' : 'text-[oklch(var(--text-secondary))]'}`}>
           {new Date(message.timestamp).toLocaleTimeString()}
         </div>

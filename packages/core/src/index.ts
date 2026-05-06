@@ -93,6 +93,8 @@ export interface Message {
   content: string;
   timestamp: number;
   toolName?: string;
+  toolCalls?: ToolCallRecord[];
+  trace?: AgentTraceEvent[];
 }
 
 export interface ToolDefinition {

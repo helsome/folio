@@ -47,9 +47,11 @@ export const ChatArea: React.FC = () => {
       const assistantMessage: Message = {
         id: crypto.randomUUID(),
         role: 'assistant',
-        content: response.ok ? response.data.content : response.error.message,
+        content: response.ok ? response.data.answer : response.error.message,
         timestamp: Date.now(),
         toolName: response.ok ? response.data.toolName : undefined,
+        toolCalls: response.ok ? response.data.toolCalls : undefined,
+        trace: response.ok ? response.data.trace : undefined,
       };
 
       addMessage(assistantMessage);

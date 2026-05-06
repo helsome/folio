@@ -27,6 +27,18 @@ const kline: Kline = {
   volume: 4567,
 };
 
+const klineDown: Kline = {
+  ...kline,
+  timestamp: 1710086400,
+  close: 194,
+};
+
+const klineUp: Kline = {
+  ...kline,
+  timestamp: 1710172800,
+  close: 202,
+};
+
 const portfolio: Portfolio = {
   totalValue: 10000,
   cash: 1500,
@@ -66,6 +78,12 @@ describe('routeFinanceIntent', () => {
   it('routes unsupported input to a friendly boundary', () => {
     expect(routeFinanceIntent('hello')).toMatchObject({
       intent: 'unsupported',
+    });
+  });
+
+  it('routes portfolio risk requests to multi-step analysis', () => {
+    expect(routeFinanceIntent('分析我的组合风险')).toMatchObject({
+      intent: 'portfolio_risk',
     });
   });
 });
@@ -161,13 +179,30 @@ describe('LocalFinanceAgentBackend', () => {
     expect(response.content).toContain('当前 MVP 支持');
     expect(response.toolName).toBeUndefined();
   });
+
+  it('analyzes portfolio risk with portfolio, quote, and kline tool calls', async () => {
+    const backend = createBackend();
+
+    const result = await backend.send({ sessionId: 's1', content: '分析我的组合风险' });
+
+    expect(result.ok).toBe(true);
+    if (!result.ok) throw new Error(result.error.message);
+    expect(result.data.answer).toContain('Portfolio Risk Summary');
+    expect(result.data.toolCalls?.map((toolCall) => toolCall.toolName)).toEqual([
+      'get_portfolio',
+      'get_quote',
+      'get_kline',
+    ]);
+    expect(result.data.sessionSnapshot.recentSymbols).toEqual(['AAPL.US']);
+    expect(result.data.trace).toHaveLength(3);
+  });
 });
 
 function createBackend() {
   const marketData = new MarketDataService({
     fetchers: {
       getQuote: async () => quote,
-      getKline: async () => [kline],
+      getKline: async () => [kline, klineDown, klineUp],
       getPortfolio: async () => portfolio,
       getIntraday: async () => [],
       getLongBridgeStatus: async () => ({

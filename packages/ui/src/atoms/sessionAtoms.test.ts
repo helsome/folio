@@ -40,4 +40,30 @@ describe('session atoms', () => {
       messages: [expect.objectContaining({ id: 'm1' })],
     });
   });
+
+  it('stores assistant tool call traces with messages', () => {
+    const store = createStore();
+    store.set(createSessionAtom);
+
+    store.set(addMessageAtom, {
+      id: 'm2',
+      role: 'assistant',
+      content: 'Portfolio Risk Summary',
+      timestamp: 1710000000,
+      toolCalls: [
+        {
+          id: 'tool-1',
+          toolName: 'get_portfolio',
+          args: {},
+          startedAt: 1710000000,
+          status: 'success',
+        },
+      ],
+    });
+
+    expect(store.get(activeMessagesAtom)[0]).toMatchObject({
+      id: 'm2',
+      toolCalls: [expect.objectContaining({ toolName: 'get_portfolio' })],
+    });
+  });
 });
