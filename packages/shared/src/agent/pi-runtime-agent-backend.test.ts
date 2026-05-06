@@ -1,9 +1,23 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import { PiRuntimeAgentBackend } from './pi-runtime-agent-backend.ts';
-import { PiRpcClient } from './pi-rpc-client.ts';
+import { PiRpcClient, readDefaultPiArgs, readDefaultPiCommand } from './pi-rpc-client.ts';
+
+const touchedEnvKeys = [
+  'FINAGENT_PI_COMMAND',
+  'FINAGENT_PI_ARGS',
+  'FINAGENT_PI_PROVIDER',
+  'FINAGENT_PI_MODEL',
+  'ANTHROPIC_MODEL',
+] as const;
+
+afterEach(() => {
+  for (const key of touchedEnvKeys) {
+    delete process.env[key];
+  }
+});
 
 class FakePiProcess extends EventEmitter {
   stdin = new PassThrough();
@@ -43,11 +57,43 @@ class FakePiProcess extends EventEmitter {
 }
 
 describe('PiRpcClient', () => {
+  it('uses the project default pi runtime command and args', () => {
+    process.env.ANTHROPIC_MODEL = 'MiniMax-M2.7';
+
+    expect(readDefaultPiCommand()).toBe('bunx');
+    expect(readDefaultPiArgs()).toEqual([
+      '@mariozechner/pi-coding-agent',
+      '--mode',
+      'rpc',
+      '--provider',
+      'anthropic',
+      '--model',
+      'MiniMax-M2.7',
+      '--extension',
+      '.pi/extensions/finagent/index.ts',
+    ]);
+  });
+
+  it('honors explicit FINAGENT_PI_COMMAND and FINAGENT_PI_ARGS overrides', () => {
+    process.env.FINAGENT_PI_COMMAND = 'pi';
+    process.env.FINAGENT_PI_ARGS = '--mode rpc --provider openai';
+
+    expect(readDefaultPiCommand()).toBe('pi');
+    expect(readDefaultPiArgs()).toEqual(['--mode', 'rpc', '--provider', 'openai']);
+  });
+
   it('collects JSONL answer and tool call events', async () => {
     const client = new PiRpcClient({
       spawnProcess: createSpawn((_command, _args, _options) =>
         new FakePiProcess((line, proc) => {
           if (line.type === 'prompt') {
+            expect(line.message).toBe('quote AAPL.US');
+            proc.writeEvent({
+              id: line.id,
+              type: 'response',
+              command: 'prompt',
+              success: true,
+            });
             proc.writeEvent({
               id: line.id,
               type: 'tool_execution_start',
@@ -61,7 +107,24 @@ describe('PiRpcClient', () => {
               toolCallId: 'tool-1',
               result: { symbol: 'AAPL.US' },
             });
-            proc.writeEvent({ id: line.id, type: 'agent_end', content: 'AAPL looks stable.' });
+            proc.writeEvent({
+              id: line.id,
+              type: 'message_update',
+              assistantMessageEvent: {
+                type: 'text_delta',
+                delta: 'AAPL ',
+              },
+            });
+            proc.writeEvent({
+              id: line.id,
+              type: 'agent_end',
+              messages: [
+                {
+                  role: 'assistant',
+                  content: [{ type: 'text', text: 'AAPL looks stable.' }],
+                },
+              ],
+            });
           }
         })
       ),
@@ -76,6 +139,29 @@ describe('PiRpcClient', () => {
       toolName: 'get_quote',
       status: 'success',
       args: { symbol: 'AAPL.US' },
+    });
+  });
+
+  it('rejects when Pi refuses a prompt before execution', async () => {
+    const client = new PiRpcClient({
+      spawnProcess: createSpawn(() =>
+        new FakePiProcess((line, proc) => {
+          if (line.type === 'prompt') {
+            proc.writeEvent({
+              id: line.id,
+              type: 'response',
+              command: 'prompt',
+              success: false,
+              error: 'StreamingBehavior required while agent is busy.',
+            });
+          }
+        })
+      ),
+    });
+
+    await expect(client.prompt('hello')).rejects.toMatchObject({
+      code: 'PI_RUNTIME_ERROR',
+      message: 'StreamingBehavior required while agent is busy.',
     });
   });
 
@@ -158,6 +244,12 @@ describe('PiRpcClient', () => {
           if (line.type === 'prompt') {
             proc.writeEvent({
               id: line.id,
+              type: 'response',
+              command: 'prompt',
+              success: true,
+            });
+            proc.writeEvent({
+              id: line.id,
               type: 'tool_execution_start',
               toolCallId: 'tool-1',
               toolName: 'get_quote',
@@ -184,7 +276,17 @@ describe('PiRpcClient', () => {
             return;
           }
           if (line.type === 'prompt') {
-            proc.writeEvent({ id: line.id, type: 'agent_end', content: 'restarted' });
+            proc.writeEvent({
+              id: line.id,
+              type: 'response',
+              command: 'prompt',
+              success: true,
+            });
+            proc.writeEvent({
+              id: line.id,
+              type: 'agent_end',
+              messages: [{ role: 'assistant', content: [{ type: 'text', text: 'restarted' }] }],
+            });
           }
         });
       }),
@@ -211,13 +313,23 @@ describe('PiRuntimeAgentBackend', () => {
           if (line.type === 'prompt') {
             proc.writeEvent({
               id: line.id,
+              type: 'response',
+              command: 'prompt',
+              success: true,
+            });
+            proc.writeEvent({
+              id: line.id,
               type: 'tool_execution_start',
               toolCallId: 'tool-1',
               toolName: 'get_portfolio',
               args: {},
             });
             proc.writeEvent({ id: line.id, type: 'tool_execution_end', toolCallId: 'tool-1' });
-            proc.writeEvent({ id: line.id, type: 'agent_end', content: 'Portfolio risk is moderate.' });
+            proc.writeEvent({
+              id: line.id,
+              type: 'agent_end',
+              messages: [{ role: 'assistant', content: [{ type: 'text', text: 'Portfolio risk is moderate.' }] }],
+            });
           }
         })
       ),

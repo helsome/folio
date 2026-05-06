@@ -44,6 +44,7 @@ export interface PiPromptResult {
 interface PendingPrompt {
   id: string;
   answerParts: string[];
+  finalAnswer?: string;
   toolCalls: ToolCallRecord[];
   trace: AgentTraceEvent[];
   toolTimeouts: Map<string, ReturnType<typeof setTimeout>>;
@@ -80,8 +81,8 @@ export class PiRpcClient {
   private pendingControls = new Map<string, PendingControl>();
 
   constructor(options: PiRpcClientOptions = {}) {
-    this.command = options.command ?? process.env.FINAGENT_PI_COMMAND ?? 'pi';
-    this.args = options.args ?? parseArgs(process.env.FINAGENT_PI_ARGS) ?? ['--mode', 'rpc'];
+    this.command = options.command ?? readDefaultPiCommand();
+    this.args = options.args ?? readDefaultPiArgs();
     this.cwd = options.cwd ?? process.cwd();
     this.env = options.env;
     this.requestTimeoutMs = options.requestTimeoutMs ?? 60_000;
@@ -120,7 +121,7 @@ export class PiRpcClient {
         reject,
       };
       this.pendingPrompts.set(id, pending);
-      this.writeJson(proc, { type: 'prompt', id, content }, pending);
+      this.writeJson(proc, { type: 'prompt', id, message: content }, pending);
     });
   }
 
@@ -322,8 +323,23 @@ export class PiRpcClient {
       data: event,
     });
 
+    if (isPromptResponse(event)) {
+      if (event.success === false) {
+        this.finishPrompt(
+          pending,
+          createCodeError('PI_RUNTIME_ERROR', String(event.error ?? event.message ?? 'Pi runtime rejected the prompt.'))
+        );
+      }
+      return;
+    }
+
     const text = extractEventText(event);
     if (text) pending.answerParts.push(text);
+
+    const finalAnswer = extractFinalAnswer(event);
+    if (finalAnswer) {
+      pending.finalAnswer = finalAnswer;
+    }
 
     this.recordToolEvent(pending, event);
 
@@ -412,7 +428,7 @@ export class PiRpcClient {
       return;
     }
     pending.resolve({
-      answer: pending.answerParts.join('').trim(),
+      answer: pending.finalAnswer ?? pending.answerParts.join('').trim(),
       toolCalls: pending.toolCalls,
       trace: pending.trace,
     });
@@ -447,7 +463,39 @@ function parseArgs(value: string | undefined) {
   return value.split(' ').map((part) => part.trim()).filter(Boolean);
 }
 
+function readDefaultPiCommand() {
+  return process.env.FINAGENT_PI_COMMAND ?? 'bunx';
+}
+
+function readDefaultPiArgs() {
+  const explicitArgs = parseArgs(process.env.FINAGENT_PI_ARGS);
+  if (explicitArgs) return explicitArgs;
+
+  const args = [
+    '@mariozechner/pi-coding-agent',
+    '--mode',
+    'rpc',
+    '--provider',
+    process.env.FINAGENT_PI_PROVIDER ?? 'anthropic',
+  ];
+
+  const model = process.env.FINAGENT_PI_MODEL ?? process.env.ANTHROPIC_MODEL;
+  if (model) {
+    args.push('--model', model);
+  }
+
+  args.push('--extension', '.pi/extensions/finagent/index.ts');
+  return args;
+}
+
 function extractEventText(event: Record<string, unknown>) {
+  const assistantMessageEvent = readRecord(event.assistantMessageEvent);
+  if (assistantMessageEvent.type === 'text_delta' && typeof assistantMessageEvent.delta === 'string') {
+    return assistantMessageEvent.delta;
+  }
+  if (assistantMessageEvent.type === 'text_end' && typeof assistantMessageEvent.content === 'string') {
+    return assistantMessageEvent.content;
+  }
   for (const key of ['text', 'content', 'message', 'delta']) {
     if (typeof event[key] === 'string') return event[key];
   }
@@ -461,6 +509,50 @@ function extractEventText(event: Record<string, unknown>) {
   return '';
 }
 
+function extractFinalAnswer(event: Record<string, unknown>) {
+  if (event.type === 'agent_end') {
+    return extractAssistantTextFromMessages(event.messages);
+  }
+
+  const message = readRecord(event.message);
+  if (message.role === 'assistant') {
+    const text = extractAssistantTextFromMessageRecord(message);
+    if (text) return text;
+  }
+
+  return '';
+}
+
+function extractAssistantTextFromMessages(messages: unknown) {
+  if (!Array.isArray(messages)) return '';
+  for (let index = messages.length - 1; index >= 0; index -= 1) {
+    const text = extractAssistantTextFromMessageRecord(messages[index]);
+    if (text) return text;
+  }
+  return '';
+}
+
+function extractAssistantTextFromMessageRecord(message: unknown) {
+  const record = readRecord(message);
+  if (record.role !== 'assistant') return '';
+  return flattenTextContent(record.content);
+}
+
+function flattenTextContent(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+
+  const texts = content.flatMap((item) => {
+    const record = readRecord(item);
+    if (record.type === 'text' && typeof record.text === 'string') {
+      return [record.text];
+    }
+    return [];
+  });
+
+  return texts.join('').trim();
+}
+
 function readRecord(value: unknown): Record<string, unknown> {
   if (!value || typeof value !== 'object' || Array.isArray(value)) return {};
   return value as Record<string, unknown>;
@@ -470,8 +562,16 @@ function redactPromptPayload(payload: Record<string, unknown>) {
   if (payload.type !== 'prompt') return payload;
   return {
     ...payload,
-    content: typeof payload.content === 'string' ? `[${payload.content.length} chars]` : payload.content,
+    message: typeof payload.message === 'string' ? `[${payload.message.length} chars]` : payload.message,
   };
+}
+
+function isPromptResponse(event: Record<string, unknown>): event is Record<string, unknown> & {
+  type: 'response';
+  command: 'prompt';
+  success: boolean;
+} {
+  return event.type === 'response' && event.command === 'prompt' && typeof event.success === 'boolean';
 }
 
 function normalizeSpawnError(error: unknown, command: string) {
@@ -497,3 +597,5 @@ function normalizeSpawnError(error: unknown, command: string) {
 function isNodeError(error: unknown): error is Error & { code: string } {
   return error instanceof Error && typeof (error as { code?: unknown }).code === 'string';
 }
+
+export { readDefaultPiArgs, readDefaultPiCommand };
