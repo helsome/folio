@@ -29,6 +29,7 @@ export interface PiRpcClientOptions {
   healthTimeoutMs?: number;
   singleToolTimeoutMs?: number;
   maxToolCalls?: number;
+  requiredEnvKeys?: string[];
   now?: () => number;
   spawnProcess?: SpawnFn;
   onLog?: (log: PiRuntimeLog) => void;
@@ -67,6 +68,7 @@ export class PiRpcClient {
   private readonly healthTimeoutMs: number;
   private readonly singleToolTimeoutMs: number;
   private readonly maxToolCalls: number;
+  private readonly requiredEnvKeys: string[];
   private readonly now: () => number;
   private readonly spawnProcess: SpawnFn;
   private readonly onLog: (log: PiRuntimeLog) => void;
@@ -86,6 +88,7 @@ export class PiRpcClient {
     this.healthTimeoutMs = options.healthTimeoutMs ?? 5_000;
     this.singleToolTimeoutMs = options.singleToolTimeoutMs ?? 30_000;
     this.maxToolCalls = options.maxToolCalls ?? 8;
+    this.requiredEnvKeys = options.requiredEnvKeys ?? [];
     this.now = options.now ?? Date.now;
     this.spawnProcess = options.spawnProcess ?? ((command, args, spawnOptions) =>
       spawn(command, args, spawnOptions));
@@ -182,20 +185,35 @@ export class PiRpcClient {
   private ensureStarted() {
     if (this.process && !this.exited) return this.process;
 
+    const env = { ...process.env, ...this.env };
+    const missingEnvKeys = this.requiredEnvKeys.filter((key) => !env[key]);
+    if (missingEnvKeys.length > 0) {
+      throw createCodeError(
+        'PI_LLM_ENV_MISSING',
+        `Pi runtime is missing required LLM environment: ${missingEnvKeys.join(', ')}.`,
+        'Set the missing variables in your shell, .env.local, or FINAGENT_ENV_FILE before launching Electron.'
+      );
+    }
+
     this.exited = false;
-    const proc = this.spawnProcess(this.command, [...this.args], {
-      cwd: this.cwd,
-      env: { ...process.env, ...this.env },
-      stdio: 'pipe',
-      shell: false,
-    });
+    let proc: SpawnProcess;
+    try {
+      proc = this.spawnProcess(this.command, [...this.args], {
+        cwd: this.cwd,
+        env,
+        stdio: 'pipe',
+        shell: false,
+      });
+    } catch (error) {
+      throw normalizeSpawnError(error, this.command);
+    }
     this.process = proc;
     this.stdoutBuffer = '';
     this.stderrBuffer = '';
 
     proc.stdout.on('data', (chunk) => this.consumeStdout(String(chunk)));
     proc.stderr.on('data', (chunk) => this.consumeStderr(String(chunk)));
-    proc.on('error', (error) => this.handleExit(error));
+    proc.on('error', (error) => this.handleExit(normalizeSpawnError(error, this.command)));
     proc.on('exit', (code, signal) => {
       this.handleExit(createCodeError(
         'PI_RUNTIME_EXITED',
@@ -208,7 +226,17 @@ export class PiRpcClient {
 
   private writeJson(proc: SpawnProcess, payload: Record<string, unknown>, pending?: PendingPrompt) {
     const line = `${JSON.stringify(payload)}\n`;
-    const ok = proc.stdin.write(line);
+    let ok = false;
+    try {
+      ok = proc.stdin.write(line);
+    } catch (error) {
+      const normalized = normalizeSpawnError(error, this.command);
+      if (pending) {
+        this.finishPrompt(pending, normalized);
+        return;
+      }
+      throw normalized;
+    }
     pending?.trace.push({
       id: randomUUID(),
       type: 'jsonl_request',
@@ -444,4 +472,28 @@ function redactPromptPayload(payload: Record<string, unknown>) {
     ...payload,
     content: typeof payload.content === 'string' ? `[${payload.content.length} chars]` : payload.content,
   };
+}
+
+function normalizeSpawnError(error: unknown, command: string) {
+  if (isNodeError(error) && error.code === 'ENOENT') {
+    return createCodeError(
+      'PI_RUNTIME_NOT_FOUND',
+      `Pi runtime command was not found: ${command}.`,
+      'Install the Pi CLI or set FINAGENT_PI_COMMAND to a JSONL/stdio runtime command before launching Electron.'
+    );
+  }
+
+  if (isNodeError(error) && error.code === 'EACCES') {
+    return createCodeError(
+      'PI_RUNTIME_NOT_EXECUTABLE',
+      `Pi runtime command is not executable: ${command}.`,
+      'Fix the runtime file permissions or set FINAGENT_PI_COMMAND to an executable JSONL/stdio runtime command.'
+    );
+  }
+
+  return error;
+}
+
+function isNodeError(error: unknown): error is Error & { code: string } {
+  return error instanceof Error && typeof (error as { code?: unknown }).code === 'string';
 }

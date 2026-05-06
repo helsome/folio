@@ -106,6 +106,49 @@ describe('PiRpcClient', () => {
     });
   });
 
+  it('rejects before spawn when required LLM env is missing', async () => {
+    let spawned = false;
+    const client = new PiRpcClient({
+      requiredEnvKeys: ['FINAGENT_TEST_LLM_KEY'],
+      spawnProcess: createSpawn(() => {
+        spawned = true;
+        return new FakePiProcess(() => undefined);
+      }),
+    });
+
+    await expect(client.healthCheck()).rejects.toMatchObject({
+      code: 'PI_LLM_ENV_MISSING',
+      action: expect.stringContaining('.env.local'),
+    });
+    expect(spawned).toBe(false);
+  });
+
+  it('normalizes missing runtime commands into actionable errors', async () => {
+    const client = new PiRpcClient({
+      spawnProcess: createSpawn(() => {
+        throw Object.assign(new Error('spawn pi ENOENT'), { code: 'ENOENT' });
+      }),
+    });
+
+    await expect(client.healthCheck()).rejects.toMatchObject({
+      code: 'PI_RUNTIME_NOT_FOUND',
+      action: expect.stringContaining('FINAGENT_PI_COMMAND'),
+    });
+  });
+
+  it('normalizes non-executable runtime commands into actionable errors', async () => {
+    const client = new PiRpcClient({
+      spawnProcess: createSpawn(() => {
+        throw Object.assign(new Error('spawn pi EACCES'), { code: 'EACCES' });
+      }),
+    });
+
+    await expect(client.healthCheck()).rejects.toMatchObject({
+      code: 'PI_RUNTIME_NOT_EXECUTABLE',
+      action: expect.stringContaining('FINAGENT_PI_COMMAND'),
+    });
+  });
+
   it('times out unfinished tool calls', async () => {
     const client = new PiRpcClient({
       singleToolTimeoutMs: 5,
@@ -203,7 +246,8 @@ describe('PiRuntimeAgentBackend', () => {
 
     expect(result.ok).toBe(false);
     if (result.ok) throw new Error('expected failure');
-    expect(result.error.message).toContain('spawn pi ENOENT');
+    expect(result.error.code).toBe('PI_RUNTIME_NOT_FOUND');
+    expect(result.error.action).toContain('FINAGENT_PI_COMMAND');
   });
 });
 

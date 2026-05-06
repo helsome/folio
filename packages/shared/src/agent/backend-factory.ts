@@ -14,7 +14,13 @@ export function createAgentBackend(options: AgentBackendFactoryOptions = {}): Ag
     return new LocalFinanceAgentBackend();
   }
 
-  return new PiRuntimeAgentBackend(options.piRuntime);
+  return new PiRuntimeAgentBackend({
+    ...options.piRuntime,
+    rpc: {
+      requiredEnvKeys: readRequiredLlmEnvKeys(),
+      ...options.piRuntime?.rpc,
+    },
+  });
 }
 
 export { LocalFinanceAgentBackend } from './local-finance-agent-backend.ts';
@@ -28,4 +34,13 @@ function readProviderFromEnv(): AgentBackendProvider | undefined {
   const value = process.env.FINAGENT_AGENT_PROVIDER;
   if (value === 'local' || value === 'pi-runtime') return value;
   return undefined;
+}
+
+function readRequiredLlmEnvKeys() {
+  if (process.env.FINAGENT_REQUIRE_LLM_ENV === '0') return [];
+  const value = process.env.FINAGENT_REQUIRED_LLM_ENV;
+  if (value) {
+    return value.split(',').map((key) => key.trim()).filter(Boolean);
+  }
+  return ['ANTHROPIC_API_KEY'];
 }

@@ -2,10 +2,19 @@ import { app, BrowserWindow, ipcMain } from 'electron';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { AgentGateway, toIpcResult } from './agentGateway.ts';
+import { loadFinagentEnv } from './loadEnv.ts';
 
 let mainWindow: BrowserWindow | null = null;
-const agentGateway = new AgentGateway();
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const appRoot = join(__dirname, '../..');
+const workspaceRoot = join(__dirname, '../../../..');
+loadFinagentEnv({
+  roots: [
+    workspaceRoot,
+    appRoot,
+  ],
+});
+const agentGateway = new AgentGateway();
 const isDev = !app.isPackaged;
 
 function createWindow() {
