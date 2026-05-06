@@ -6,6 +6,8 @@ import { MessageList } from './MessageList';
 import { Button } from '../primitives/Button';
 import type { Message } from '@finagent/core';
 
+const folioLogoUrl = new URL('../../assets/folio-logo.png', import.meta.url).href;
+
 export const ChatArea: React.FC = () => {
   const client = useFinagentClient();
   const [messages] = useAtom(activeMessagesAtom);
@@ -77,36 +79,49 @@ export const ChatArea: React.FC = () => {
 
   if (!activeSessionId) {
     return (
-      <main className="flex-1 flex flex-col items-center justify-center bg-[oklch(var(--bg-primary))]">
-        <div className="text-center">
-          <h1 className="text-2xl font-bold mb-4">Welcome to Finance Agent</h1>
-          <p className="text-[oklch(var(--text-secondary))] mb-6">
+      <main className="mac-main-surface flex flex-1 flex-col items-center justify-center">
+        <div className="text-center max-w-md px-6">
+          <img
+            src={folioLogoUrl}
+            alt=""
+            className="mx-auto mb-5 h-20 w-20 rounded-[22px] shadow-[0_18px_50px_rgba(var(--accent-rgb),0.18)]"
+            draggable={false}
+          />
+          <h1 className="mb-3 text-[28px] font-semibold tracking-tight text-foreground">Folio</h1>
+          <p className="mb-6 text-[15px] leading-relaxed text-foreground/58">
             Start a new session to begin exploring market data and managing your portfolio.
           </p>
-          <Button onClick={() => createSession()}>Create New Session</Button>
+          <Button onClick={() => createSession()} size="lg">Create New Session</Button>
         </div>
       </main>
     );
   }
 
   return (
-    <main className="flex-1 flex flex-col bg-[oklch(var(--bg-primary))]">
+    <main className="mac-main-surface flex flex-1 flex-col">
       <MessageList messages={messages} isLoading={isLoading} />
       <div ref={messagesEndRef} />
 
-      {/* Input Area */}
-      <div className="p-4 border-t border-[oklch(var(--bg-secondary))]">
-        <div className="flex gap-2">
+      <div className="border-t mac-section-divider bg-background/64 px-5 py-4 backdrop-blur-2xl">
+        <div className="mx-auto flex max-w-3xl items-end gap-2.5">
           <textarea
             value={input}
             onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Type a message..."
-            className="flex-1 px-4 py-3 rounded-lg border border-[oklch(var(--bg-secondary))] bg-[oklch(var(--bg-primary))] text-[oklch(var(--text-primary))] resize-none focus:outline-none focus:ring-2 focus:ring-[oklch(var(--accent-primary))]"
+            placeholder="Ask about quotes, portfolio, or market moves..."
+            className="mac-input max-h-32 min-h-11 flex-1 resize-none rounded-[18px] px-4 py-3 text-[14px] leading-relaxed text-foreground placeholder:text-foreground/38 focus:border-[rgba(var(--accent-rgb),0.34)] focus:outline-none focus:ring-2 focus:ring-accent/25"
             rows={1}
           />
-          <Button onClick={handleSend} disabled={!input.trim() || isLoading}>
-            Send
+          <Button
+            onClick={handleSend}
+            disabled={!input.trim() || isLoading}
+            size="icon"
+            className="h-11 w-11 rounded-full"
+            aria-label="Send message"
+          >
+            <svg width="17" height="17" viewBox="0 0 17 17" fill="none" aria-hidden="true">
+              <path d="M8.5 13.5v-10M8.5 3.5 4.2 7.8M8.5 3.5l4.3 4.3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
+            </svg>
           </Button>
         </div>
       </div>

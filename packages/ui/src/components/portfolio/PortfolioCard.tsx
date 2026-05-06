@@ -11,14 +11,14 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio }) => {
   const totalPnLPercent = totalInvested > 0 ? (totalPnL / totalInvested) * 100 : 0;
 
   const isPositive = totalPnL >= 0;
-  const pnlColor = isPositive ? 'text-green-500' : 'text-red-500';
+  const pnlColor = isPositive ? 'text-[var(--mac-green)]' : 'text-[var(--mac-red)]';
 
   return (
-    <div className="p-4 bg-[oklch(var(--bg-secondary))] rounded-lg">
+    <div className="mac-stock-tile rounded-[14px] p-4">
       <div className="flex justify-between items-start">
         <div>
-          <div className="text-sm text-[oklch(var(--text-secondary))]">Total Value</div>
-          <div className="text-3xl font-bold text-[oklch(var(--text-primary))]">
+          <div className="text-[13px] text-foreground/54">Total Value</div>
+          <div className="text-3xl font-semibold tracking-tight text-foreground">
             ${portfolio.totalValue.toFixed(2)}
           </div>
         </div>
@@ -34,14 +34,14 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({ portfolio }) => {
 
       <div className="mt-4 flex justify-between text-sm">
         <div>
-          <span className="text-[oklch(var(--text-secondary))]">Cash: </span>
-          <span className="text-[oklch(var(--text-primary))] font-medium">
+          <span className="text-foreground/54">Cash: </span>
+          <span className="font-medium text-foreground">
             ${portfolio.cash.toFixed(2)}
           </span>
         </div>
         <div>
-          <span className="text-[oklch(var(--text-secondary))]">Positions: </span>
-          <span className="text-[oklch(var(--text-primary))] font-medium">
+          <span className="text-foreground/54">Positions: </span>
+          <span className="font-medium text-foreground">
             {portfolio.positions.length}
           </span>
         </div>

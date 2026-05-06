@@ -8,31 +8,31 @@ interface StockCardProps {
 
 export const StockCard: React.FC<StockCardProps> = ({ quote, onClick }) => {
   const isPositive = quote.change >= 0;
-  const changeColor = isPositive ? 'text-green-500' : 'text-red-500';
-  const bgColor = isPositive ? 'border-green-500/20' : 'border-red-500/20';
+  const changeColor = isPositive ? 'text-[var(--mac-green)]' : 'text-[var(--mac-red)]';
+  const bgColor = isPositive ? 'border-[rgba(48,209,88,0.22)]' : 'border-[rgba(255,69,58,0.22)]';
 
   return (
     <div
-      className={`p-4 rounded-lg bg-[oklch(var(--bg-secondary))] border ${bgColor} cursor-pointer hover:opacity-80 transition-opacity`}
+      className={`mac-stock-tile cursor-pointer rounded-[14px] border p-4 transition-smooth hover:translate-y-[-1px] ${bgColor}`}
       onClick={onClick}
     >
       <div className="flex justify-between items-start">
         <div>
-          <div className="font-semibold text-[oklch(var(--text-primary))]">{quote.symbol}</div>
-          <div className="text-2xl font-bold text-[oklch(var(--text-primary))]">
+          <div className="text-[13px] font-semibold text-foreground/72">{quote.symbol}</div>
+          <div className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
             ${quote.lastPrice.toFixed(2)}
           </div>
         </div>
         <div className={`text-right ${changeColor}`}>
-          <div className="font-medium">
+          <div className="font-semibold">
             {isPositive ? '+' : ''}{quote.change.toFixed(2)}
           </div>
-          <div className="text-sm">
+          <div className="text-[13px]">
             {isPositive ? '+' : ''}{quote.changePercent.toFixed(2)}%
           </div>
         </div>
       </div>
-      <div className="mt-3 flex justify-between text-xs text-[oklch(var(--text-secondary))]">
+      <div className="mt-3 flex justify-between text-[12px] text-foreground/48">
         <span>Vol: {quote.volume.toLocaleString()}</span>
         <span>H: ${quote.high.toFixed(2)} L: ${quote.low.toFixed(2)}</span>
       </div>

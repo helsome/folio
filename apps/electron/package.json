@@ -33,7 +33,7 @@
   },
   "build": {
     "appId": "com.finagent.app",
-    "productName": "Finance Agent",
+    "productName": "Folio",
     "directories": {
       "output": "../../dist/electron"
     },

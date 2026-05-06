@@ -51,12 +51,11 @@ export const Watchlist: React.FC = () => {
 
   return (
     <div className="flex flex-col h-full">
-      <div className="p-3 border-b border-[oklch(var(--bg-primary))]">
-        <div className="text-xs font-semibold text-[oklch(var(--text-secondary))] uppercase tracking-wide mb-2">
+      <div className="border-b mac-section-divider px-3 py-3">
+        <div className="mb-2 px-0.5 text-[11px] font-semibold uppercase text-foreground/42">
           Watchlist
         </div>
-        {/* Add symbol input */}
-        <div className="flex gap-1">
+        <div className="flex gap-1.5">
           <Input
             value={newSymbol}
             onChange={(e: React.ChangeEvent<HTMLInputElement>) => {
@@ -66,16 +65,17 @@ export const Watchlist: React.FC = () => {
             onKeyDown={handleKeyDown}
             placeholder="AAPL.US"
             error={error}
-            className="flex-1 text-sm"
+            className="h-8 flex-1 text-[12px]"
           />
-          <Button size="sm" onClick={handleAddSymbol}>
-            +
+          <Button size="icon" onClick={handleAddSymbol} aria-label="Add symbol">
+            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
+              <path d="M6.5 2.25v8.5M2.25 6.5h8.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
+            </svg>
           </Button>
         </div>
       </div>
 
-      {/* Watchlist items */}
-      <div className="flex-1 overflow-y-auto p-2 space-y-2">
+      <div className="flex-1 space-y-2 overflow-y-auto p-2.5">
         {watchlist.map((symbol) => (
           <WatchlistItem
             key={symbol}
@@ -85,7 +85,7 @@ export const Watchlist: React.FC = () => {
           />
         ))}
         {watchlist.length === 0 && (
-          <div className="text-center py-8 text-[oklch(var(--text-secondary))] text-sm">
+          <div className="py-8 text-center text-[13px] text-foreground/44">
             <p>No symbols in watchlist</p>
             <p className="mt-1">Add symbols above</p>
           </div>
@@ -114,26 +114,29 @@ const WatchlistItem: React.FC<WatchlistItemProps> = ({ symbol, client, onRemove 
 
   if (cache.loading && !cache.data) {
     return (
-      <div className="p-3 bg-[oklch(var(--bg-secondary))] rounded-lg animate-pulse">
-        <div className="h-4 w-16 bg-[oklch(var(--bg-primary))] rounded mb-2" />
-        <div className="h-6 w-24 bg-[oklch(var(--bg-primary))] rounded" />
+      <div className="mac-stock-tile animate-pulse rounded-[10px] p-3">
+        <div className="mb-2 h-3.5 w-16 rounded bg-foreground/8" />
+        <div className="h-5 w-24 rounded bg-foreground/8" />
       </div>
     );
   }
 
   if (cache.error && !cache.data) {
     return (
-      <div className="p-3 bg-[oklch(var(--bg-secondary))] rounded-lg">
+      <div className="mac-stock-tile rounded-[10px] p-3">
         <div className="flex justify-between items-start">
           <div>
-            <div className="font-semibold text-[oklch(var(--text-primary))]">{symbol}</div>
-            <div className="text-sm text-red-500">{cache.error}</div>
+            <div className="text-[13px] font-semibold text-foreground">{symbol}</div>
+            <div className="mt-0.5 text-[12px] text-[var(--mac-red)]">{cache.error}</div>
           </div>
           <button
             onClick={onRemove}
-            className="text-[oklch(var(--text-secondary))] hover:text-red-500"
+            className="flex h-6 w-6 items-center justify-center rounded-full text-foreground/42 transition-smooth hover:bg-foreground/7 hover:text-[var(--mac-red)]"
+            aria-label={`Remove ${symbol}`}
           >
-            ×
+            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+              <path d="M2.4 2.4l6.2 6.2M8.6 2.4 2.4 8.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+            </svg>
           </button>
         </div>
       </div>
@@ -147,28 +150,30 @@ const WatchlistItem: React.FC<WatchlistItemProps> = ({ symbol, client, onRemove 
 
   return (
     <div className="group relative">
-      <div className="flex justify-between items-center p-3 bg-[oklch(var(--bg-secondary))] rounded-lg hover:opacity-80 cursor-pointer">
+      <div className="mac-stock-tile flex cursor-pointer items-center justify-between rounded-[10px] p-3 transition-smooth hover:translate-y-[-1px]">
         <div>
-          <div className="font-semibold text-[oklch(var(--text-primary))]">{quote.symbol}</div>
-          <div className="text-lg font-bold text-[oklch(var(--text-primary))]">
+          <div className="text-[13px] font-semibold text-foreground">{quote.symbol}</div>
+          <div className="mt-0.5 text-[18px] font-semibold tracking-tight text-foreground">
             ${quote.lastPrice.toFixed(2)}
           </div>
         </div>
-        <div className={`text-right ${isPositive ? 'text-green-500' : 'text-red-500'}`}>
-          <div className="font-medium">
+        <div className={`text-right ${isPositive ? 'text-[var(--mac-green)]' : 'text-[var(--mac-red)]'}`}>
+          <div className="text-[13px] font-semibold">
             {isPositive ? '+' : ''}{quote.changePercent.toFixed(2)}%
           </div>
         </div>
       </div>
-      {/* Remove button on hover */}
       <button
         onClick={(e) => {
           e.stopPropagation();
           onRemove();
         }}
-        className="absolute top-2 right-2 opacity-0 group-hover:opacity-100 transition-opacity bg-[oklch(var(--bg-primary))] rounded-full w-6 h-6 flex items-center justify-center text-[oklch(var(--text-secondary))] hover:text-red-500"
+        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-background/80 text-foreground/42 opacity-0 shadow-sm backdrop-blur transition-smooth hover:text-[var(--mac-red)] group-hover:opacity-100"
+        aria-label={`Remove ${symbol}`}
       >
-        ×
+        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+          <path d="M2.4 2.4l6.2 6.2M8.6 2.4 2.4 8.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+        </svg>
       </button>
     </div>
   );

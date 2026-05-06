@@ -17,7 +17,7 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({ client = fallbackClient }) => {
   return (
     <FinagentClientProvider client={client}>
-      <div className="flex flex-col h-screen bg-[oklch(var(--bg-primary))]">
+      <div className="mac-app-window flex h-screen flex-col overflow-hidden bg-background text-foreground">
         <TitleBar />
         <LongBridgeBanner />
         <div className="flex flex-1 overflow-hidden">
@@ -60,10 +60,10 @@ const LongBridgeBanner: React.FC = () => {
   const title = status?.status === 'rate_limited' ? 'LongBridge paused: ' : 'LongBridge setup needed: ';
 
   return (
-    <div className="border-b border-yellow-500/30 bg-yellow-500/10 px-4 py-2 text-sm text-[oklch(var(--text-primary))]">
-      <span className="font-medium">{title}</span>
-      <span>{message}</span>
-      <span className="ml-2 text-[oklch(var(--text-secondary))]">{action}</span>
+    <div className="border-b border-[color-mix(in_srgb,var(--info)_26%,transparent)] bg-[color-mix(in_srgb,var(--info)_10%,transparent)] px-4 py-2 text-[13px] backdrop-blur-xl">
+      <span className="font-semibold text-foreground">{title}</span>
+      <span className="text-foreground/78">{message}</span>
+      <span className="ml-2 text-foreground/54">{action}</span>
     </div>
   );
 };

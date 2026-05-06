@@ -1,3 +1,4 @@
+export * from './lib/utils';
 export * from './atoms';
 export * from './client';
 export * from './components/primitives/Button';

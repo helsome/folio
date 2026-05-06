@@ -15,41 +15,41 @@ export const TurnCard: React.FC<TurnCardProps> = ({ message }) => {
       className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
     >
       <div
-        className={`max-w-[70%] rounded-lg px-4 py-3 ${
+        className={`max-w-[76%] rounded-[20px] px-4 py-3 ${
           isUser
-            ? 'bg-[oklch(var(--accent-primary))] text-white'
+            ? 'mac-message-user rounded-br-[6px]'
             : isTool
-            ? 'bg-[oklch(var(--bg-secondary))] text-[oklch(var(--text-secondary))] border border-[oklch(var(--accent-primary))]'
-            : 'bg-[oklch(var(--bg-secondary))] text-[oklch(var(--text-primary))]'
+            ? 'mac-message-assistant rounded-bl-[6px] text-foreground'
+            : 'mac-message-assistant rounded-bl-[6px] text-foreground'
         }`}
       >
         {isTool && message.toolName && (
-          <div className="text-xs font-medium mb-1 text-[oklch(var(--accent-primary))]">
+          <div className="mb-1.5 text-[12px] font-semibold text-accent">
             Tool: {message.toolName}
           </div>
         )}
-        <div className="prose prose-sm max-w-none">
+        <div className="max-w-none whitespace-pre-wrap text-[14px] leading-relaxed">
           {message.content}
         </div>
         {!isUser && toolCalls.length > 0 && (
-          <div className="mt-3 border-t border-[oklch(var(--bg-primary))] pt-2">
-            <div className="text-xs font-medium text-[oklch(var(--text-secondary))]">
+          <div className="mt-3 border-t mac-section-divider pt-3">
+            <div className="mb-2 text-[11px] font-semibold uppercase text-foreground/42">
               Tool calls
             </div>
-            <div className="mt-1 space-y-1">
+            <div className="space-y-1.5">
               {toolCalls.map((toolCall) => (
                 <div
                   key={toolCall.id}
-                  className="flex items-center justify-between gap-3 rounded bg-[oklch(var(--bg-primary))] px-2 py-1 text-xs"
+                  className="flex items-center justify-between gap-3 rounded-[10px] bg-foreground/[0.045] px-3 py-2 text-[12px]"
                 >
-                  <span className="truncate font-mono text-[oklch(var(--text-primary))]">
+                  <span className="truncate font-mono text-foreground/68">
                     {toolCall.toolName}
                   </span>
                   <span
                     className={
                       toolCall.status === 'success'
-                        ? 'text-green-600 dark:text-green-400'
-                        : 'text-red-600 dark:text-red-400'
+                        ? 'font-semibold text-success'
+                        : 'font-semibold text-destructive'
                     }
                   >
                     {toolCall.status}
@@ -59,8 +59,8 @@ export const TurnCard: React.FC<TurnCardProps> = ({ message }) => {
             </div>
           </div>
         )}
-        <div className={`text-xs mt-1 ${isUser ? 'text-white/70' : 'text-[oklch(var(--text-secondary))]'}`}>
-          {new Date(message.timestamp).toLocaleTimeString()}
+        <div className={`mt-2 text-[11px] ${isUser ? 'text-white/68' : 'text-foreground/38'}`}>
+          {new Date(message.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
         </div>
       </div>
     </div>

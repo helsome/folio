@@ -43,7 +43,7 @@ const missingClient = (operation: string) => async () => ({
   ok: false as const,
   error: {
     code: 'CLIENT_UNAVAILABLE',
-    message: `Finagent client is not available for ${operation}.`,
+    message: `Folio client is not available for ${operation}.`,
   },
 });
 

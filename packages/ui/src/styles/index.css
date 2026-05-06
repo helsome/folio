@@ -1,24 +1,173 @@
 @import "tailwindcss";
 
+/* CRAFT AGENT THEME - Apple/macOS 6 Color System */
 :root {
-  --bg-primary: 0.98 0.01 250;
-  --bg-secondary: 0.96 0.01 250;
-  --accent-primary: 0.65 0.20 280;
-  --text-primary: 0.15 0.02 280;
-  --text-secondary: 0.45 0.02 280;
+  /* === 6 BASE COLORS === */
+  --background: oklch(0.985 0.002 260);
+  --background-elevated: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
+  --foreground: oklch(0.19 0.012 260);
+  --foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
+  --foreground-rgb: 35, 37, 43;
+  --accent: oklch(0.62 0.19 253);
+  --accent-rgb: 10, 132, 255;
+  --info: oklch(0.75 0.16 70);
+  --info-rgb: 180, 120, 40;
+  --success: oklch(0.55 0.17 145);
+  --success-rgb: 34, 120, 60;
+  --destructive: oklch(0.58 0.24 28);
+  --destructive-rgb: 180, 60, 50;
+
+  /* === SHADOW OPACITY (light mode = subtle) === */
+  --shadow-border-opacity: 0.08;
+  --shadow-blur-opacity: 0.06;
+
+  /* === SHADOW VALUES === */
+  --shadow-minimal:
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(var(--foreground-rgb), 0.055) 0px 0px 0px 1px,
+    rgba(0, 0, 0, 0.035) 0px 1px 1px -0.5px,
+    rgba(0, 0, 0, 0.045) 0px 5px 12px -8px;
+
+  --shadow-middle:
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
+    rgba(var(--foreground-rgb), 0.07) 0px 0px 0px 1px,
+    rgba(18, 23, 35, 0.045) 0px 2px 4px -2px,
+    rgba(18, 23, 35, 0.08) 0px 18px 38px -24px;
+
+  --mac-window: oklch(0.985 0.002 260);
+  --mac-titlebar: color-mix(in srgb, white 78%, var(--background));
+  --mac-sidebar: color-mix(in srgb, white 66%, var(--background));
+  --mac-sidebar-hover: color-mix(in srgb, var(--foreground) 4%, transparent);
+  --mac-border: color-mix(in srgb, var(--foreground) 8%, transparent);
+  --mac-border-strong: color-mix(in srgb, var(--foreground) 13%, transparent);
+  --mac-control: color-mix(in srgb, var(--foreground) 3.8%, white);
+  --mac-control-hover: color-mix(in srgb, var(--foreground) 6%, white);
+  --mac-surface: rgba(255, 255, 255, 0.78);
+  --mac-surface-solid: oklch(1 0 0);
+  --mac-blue: #0a84ff;
+  --mac-blue-hover: #0071e3;
+  --mac-blue-soft: rgba(10, 132, 255, 0.12);
+  --mac-green: #30d158;
+  --mac-red: #ff453a;
+  --mac-yellow: #ffd60a;
+
+  /* === LEGACY TOKENS (mapped for compatibility) === */
+  --bg-primary: 0.985 0.002 260;
+  --bg-secondary: 0.965 0.003 260;
+  --accent-primary: 0.62 0.19 253;
+  --text-primary: 0.19 0.012 260;
+  --text-secondary: 0.45 0.01 270;
 }
 
 .dark {
-  --bg-primary: 0.15 0.02 280;
-  --bg-secondary: 0.20 0.02 280;
-  --accent-primary: 0.70 0.18 280;
-  --text-primary: 0.95 0.01 250;
-  --text-secondary: 0.70 0.02 250;
+  --background: oklch(0.145 0.015 270);
+  --background-elevated: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
+  --foreground: oklch(0.95 0.01 270);
+  --foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
+  --foreground-rgb: 237, 236, 240;
+  --accent: oklch(0.68 0.18 253);
+  --accent-rgb: 64, 156, 255;
+  --info: oklch(0.78 0.14 70);
+  --info-rgb: 210, 155, 55;
+  --success: oklch(0.60 0.17 145);
+  --success-rgb: 50, 140, 80;
+  --destructive: oklch(0.65 0.22 28);
+  --destructive-rgb: 200, 70, 60;
+
+  --mac-window: oklch(0.155 0.014 260);
+  --mac-titlebar: color-mix(in srgb, var(--background) 84%, white);
+  --mac-sidebar: color-mix(in srgb, var(--background) 88%, white);
+  --mac-sidebar-hover: color-mix(in srgb, var(--foreground) 7%, transparent);
+  --mac-border: color-mix(in srgb, var(--foreground) 12%, transparent);
+  --mac-border-strong: color-mix(in srgb, var(--foreground) 20%, transparent);
+  --mac-control: color-mix(in srgb, var(--foreground) 7%, var(--background));
+  --mac-control-hover: color-mix(in srgb, var(--foreground) 11%, var(--background));
+  --mac-surface: rgba(35, 37, 44, 0.74);
+  --mac-surface-solid: oklch(0.205 0.014 260);
+  --mac-blue: #409cff;
+  --mac-blue-hover: #64adff;
+  --mac-blue-soft: rgba(64, 156, 255, 0.18);
+  --mac-green: #32d74b;
+  --mac-red: #ff6961;
+  --mac-yellow: #ffd60a;
+
+  /* === SHADOW OPACITY (stronger in dark mode) === */
+  --shadow-border-opacity: 0.15;
+  --shadow-blur-opacity: 0.12;
+
+  /* === LEGACY TOKENS === */
+  --bg-primary: 0.145 0.015 270;
+  --bg-secondary: 0.20 0.015 270;
+  --accent-primary: 0.68 0.18 253;
+  --text-primary: 0.95 0.01 270;
+  --text-secondary: 0.70 0.01 270;
+}
+
+/* Z-Index Scale */
+:root {
+  --z-index-base: 0;
+  --z-index-local: 10;
+  --z-index-sticky: 20;
+  --z-index-titlebar: 40;
+  --z-index-panel: 50;
+  --z-index-dropdown: 100;
+  --z-index-tooltip: 150;
+  --z-index-modal: 200;
+  --z-index-overlay: 300;
+}
+
+/* Theme integration via @theme inline */
+@theme inline {
+  --color-background: var(--background);
+  --color-foreground: var(--foreground);
+  --color-accent: var(--accent);
+  --color-info: var(--info);
+  --color-success: var(--success);
+  --color-destructive: var(--destructive);
 }
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+  text-rendering: geometricPrecision;
+  background:
+    linear-gradient(180deg, color-mix(in srgb, var(--background) 98%, white), var(--background));
+}
+
+button,
+textarea,
+input {
+  font: inherit;
+}
+
+/* Apple-style frosted glass panels */
+.glass-panel {
+  background: var(--mac-surface);
+  backdrop-filter: saturate(180%) blur(24px);
+  -webkit-backdrop-filter: saturate(180%) blur(24px);
+  border: 1px solid var(--mac-border);
+}
+
+/* Apple-style elevated surface */
+.elevated-surface {
+  background: var(--mac-surface);
+  box-shadow: var(--shadow-middle);
+  border-radius: 12px;
+}
+
+/* Smooth transitions for interactive elements */
+.transition-smooth {
+  transition:
+    background-color 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
+    border-color 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
+    box-shadow 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
+    color 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
+    opacity 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
+    transform 0.18s cubic-bezier(0.25, 0.1, 0.25, 1);
 }
 
 /* Scrollbar styling */
@@ -38,4 +187,119 @@ body {
 
 ::-webkit-scrollbar-thumb:hover {
   background: oklch(var(--text-secondary) / 0.5);
+}
+
+.mac-app-window {
+  background:
+    radial-gradient(circle at 24% 0%, rgba(var(--accent-rgb), 0.055), transparent 28rem),
+    linear-gradient(180deg, color-mix(in srgb, var(--mac-window) 96%, white), var(--mac-window));
+}
+
+.mac-titlebar {
+  height: 2.25rem;
+  background: var(--mac-titlebar);
+  border-bottom: 1px solid var(--mac-border);
+  backdrop-filter: saturate(180%) blur(22px);
+  -webkit-backdrop-filter: saturate(180%) blur(22px);
+}
+
+.mac-traffic-light {
+  height: 0.78rem;
+  width: 0.78rem;
+  border-radius: 999px;
+  box-shadow:
+    inset 0 0 0 0.5px rgba(0, 0, 0, 0.16),
+    0 0.5px 1px rgba(0, 0, 0, 0.10);
+}
+
+.mac-traffic-light-close {
+  background: #ff5f57;
+}
+
+.mac-traffic-light-minimize {
+  background: #febc2e;
+}
+
+.mac-traffic-light-maximize {
+  background: #28c840;
+}
+
+.mac-sidebar {
+  background: var(--mac-sidebar);
+  border-right: 1px solid var(--mac-border);
+  backdrop-filter: saturate(180%) blur(26px);
+  -webkit-backdrop-filter: saturate(180%) blur(26px);
+}
+
+.mac-main-surface {
+  background:
+    linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0) 16rem),
+    var(--background);
+}
+
+.mac-section-divider {
+  border-color: var(--mac-border);
+}
+
+.mac-primary-button {
+  background: var(--mac-blue);
+  color: white;
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 8px 18px rgba(var(--accent-rgb), 0.22);
+}
+
+.mac-primary-button:hover {
+  background: var(--mac-blue-hover);
+  box-shadow:
+    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
+    0 10px 22px rgba(var(--accent-rgb), 0.25);
+}
+
+.mac-secondary-button,
+.mac-input {
+  background: var(--mac-control);
+  border: 1px solid var(--mac-border);
+  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.48);
+}
+
+.mac-secondary-button:hover,
+.mac-input:hover {
+  background: var(--mac-control-hover);
+}
+
+.mac-message-assistant {
+  background: var(--mac-surface);
+  border: 1px solid var(--mac-border);
+  box-shadow: var(--shadow-minimal);
+}
+
+.mac-message-user {
+  background: var(--mac-blue);
+  color: white;
+  box-shadow: 0 8px 18px rgba(var(--accent-rgb), 0.18);
+}
+
+.mac-list-row {
+  border: 1px solid transparent;
+  transition:
+    background-color 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
+    border-color 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
+    transform 0.18s cubic-bezier(0.25, 0.1, 0.25, 1);
+}
+
+.mac-list-row:hover {
+  background: var(--mac-sidebar-hover);
+}
+
+.mac-list-row-active {
+  background: var(--mac-blue-soft);
+  border-color: rgba(var(--accent-rgb), 0.18);
+  color: var(--foreground);
+}
+
+.mac-stock-tile {
+  background: color-mix(in srgb, white 72%, var(--background));
+  border: 1px solid var(--mac-border);
+  box-shadow: var(--shadow-minimal);
 }
