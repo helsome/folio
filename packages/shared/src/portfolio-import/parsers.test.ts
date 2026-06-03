@@ -172,6 +172,24 @@ describe('parseCsv', () => {
     expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 100, costPrice: 180.5 })
   })
 
+  it('keeps Price as a cost fallback only when no specific cost column exists', () => {
+    const rows = parseCsv('Symbol,Price,Shares\nAAPL.US,180.5,100')
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 100, costPrice: 180.5, confidence: 1, issues: [] })
+  })
+
+  it('uses the specific cost column when an earlier Price column is also present', () => {
+    const rows = parseCsv('Symbol,Price,Cost,Qty\nAAPL.US,190.25,180.5,100\n0700.HK,330,320,500')
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 100, costPrice: 180.5, confidence: 1, issues: [] })
+    expect(rows[1]).toMatchObject({ symbol: '0700.HK', quantity: 500, costPrice: 320 })
+  })
+
+  it('prefers Avg Cost and 成本 over a generic price column', () => {
+    const english = parseCsv('Ticker,Price,Avg Cost,Shares\nAAPL.US,190.25,180.5,100')
+    expect(english[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 100, costPrice: 180.5 })
+    const chinese = parseCsv('代码,价格,成本,数量\n600519.SH,1700,1600,10')
+    expect(chinese[0]).toMatchObject({ symbol: '600519.SH', quantity: 10, costPrice: 1600, confidence: 1, issues: [] })
+  })
+
   it('supports an explicit headerMapping override', () => {
     const rows = parseCsv('Ticker,Avg Cost,Units\nAAPL.US,180.5,100', { symbol: 'Ticker', cost: 'Avg Cost', quantity: 'Units' })
     expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 100, costPrice: 180.5 })

@@ -26,18 +26,24 @@ export const HEADER_ALIASES: Record<HeaderField, readonly string[]> = {
   symbol: ['symbol', 'ticker', 'code', 'stock', '代码', '股票代码', '证券代码'],
   name: ['name', 'company', 'stockname', '名称', '股票名称', '证券名称'],
   quantity: ['quantity', 'qty', 'shares', '数量', '持股数量', '股数', '持仓数量'],
+  // Specific cost headers come first. `price` / `价格` are fallbacks only:
+  // a leftmost "Price" column must not steal the value when "Cost" or
+  // "Avg Cost" is also present.
   cost: [
     'cost',
     'costprice',
     'cost price',
-    'price',
     'avgcost',
     'avg cost',
+    'averagecost',
+    'average cost',
     '成本',
     '成本价',
     '买入价',
     '持仓成本',
     '均价',
+    '价格',
+    'price',
   ],
   currency: ['currency', 'ccy', '货币', '币种'],
   account: ['account', '账户', '账号', '组合'],
@@ -175,6 +181,20 @@ function normalizeHeaderCell(cell: string): string {
   return cell.trim().toLowerCase().replace(/[\s_\-]/g, '')
 }
 
+/**
+ * Pick a column by alias specificity, not by leftmost match.
+ * The first alias that appears anywhere in the row wins, so a generic
+ * fallback such as `price` does not override an earlier specific header
+ * that happens to sit further right.
+ */
+function columnForAliases(cells: readonly string[], aliases: readonly string[]): number {
+  for (const alias of aliases) {
+    const index = cells.indexOf(normalizeHeaderCell(alias))
+    if (index >= 0) return index
+  }
+  return -1
+}
+
 /** Field → resolved column index for one CSV file. */
 export interface CsvColumnMap {
   isHeader: boolean
@@ -204,7 +224,7 @@ export function resolveCsvColumns(
       found = cells.indexOf(normalizeHeaderCell(explicit))
     }
     if (found === -1) {
-      found = cells.findIndex((cell) => HEADER_ALIASES[field].some((alias) => normalizeHeaderCell(alias) === cell))
+      found = columnForAliases(cells, HEADER_ALIASES[field])
     }
     if (found >= 0) byIndex.set(found, field)
   }
