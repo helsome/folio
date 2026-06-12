@@ -90,6 +90,26 @@ export function checkSymbol(raw: string): SymbolCheck {
 }
 
 /**
+ * Accounting exports write negatives as `(180.50)` or `180.50-`.
+ * Fullwidth parentheses are accepted. A normal leading minus is left for
+ * the numeric parse.
+ */
+function takeAccountingSign(value: string): { text: string; negative: boolean } {
+  let text = value.trim()
+  let negative = false
+  const wrapped = /^(?:\(|（)\s*(.*?)\s*(?:\)|）)$/.exec(text)
+  if (wrapped) {
+    negative = true
+    text = wrapped[1].trim()
+  }
+  if (text.endsWith('-') && !/^[+-]/.test(text)) {
+    negative = true
+    text = text.slice(0, -1).trim()
+  }
+  return { text, negative }
+}
+
+/**
  * Drop currency markers brokerage exports glue onto a number.
  * `HK$1,234.50`, `US$180`, `¥180.5`, `180.50 USD` all reduce to the digits.
  * A leading sign is preserved (`-HK$12` stays negative).
@@ -119,7 +139,8 @@ export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value !== 'string') {
     return undefined
   }
-  const trimmed = stripCurrencyAffixes(value)
+  const accounting = takeAccountingSign(value)
+  const trimmed = stripCurrencyAffixes(accounting.text)
   if (trimmed === '') {
     return undefined
   }
@@ -130,7 +151,8 @@ export function toFiniteNumber(value: unknown): number | undefined {
   }
   const parsed = Number(cleaned)
   if (!Number.isFinite(parsed)) return undefined
-  return parsed === 0 ? 0 : parsed
+  if (parsed === 0) return 0
+  return accounting.negative ? -Math.abs(parsed) : parsed
 }
 
 // ── CSV ────────────────────────────────────────────────────────────────────
