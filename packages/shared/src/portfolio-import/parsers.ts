@@ -149,7 +149,7 @@ export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value !== 'string') {
     return undefined
   }
-  const accounting = takeAccountingSign(foldNumericWidth(value))
+  const accounting = takeAccountingSign(foldNumericWidth(stripInvisible(value)))
   const trimmed = stripCurrencyAffixes(accounting.text)
   if (trimmed === '') {
     return undefined
@@ -229,8 +229,15 @@ export function splitCsvLine(line: string, delimiter: ',' | '\t' = csvDelimiter(
   return cells
 }
 
+/** Characters `trim` does not remove, but spreadsheets and web paste often insert. */
+const INVISIBLE_CHARS = /[\uFEFF\u200B\u200C\u200D\u2060]/g
+
+function stripInvisible(value: string): string {
+  return value.replace(INVISIBLE_CHARS, '')
+}
+
 function normalizeHeaderCell(cell: string): string {
-  return cell.trim().toLowerCase().replace(/[\s_\-]/g, '')
+  return stripInvisible(cell).trim().toLowerCase().replace(/[\s_\-]/g, '')
 }
 
 /**
