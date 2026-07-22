@@ -79,6 +79,22 @@ describe('toFiniteNumber', () => {
     expect(toFiniteNumber(' 1,234.56 ')).toBe(1234.56)
   })
 
+  it('reads HK$, US$, yuan, and ISO currency glued onto the number', () => {
+    expect(toFiniteNumber('HK$1,234.50')).toBe(1234.5)
+    expect(toFiniteNumber('hk$180.5')).toBe(180.5)
+    expect(toFiniteNumber('US$180.50')).toBe(180.5)
+    expect(toFiniteNumber('¥180.5')).toBe(180.5)
+    expect(toFiniteNumber('￥1,600')).toBe(1600)
+    expect(toFiniteNumber('CN¥180')).toBe(180)
+    expect(toFiniteNumber('RMB 180.5')).toBe(180.5)
+    expect(toFiniteNumber('180.50 USD')).toBe(180.5)
+    expect(toFiniteNumber('320 HKD')).toBe(320)
+    expect(toFiniteNumber('-HK$12.5')).toBe(-12.5)
+    expect(toFiniteNumber('-$0.00')).toBe(0)
+    expect(toFiniteNumber('USD')).toBeUndefined()
+    expect(toFiniteNumber('HK$')).toBeUndefined()
+  })
+
   it('returns undefined for null, empty, and junk', () => {
     expect(toFiniteNumber(null)).toBeUndefined()
     expect(toFiniteNumber(undefined)).toBeUndefined()
@@ -130,6 +146,13 @@ describe('parseCsv', () => {
     expect(row).toMatchObject({ name: 'Apple, Inc.', quantity: 1000, costPrice: 180.5, issues: [] })
     const [mapped] = parseCsv('Ticker\tUnits\tAvg Cost\nAAPL.US\t1,000\t180.5', { symbol: 'Ticker', quantity: 'Units', cost: 'Avg Cost' })
     expect(mapped).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, issues: [] })
+  })
+
+  it('parses currency-prefixed cost cells from a brokerage CSV', () => {
+    const rows = parseCsv('Symbol,Quantity,Cost,Currency\nAAPL.US,"1,000","US$180.50",USD\n0700.HK,500,HK$320,HKD\n600519.SH,10,¥1600,CNY')
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, currency: 'USD', confidence: 1, issues: [] })
+    expect(rows[1]).toMatchObject({ symbol: '0700.HK', quantity: 500, costPrice: 320, currency: 'HKD' })
+    expect(rows[2]).toMatchObject({ symbol: '600519.SH', quantity: 10, costPrice: 1600, currency: 'CNY' })
   })
 
   it('flags formatting-only quantities and costs without inventing zeros', () => {

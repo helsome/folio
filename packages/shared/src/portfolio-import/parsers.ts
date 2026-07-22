@@ -90,8 +90,27 @@ export function checkSymbol(raw: string): SymbolCheck {
 }
 
 /**
+ * Drop currency markers brokerage exports glue onto a number.
+ * `HK$1,234.50`, `US$180`, `¥180.5`, `180.50 USD` all reduce to the digits.
+ * A leading sign is preserved (`-HK$12` stays negative).
+ */
+function stripCurrencyAffixes(value: string): string {
+  let text = value.trim()
+  const sign = text.startsWith('-') || text.startsWith('+') ? text[0] : ''
+  if (sign !== '') text = text.slice(1).trim()
+  text = text.replace(/^(?:HK|US|S|A|C)\s*\$\s*/i, '')
+  text = text.replace(/^(?:CN|RMB)\s*[¥￥]\s*/i, '')
+  text = text.replace(/^(?:RMB|CNY|USD|HKD|SGD|EUR|GBP|AUD|CAD)\s*/i, '')
+  text = text.replace(/^[¥￥€£$]\s*/, '')
+  text = text.replace(/\s*(?:RMB|CNY|USD|HKD|SGD|EUR|GBP|AUD|CAD)\s*$/i, '')
+  text = text.replace(/\s*[$¥￥€£]\s*$/, '')
+  return `${sign}${text.trim()}`
+}
+
+/**
  * Coerce a CSV/paste cell to a finite number. Strings with thousands
- * separators or a leading `$` are handled; empty/null/non-numeric → undefined.
+ * separators or a currency prefix (`$`, `HK$`, `US$`, `¥`, `USD`) are
+ * handled; empty/null/non-numeric → undefined.
  */
 export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value === 'number') {
@@ -100,17 +119,18 @@ export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value !== 'string') {
     return undefined
   }
-  const trimmed = value.trim()
+  const trimmed = stripCurrencyAffixes(value)
   if (trimmed === '') {
     return undefined
   }
   const cleaned = trimmed.replace(/[,$\s]/g, '')
   // Number('') is zero, but formatting alone does not supply a numeric value.
-  if (cleaned === '') {
+  if (cleaned === '' || cleaned === '+' || cleaned === '-') {
     return undefined
   }
   const parsed = Number(cleaned)
-  return Number.isFinite(parsed) ? parsed : undefined
+  if (!Number.isFinite(parsed)) return undefined
+  return parsed === 0 ? 0 : parsed
 }
 
 // ── CSV ────────────────────────────────────────────────────────────────────
