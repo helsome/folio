@@ -79,6 +79,17 @@ describe('toFiniteNumber', () => {
     expect(toFiniteNumber(' 1,234.56 ')).toBe(1234.56)
   })
 
+  it('reads accounting parentheses and a trailing minus as negative amounts', () => {
+    expect(toFiniteNumber('(180.50)')).toBe(-180.5)
+    expect(toFiniteNumber('($1,234.56)')).toBe(-1234.56)
+    expect(toFiniteNumber('（180.50）')).toBe(-180.5)
+    expect(toFiniteNumber('1,234.56-')).toBe(-1234.56)
+    expect(toFiniteNumber('($0.00)')).toBe(0)
+    expect(toFiniteNumber('()')).toBeUndefined()
+    expect(toFiniteNumber('($)')).toBeUndefined()
+    expect(toFiniteNumber('-45.2')).toBe(-45.2)
+  })
+
   it('returns undefined for null, empty, and junk', () => {
     expect(toFiniteNumber(null)).toBeUndefined()
     expect(toFiniteNumber(undefined)).toBeUndefined()
@@ -130,6 +141,11 @@ describe('parseCsv', () => {
     expect(row).toMatchObject({ name: 'Apple, Inc.', quantity: 1000, costPrice: 180.5, issues: [] })
     const [mapped] = parseCsv('Ticker\tUnits\tAvg Cost\nAAPL.US\t1,000\t180.5', { symbol: 'Ticker', quantity: 'Units', cost: 'Avg Cost' })
     expect(mapped).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, issues: [] })
+  })
+
+  it('parses parenthesized cost cells as negative amounts', () => {
+    const [row] = parseCsv('Symbol,Quantity,Cost\nAAPL.US,(100),"($1,234.50)"')
+    expect(row).toMatchObject({ symbol: 'AAPL.US', quantity: -100, costPrice: -1234.5, confidence: 1, issues: [] })
   })
 
   it('flags formatting-only quantities and costs without inventing zeros', () => {

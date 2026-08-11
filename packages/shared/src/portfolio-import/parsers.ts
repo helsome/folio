@@ -84,8 +84,29 @@ export function checkSymbol(raw: string): SymbolCheck {
 }
 
 /**
+ * Accounting exports write negatives as `(180.50)` or `180.50-`.
+ * Fullwidth parentheses are accepted. A normal leading minus is left for
+ * the numeric parse.
+ */
+function takeAccountingSign(value: string): { text: string; negative: boolean } {
+  let text = value.trim()
+  let negative = false
+  const wrapped = /^(?:\(|（)\s*(.*?)\s*(?:\)|）)$/.exec(text)
+  if (wrapped) {
+    negative = true
+    text = wrapped[1].trim()
+  }
+  if (text.endsWith('-') && !/^[+-]/.test(text)) {
+    negative = true
+    text = text.slice(0, -1).trim()
+  }
+  return { text, negative }
+}
+
+/**
  * Coerce a CSV/paste cell to a finite number. Strings with thousands
  * separators or a leading `$` are handled; empty/null/non-numeric → undefined.
+ * Accounting parentheses and a trailing minus are negative amounts.
  */
 export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value === 'number') {
@@ -94,17 +115,20 @@ export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value !== 'string') {
     return undefined
   }
-  const trimmed = value.trim()
+  const accounting = takeAccountingSign(value)
+  const trimmed = accounting.text.trim()
   if (trimmed === '') {
     return undefined
   }
   const cleaned = trimmed.replace(/[,$\s]/g, '')
   // Number('') is zero, but formatting alone does not supply a numeric value.
-  if (cleaned === '') {
+  if (cleaned === '' || cleaned === '+' || cleaned === '-') {
     return undefined
   }
   const parsed = Number(cleaned)
-  return Number.isFinite(parsed) ? parsed : undefined
+  if (!Number.isFinite(parsed)) return undefined
+  if (parsed === 0) return 0
+  return accounting.negative ? -Math.abs(parsed) : parsed
 }
 
 // ── CSV ────────────────────────────────────────────────────────────────────
