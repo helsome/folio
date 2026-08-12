@@ -200,7 +200,16 @@ export class PiRpcClient {
     });
 
     const timeout = setTimeout(() => {
+      // Settle the stream; clear per-tool timers so no late tool-timeout
+      // callback fires after the stream has already terminated.
+      const timedOut = this.pendingPrompts.get(id);
       this.pendingPrompts.delete(id);
+      if (timedOut) {
+        for (const toolTimeout of timedOut.toolTimeouts.values()) {
+          clearTimeout(toolTimeout);
+        }
+        timedOut.toolTimeouts.clear();
+      }
       push({
         kind: 'error',
         error: createCodeError('PI_REQUEST_TIMEOUT', `Pi request timed out after ${this.requestTimeoutMs}ms.`),
