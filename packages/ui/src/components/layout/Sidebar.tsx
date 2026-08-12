@@ -5,9 +5,11 @@ import {
   activeSessionIdAtom,
   createSessionAtom,
 } from '../../atoms';
+import { useFinagentClient } from '../../client';
 import { Watchlist } from '../stock/Watchlist';
 
 export const Sidebar: React.FC = () => {
+  const client = useFinagentClient();
   const [sessions] = useAtom(sessionsAtom);
   const [activeSessionId] = useAtom(activeSessionIdAtom);
   const createSession = useSetAtom(createSessionAtom);
@@ -17,7 +19,7 @@ export const Sidebar: React.FC = () => {
     <aside className="mac-sidebar flex w-[17rem] flex-col">
       <div className="border-b mac-section-divider px-3.5 py-3">
         <button
-          onClick={() => createSession()}
+          onClick={() => void createSession(client)}
           className="mac-primary-button flex h-9 w-full items-center justify-center gap-2 rounded-[10px] px-4 text-[13px] font-semibold transition-smooth active:scale-[0.985]"
         >
           <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
@@ -44,7 +46,7 @@ export const Sidebar: React.FC = () => {
             >
               <div className="truncate text-[13px] font-semibold">{session.title}</div>
               <div className="mt-0.5 text-[11px] opacity-56">
-                {session.messages.length} messages
+                {session.messageCount} messages
               </div>
             </button>
           ))}

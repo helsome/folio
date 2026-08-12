@@ -1,93 +1,80 @@
 import { atom } from 'jotai';
 import { atomFamily } from 'jotai/utils';
-import type { Session, Message } from '@finagent/core';
+import type { Message, SessionMeta } from '@finagent/core';
+import type { FinagentClient } from '../client';
 
-// Session atom family for session isolation
-export const sessionAtomFamily = atomFamily((sessionId: string) =>
-  atom<Session>({
-    id: sessionId,
-    title: 'New Session',
-    messages: [],
-    status: 'idle',
-    createdAt: Date.now(),
-    updatedAt: Date.now(),
-  })
-);
+// The kernel (main process) is the source of truth for sessions and messages;
+// these atoms are the renderer's view cache, hydrated from and updated by it.
 
-// Active session management
+export const sessionsAtom = atom<SessionMeta[]>([]);
+
 export const activeSessionIdAtom = atom<string | null>(null);
 
-// All sessions list
-export const sessionsAtom = atom<Session[]>([]);
-
-// Derived atom for active session
 export const activeSessionAtom = atom((get) => {
   const activeId = get(activeSessionIdAtom);
   if (!activeId) return null;
-  return get(sessionAtomFamily(activeId));
+  return get(sessionsAtom).find((session) => session.id === activeId) ?? null;
 });
 
-// Messages derived from active session
+// Per-session message cache, loaded lazily from the kernel.
+export const messagesAtomFamily = atomFamily((_sessionId: string) => atom<Message[]>([]));
+
 export const activeMessagesAtom = atom((get) => {
-  const session = get(activeSessionAtom);
-  return session?.messages ?? [];
+  const activeId = get(activeSessionIdAtom);
+  if (!activeId) return [];
+  return get(messagesAtomFamily(activeId));
 });
 
-// Add message to session
-export const addMessageAtom = atom(
-  null,
-  (get, set, message: Message) => {
-    const sessionId = get(activeSessionIdAtom);
-    if (!sessionId) return;
+export const loadedSessionIdsAtom = atom<Set<string>>(new Set<string>());
 
-    const session = get(sessionAtomFamily(sessionId));
-    const updatedSession: Session = {
-      ...session,
-      messages: [...session.messages, message],
-      updatedAt: Date.now(),
-    };
-    set(sessionAtomFamily(sessionId), updatedSession);
-    set(sessionsAtom, (sessions) =>
-      sessions.map((session) => session.id === sessionId ? updatedSession : session)
-    );
+export const hydrateSessionsAtom = atom(
+  null,
+  async (_get, set, client: FinagentClient) => {
+    const result = await client.kernel.hydrate();
+    if (!result.ok) return;
+    set(sessionsAtom, result.data.sessions);
+    if (!_get(activeSessionIdAtom) && result.data.sessions.length > 0) {
+      set(activeSessionIdAtom, result.data.sessions[0].id);
+    }
   }
 );
 
-// Update session status
-export const updateSessionStatusAtom = atom(
+export const loadMessagesAtom = atom(
   null,
-  (get, set, status: Session['status']) => {
-    const sessionId = get(activeSessionIdAtom);
-    if (!sessionId) return;
-
-    const session = get(sessionAtomFamily(sessionId));
-    const updatedSession = {
-      ...session,
-      status,
-      updatedAt: Date.now(),
-    };
-    set(sessionAtomFamily(sessionId), updatedSession);
-    set(sessionsAtom, (sessions) =>
-      sessions.map((item) => item.id === sessionId ? updatedSession : item)
-    );
+  async (_get, set, client: FinagentClient, sessionId: string) => {
+    const result = await client.kernel.getMessages(sessionId);
+    if (!result.ok) return;
+    set(messagesAtomFamily(sessionId), result.data);
+    set(loadedSessionIdsAtom, (loaded) => {
+      const next = new Set(loaded);
+      next.add(sessionId);
+      return next;
+    });
   }
 );
 
-// Create new session
 export const createSessionAtom = atom(
   null,
-  (_get, set, title?: string) => {
-    const newSession: Session = {
-      id: crypto.randomUUID(),
-      title: title ?? 'New Session',
-      messages: [],
-      status: 'idle',
-      createdAt: Date.now(),
-      updatedAt: Date.now(),
-    };
-    set(sessionAtomFamily(newSession.id), newSession);
-    set(sessionsAtom, (sessions) => [...sessions, newSession]);
-    set(activeSessionIdAtom, newSession.id);
-    return newSession;
+  async (_get, set, client: FinagentClient, title?: string) => {
+    const result = await client.kernel.createSession(title);
+    if (!result.ok) return null;
+    set(sessionsAtom, (sessions) => [...sessions, result.data]);
+    set(activeSessionIdAtom, result.data.id);
+    set(messagesAtomFamily(result.data.id), []);
+    return result.data;
+  }
+);
+
+export const deleteSessionAtom = atom(
+  null,
+  async (_get, set, client: FinagentClient, sessionId: string) => {
+    const result = await client.kernel.deleteSession(sessionId);
+    if (!result.ok) return;
+    set(sessionsAtom, (sessions) => sessions.filter((session) => session.id !== sessionId));
+    messagesAtomFamily.remove(sessionId);
+    if (_get(activeSessionIdAtom) === sessionId) {
+      const remaining = _get(sessionsAtom);
+      set(activeSessionIdAtom, remaining.length > 0 ? remaining[0].id : null);
+    }
   }
 );

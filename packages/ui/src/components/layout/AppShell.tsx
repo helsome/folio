@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { Sidebar } from './Sidebar';
 import { ChatArea } from '../chat/ChatArea';
 import { TitleBar } from './TitleBar';
+import { KernelBridge } from '../kernel/KernelBridge';
 import {
   FinagentClientProvider,
   fallbackClient,
@@ -17,6 +18,7 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({ client = fallbackClient }) => {
   return (
     <FinagentClientProvider client={client}>
+      <KernelBridge client={client} />
       <div className="mac-app-window flex h-screen flex-col overflow-hidden bg-background text-foreground">
         <TitleBar />
         <LongBridgeBanner />

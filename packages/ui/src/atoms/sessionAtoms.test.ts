@@ -1,69 +1,134 @@
-import { describe, expect, it } from 'bun:test';
+import { beforeEach, describe, expect, it } from 'bun:test';
 import { createStore } from 'jotai';
+import type { FinagentClient } from '../client';
+import type { Run, SessionMeta } from '@finagent/core';
 import {
   activeMessagesAtom,
   activeSessionIdAtom,
-  addMessageAtom,
   createSessionAtom,
-  sessionAtomFamily,
+  hydrateSessionsAtom,
+  loadMessagesAtom,
+  messagesAtomFamily,
   sessionsAtom,
 } from './sessionAtoms.ts';
 
+let sessionCounter = 0;
+let savedSessions: SessionMeta[] = [];
+let savedMessages: Record<string, unknown[]> = {};
+
+function makeSession(title: string): SessionMeta {
+  sessionCounter += 1;
+  return {
+    id: `s${sessionCounter}`,
+    title,
+    status: 'idle',
+    createdAt: 1000,
+    updatedAt: 1000,
+    messageCount: 0,
+  };
+}
+
+function makeClient(): FinagentClient {
+  return {
+    kernel: {
+      hydrate: async () => ({ ok: true as const, data: { sessions: savedSessions } }),
+      createSession: async (title?: string) => {
+        const session = makeSession(title ?? 'New Session');
+        savedSessions = [...savedSessions, session];
+        return { ok: true as const, data: session };
+      },
+      deleteSession: async (id: string) => {
+        savedSessions = savedSessions.filter((session) => session.id !== id);
+        return { ok: true as const, data: undefined };
+      },
+      getMessages: async (sessionId: string) => ({
+        ok: true as const,
+        data: (savedMessages[sessionId] ?? []) as never[],
+      }),
+      listRuns: async () => ({ ok: true as const, data: [] as Run[] }),
+      startRun: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      cancelRun: async () => ({ ok: true as const, data: undefined }),
+      onAgentEvent: () => () => undefined,
+    },
+    agent: {
+      getTools: async () => ({ ok: true as const, data: [] }),
+    },
+    market: {
+      getQuote: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      getKline: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      getPortfolio: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+    },
+    longbridge: {
+      getStatus: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+    },
+    alerts: {
+      load: async () => ({ ok: true as const, data: [] }),
+      save: async () => ({ ok: true as const, data: undefined }),
+    },
+  };
+}
+
 describe('session atoms', () => {
-  it('creates a session in both active session state and session list state', () => {
-    const store = createStore();
-
-    const session = store.set(createSessionAtom);
-
-    expect(store.get(activeSessionIdAtom)).toBe(session.id);
-    expect(store.get(sessionAtomFamily(session.id))).toMatchObject({
-      id: session.id,
-      messages: [],
-    });
-    expect(store.get(sessionsAtom)).toHaveLength(1);
+  beforeEach(() => {
+    sessionCounter = 0;
+    savedSessions = [];
+    savedMessages = {};
   });
 
-  it('keeps sidebar session metadata in sync when messages are added', () => {
+  it('hydrates sessions from the kernel and activates the first one', async () => {
     const store = createStore();
-    const session = store.set(createSessionAtom);
+    savedSessions = [makeSession('Session A')];
 
-    store.set(addMessageAtom, {
-      id: 'm1',
-      role: 'user',
-      content: 'AAPL.US quote',
-      timestamp: 1710000000,
-    });
+    await store.set(hydrateSessionsAtom, makeClient());
+
+    expect(store.get(sessionsAtom)).toHaveLength(1);
+    expect(store.get(activeSessionIdAtom)).toBe('s1');
+    expect(store.get(sessionsAtom)[0]).toMatchObject({ title: 'Session A', messageCount: 0 });
+  });
+
+  it('creates a session through the kernel and activates it', async () => {
+    const store = createStore();
+    const client = makeClient();
+
+    await store.set(createSessionAtom, client, 'Portfolio Review');
+
+    expect(store.get(sessionsAtom)).toHaveLength(1);
+    expect(store.get(activeSessionIdAtom)).toBe('s1');
+    expect(store.get(sessionsAtom)[0].title).toBe('Portfolio Review');
+  });
+
+  it('loads messages for the active session lazily from the kernel', async () => {
+    const store = createStore();
+    savedSessions = [makeSession('Session A')];
+    savedMessages = {
+      s1: [{ id: 'm1', role: 'user', content: 'AAPL.US quote', timestamp: 1000 }],
+    };
+    const client = makeClient();
+
+    await store.set(hydrateSessionsAtom, client);
+    await store.set(loadMessagesAtom, client, 's1');
 
     expect(store.get(activeMessagesAtom)).toHaveLength(1);
-    expect(store.get(sessionsAtom)[0]).toMatchObject({
-      id: session.id,
-      messages: [expect.objectContaining({ id: 'm1' })],
+    expect(store.get(activeMessagesAtom)[0]).toMatchObject({
+      id: 'm1',
+      content: 'AAPL.US quote',
     });
   });
 
-  it('stores assistant tool call traces with messages', () => {
+  it('keeps per-session message caches isolated', async () => {
     const store = createStore();
-    store.set(createSessionAtom);
+    savedSessions = [makeSession('A'), makeSession('B')];
+    savedMessages = {
+      s1: [{ id: 'm1', role: 'user', content: 'from A', timestamp: 1000 }],
+      s2: [{ id: 'm2', role: 'user', content: 'from B', timestamp: 1000 }],
+    };
+    const client = makeClient();
 
-    store.set(addMessageAtom, {
-      id: 'm2',
-      role: 'assistant',
-      content: 'Portfolio Risk Summary',
-      timestamp: 1710000000,
-      toolCalls: [
-        {
-          id: 'tool-1',
-          toolName: 'get_portfolio',
-          args: {},
-          startedAt: 1710000000,
-          status: 'success',
-        },
-      ],
-    });
+    await store.set(hydrateSessionsAtom, client);
+    await store.set(loadMessagesAtom, client, 's1');
+    await store.set(loadMessagesAtom, client, 's2');
 
-    expect(store.get(activeMessagesAtom)[0]).toMatchObject({
-      id: 'm2',
-      toolCalls: [expect.objectContaining({ toolName: 'get_portfolio' })],
-    });
+    expect(store.get(messagesAtomFamily('s1'))[0].content).toBe('from A');
+    expect(store.get(messagesAtomFamily('s2'))[0].content).toBe('from B');
   });
 });
