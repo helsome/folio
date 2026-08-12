@@ -229,7 +229,7 @@ finagent/
 │   ├── ui/                    # React components, atoms, KernelBridge, client
 │   ├── pi-extension/          # Pi tool metadata (registered into the Pi runtime)
 │   ├── longbridge-tools/      # LongBridge CLI wrapper
-│   └── skill-hub/             # Deferred (Phase 4+)
+│   └── skill-hub/             # Minimal SKILL.md loader + enable/disable (marketplace deferred)
 └── apps/electron/
     └── src/
         ├── main/              # index.ts (IPC), kernelHost.ts, loadEnv.ts
