@@ -1,5 +1,6 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
+import { mkdir, writeFile } from 'node:fs/promises';
 import { afterEach, describe, expect, it } from 'bun:test';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import { PiRuntimeAdapter } from './pi-runtime-adapter.ts';
@@ -69,6 +70,14 @@ function createSpawn(factory: (
 ) => FakePiProcess) {
   return (command: string, args: string[], options: SpawnOptionsWithoutStdio) =>
     factory(command, args, options) as never;
+}
+
+async function readFileOrNull(path: string) {
+  try {
+    return await Bun.file(path).text();
+  } catch {
+    return null;
+  }
 }
 
 describe('PiRpcClient', () => {
@@ -596,5 +605,19 @@ describe('PiRuntimeAdapter', () => {
 
     expect(types).toEqual(['run_failed']);
     expect(errors).toEqual(['PI_RUNTIME_NOT_FOUND']);
+  });
+
+  it('removes the session conversation file on disposeSession', async () => {
+    const client = new PiRpcClient({
+      spawnProcess: createSpawn(() => new FakePiProcess(() => undefined)),
+    });
+    const adapter = new PiRuntimeAdapter({ rpcClient: client, sessionDir: '/tmp/pi' });
+    const sessionPath = '/tmp/pi/s1.jsonl';
+    await mkdir('/tmp/pi', { recursive: true });
+    await writeFile(sessionPath, 'dummy', 'utf8');
+
+    await adapter.disposeSession('s1');
+
+    await expect(readFileOrNull(sessionPath)).resolves.toBeNull();
   });
 });

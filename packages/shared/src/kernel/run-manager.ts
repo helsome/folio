@@ -61,6 +61,11 @@ export class RunManager {
     return this.activeRun !== null;
   }
 
+  /** Whether a run is currently executing for the given session. */
+  hasActiveRun(sessionId: string): boolean {
+    return this.activeRun?.sessionId === sessionId;
+  }
+
   async startRun(sessionId: string, content: string): Promise<Run> {
     const text = content.trim();
     if (!text) {

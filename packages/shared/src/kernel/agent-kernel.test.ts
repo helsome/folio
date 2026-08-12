@@ -167,6 +167,74 @@ describe('AgentKernel E2E agent loop', () => {
 
     await second.dispose();
   });
+
+  it('deletes a session, its data, and disposes the runtime session', async () => {
+    const kernel = createKernel();
+    const session = await kernel.sessions.createSession('To Delete');
+    await collectRun(kernel, session.id, 'AAPL.US quote');
+
+    await kernel.deleteSession(session.id);
+
+    expect(await kernel.sessions.listSessions()).toEqual([]);
+    expect(await kernel.sessions.listMessages(session.id)).toEqual([]);
+    await kernel.dispose();
+  });
+
+  it('rejects deleting a session while a run is active in it', async () => {
+    let release: (() => void) | undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    const scripted = new AgentKernel({
+      storageDir: join(dir, 'store'),
+      piSessionDir: join(dir, 'pi-sessions'),
+      runtime: {
+        getTools: async () => ({ ok: true, data: [] }),
+        ensureSession: async () => ({ sessionId: 'x', status: 'active' }),
+        run: async function* () {
+          yield { id: 'e', sessionId: 'x', runId: 'r', type: 'message_started', timestamp: 1, sequence: 1 };
+          await gate;
+        },
+        cancel: async () => undefined,
+        dispose: async () => undefined,
+      },
+    });
+    const session = await scripted.sessions.createSession('Busy');
+
+    await scripted.runs.startRun(session.id, 'slow task');
+    await expect(scripted.deleteSession(session.id)).rejects.toMatchObject({
+      code: 'RUN_IN_PROGRESS',
+    });
+    release?.();
+    await waitFor(async () => !scripted.runs.isRunning());
+    await scripted.deleteSession(session.id);
+    expect(await scripted.sessions.listSessions()).toEqual([]);
+    await scripted.dispose();
+  });
+
+  it('disposes the runtime session when deleting a session', async () => {
+    const disposed: string[] = [];
+    const kernel = new AgentKernel({
+      storageDir: join(dir, 'store'),
+      piSessionDir: join(dir, 'pi-sessions'),
+      runtime: {
+        getTools: async () => ({ ok: true, data: [] }),
+        ensureSession: async () => ({ sessionId: 'x', status: 'active' }),
+        run: async function* () {},
+        cancel: async () => undefined,
+        disposeSession: async (sessionId: string) => {
+          disposed.push(sessionId);
+        },
+        dispose: async () => undefined,
+      },
+    });
+    const session = await kernel.sessions.createSession('Spy');
+
+    await kernel.deleteSession(session.id);
+
+    expect(disposed).toEqual([session.id]);
+    await kernel.dispose();
+  });
 });
 
 async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 3000) {

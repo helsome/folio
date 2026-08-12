@@ -6,6 +6,7 @@ import { SessionRepository } from '../storage/session-repository.ts';
 import { LocalRuntimeAdapter } from '../agent/local-runtime-adapter.ts';
 import { PiRuntimeAdapter } from '../agent/pi-runtime-adapter.ts';
 import { MarketDataService } from '../agent/market-data-service.ts';
+import { createCodeError } from '../agent/errors.ts';
 import type { PiRpcClientOptions } from '../agent/pi-rpc-client.ts';
 import { SessionManager } from './session-manager.ts';
 import { RunManager } from './run-manager.ts';
@@ -63,6 +64,22 @@ export class AgentKernel {
 
   getTools(): Promise<ApiResult<ToolDefinition[]>> {
     return this.runtime.getTools();
+  }
+
+  /**
+   * Delete a session and its persisted data, then dispose the corresponding
+   * runtime session (e.g. remove the Pi conversation file). Rejects while a
+   * run is active in the session so a run never lands in a deleted session.
+   */
+  async deleteSession(sessionId: string): Promise<void> {
+    if (this.runs.hasActiveRun(sessionId)) {
+      throw createCodeError(
+        'RUN_IN_PROGRESS',
+        'Cannot delete a session while a run is active in it. Stop the run first.'
+      );
+    }
+    await this.sessions.deleteSession(sessionId);
+    await this.runtime.disposeSession?.(sessionId);
   }
 
   async dispose(): Promise<void> {

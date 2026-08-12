@@ -71,7 +71,7 @@ export class AgentKernelHost {
   }
 
   async deleteSession(sessionId: unknown): Promise<void> {
-    await this.kernel.sessions.deleteSession(requireString(sessionId, 'sessionId'));
+    await this.kernel.deleteSession(requireString(sessionId, 'sessionId'));
   }
 
   async getMessages(sessionId: unknown): Promise<Message[]> {

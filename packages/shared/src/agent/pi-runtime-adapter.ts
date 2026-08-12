@@ -1,5 +1,6 @@
 import { homedir } from 'node:os';
 import { join } from 'node:path';
+import { unlink } from 'node:fs/promises';
 import type {
   AgentEvent,
   AgentRunInput,
@@ -112,7 +113,15 @@ export class PiRuntimeAdapter implements AgentRuntime {
   }
 
   async disposeSession(sessionId: string): Promise<void> {
+    const state = this.sessions.get(sessionId);
     this.sessions.delete(sessionId);
+    // Remove the Pi conversation file together with the Folio session. The
+    // path is deterministic per session, so this works even when the session
+    // was created but never ran.
+    await unlink(join(this.sessionDir, `${sessionId}.jsonl`)).catch(() => undefined);
+    if (state?.sessionPath && state.sessionPath !== join(this.sessionDir, `${sessionId}.jsonl`)) {
+      await unlink(state.sessionPath).catch(() => undefined);
+    }
   }
 
   async dispose(): Promise<void> {
