@@ -28,9 +28,9 @@ export class LocalFinanceAgentBackend implements AgentBackend {
   private readonly sessions = new Map<string, AgentSessionSnapshot>();
 
   constructor(options: LocalFinanceAgentBackendOptions = {}) {
-    const marketData = options.marketData ?? new MarketDataService();
-    this.registry = options.registry ?? new FinanceToolRegistry(marketData);
     this.now = options.now ?? Date.now;
+    const marketData = options.marketData ?? new MarketDataService();
+    this.registry = options.registry ?? new FinanceToolRegistry(marketData, { now: this.now });
   }
 
   async getTools(): Promise<ApiResult<ToolDefinition[]>> {
@@ -73,7 +73,7 @@ export class LocalFinanceAgentBackend implements AgentBackend {
       if (routed.symbol) {
         rememberSymbol(session, routed.symbol);
       }
-      toolCall.result = result.details;
+      toolCall.result = structuredResult(result.details, result.provenance);
       const response = composeToolResponse(toolName, result, toolCall, session);
       response.session = session;
       return { ok: true, data: response };
@@ -137,7 +137,7 @@ export class LocalFinanceAgentBackend implements AgentBackend {
         const result = await this.registry.execute({ name: toolName, args });
         toolCall.status = 'success';
         toolCall.completedAt = this.now();
-        toolCall.result = result.details;
+        toolCall.result = structuredResult(result.details, result.provenance);
         return result.details;
       } catch (error) {
         const apiError = toApiError(error);
@@ -280,4 +280,9 @@ function rememberSymbol(session: AgentSessionSnapshot, symbol: string) {
     symbol,
     ...session.recentSymbols.filter((existing) => existing !== symbol),
   ].slice(0, 5);
+}
+
+function structuredResult(details: unknown, provenance?: { provider: string; fetchedAt: number }) {
+  if (!provenance) return details;
+  return { data: details, provenance };
 }

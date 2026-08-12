@@ -170,6 +170,23 @@ export interface RunStartedPayload {
   userMessage: Message;
 }
 
+/**
+ * Structured tool-result metadata. Tools may attach it so both the UI and the
+ * agent can reason about where data came from and how fresh it is.
+ */
+export interface ToolResultProvenance {
+  provider: string;
+  fetchedAt: number;
+  marketTime?: number;
+  stale?: boolean;
+}
+
+/** Structured tool result: raw data plus optional provenance. */
+export interface StructuredToolResult<T> {
+  data: T;
+  provenance?: ToolResultProvenance;
+}
+
 export interface MessageDeltaPayload {
   delta: string;
   answer: string;

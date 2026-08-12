@@ -1,4 +1,4 @@
-import type { Kline, Portfolio, Quote, ToolDefinition } from '@finagent/core';
+import type { Kline, Portfolio, Quote, ToolDefinition, ToolResultProvenance } from '@finagent/core';
 import { tools as piTools } from '@finagent/pi-extension';
 import type { MarketDataService } from './market-data-service.ts';
 import { createCodeError } from './errors.ts';
@@ -8,11 +8,16 @@ export type FinanceToolName = 'get_quote' | 'get_portfolio' | 'get_kline' | 'get
 export interface FinanceToolResult {
   content: Array<{ type: 'text'; text: string }>;
   details: unknown;
+  provenance?: ToolResultProvenance;
 }
 
 export interface ExecuteToolInput {
   name: FinanceToolName;
   args: Record<string, unknown>;
+}
+
+export interface FinanceToolRegistryOptions {
+  now?: () => number;
 }
 
 const SUPPORTED_TOOL_NAMES: FinanceToolName[] = [
@@ -24,9 +29,11 @@ const SUPPORTED_TOOL_NAMES: FinanceToolName[] = [
 
 export class FinanceToolRegistry {
   private readonly marketData: MarketDataService;
+  private readonly now: () => number;
 
-  constructor(marketData: MarketDataService) {
+  constructor(marketData: MarketDataService, options: FinanceToolRegistryOptions = {}) {
     this.marketData = marketData;
+    this.now = options.now ?? Date.now;
   }
 
   getTools(): ToolDefinition[] {
@@ -47,6 +54,12 @@ export class FinanceToolRegistry {
       return {
         content: [{ type: 'text', text: formatQuote(quote) }],
         details: quote,
+        provenance: {
+          provider: 'longbridge',
+          fetchedAt: this.now(),
+          marketTime: quote.timestamp,
+          stale: false,
+        },
       };
     }
 
@@ -55,6 +68,11 @@ export class FinanceToolRegistry {
       return {
         content: [{ type: 'text', text: formatPortfolio(portfolio) }],
         details: portfolio,
+        provenance: {
+          provider: 'longbridge',
+          fetchedAt: this.now(),
+          stale: false,
+        },
       };
     }
 
@@ -70,6 +88,12 @@ export class FinanceToolRegistry {
       return {
         content: [{ type: 'text', text: formatKline(symbol, period, klines) }],
         details: klines,
+        provenance: {
+          provider: 'longbridge',
+          fetchedAt: this.now(),
+          marketTime: klines[klines.length - 1]?.timestamp,
+          stale: false,
+        },
       };
     }
 
@@ -79,6 +103,12 @@ export class FinanceToolRegistry {
       return {
         content: [{ type: 'text', text: formatIntraday(symbol, intraday) }],
         details: intraday,
+        provenance: {
+          provider: 'longbridge',
+          fetchedAt: this.now(),
+          marketTime: intraday[intraday.length - 1]?.timestamp,
+          stale: false,
+        },
       };
     }
 
