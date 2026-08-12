@@ -20,21 +20,29 @@ When starting work on this project, Claude Code will automatically:
 
 ## Skill System
 
-Finance Agent uses a **Skill Hub** system for extensibility:
+Finance Agent uses a **Skill Hub** system for extensibility. Skills are loaded
+from `SKILL.md` files (`<skillsDir>/<name>/SKILL.md`) with frontmatter
+(name/keywords) and can be enabled/disabled; the choice persists to
+`skills-state.json`. Marketplace and editor features are out of scope for V1.
 
-The current MVP agent path is intentionally deterministic:
+The current agent path runs on the persistent **Agent Kernel** in the Electron
+main process:
 
 ```
 Renderer ChatArea
-  -> FinagentClient
-  -> Electron preload IPC
-  -> AgentGateway
-  -> LocalFinanceAgentBackend
-  -> IntentRouter / FinanceToolRegistry / MarketDataService
+  -> FinagentClient (kernel.startRun / onAgentEvent)
+  -> Electron preload IPC (runs:* / agent:event)
+  -> AgentKernelHost -> AgentKernel
+  -> RunManager -> AgentRuntime
+     -> PiRuntimeAdapter (Pi JSONL/stdio) | LocalRuntimeAdapter
+  -> FinanceToolRegistry / MarketDataService
   -> longbridge-tools
 ```
 
-Do not put Node, Electron, or LongBridge imports in `packages/ui`. UI code talks only through `FinagentClient`.
+Sessions, runs, and messages are persisted by the kernel (JSON repositories
+under `<userData>/store`); the renderer only hydrates from it and projects the
+`agent:event` stream into Jotai. Do not put Node, Electron, or LongBridge
+imports in `packages/ui`. UI code talks only through `FinagentClient`.
 
 ### Skill Types
 
