@@ -78,13 +78,26 @@ export interface AnalystRating {
   timestamp: number;
 }
 
+export type SessionStatus = 'idle' | 'running' | 'error';
+
 export interface Session {
   id: string;
   title: string;
-  messages: Message[];
-  status: 'idle' | 'loading' | 'error';
+  status: SessionStatus;
   createdAt: number;
   updatedAt: number;
+  /** Runtime-context identity (e.g. Pi session id) so the runtime conversation can be recovered after restart. */
+  runtimeSessionId?: string;
+  /** Runtime session file path (e.g. Pi JSONL session file). */
+  runtimeSessionPath?: string;
+  /** Recently referenced symbols, restored into the runtime after restart. */
+  recentSymbols?: string[];
+}
+
+/** Session metadata for list views; messages are stored separately. */
+export interface SessionMeta extends Session {
+  messageCount: number;
+  lastMessageAt?: number;
 }
 
 export interface Message {
@@ -95,6 +108,109 @@ export interface Message {
   toolName?: string;
   toolCalls?: ToolCallRecord[];
   trace?: AgentTraceEvent[];
+}
+
+export type RunStatus = 'running' | 'completed' | 'failed' | 'cancelled';
+
+/** One agent execution inside a session. */
+export interface Run {
+  id: string;
+  sessionId: string;
+  status: RunStatus;
+  input: string;
+  startedAt: number;
+  completedAt?: number;
+  answer?: string;
+  error?: ApiError;
+}
+
+/** Live tool call state, streamed through agent events. */
+export interface ToolCall {
+  id: string;
+  toolName: string;
+  args: Record<string, unknown>;
+  startedAt: number;
+  completedAt?: number;
+  status: 'running' | 'success' | 'error';
+  result?: unknown;
+  error?: ApiError;
+}
+
+export type AgentEventType =
+  | 'run_started'
+  | 'message_started'
+  | 'message_delta'
+  | 'message_completed'
+  | 'tool_started'
+  | 'tool_completed'
+  | 'run_completed'
+  | 'run_failed';
+
+/** Unified agent event protocol shared between runtime, IPC, and UI. */
+interface AgentEventBase {
+  id: string;
+  sessionId: string;
+  runId: string;
+  timestamp: number;
+  sequence: number;
+}
+
+export type AgentEvent =
+  | AgentEventBase & { type: 'run_started'; payload: RunStartedPayload }
+  | AgentEventBase & { type: 'message_started' }
+  | AgentEventBase & { type: 'message_delta'; payload: MessageDeltaPayload }
+  | AgentEventBase & { type: 'message_completed'; payload: MessageCompletedPayload }
+  | AgentEventBase & { type: 'tool_started'; payload: ToolStartedPayload }
+  | AgentEventBase & { type: 'tool_completed'; payload: ToolCompletedPayload }
+  | AgentEventBase & { type: 'run_completed'; payload: RunCompletedPayload }
+  | AgentEventBase & { type: 'run_failed'; payload: RunFailedPayload };
+
+export interface RunStartedPayload {
+  run: Run;
+  userMessage: Message;
+}
+
+export interface MessageDeltaPayload {
+  delta: string;
+  answer: string;
+}
+
+export interface ToolStartedPayload {
+  toolCall: ToolCall;
+}
+
+export interface ToolCompletedPayload {
+  toolCall: ToolCall;
+}
+
+export interface MessageCompletedPayload {
+  answer: string;
+}
+
+export interface RunCompletedPayload {
+  answer: string;
+  toolCalls: ToolCall[];
+}
+
+export interface RunFailedPayload {
+  error: ApiError;
+}
+
+export type AgentEventPayload =
+  | RunStartedPayload
+  | MessageDeltaPayload
+  | ToolStartedPayload
+  | ToolCompletedPayload
+  | MessageCompletedPayload
+  | RunCompletedPayload
+  | RunFailedPayload;
+
+/** Runtime-side session handle that maps a Folio session to a runtime conversation. */
+export interface RuntimeSession {
+  sessionId: string;
+  runtimeSessionId?: string;
+  sessionPath?: string;
+  status: 'active' | 'inactive' | 'error';
 }
 
 export interface ToolDefinition {
@@ -173,6 +289,32 @@ export interface AgentBackend {
   getTools: () => Promise<ApiResult<ToolDefinition[]>>;
   send: (request: AgentRequest) => Promise<ApiResult<AgentResponse>>;
   dispose?: () => Promise<void>;
+}
+
+export interface AgentRunInput {
+  sessionId: string;
+  runId: string;
+  content: string;
+}
+
+/**
+ * Long-lived agent runtime abstraction.
+ *
+ * A runtime owns runtime conversations (one per Folio session), executes runs
+ * as streaming AgentEvent sequences, and supports cancellation.
+ */
+export interface AgentRuntime {
+  getTools: () => Promise<ApiResult<ToolDefinition[]>>;
+  ensureSession: (session: {
+    id: string;
+    title?: string;
+    sessionPath?: string;
+    recentSymbols?: string[];
+  }) => Promise<RuntimeSession>;
+  run: (input: AgentRunInput) => AsyncIterable<AgentEvent>;
+  cancel: (input: { sessionId: string; runId: string }) => Promise<void>;
+  disposeSession?: (sessionId: string) => Promise<void>;
+  dispose: () => Promise<void>;
 }
 
 export type AgentBackendProvider = 'local' | 'pi-runtime';
