@@ -1,8 +1,15 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
-import { app } from 'electron';
-import type { AgentBackend, AgentResponse, ApiResult, ToolDefinition } from '@finagent/core';
-import { createAgentBackend, MarketDataService } from '@finagent/shared';
+import { app, type BrowserWindow } from 'electron';
+import type {
+  AgentEvent,
+  ApiResult,
+  Message,
+  Run,
+  SessionMeta,
+  ToolDefinition,
+} from '@finagent/core';
+import { AgentKernel, MarketDataService } from '@finagent/shared';
 
 type IpcSuccess<T> = { ok: true; data: T };
 type IpcFailure = {
@@ -22,39 +29,87 @@ interface KlineRequest {
   limit?: number;
 }
 
-export class AgentGateway {
+/**
+ * Main-process bridge between the renderer and the agent kernel.
+ *
+ * Sessions, runs, and agent events live in the kernel; the window only sees
+ * the whitelisted IPC surface and the `agent:event` push channel.
+ */
+export class AgentKernelHost {
   private readonly marketData = new MarketDataService();
-  private readonly backend: AgentBackend = createAgentBackend({
-    provider: readAgentProvider(),
-    piRuntime: {
+  private readonly kernel: AgentKernel;
+  private unsubscribe: (() => void) | null = null;
+
+  constructor() {
+    this.kernel = new AgentKernel({
+      storageDir: join(app.getPath('userData'), 'store'),
+      piSessionDir: join(app.getPath('userData'), 'pi-sessions'),
+      provider: readAgentProvider(),
       marketData: this.marketData,
-    },
-  });
-
-  getTools(): Promise<ApiResult<ToolDefinition[]>> {
-    return this.backend.getTools();
-  }
-
-  async send(message: unknown): Promise<ApiResult<AgentResponse>> {
-    return this.backend.send({
-      sessionId: extractSessionId(message) ?? 'default',
-      content: extractMessageText(message),
-      context: extractContext(message),
+      rpc: {
+        requiredEnvKeys: readRequiredLlmEnvKeys(),
+      },
     });
   }
 
-  async dispose() {
-    await this.backend.dispose?.();
+  /** Forward kernel events to the window's renderer. */
+  attach(window: BrowserWindow): void {
+    this.unsubscribe?.();
+    this.unsubscribe = this.kernel.runs.subscribe((event: AgentEvent) => {
+      if (!window.isDestroyed()) {
+        window.webContents.send('agent:event', event);
+      }
+    });
+  }
+
+  async hydrate(): Promise<{ sessions: SessionMeta[] }> {
+    return { sessions: await this.kernel.sessions.listSessions() };
+  }
+
+  async createSession(title: unknown): Promise<SessionMeta> {
+    return this.kernel.sessions.createSession(typeof title === 'string' ? title : undefined);
+  }
+
+  async deleteSession(sessionId: unknown): Promise<void> {
+    await this.kernel.sessions.deleteSession(requireString(sessionId, 'sessionId'));
+  }
+
+  async getMessages(sessionId: unknown): Promise<Message[]> {
+    return this.kernel.sessions.listMessages(requireString(sessionId, 'sessionId'));
+  }
+
+  async listRuns(sessionId: unknown): Promise<Run[]> {
+    return this.kernel.sessions.listRuns(requireString(sessionId, 'sessionId'));
+  }
+
+  async startRun(input: unknown): Promise<Run> {
+    const request = requireObject(input);
+    return this.kernel.runs.startRun(
+      requireString(request.sessionId, 'sessionId'),
+      requireString(request.content, 'content')
+    );
+  }
+
+  async cancelRun(input: unknown): Promise<void> {
+    const request = requireObject(input);
+    await this.kernel.runs.cancelRun(
+      requireString(request.sessionId, 'sessionId'),
+      requireString(request.runId, 'runId')
+    );
+  }
+
+  getTools(): Promise<ApiResult<ToolDefinition[]>> {
+    return this.kernel.getTools();
   }
 
   getQuote(symbol: unknown) {
-    return this.marketData.getQuote(requireString(symbol, 'symbol'));
+    return this.marketData.getQuote(requireString(symbol, 'symbol').toUpperCase());
   }
 
   getKline(input: unknown) {
     const request = requireObject(input);
     const payload: KlineRequest = {
-      symbol: requireString(request.symbol, 'symbol'),
+      symbol: requireString(request.symbol, 'symbol').toUpperCase(),
     };
 
     if (typeof request.period === 'string') {
@@ -112,6 +167,11 @@ export class AgentGateway {
     return alerts;
   }
 
+  async dispose() {
+    this.unsubscribe?.();
+    this.unsubscribe = null;
+    await this.kernel.dispose();
+  }
 }
 
 function getLongBridgeStatusAction(status: string) {
@@ -180,47 +240,19 @@ export async function toIpcResult<T>(operation: () => Promise<T> | T): Promise<I
   }
 }
 
-function extractMessageText(message: unknown): string {
-  if (typeof message === 'string') {
-    return message;
-  }
-
-  if (message && typeof message === 'object') {
-    const record = message as Record<string, unknown>;
-    for (const key of ['text', 'message', 'content', 'query', 'prompt']) {
-      if (typeof record[key] === 'string') {
-        return record[key];
-      }
-    }
-  }
-
-  return '';
-}
-
-function extractSessionId(message: unknown): string | undefined {
-  if (message && typeof message === 'object') {
-    const record = message as Record<string, unknown>;
-    if (typeof record.sessionId === 'string') {
-      return record.sessionId;
-    }
-  }
-  return undefined;
-}
-
-function extractContext(message: unknown): Record<string, unknown> | undefined {
-  if (message && typeof message === 'object') {
-    const context = (message as Record<string, unknown>).context;
-    if (context && typeof context === 'object' && !Array.isArray(context)) {
-      return context as Record<string, unknown>;
-    }
-  }
-  return undefined;
-}
-
 function readAgentProvider() {
   const provider = process.env.FINAGENT_AGENT_PROVIDER;
   if (provider === 'local' || provider === 'pi-runtime') return provider;
   return undefined;
+}
+
+function readRequiredLlmEnvKeys() {
+  if (process.env.FINAGENT_REQUIRE_LLM_ENV === '0') return [];
+  const value = process.env.FINAGENT_REQUIRED_LLM_ENV;
+  if (value) {
+    return value.split(',').map((key) => key.trim()).filter(Boolean);
+  }
+  return ['ANTHROPIC_API_KEY'];
 }
 
 function isApiResult<T>(value: unknown): value is ApiResult<T> {
@@ -236,7 +268,7 @@ function requireString(value: unknown, field: string) {
   if (typeof value !== 'string' || value.trim().length === 0) {
     throw createCodeError('INVALID_ARGUMENT', `${field} is required.`);
   }
-  return value.trim().toUpperCase();
+  return value.trim();
 }
 
 function requireObject(value: unknown): Record<string, unknown> {

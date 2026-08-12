@@ -1,4 +1,4 @@
-import type { ApiResult } from '@finagent/core';
+import type { AgentEvent, ApiResult } from '@finagent/core';
 import { fallbackClient, type FinagentClient } from '@finagent/ui';
 
 function ipcResult<T>(promise: Promise<unknown>): Promise<ApiResult<T>> {
@@ -17,8 +17,20 @@ function createElectronClient(): FinagentClient {
       close: () => window.electronAPI.window.close(),
       isMaximized: () => window.electronAPI.window.isMaximized(),
     },
+    kernel: {
+      hydrate: () => ipcResult(window.electronAPI.kernel.hydrate()),
+      createSession: (title?: string) => ipcResult(window.electronAPI.kernel.createSession(title)),
+      deleteSession: (sessionId: string) => ipcResult(window.electronAPI.kernel.deleteSession(sessionId)),
+      getMessages: (sessionId: string) => ipcResult(window.electronAPI.kernel.getMessages(sessionId)),
+      listRuns: (sessionId: string) => ipcResult(window.electronAPI.kernel.listRuns(sessionId)),
+      startRun: (sessionId: string, content: string) =>
+        ipcResult(window.electronAPI.kernel.startRun({ sessionId, content })),
+      cancelRun: (sessionId: string, runId: string) =>
+        ipcResult(window.electronAPI.kernel.cancelRun({ sessionId, runId })),
+      onAgentEvent: (callback: (event: AgentEvent) => void) =>
+        window.electronAPI.kernel.onAgentEvent((event) => callback(event as AgentEvent)),
+    },
     agent: {
-      send: (request) => ipcResult(window.electronAPI.agent.send(request)),
       getTools: () => ipcResult(window.electronAPI.agent.getTools()),
     },
     market: {

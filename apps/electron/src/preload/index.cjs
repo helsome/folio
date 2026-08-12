@@ -7,8 +7,23 @@ const electronAPI = {
     close: () => ipcRenderer.invoke('window:close'),
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
   },
+  kernel: {
+    hydrate: () => ipcRenderer.invoke('kernel:hydrate'),
+    createSession: (title) => ipcRenderer.invoke('sessions:create', title),
+    deleteSession: (sessionId) => ipcRenderer.invoke('sessions:delete', sessionId),
+    getMessages: (sessionId) => ipcRenderer.invoke('sessions:getMessages', sessionId),
+    listRuns: (sessionId) => ipcRenderer.invoke('sessions:listRuns', sessionId),
+    startRun: (input) => ipcRenderer.invoke('runs:start', input),
+    cancelRun: (input) => ipcRenderer.invoke('runs:cancel', input),
+    onAgentEvent: (callback) => {
+      const listener = (_event, agentEvent) => callback(agentEvent);
+      ipcRenderer.on('agent:event', listener);
+      return () => {
+        ipcRenderer.removeListener('agent:event', listener);
+      };
+    },
+  },
   agent: {
-    send: (message) => ipcRenderer.invoke('agent:send', message),
     getTools: () => ipcRenderer.invoke('agent:getTools'),
   },
   market: {

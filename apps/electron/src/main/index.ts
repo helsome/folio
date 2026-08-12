@@ -1,7 +1,7 @@
 import { app, BrowserWindow, ipcMain } from 'electron';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
-import { AgentGateway, toIpcResult } from './agentGateway.ts';
+import { AgentKernelHost, toIpcResult } from './kernelHost.ts';
 import { loadFinagentEnv } from './loadEnv.ts';
 
 let mainWindow: BrowserWindow | null = null;
@@ -14,7 +14,7 @@ loadFinagentEnv({
     appRoot,
   ],
 });
-const agentGateway = new AgentGateway();
+const agentKernelHost = new AgentKernelHost();
 const isDev = !app.isPackaged;
 
 function createWindow() {
@@ -31,6 +31,9 @@ function createWindow() {
       sandbox: true,
     },
   });
+
+  // Forward kernel agent events to the renderer.
+  agentKernelHost.attach(mainWindow);
 
   // Load the app
   if (isDev) {
@@ -56,7 +59,7 @@ app.on('window-all-closed', () => {
 });
 
 app.on('before-quit', () => {
-  void agentGateway.dispose();
+  void agentKernelHost.dispose();
 });
 
 app.on('activate', () => {
@@ -80,35 +83,59 @@ ipcMain.handle('window:close', () => mainWindow?.close());
 
 ipcMain.handle('window:isMaximized', () => mainWindow?.isMaximized());
 
-// Finance Agent MVP IPC
-ipcMain.handle('agent:send', async (_event, message: unknown) =>
-  toIpcResult(() => agentGateway.send(message))
+// Agent Kernel IPC
+ipcMain.handle('kernel:hydrate', async () =>
+  toIpcResult(() => agentKernelHost.hydrate())
+);
+
+ipcMain.handle('sessions:create', async (_event, title: unknown) =>
+  toIpcResult(() => agentKernelHost.createSession(title))
+);
+
+ipcMain.handle('sessions:delete', async (_event, sessionId: unknown) =>
+  toIpcResult(() => agentKernelHost.deleteSession(sessionId))
+);
+
+ipcMain.handle('sessions:getMessages', async (_event, sessionId: unknown) =>
+  toIpcResult(() => agentKernelHost.getMessages(sessionId))
+);
+
+ipcMain.handle('sessions:listRuns', async (_event, sessionId: unknown) =>
+  toIpcResult(() => agentKernelHost.listRuns(sessionId))
+);
+
+ipcMain.handle('runs:start', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.startRun(input))
+);
+
+ipcMain.handle('runs:cancel', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.cancelRun(input))
 );
 
 ipcMain.handle('agent:getTools', async () =>
-  toIpcResult(() => agentGateway.getTools())
+  toIpcResult(() => agentKernelHost.getTools())
 );
 
 ipcMain.handle('market:getQuote', async (_event, symbol: unknown) =>
-  toIpcResult(() => agentGateway.getQuote(symbol))
+  toIpcResult(() => agentKernelHost.getQuote(symbol))
 );
 
 ipcMain.handle('market:getKline', async (_event, request: unknown) =>
-  toIpcResult(() => agentGateway.getKline(request))
+  toIpcResult(() => agentKernelHost.getKline(request))
 );
 
 ipcMain.handle('market:getPortfolio', async () =>
-  toIpcResult(() => agentGateway.getPortfolio())
+  toIpcResult(() => agentKernelHost.getPortfolio())
 );
 
 ipcMain.handle('longbridge:getStatus', async () =>
-  toIpcResult(() => agentGateway.getLongBridgeStatus())
+  toIpcResult(() => agentKernelHost.getLongBridgeStatus())
 );
 
 ipcMain.handle('alerts:load', async () =>
-  toIpcResult(() => agentGateway.loadAlerts())
+  toIpcResult(() => agentKernelHost.loadAlerts())
 );
 
 ipcMain.handle('alerts:save', async (_event, alerts: unknown) =>
-  toIpcResult(() => agentGateway.saveAlerts(alerts))
+  toIpcResult(() => agentKernelHost.saveAlerts(alerts))
 );

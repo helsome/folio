@@ -7,8 +7,17 @@ export interface ElectronAPI {
     close: () => Promise<void>;
     isMaximized: () => Promise<boolean>;
   };
+  kernel: {
+    hydrate: () => Promise<unknown>;
+    createSession: (title?: string) => Promise<unknown>;
+    deleteSession: (sessionId: string) => Promise<unknown>;
+    getMessages: (sessionId: string) => Promise<unknown>;
+    listRuns: (sessionId: string) => Promise<unknown>;
+    startRun: (input: { sessionId: string; content: string }) => Promise<unknown>;
+    cancelRun: (input: { sessionId: string; runId: string }) => Promise<unknown>;
+    onAgentEvent: (callback: (event: unknown) => void) => () => void;
+  };
   agent: {
-    send: (message: unknown) => Promise<unknown>;
     getTools: () => Promise<unknown>;
   };
   market: {
@@ -32,8 +41,23 @@ const electronAPI: ElectronAPI = {
     close: () => ipcRenderer.invoke('window:close'),
     isMaximized: () => ipcRenderer.invoke('window:isMaximized'),
   },
+  kernel: {
+    hydrate: () => ipcRenderer.invoke('kernel:hydrate'),
+    createSession: (title?: string) => ipcRenderer.invoke('sessions:create', title),
+    deleteSession: (sessionId: string) => ipcRenderer.invoke('sessions:delete', sessionId),
+    getMessages: (sessionId: string) => ipcRenderer.invoke('sessions:getMessages', sessionId),
+    listRuns: (sessionId: string) => ipcRenderer.invoke('sessions:listRuns', sessionId),
+    startRun: (input: { sessionId: string; content: string }) => ipcRenderer.invoke('runs:start', input),
+    cancelRun: (input: { sessionId: string; runId: string }) => ipcRenderer.invoke('runs:cancel', input),
+    onAgentEvent: (callback: (event: unknown) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, agentEvent: unknown) => callback(agentEvent);
+      ipcRenderer.on('agent:event', listener);
+      return () => {
+        ipcRenderer.removeListener('agent:event', listener);
+      };
+    },
+  },
   agent: {
-    send: (message: unknown) => ipcRenderer.invoke('agent:send', message),
     getTools: () => ipcRenderer.invoke('agent:getTools'),
   },
   market: {

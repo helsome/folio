@@ -1,0 +1,200 @@
+import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import type { AgentEvent } from '@finagent/core';
+
+let lastKernelOptions: Record<string, unknown> | null = null;
+let lastMarketData: FakeMarketDataService | null = null;
+let forwardedEvents: unknown[] = [];
+
+class FakeMarketDataService {
+  quoteSymbols: string[] = [];
+
+  async getQuote(symbol: string) {
+    this.quoteSymbols.push(symbol);
+    return { symbol, lastPrice: 200 };
+  }
+
+  async getKline(input: unknown) {
+    return [{ input }];
+  }
+
+  async getPortfolio() {
+    return { totalValue: 1000, cash: 100, positions: [] };
+  }
+
+  async getLongBridgeStatus() {
+    return {
+      installed: true,
+      authed: true,
+      available: true,
+      status: 'available',
+    };
+  }
+}
+
+const fakeSessions = {
+  listSessions: async () => [{ id: 's1', title: 'Session A', status: 'idle', messageCount: 0, createdAt: 1, updatedAt: 1 }],
+  createSession: async (title?: string) => ({
+    id: 's-new',
+    title: title ?? 'New Session',
+    status: 'idle',
+    messageCount: 0,
+    createdAt: 1,
+    updatedAt: 1,
+  }),
+  deleteSession: async () => undefined,
+  listMessages: async (sessionId: string) => [{ id: 'm1', role: 'user', content: sessionId, timestamp: 1 }],
+  listRuns: async () => [],
+};
+
+const fakeRuns = {
+  subscribe: (_listener: (event: AgentEvent) => void) => () => undefined,
+  startRun: async (sessionId: string, content: string) => ({
+    id: 'r1',
+    sessionId,
+    status: 'running',
+    input: content,
+    startedAt: 1,
+  }),
+  cancelRun: async () => undefined,
+};
+
+class FakeAgentKernel {
+  sessions = fakeSessions;
+  runs = fakeRuns;
+
+  constructor(options: Record<string, unknown>) {
+    lastKernelOptions = options;
+  }
+
+  getTools = async () => ({ ok: true, data: [{ name: 'get_quote' }] });
+  dispose = async () => undefined;
+}
+
+mock.module('electron', () => ({
+  app: {
+    getPath: () => '/tmp/finagent-test',
+  },
+}));
+
+mock.module('@finagent/shared', () => ({
+  AgentKernel: FakeAgentKernel,
+  MarketDataService: class extends FakeMarketDataService {
+    constructor() {
+      super();
+      lastMarketData = this;
+    }
+  },
+}));
+
+const { AgentKernelHost } = await import('./kernelHost.ts');
+
+beforeEach(() => {
+  lastKernelOptions = null;
+  lastMarketData = null;
+  forwardedEvents = [];
+});
+
+describe('AgentKernelHost', () => {
+  it('builds the kernel on the electron userData store', () => {
+    const host = new AgentKernelHost();
+
+    expect(lastKernelOptions).toMatchObject({
+      storageDir: '/tmp/finagent-test/store',
+      piSessionDir: '/tmp/finagent-test/pi-sessions',
+    });
+    host.dispose();
+  });
+
+  it('hydrates sessions from the kernel', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(host.hydrate()).resolves.toEqual({
+      sessions: [expect.objectContaining({ id: 's1', title: 'Session A' })],
+    });
+    host.dispose();
+  });
+
+  it('creates sessions through the kernel', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(host.createSession('My Session')).resolves.toMatchObject({
+      id: 's-new',
+      title: 'My Session',
+    });
+    host.dispose();
+  });
+
+  it('starts and cancels runs through the kernel', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(host.startRun({ sessionId: 's1', content: 'AAPL.US quote' })).resolves.toMatchObject({
+      id: 'r1',
+      status: 'running',
+      input: 'AAPL.US quote',
+    });
+    await expect(host.cancelRun({ sessionId: 's1', runId: 'r1' })).resolves.toBeUndefined();
+    host.dispose();
+  });
+
+  it('rejects malformed run payloads', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(host.startRun({ sessionId: '', content: 'x' })).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+    });
+    host.dispose();
+  });
+
+  it('forwards kernel agent events to the attached window', async () => {
+    let subscriber: ((event: AgentEvent) => void) | null = null;
+    fakeRuns.subscribe = (listener) => {
+      subscriber = listener;
+      return () => undefined;
+    };
+    const host = new AgentKernelHost();
+    const window = {
+      isDestroyed: () => false,
+      webContents: { send: (channel: string, event: unknown) => forwardedEvents.push({ channel, event }) },
+    };
+
+    host.attach(window as never);
+    const fn = subscriber as ((event: AgentEvent) => void) | null;
+    fn?.({
+      id: 'e1',
+      sessionId: 's1',
+      runId: 'r1',
+      type: 'run_started',
+      timestamp: 1,
+      sequence: 1,
+      payload: {
+        run: { id: 'r1', sessionId: 's1', status: 'running', input: 'x', startedAt: 1 },
+        userMessage: { id: 'm1', role: 'user', content: 'x', timestamp: 1 },
+      },
+    });
+
+    expect(forwardedEvents).toHaveLength(1);
+    expect(forwardedEvents[0]).toMatchObject({ channel: 'agent:event' });
+    host.dispose();
+  });
+
+  it('routes market quotes through the shared market data service', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(host.getQuote('aapl.us')).resolves.toMatchObject({
+      symbol: 'AAPL.US',
+    });
+    expect(lastMarketData?.quoteSymbols).toEqual(['AAPL.US']);
+    host.dispose();
+  });
+
+  it('wraps market data errors into IPC results', async () => {
+    const host = new AgentKernelHost();
+    const { toIpcResult } = await import('./kernelHost.ts');
+
+    await expect(toIpcResult(() => host.getQuote(''))).resolves.toEqual({
+      ok: false,
+      error: expect.objectContaining({ code: 'INVALID_ARGUMENT' }),
+    });
+    host.dispose();
+  });
+});
