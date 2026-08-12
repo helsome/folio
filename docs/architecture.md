@@ -2,400 +2,261 @@
 
 ## Overview
 
-Finance Agent is a desktop application that combines AI conversational interface with financial market data from LongBridge. This document details the system architecture.
+Folio is a desktop application that combines an AI conversational interface with financial market data from LongBridge. The agent layer is built on a persistent **Agent Kernel**: sessions, runs, and agent events are first-class entities owned by the main process, streamed to the UI over IPC, and persisted on disk so the app can be restarted without losing conversation state.
 
 ---
 
 ## 1. Architecture Overview
 
 ```
-┌─────────────────────────────────────────────────────────────────────┐
-│                         ELECTRON LAYER                               │
-│  ┌───────────────────────────────────────────────────────────────┐     │
-│  │                     RENDERER PROCESS                          │     │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐            │     │
-│  │  │  AppShell   │  │    Jotai   │  │   Tailwind  │            │     │
-│  │  │   Layout    │  │    State   │  │   CSS v4    │            │     │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘            │     │
-│  │                                                               │     │
-│  │  ┌─────────────────────────────────────────────────────┐     │     │
-│  │  │              React Components                          │     │     │
-│  │  │  AppShell | TopBar | LeftSidebar | MainContent | RightPanel   │     │
-│  │  └─────────────────────────────────────────────────────┘     │     │
-│  └───────────────────────────────────────────────────────────────┘     │
-│                               │ IPC (contextBridge)                   │
-│  ┌───────────────────────────────────────────────────────────────┐     │
-│  │                      MAIN PROCESS                               │     │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │     │
-│  │  │   Window    │  │ AgentGateway│  │ Local JSON  │              │     │
-│  │  │  Manager    │  │ IPC Adapter │  │  Storage    │              │     │
-│  │  └─────────────┘  └──────┬──────┘  └─────────────┘              │     │
-│  └───────────────────────────────────────────────────────────────┘     │
-│                               │ shared package API                    │
-│  ┌───────────────────────────────────────────────────────────────┐     │
-│  │                  FINANCE AGENT BACKEND                          │     │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │     │
-│  │  │AgentBackend │  │ Intent     │  │ Response    │              │     │
-│  │  │  Factory    │  │ Router     │  │ Composer    │              │     │
-│  │  └─────────────┘  └──────┬──────┘  └─────────────┘              │     │
-│  │  ┌─────────────┐  ┌──────▼──────┐  ┌─────────────┐              │     │
-│  │  │ Session     │  │ FinanceTool │  │ MarketData  │              │     │
-│  │  │ Context     │  │ Registry    │  │ Service     │              │     │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘              │     │
-│  └───────────────────────────────────────────────────────────────┘     │
-│                               │ execa (safe)                         │
-│  ┌───────────────────────────────────────────────────────────────┐     │
-│  │                    LONGBRIDGE LAYER                              │     │
-│  │  ┌─────────────┐  ┌─────────────┐  ┌─────────────┐              │     │
-│  │  │    which    │  │   execa    │  │   parse     │              │     │
-│  │  │  (检测)     │  │   (执行)    │  │   (解析)    │              │     │
-│  │  └─────────────┘  └─────────────┘  └─────────────┘              │     │
-│  └───────────────────────────────────────────────────────────────┘     │
-│                               │                                     │
-│                    ┌──────────┴──────────┐                          │
-│              ┌─────┴─────┐        ┌─────┴─────┐                     │
-│              │ longbridge│        │  Local    │                     │
-│              │    CLI    │        │  Storage  │                     │
-│              │ (用户安装) │        │ (JSON)    │                     │
-│              └───────────┘        └───────────┘                     │
-└─────────────────────────────────────────────────────────────────────┘
+Folio Session
+      │
+      ▼
+SessionManager (persistence + lifecycle)
+      │
+      ▼
+RunManager (run lifecycle + event broadcast)
+      │
+      ▼
+AgentRuntime (provider-agnostic abstraction)
+      │
+      ├── PiRuntimeAdapter ──► Pi Runtime (JSONL/stdio)
+      └── LocalRuntimeAdapter ─► LocalFinanceAgentBackend (deterministic / tests)
+      │
+      ▼
+AgentEvent Stream (run_started … run_completed)
+      │
+      ▼
+Electron IPC ('agent:event' push channel)
+      │
+      ▼
+React UI (Jotai atoms as view cache only)
 ```
+
+The kernel runs in the Electron **main process**. The renderer never writes sessions, runs, or messages directly; it hydrates from the kernel and projects the event stream into Jotai state.
 
 ---
 
 ## 2. Process Architecture
 
-### 2.1 Electron Processes
+| Process | Responsibility |
+|---------|----------------|
+| **Main Process** | `AgentKernel` (SessionManager + RunManager + runtime), IPC surface, market data, alerts |
+| **Preload** | Whitelisted `contextBridge` API (`window.electronAPI`) |
+| **Renderer** | React UI; subscribes to `agent:event`, calls kernel IPC (`sessions:*`, `runs:*`) |
 
-| Process | Language | Responsibility |
-|---------|----------|----------------|
-| **Main Process** | Node.js + TypeScript | Window management, native APIs, Alert engine |
-| **Preload** | TypeScript | Secure IPC bridge (contextBridge) |
-| **Renderer** | React + TypeScript | UI rendering, state management, user input |
-
-### 2.2 Agent Backend
-
-| Component | Language | Responsibility |
-|-----------|----------|----------------|
-| **AgentGateway** | Electron main + TypeScript | IPC adapter, ApiResult wrapping, local alert storage |
-| **LocalFinanceAgentBackend** | TypeScript | MVP agent backend, deterministic intent routing, session context |
-| **MarketDataService** | TypeScript | LongBridge access, TTL cache, in-flight request coalescing |
-| **FinanceToolRegistry** | TypeScript | Tool metadata and tool execution boundary |
-| **pi-extension** | TypeScript | Pi-compatible tool definitions and metadata |
-
-**Communication:**
-- Renderer ↔ Main Process: whitelisted IPC via preload.
-- Main Process → Agent Backend: in-process `@finagent/shared` API.
-- Agent Backend → LongBridge CLI: `longbridge-tools` using `execa` array arguments.
-- Future Pi runtime: `AgentBackend` already supports a `pi-runtime` provider slot, but no JSONL/stdio process is launched in the MVP.
-
----
-
-## 3. Module Design
-
-### 3.1 Package Architecture
-
-```
-finagent/
-├── packages/
-│   ├── core/                    # Lightweight types only
-│   │   └── src/
-│   │       ├── types/          # Stock, Quote, Portfolio, Alert interfaces
-│   │       └── utils/          # Pure utility functions
-│   │
-│   ├── shared/                 # Business logic
-│   │   └── src/
-│   │       ├── agent/          # AgentBackend, router, registry, market service
-│   │       ├── config/         # Zod-validated configuration
-│   │       ├── credentials/    # Token storage (Keychain)
-│   │       └── sessions/       # Session management
-│   │
-│   ├── ui/                     # Shared React components
-│   │   └── src/
-│   │       ├── components/     # Primitives (Button, Input, Dialog)
-│   │       │   └── ui/         # Radix-based primitives
-│   │       ├── chat/           # Chat components (TurnCard, Message)
-│   │       ├── stock/          # Stock-specific components (QuoteCard, KlineChart)
-│   │       ├── styles/         # Tailwind CSS v4 + OKLCH theme
-│   │       └── lib/             # cn() utility, layout constants
-│   │
-│   ├── pi-extension/           # Pi-compatible tool metadata
-│   │   └── src/
-│   │       ├── index.ts         # Extension entry point
-│   │       ├── tools/          # Tool registrations
-│   │       │   ├── get-quote.ts
-│   │       │   ├── get-kline.ts
-│   │       │   ├── get-portfolio.ts
-│   │       │   └── ...
-│   │
-│   └── longbridge-tools/       # LongBridge CLI wrapper
-│       └── src/
-│           ├── executor.ts       # Safe execa wrapper
-│           ├── parser.ts       # JSON output parser
-│           ├── validator.ts    # Symbol validation
-│           └── tools/          # quote/kline/portfolio wrappers
-│
-└── apps/
-    └── electron/                # Electron desktop app
-        └── src/
-            ├── main/             # Main process
-            │   ├── index.ts      # Window + IPC handler registration
-            │   └── agentGateway.ts  # IPC-to-backend adapter
-            │
-            ├── preload/         # Preload scripts
-            │   └── index.ts      # contextBridge API
-            │
-            └── renderer/       # React app
-                ├── main.tsx     # React entry
-                ├── App.tsx     # Root component
-                ├── atoms/       # Jotai atoms
-                │   ├── sessions.ts  # Session atoms
-                │   ├── watchlist.ts # Watchlist atoms
-                │   └── alerts.ts    # Alert atoms
-                ├── components/     # App-specific components
-                │   ├── app-shell/
-                │   ├── chat/
-                │   └── stock/
-                └── styles/       # App-specific styles
-```
-
----
-
-## 4. Data Flow
-
-### 4.1 Chat Quote Query Flow
-
-```
-User: "What's the price of TSLA?"
-    ↓
-ChatArea sends { sessionId, content }
-    ↓
-FinagentClient invokes agent:send through preload IPC
-    ↓
-AgentGateway forwards to LocalFinanceAgentBackend
-    ↓
-IntentRouter classifies quote and extracts TSLA.US
-    ↓
-FinanceToolRegistry calls MarketDataService.getQuote()
-    ↓
-MarketDataService cache/coalescing, then longbridge-tools executor
-    ↓
-longbridge quote TSLA.US --format json
-    ↓
-Parser normalizes JSON, ResponseComposer formats text
-    ↓
-Renderer appends assistant message
-```
-
-### 4.2 Follow-up Query Flow
-
-```
-User: "AAPL.US quote"
-    ↓
-LocalFinanceAgentBackend records AAPL.US in session.recentSymbols
-    ↓
-User: "show chart"
-    ↓
-IntentRouter uses the active session context to infer AAPL.US
-    ↓
-get_kline executes through the shared MarketDataService
-```
-
-### 4.3 Alert Trigger Flow
-
-```
-AlertEngine (every 60s)
-    ↓
-Check all active alerts
-    ↓
-For each alert, query current price
-    ↓
-Compare with threshold
-    ↓
-If triggered:
-    ↓
-Send system notification
-    ↓
-Mark alert as triggered
-    ↓
-Remove or keep alert (configurable)
-```
-
----
-
-## 5. State Management
-
-### 5.1 Jotai Atoms
+Security boundary is unchanged and enforced:
 
 ```typescript
-// Session isolation - each session has its own state
-const sessionAtomFamily = atomFamily((sessionId: string) => {
-  return atom({
-    id: sessionId,
-    messages: [] as Message[],
-    status: 'idle' as const,
-    createdAt: Date.now(),
-  });
-});
-
-// Global atoms - shared across all sessions
-const watchlistAtom = atom<WatchlistItem[]>([]);
-const alertsAtom = atom<Alert[]>([]);
-const portfolioAtom = atom<Portfolio | null>(null);
-
-// Active session tracking
-const activeSessionIdAtom = atom<string | null>(null);
-```
-
-### 5.2 State Persistence
-
-| Data | Storage | Notes |
-|------|---------|-------|
-| Sessions | JSON files | `~/.finagent/sessions/` |
-| Watchlist | JSON | `~/.finagent/watchlist.json` |
-| Alerts | JSON | `~/.finagent/alerts.json` |
-| Settings | JSON | `~/.finagent/settings.json` |
-| Token | Keychain | Never stored in plain files |
-
----
-
-## 6. Security Architecture
-
-### 6.1 Electron Security
-
-```typescript
-// Main process - BrowserWindow config
 new BrowserWindow({
   webPreferences: {
-    contextIsolation: true,    // Required
-    nodeIntegration: false,     // Required
-    sandbox: true,             // Required
-    preload: path.join(__dirname, '../preload/index.js'),
+    contextIsolation: true,
+    nodeIntegration: false,
+    sandbox: true,
+    preload: path.join(__dirname, '../preload/index.cjs'),
   },
 });
 ```
 
-### 6.2 IPC Security
+The renderer has no access to `fs`, `child_process`, the database, or the Pi runtime.
 
-```typescript
-// Preload - Whitelist channels
-const validInvokeChannels = [
-  'sessions:list',
-  'sessions:create',
-  'sessions:get',
-  'alert:create',
-  'alert:list',
-  'alert:delete',
-];
+---
 
-const validOnChannels = [
-  'alert:triggered',
-  'market:status',
-];
+## 3. Domain Model
+
+All types live in `@finagent/core`:
+
+```
+Session          ← persisted conversation scope (id, title, status, runtimeSessionPath, recentSymbols)
+  ├── Messages   ← visible transcript (user / assistant), persisted per session
+  └── Runs       ← one agent execution per user message
+        └── AgentEvents ← unified event protocol (streamed, not persisted)
+              └── ToolCalls ← live tool state inside events
 ```
 
-### 6.3 LongBridge CLI Security
+### AgentEvent protocol
 
-```typescript
-// Symbol validation before execution
-const ALLOWED_SYMBOL_PATTERN = /^[A-Z]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
+```ts
+type AgentEvent =
+  | run_started       { run, userMessage }
+  | message_started
+  | message_delta     { delta, answer }
+  | message_completed { answer }
+  | tool_started      { toolCall }
+  | tool_completed    { toolCall }
+  | run_completed     { answer, toolCalls }
+  | run_failed        { error }
+```
 
-function validateSymbol(symbol: string): boolean {
-  return ALLOWED_SYMBOL_PATTERN.test(symbol);
+Every event carries `id`, `sessionId`, `runId`, `timestamp`, `sequence`. Pi-specific event shapes never cross the kernel boundary: raw Pi JSONL events are converted by `PiEventAdapter` in the `PiRuntimeAdapter`.
+
+---
+
+## 4. Agent Kernel
+
+`packages/shared/src/kernel/`:
+
+| Component | Responsibility |
+|-----------|----------------|
+| `SessionManager` | Create/list/delete sessions, persist messages, keep session metadata stats, assign each session a runtime session file path |
+| `RunManager` | Start runs (persist user message + run record), drive the runtime event stream, broadcast events to subscribers, persist the final assistant message + run outcome, guarantee every run settles (completed / failed / cancelled) |
+| `AgentKernel` | Composition root; owns `SessionManager`, `RunManager`, and the runtime adapter |
+
+RunManager invariants:
+
+- One run executes at a time (the Pi runtime processes one prompt at a time); a second `startRun` fails with `RUN_IN_PROGRESS`.
+- `cancelRun` marks the run and calls `runtime.cancel()`; the run ends as `cancelled` (or `completed` if the runtime already finished).
+- Timeouts, runtime crashes, tool failures, and malformed protocol output all end the run — no run can stay `running` forever.
+
+### AgentRuntime abstraction
+
+`@finagent/core` defines the provider-agnostic runtime contract:
+
+```ts
+interface AgentRuntime {
+  getTools(): Promise<ApiResult<ToolDefinition[]>>;
+  ensureSession({ id, title?, sessionPath?, recentSymbols? }): Promise<RuntimeSession>;
+  run({ sessionId, runId, content }): AsyncIterable<AgentEvent>;
+  cancel({ sessionId, runId }): Promise<void>;
+  disposeSession?(sessionId): Promise<void>;
+  dispose(): Promise<void>;
 }
-
-// Use execa array parameters - no shell injection
-await execa('longbridge', ['quote', symbol, '--format', 'json']);
 ```
 
----
+## 5. Pi Runtime Adapter
 
-## 7. Key Design Patterns
+`packages/shared/src/agent/`:
 
-### 7.1 Agent Backend Factory Pattern
+| Component | Responsibility |
+|-----------|----------------|
+| `PiRpcClient` | JSONL/stdio transport: `prompt`, `promptStreaming` (live raw events), `switchSession`, `getState`, `abortCurrentPrompt`, health checks, timeouts, process restart |
+| `PiEventAdapter` | Pure Pi-event → AgentEvent mapping per run |
+| `PiRuntimeAdapter` | `AgentRuntime` implementation: Folio session ↔ Pi session file lifecycle, prompt construction, symbol memory |
 
-```typescript
-// packages/shared/src/agent/backend-factory.ts
-export function createAgentBackend(options = {}): AgentBackend {
-  const provider = options.provider ?? 'local';
-  if (provider === 'local') {
-    return new LocalFinanceAgentBackend();
-  }
-  throw new Error('Pi runtime backend is not wired yet. Use provider: local.');
-}
+### Session isolation and recovery
+
+Folio Session ↔ Pi conversation is a stable 1:1 mapping:
+
+```
+Folio Session A ──► <userData>/pi-sessions/<sessionA>.jsonl
+Folio Session B ──► <userData>/pi-sessions/<sessionB>.jsonl
 ```
 
-### 7.2 Market Data Cache Pattern
+One Pi process is shared; the runtime switches conversations with the `switch_session` RPC command. The JSONL session file is Pi's own persistent conversation store, so:
 
-```typescript
-// packages/shared/src/agent/market-data-service.ts
-await marketData.getQuote('AAPL.US');      // 30s TTL
-await marketData.getKline({ symbol });     // 5min TTL
-await marketData.getPortfolio();           // 60s TTL
+- Session isolation: each Folio session has its own Pi session file — no cross-session context pollution.
+- Resume: `switch_session` reloads the file, restoring the full conversation.
+- Restart recovery: session files survive app restarts; `runtimeSessionId` is refreshed via `get_state` and stored on the Folio session.
+
+### Event pipeline
+
+```
+Pi stdout (JSONL)                       tool_execution_start / tool_execution_end /
+                                        message_update(text_delta) / agent_end / error
+        │
+        ▼
+PiRpcClient.promptStreaming()           live raw events + aggregated result
+        │
+        ▼
+PiEventAdapter.consume()                AgentEvent sequence (tool_started,
+                                        message_delta, run_completed, …)
+        │
+        ▼
+PiRuntimeAdapter.run()                  AsyncIterable<AgentEvent>
+        │
+        ▼
+RunManager                              broadcast → IPC → UI; persistence
 ```
 
----
+## 6. Local Runtime
 
-## 8. System Tray Integration
+`LocalRuntimeAdapter` wraps `LocalFinanceAgentBackend` in the `AgentRuntime` contract so the full session → run → event → UI loop works without a Pi process and in tests. Tool calls are replayed as start/end events from the backend's own records; cancellation is best-effort (applies when the current tool call settles). Session context (recent symbols) is persisted on the session and restored on restart.
 
-### 8.1 Tray Features
+## 7. Persistence
 
-| Feature | Description |
-|---------|-------------|
-| Show/Hide | Toggle window visibility |
-| Status | Show market status (open/closed) |
-| Alerts | Quick view of recent alerts |
-| Quit | Exit application |
+`packages/shared/src/storage/` — atomic JSON file store with repository abstractions (SQLite-swappable):
 
-### 8.2 Background Running
+| Repository | File | Contents |
+|------------|------|----------|
+| `SessionRepository` | `sessions.json` | Session metadata index (`SessionMeta` incl. `messageCount`, `runtimeSessionPath`) |
+| `MessageRepository` | `sessions/<id>/messages.json` | Visible transcript |
+| `RunRepository` | `sessions/<id>/runs.json` | Run history |
 
-When user clicks minimize to tray:
-1. Window hides (not closed)
-2. Agent backend remains in Electron main
-3. Alert Engine continues monitoring
-4. System notifications remain active
+Storage root: `<userData>/store`; Pi session files: `<userData>/pi-sessions`. Writes are atomic (tmp file + rename). The renderer never persists anything — Jotai atoms are a view cache hydrated from the kernel at startup.
 
----
+## 8. IPC Surface
 
-## 9. Extension Points
+| Channel | Direction | Purpose |
+|---------|-----------|---------|
+| `kernel:hydrate` | invoke | Session list on startup |
+| `sessions:create` / `sessions:delete` | invoke | Session lifecycle |
+| `sessions:getMessages` / `sessions:listRuns` | invoke | Lazy transcript / run history |
+| `runs:start` / `runs:cancel` | invoke | Run lifecycle |
+| `agent:event` | push | Live AgentEvent stream to the renderer |
+| `agent:getTools`, `market:*`, `longbridge:getStatus`, `alerts:*` | invoke | Market data and utilities (unchanged) |
 
-### 9.1 Adding New LongBridge Commands
+All handlers wrap results in the `{ ok, data | error }` envelope (`toIpcResult`).
 
-1. Add a wrapper in `packages/longbridge-tools/src/tools/`
-2. Add parser/error coverage in `packages/longbridge-tools/src/parser.ts` and tests
-3. Expose the behavior through `packages/shared/src/agent/finance-tool-registry.ts`
-4. Add intent routing in `packages/shared/src/agent/intent-router.ts`
-5. Register Pi-compatible metadata in `packages/pi-extension/src/tools/` if the tool should be discoverable
-6. Add UI through `FinagentClient` if needed
+## 9. State Management
 
-### 9.2 Adding New UI Components
+- Sessions list: `sessionsAtom` (hydrated from kernel).
+- Messages: `messagesAtomFamily` per session, loaded lazily from the kernel.
+- Runs: `runViewAtom` + `applyAgentEventAtom` reducer — a pure projection of the `agent:event` stream. `run_started` surfaces the user message; `tool_started`/`tool_completed` drive the live tool list; `message_delta` streams the answer; terminal events finalize the assistant message and clear the run view.
+- The `KernelBridge` component hydrates on mount and subscribes to the event stream.
 
-1. Add to `packages/ui/src/components/`
-2. Follow OKLCH color system
-3. Support dark mode via `.dark` class
-4. Use existing primitives (Button, Input, etc.)
+## 10. Security Architecture
 
----
-
-## 10. Performance Considerations
-
-| Aspect | Strategy |
-|--------|----------|
-| Quote data | 30-second cache |
-| K-line data | 5-minute cache |
-| Portfolio data | 60-second cache |
-| In-flight market requests | Same-key requests share one Promise |
-| Alert polling | 60-second interval |
-| Session loading | Lazy load messages |
+- `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
+- IPC is whitelisted channel-by-channel in the preload (`index.ts` source, `index.cjs` runtime).
+- LongBridge access stays behind `longbridge-tools` (parameterized execa array arguments, symbol validation).
+- The renderer cannot reach `fs`, the database, the Pi process, or the LongBridge CLI directly.
 
 ---
 
-## 11. Error Handling
+## 11. Component Map
 
-| Error Type | Handling |
-|-------------|----------|
-| LongBridge not installed | Show Setup Wizard |
-| Not authenticated | Show auth prompt |
-| Network error | Retry with exponential backoff |
-| Invalid symbol | Show validation error |
-| Rate limited | Queue and retry |
+```
+finagent/
+├── packages/
+│   ├── core/                  # Types only: Session, Message, Run, AgentEvent,
+│   │                          #   ToolCall, RuntimeSession, AgentRuntime
+│   ├── shared/
+│   │   ├── agent/             # PiRpcClient, PiEventAdapter, PiRuntimeAdapter,
+│   │   │                      #   LocalRuntimeAdapter, LocalFinanceAgentBackend,
+│   │   │                      #   FinanceToolRegistry, MarketDataService
+│   │   ├── kernel/            # SessionManager, RunManager, AgentKernel
+│   │   └── storage/           # JsonFileStore, Session/Message/RunRepository
+│   ├── ui/                    # React components, atoms, KernelBridge, client
+│   ├── pi-extension/          # Pi tool metadata (registered into the Pi runtime)
+│   ├── longbridge-tools/      # LongBridge CLI wrapper
+│   └── skill-hub/             # Deferred (Phase 4+)
+└── apps/electron/
+    └── src/
+        ├── main/              # index.ts (IPC), kernelHost.ts, loadEnv.ts
+        ├── preload/           # contextBridge API
+        └── renderer/          # React app, finagentClient
+```
+
+## 12. Data Flow — Chat Query
+
+```
+User: "分析一下我当前持仓最大的风险"
+    ↓
+ChatArea → client.kernel.startRun(sessionId, content)
+    ↓
+RunManager.startRun()
+    ↓
+persist run + user message → emit run_started
+    ↓
+AgentRuntime.run() → Pi/Local event stream
+    ↓
+tool_started / tool_completed / message_delta …
+    ↓
+IPC 'agent:event' → KernelBridge → run reducer → UI
+    ↓
+run_completed (or run_failed / cancelled)
+    ↓
+RunManager persists assistant message + run outcome
+```
+
+App restart: `kernel:hydrate` restores the session list, `sessions:getMessages` restores transcripts, and Pi session files restore runtime conversation context.
