@@ -53,9 +53,12 @@ export const alertSchema = z.object({
 export const sessionSchema = z.object({
   id: z.string(),
   title: z.string(),
-  status: z.enum(['idle', 'loading', 'error']),
+  status: z.enum(['idle', 'running', 'error']),
   createdAt: z.number(),
   updatedAt: z.number(),
+  runtimeSessionId: z.string().optional(),
+  runtimeSessionPath: z.string().optional(),
+  recentSymbols: z.array(z.string()).optional(),
 });
 
 // Config validation
@@ -102,9 +105,26 @@ export function getStoragePath(filename: string): string {
 // Re-export storage utilities
 export { loadAlerts, saveAlerts, addAlert, removeAlert, updateAlert } from './storage/alerts.ts';
 export {
-  createAgentBackend,
+  JsonFileStore,
+  SessionRepository,
+  MessageRepository,
+  RunRepository,
+} from './storage/index.ts';
+export {
+  AgentKernel,
+  SessionManager,
+  RunManager,
+  type AgentKernelOptions,
+  type AgentProvider,
+} from './kernel/index.ts';
+export {
   LocalFinanceAgentBackend,
+  LocalRuntimeAdapter,
+  PiRuntimeAdapter,
+  PiRpcClient,
+  PiEventAdapter,
   FinanceToolRegistry,
   MarketDataService,
   routeFinanceIntent,
-} from './agent/backend-factory.ts';
+} from './agent/index.ts';
+export type { PiPromptStream, PiPromptResult, PiState, PiStreamEvent } from './agent/pi-rpc-client.ts';

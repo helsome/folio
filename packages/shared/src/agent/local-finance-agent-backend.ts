@@ -16,7 +16,7 @@ import { MarketDataService } from './market-data-service.ts';
 import { composeToolResponse } from './response-composer.ts';
 import { toApiError } from './errors.ts';
 
-interface LocalFinanceAgentBackendOptions {
+export interface LocalFinanceAgentBackendOptions {
   registry?: FinanceToolRegistry;
   marketData?: MarketDataService;
   now?: () => number;
@@ -100,6 +100,14 @@ export class LocalFinanceAgentBackend implements AgentBackend {
 
   getSessionSnapshot(sessionId = 'default') {
     return this.getSession(sessionId);
+  }
+
+  /** Restore persisted session context (e.g. recent symbols) after a restart. */
+  restoreSession(sessionId: string, recentSymbols: string[]): void {
+    const session = this.getSession(sessionId);
+    if (recentSymbols.length > 0) {
+      session.recentSymbols = recentSymbols.slice(0, 5);
+    }
   }
 
   private getSession(sessionId: string): AgentSessionSnapshot {

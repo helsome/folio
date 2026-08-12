@@ -25,6 +25,7 @@ export interface PiRpcClientOptions {
   args?: string[];
   cwd?: string;
   env?: NodeJS.ProcessEnv;
+  sessionDir?: string;
   requestTimeoutMs?: number;
   healthTimeoutMs?: number;
   singleToolTimeoutMs?: number;
@@ -39,6 +40,29 @@ export interface PiPromptResult {
   answer: string;
   toolCalls: ToolCallRecord[];
   trace: AgentTraceEvent[];
+  /** True when the run ended because abort was requested. */
+  aborted?: boolean;
+}
+
+/** Runtime state reported by `get_state`. */
+export interface PiState {
+  sessionId?: string;
+  sessionFile?: string;
+  sessionName?: string;
+  isStreaming?: boolean;
+  messageCount?: number;
+}
+
+/** Events yielded by {@link PiRpcClient.promptStreaming}. */
+export type PiStreamEvent =
+  | { kind: 'event'; event: Record<string, unknown> }
+  | { kind: 'end'; result: PiPromptResult }
+  | { kind: 'error'; error: unknown };
+
+/** Live prompt handle: iterate to consume raw Pi events, abort to stop. */
+export interface PiPromptStream {
+  [Symbol.asyncIterator](): AsyncIterator<PiStreamEvent>;
+  abort(): Promise<void>;
 }
 
 interface PendingPrompt {
@@ -49,6 +73,8 @@ interface PendingPrompt {
   trace: AgentTraceEvent[];
   toolTimeouts: Map<string, ReturnType<typeof setTimeout>>;
   timeout: ReturnType<typeof setTimeout>;
+  abortRequested: boolean;
+  onEvent?: (event: Record<string, unknown>) => void;
   resolve: (result: PiPromptResult) => void;
   reject: (error: unknown) => void;
 }
@@ -56,7 +82,7 @@ interface PendingPrompt {
 interface PendingControl {
   id: string;
   timeout: ReturnType<typeof setTimeout>;
-  resolve: () => void;
+  resolve: (data: unknown) => void;
   reject: (error: unknown) => void;
 }
 
@@ -65,6 +91,7 @@ export class PiRpcClient {
   private readonly args: string[];
   private readonly cwd?: string;
   private readonly env?: NodeJS.ProcessEnv;
+  private readonly sessionDir?: string;
   private readonly requestTimeoutMs: number;
   private readonly healthTimeoutMs: number;
   private readonly singleToolTimeoutMs: number;
@@ -82,9 +109,15 @@ export class PiRpcClient {
 
   constructor(options: PiRpcClientOptions = {}) {
     this.command = options.command ?? readDefaultPiCommand();
-    this.args = options.args ?? readDefaultPiArgs();
+    const defaultArgs = readDefaultPiArgs();
+    this.args = options.args ?? (
+      options.sessionDir
+        ? [...defaultArgs, '--session-dir', options.sessionDir]
+        : defaultArgs
+    );
     this.cwd = options.cwd ?? process.cwd();
     this.env = options.env;
+    this.sessionDir = options.sessionDir;
     this.requestTimeoutMs = options.requestTimeoutMs ?? 60_000;
     this.healthTimeoutMs = options.healthTimeoutMs ?? 5_000;
     this.singleToolTimeoutMs = options.singleToolTimeoutMs ?? 30_000;
@@ -97,7 +130,122 @@ export class PiRpcClient {
   }
 
   async healthCheck(): Promise<void> {
-    await this.sendControl({ type: 'get_state' }, this.healthTimeoutMs);
+    await this.sendControl<unknown>({ type: 'get_state' }, this.healthTimeoutMs);
+  }
+
+  /** Read the runtime's current session identity and file. */
+  async getState(): Promise<PiState> {
+    const data = await this.sendControl<unknown>({ type: 'get_state' }, this.healthTimeoutMs);
+    return readRecord(data) as PiState;
+  }
+
+  /**
+   * Switch the runtime to the given session file, creating it on first use.
+   * Returns the runtime session identity for the now-active conversation.
+   */
+  async switchSession(sessionPath: string): Promise<PiState> {
+    await this.sendControl<unknown>({ type: 'switch_session', sessionPath }, this.healthTimeoutMs);
+    return this.getState();
+  }
+
+  /**
+   * Abort the currently running prompt. The runtime stops streaming and the
+   * active prompt stream settles as aborted.
+   */
+  async abortCurrentPrompt(): Promise<void> {
+    const pending = this.activePrompt();
+    if (!pending) return;
+    if (pending.abortRequested) return;
+    pending.abortRequested = true;
+    try {
+      await this.sendControl<unknown>({ type: 'abort' }, this.healthTimeoutMs);
+    } catch {
+      // Runtime may be unresponsive; force-finish the prompt below anyway.
+    }
+    const stillPending = this.activePrompt();
+    if (stillPending) {
+      this.finishPrompt(stillPending);
+    }
+  }
+
+  /**
+   * Send a prompt and consume raw Pi JSONL events as they arrive.
+   *
+   * The stream yields each parsed stdout event, then ends with `kind: 'end'`
+   * carrying the aggregated result. It throws on runtime error, exit, timeout,
+   * or malformed output, and never hangs: every failure path settles it.
+   */
+  promptStreaming(content: string): PiPromptStream {
+    const proc = this.ensureStarted();
+    const id = randomUUID();
+    const queue: PiStreamEvent[] = [];
+    const waiters: Array<(event: PiStreamEvent) => void> = [];
+
+    const push = (event: PiStreamEvent) => {
+      const waiter = waiters.shift();
+      if (waiter) {
+        waiter(event);
+      } else {
+        queue.push(event);
+      }
+    };
+
+    const next = () => new Promise<PiStreamEvent>((resolve) => {
+      const queued = queue.shift();
+      if (queued) {
+        resolve(queued);
+      } else {
+        waiters.push(resolve);
+      }
+    });
+
+    const timeout = setTimeout(() => {
+      this.pendingPrompts.delete(id);
+      push({
+        kind: 'error',
+        error: createCodeError('PI_REQUEST_TIMEOUT', `Pi request timed out after ${this.requestTimeoutMs}ms.`),
+      });
+    }, this.requestTimeoutMs);
+
+    const pending: PendingPrompt = {
+      id,
+      answerParts: [],
+      toolCalls: [],
+      trace: [],
+      toolTimeouts: new Map(),
+      timeout,
+      abortRequested: false,
+      onEvent: (event) => push({ kind: 'event', event }),
+      resolve: (result) => {
+        clearTimeout(timeout);
+        push({ kind: 'end', result });
+      },
+      reject: (error) => {
+        clearTimeout(timeout);
+        push({ kind: 'error', error });
+      },
+    };
+    this.pendingPrompts.set(id, pending);
+    this.writeJson(proc, { type: 'prompt', id, message: content }, pending);
+
+    const iterator = (async function* () {
+      while (true) {
+        const event = await next();
+        if (event.kind === 'error') {
+          throw event.error;
+        }
+        if (event.kind === 'end') {
+          yield event;
+          return;
+        }
+        yield event;
+      }
+    })();
+
+    return {
+      [Symbol.asyncIterator]: () => iterator,
+      abort: () => this.abortCurrentPrompt(),
+    };
   }
 
   async prompt(content: string): Promise<PiPromptResult> {
@@ -117,6 +265,7 @@ export class PiRpcClient {
         trace: [],
         toolTimeouts: new Map(),
         timeout,
+        abortRequested: false,
         resolve,
         reject,
       };
@@ -156,11 +305,11 @@ export class PiRpcClient {
     this.exited = true;
   }
 
-  private sendControl(payload: Record<string, unknown>, timeoutMs: number): Promise<void> {
+  private sendControl<T>(payload: Record<string, unknown>, timeoutMs: number): Promise<T> {
     const proc = this.ensureStarted();
     const id = randomUUID();
 
-    return new Promise((resolve, reject) => {
+    return new Promise<T>((resolve, reject) => {
       const timeout = setTimeout(() => {
         this.pendingControls.delete(id);
         reject(createCodeError('PI_HEALTH_TIMEOUT', `Pi health check timed out after ${timeoutMs}ms.`));
@@ -169,9 +318,9 @@ export class PiRpcClient {
       const pending: PendingControl = {
         id,
         timeout,
-        resolve: () => {
+        resolve: (data) => {
           clearTimeout(timeout);
-          resolve();
+          resolve(data as T);
         },
         reject: (error) => {
           clearTimeout(timeout);
@@ -310,7 +459,7 @@ export class PiRpcClient {
       if (event.type === 'error') {
         control.reject(createCodeError('PI_RUNTIME_ERROR', String(event.message ?? 'Pi runtime error.')));
       } else {
-        control.resolve();
+        control.resolve(event.data);
       }
     }
 
@@ -342,6 +491,10 @@ export class PiRpcClient {
     }
 
     this.recordToolEvent(pending, event);
+
+    if (pending.onEvent) {
+      pending.onEvent(event);
+    }
 
     if (event.type === 'error') {
       this.finishPrompt(pending, createCodeError('PI_RUNTIME_ERROR', String(event.message ?? 'Pi runtime error.')));
@@ -431,7 +584,12 @@ export class PiRpcClient {
       answer: pending.finalAnswer ?? pending.answerParts.join('').trim(),
       toolCalls: pending.toolCalls,
       trace: pending.trace,
+      aborted: pending.abortRequested,
     });
+  }
+
+  private activePrompt(): PendingPrompt | undefined {
+    return Array.from(this.pendingPrompts.values())[0];
   }
 
   private handleExit(error: unknown) {
