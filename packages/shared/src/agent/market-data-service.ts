@@ -1,10 +1,23 @@
-import type { IntradayData, Kline, Portfolio, Quote } from '@finagent/core';
+import type {
+  CalcIndex,
+  IntradayData,
+  Kline,
+  MarketStatus,
+  NewsItem,
+  Portfolio,
+  Quote,
+  StaticInfo,
+} from '@finagent/core';
 import {
+  getCalcIndex,
   getIntraday,
   getKline,
   getLongBridgeStatus,
+  getMarketStatus,
+  getNews,
   getPortfolio,
   getQuote,
+  getStaticInfo,
   type GetKlineOptions,
   type LongBridgeStatus,
 } from '@finagent/longbridge-tools';
@@ -14,6 +27,7 @@ export interface MarketDataServiceOptions {
   klineTTL?: number;
   portfolioTTL?: number;
   statusTTL?: number;
+  referenceTTL?: number;
   fetchers?: Partial<MarketDataFetchers>;
   now?: () => number;
 }
@@ -24,6 +38,10 @@ export interface MarketDataFetchers {
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
   getPortfolio: () => Promise<Portfolio>;
   getLongBridgeStatus: () => Promise<LongBridgeStatus>;
+  getStaticInfo: (symbol: string) => Promise<StaticInfo>;
+  getCalcIndex: (symbol: string) => Promise<CalcIndex>;
+  getMarketStatus: () => Promise<MarketStatus[]>;
+  getNews: (symbol: string) => Promise<NewsItem[]>;
 }
 
 interface CacheEntry<T> {
@@ -37,6 +55,10 @@ const defaultFetchers: MarketDataFetchers = {
   getIntraday,
   getPortfolio,
   getLongBridgeStatus,
+  getStaticInfo,
+  getCalcIndex,
+  getMarketStatus,
+  getNews,
 };
 
 export class MarketDataService {
@@ -44,6 +66,7 @@ export class MarketDataService {
   private readonly klineTTL: number;
   private readonly portfolioTTL: number;
   private readonly statusTTL: number;
+  private readonly referenceTTL: number;
   private readonly fetchers: MarketDataFetchers;
   private readonly now: () => number;
   private readonly cache = new Map<string, CacheEntry<unknown>>();
@@ -54,6 +77,7 @@ export class MarketDataService {
     this.klineTTL = options.klineTTL ?? 300_000;
     this.portfolioTTL = options.portfolioTTL ?? 60_000;
     this.statusTTL = options.statusTTL ?? 15_000;
+    this.referenceTTL = options.referenceTTL ?? 600_000;
     this.fetchers = { ...defaultFetchers, ...options.fetchers };
     this.now = options.now ?? Date.now;
   }
@@ -77,6 +101,22 @@ export class MarketDataService {
 
   getLongBridgeStatus() {
     return this.cached('longbridge-status', this.statusTTL, () => this.fetchers.getLongBridgeStatus());
+  }
+
+  getStaticInfo(symbol: string) {
+    return this.cached(`static:${symbol}`, this.referenceTTL, () => this.fetchers.getStaticInfo(symbol));
+  }
+
+  getCalcIndex(symbol: string) {
+    return this.cached(`calc-index:${symbol}`, this.referenceTTL, () => this.fetchers.getCalcIndex(symbol));
+  }
+
+  getMarketStatus() {
+    return this.cached('market-status', this.statusTTL, () => this.fetchers.getMarketStatus());
+  }
+
+  getNews(symbol: string) {
+    return this.cached(`news:${symbol}`, this.quoteTTL, () => this.fetchers.getNews(symbol));
   }
 
   clear() {

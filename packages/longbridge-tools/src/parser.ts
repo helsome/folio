@@ -1,5 +1,15 @@
 import { LongBridgeError } from './errors.ts';
-import type { Quote, Portfolio, Kline, Position, IntradayData } from '@finagent/core';
+import type {
+  CalcIndex,
+  IntradayData,
+  Kline,
+  MarketStatus,
+  NewsItem,
+  Portfolio,
+  Position,
+  Quote,
+  StaticInfo,
+} from '@finagent/core';
 
 interface RawQuoteResponse {
   symbol: string;
@@ -134,6 +144,131 @@ export function parseIntradayResponse(output: string): IntradayData[] {
       'LONGBRIDGE_PARSE_FAILURE'
     );
   }
+}
+
+interface RawStaticInfoResponse {
+  symbol: string;
+  name: string;
+  exchange?: string;
+  currency?: string;
+  lot_size?: number | string;
+  total_shares?: number | string;
+  'circ._shares'?: number | string;
+  circulating_shares?: number | string;
+  eps?: number | string;
+  eps_ttm?: number | string;
+  bps?: number | string;
+  dividend?: number | string;
+}
+
+export function parseStaticInfoResponse(output: string): StaticInfo {
+  try {
+    const parsed = JSON.parse(output);
+    const data: RawStaticInfoResponse = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!data || typeof data !== 'object') {
+      throw new Error('Static info response is empty');
+    }
+    return {
+      symbol: data.symbol,
+      name: data.name,
+      exchange: data.exchange,
+      currency: data.currency,
+      lotSize: toOptionalNumber(data.lot_size),
+      totalShares: toOptionalNumber(data.total_shares),
+      circulatingShares: toOptionalNumber(data['circ._shares'] ?? data.circulating_shares),
+      eps: toOptionalNumber(data.eps),
+      epsTtm: toOptionalNumber(data.eps_ttm),
+      bps: toOptionalNumber(data.bps),
+      dividend: toOptionalNumber(data.dividend),
+    };
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse static info response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawCalcIndexResponse {
+  symbol: string;
+  pe?: number | string;
+  pb?: number | string;
+  dps_rate?: number | string;
+  total_market_value?: number | string;
+  turnover_rate?: number | string;
+  ytd_change_rate?: number | string;
+  volume_ratio?: number | string;
+  amplitude?: number | string;
+}
+
+export function parseCalcIndexResponse(output: string): CalcIndex {
+  try {
+    const parsed = JSON.parse(output);
+    const data: RawCalcIndexResponse = Array.isArray(parsed) ? parsed[0] : parsed;
+    if (!data || typeof data !== 'object') {
+      throw new Error('Calc index response is empty');
+    }
+    return {
+      symbol: data.symbol,
+      pe: toOptionalNumber(data.pe),
+      pb: toOptionalNumber(data.pb),
+      dpsRate: toOptionalNumber(data.dps_rate),
+      totalMarketValue: toOptionalNumber(data.total_market_value),
+      turnoverRate: toOptionalNumber(data.turnover_rate),
+      ytdChangeRate: toOptionalNumber(data.ytd_change_rate),
+      volumeRatio: toOptionalNumber(data.volume_ratio),
+      amplitude: toOptionalNumber(data.amplitude),
+    };
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse calc-index response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawMarketStatusResponse {
+  market: string;
+  status: string;
+}
+
+export function parseMarketStatusResponse(output: string): MarketStatus[] {
+  try {
+    const data: RawMarketStatusResponse[] = JSON.parse(output);
+    if (!Array.isArray(data)) {
+      throw new Error('Market status response is not an array');
+    }
+    return data.map((entry) => ({ market: entry.market, status: entry.status }));
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse market-status response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawNewsResponse {
+  id: string;
+  title: string;
+  url?: string;
+  published_at?: number | string;
+}
+
+export function parseNewsResponse(output: string): NewsItem[] {
+  try {
+    const data: RawNewsResponse[] = JSON.parse(output);
+    if (!Array.isArray(data)) {
+      throw new Error('News response is not an array');
+    }
+    return data.map((entry) => ({
+      id: String(entry.id),
+      title: entry.title,
+      summary: '',
+      url: entry.url ?? `https://longbridge.cn/news/${entry.id}`,
+      timestamp: toTimestamp(entry.published_at),
+      symbols: [],
+    }));
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse news response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+function toOptionalNumber(value: unknown): number | undefined {
+  if (value === undefined || value === null || value === '') return undefined;
+  const numberValue = typeof value === 'number' ? value : Number(value);
+  if (!Number.isFinite(numberValue)) return undefined;
+  return numberValue;
 }
 
 function toNumber(value: unknown, field: string): number {

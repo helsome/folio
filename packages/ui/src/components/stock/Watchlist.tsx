@@ -1,28 +1,65 @@
-import React, { useEffect } from 'react';
-import { useAtom, useSetAtom } from 'jotai';
+import React, { useEffect, useReducer, useRef } from 'react';
+import { useAtomValue, useSetAtom } from 'jotai';
 import {
   watchlistAtom,
   quoteCacheAtomFamily,
   fetchQuoteAtom,
   addToWatchlistAtom,
   removeFromWatchlistAtom,
+  activeSymbolAtom,
+  activeViewAtom,
 } from '../../atoms';
 import { useFinagentClient } from '../../client';
-import { StockCard } from './StockCard';
 import { Input } from '../primitives/Input';
 import { Button } from '../primitives/Button';
 
 const SYMBOL_REGEX = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
+const DASH = '\u2014';
+
+const formatPrice = (value: number): string => `$${value.toFixed(2)}`;
+const formatPercent = (value: number): string =>
+  `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 
 export const Watchlist: React.FC = () => {
   const client = useFinagentClient();
-  const [watchlist] = useAtom(watchlistAtom);
+  const watchlist = useAtomValue(watchlistAtom);
   const addSymbol = useSetAtom(addToWatchlistAtom);
   const removeSymbol = useSetAtom(removeFromWatchlistAtom);
-  const fetchQuote = useSetAtom(fetchQuoteAtom);
+  const setActiveSymbol = useSetAtom(activeSymbolAtom);
+  const setActiveView = useSetAtom(activeViewAtom);
+  const activeSymbol = useAtomValue(activeSymbolAtom);
 
   const [newSymbol, setNewSymbol] = React.useState('');
   const [error, setError] = React.useState('');
+
+  // Local static-info name cache: symbol -> display name.
+  const nameCache = useRef(new Map<string, string>());
+  const inflight = useRef(new Set<string>());
+  const [, force] = useReducer((x: number) => x + 1, 0);
+
+  const resolveName = (symbol: string): string => {
+    const cached = nameCache.current.get(symbol);
+    if (cached !== undefined) return cached;
+    if (!inflight.current.has(symbol)) {
+      inflight.current.add(symbol);
+      client.market
+        .getStaticInfo(symbol)
+        .then((res) => {
+          nameCache.current.set(
+            symbol,
+            res.ok && res.data.name ? res.data.name : symbol
+          );
+        })
+        .catch(() => {
+          nameCache.current.set(symbol, symbol);
+        })
+        .finally(() => {
+          inflight.current.delete(symbol);
+          force();
+        });
+    }
+    return symbol;
+  };
 
   const handleAddSymbol = () => {
     const symbol = newSymbol.trim().toUpperCase();
@@ -50,7 +87,7 @@ export const Watchlist: React.FC = () => {
   };
 
   return (
-    <div className="flex flex-col h-full">
+    <div className="flex h-full flex-col">
       <div className="border-b mac-section-divider px-3 py-3">
         <div className="mb-2 px-0.5 text-[11px] font-semibold uppercase text-foreground/42">
           Watchlist
@@ -75,12 +112,17 @@ export const Watchlist: React.FC = () => {
         </div>
       </div>
 
-      <div className="flex-1 space-y-2 overflow-y-auto p-2.5">
+      <div className="flex-1 overflow-y-auto p-1.5">
         {watchlist.map((symbol) => (
-          <WatchlistItem
+          <WatchlistRow
             key={symbol}
             symbol={symbol}
-            client={client}
+            name={resolveName(symbol)}
+            active={symbol === activeSymbol}
+            onSelect={() => {
+              setActiveSymbol(symbol);
+              setActiveView('overview');
+            }}
             onRemove={() => removeSymbol(symbol)}
           />
         ))}
@@ -95,83 +137,93 @@ export const Watchlist: React.FC = () => {
   );
 };
 
-interface WatchlistItemProps {
+interface WatchlistRowProps {
   symbol: string;
-  client: ReturnType<typeof useFinagentClient>;
+  name: string;
+  active: boolean;
+  onSelect: () => void;
   onRemove: () => void;
 }
 
-const WatchlistItem: React.FC<WatchlistItemProps> = ({ symbol, client, onRemove }) => {
-  const [cache] = useAtom(quoteCacheAtomFamily(symbol));
+const WatchlistRow: React.FC<WatchlistRowProps> = ({
+  symbol,
+  name,
+  active,
+  onSelect,
+  onRemove,
+}) => {
+  const client = useFinagentClient();
+  const cache = useAtomValue(quoteCacheAtomFamily(symbol));
   const fetchQuote = useSetAtom(fetchQuoteAtom);
 
   useEffect(() => {
     fetchQuote({ client, symbol });
-    // Refresh every 30 seconds
     const interval = setInterval(() => fetchQuote({ client, symbol }), 30000);
     return () => clearInterval(interval);
   }, [client, symbol, fetchQuote]);
 
-  if (cache.loading && !cache.data) {
-    return (
-      <div className="mac-stock-tile animate-pulse rounded-[10px] p-3">
-        <div className="mb-2 h-3.5 w-16 rounded bg-foreground/8" />
-        <div className="h-5 w-24 rounded bg-foreground/8" />
-      </div>
-    );
-  }
-
-  if (cache.error && !cache.data) {
-    return (
-      <div className="mac-stock-tile rounded-[10px] p-3">
-        <div className="flex justify-between items-start">
-          <div>
-            <div className="text-[13px] font-semibold text-foreground">{symbol}</div>
-            <div className="mt-0.5 text-[12px] text-[var(--mac-red)]">{cache.error}</div>
-          </div>
-          <button
-            onClick={onRemove}
-            className="flex h-6 w-6 items-center justify-center rounded-full text-foreground/42 transition-smooth hover:bg-foreground/7 hover:text-[var(--mac-red)]"
-            aria-label={`Remove ${symbol}`}
-          >
-            <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
-              <path d="M2.4 2.4l6.2 6.2M8.6 2.4 2.4 8.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-      </div>
-    );
-  }
-
-  if (!cache.data) return null;
-
   const quote = cache.data;
-  const isPositive = quote.change >= 0;
+  const loading = !quote && !cache.error;
+  const changeColor = quote
+    ? quote.change >= 0
+      ? 'var(--positive)'
+      : 'var(--negative)'
+    : undefined;
 
   return (
-    <div className="group relative">
-      <div className="mac-stock-tile flex cursor-pointer items-center justify-between rounded-[10px] p-3 transition-smooth hover:translate-y-[-1px]">
-        <div>
-          <div className="text-[13px] font-semibold text-foreground">{quote.symbol}</div>
-          <div className="mt-0.5 text-[18px] font-semibold tracking-tight text-foreground">
-            ${quote.lastPrice.toFixed(2)}
-          </div>
-        </div>
-        <div className={`text-right ${isPositive ? 'text-[var(--mac-green)]' : 'text-[var(--mac-red)]'}`}>
-          <div className="text-[13px] font-semibold">
-            {isPositive ? '+' : ''}{quote.changePercent.toFixed(2)}%
-          </div>
+    <div
+      role="button"
+      tabIndex={0}
+      aria-label={symbol}
+      data-testid={`watchlist-row-${symbol}`}
+      onClick={onSelect}
+      onKeyDown={(event) => {
+        if (event.key === 'Enter' || event.key === ' ') {
+          event.preventDefault();
+          onSelect();
+        }
+      }}
+      className={`group relative flex cursor-pointer items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 transition-colors ${
+        active
+          ? 'bg-[var(--mac-blue-soft)]'
+          : 'hover:bg-[var(--mac-sidebar-hover)]'
+      }`}
+    >
+      <div className="min-w-0 flex-1">
+        <div className="flex items-baseline gap-1.5">
+          <span className="text-[12px] font-bold uppercase tracking-tight text-foreground">
+            {symbol}
+          </span>
+          <span className="truncate text-[11px] text-foreground/48">{name}</span>
         </div>
       </div>
+
+      <div className="shrink-0 text-right tabular-nums">
+        {loading ? (
+          <div className="h-3.5 w-14 animate-pulse rounded bg-foreground/10" />
+        ) : quote ? (
+          <>
+            <div className="text-[12px] font-semibold text-foreground">
+              {formatPrice(quote.lastPrice)}
+            </div>
+            <div className="text-[11px]" style={{ color: changeColor }}>
+              {formatPercent(quote.changePercent)}
+            </div>
+          </>
+        ) : (
+          <div className="text-[12px] text-foreground/40">{DASH}</div>
+        )}
+      </div>
+
       <button
         onClick={(e) => {
           e.stopPropagation();
           onRemove();
         }}
-        className="absolute right-2 top-2 flex h-6 w-6 items-center justify-center rounded-full bg-background/80 text-foreground/42 opacity-0 shadow-sm backdrop-blur transition-smooth hover:text-[var(--mac-red)] group-hover:opacity-100"
+        className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-foreground/38 opacity-0 transition-smooth hover:bg-foreground/8 hover:text-[var(--negative)] group-hover:opacity-100"
         aria-label={`Remove ${symbol}`}
       >
-        <svg width="11" height="11" viewBox="0 0 11 11" fill="none" aria-hidden="true">
+        <svg width="10" height="10" viewBox="0 0 11 11" fill="none" aria-hidden="true">
           <path d="M2.4 2.4l6.2 6.2M8.6 2.4 2.4 8.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
         </svg>
       </button>

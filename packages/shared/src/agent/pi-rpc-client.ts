@@ -1,8 +1,7 @@
 import { randomUUID } from 'node:crypto';
 import { spawn, type ChildProcessWithoutNullStreams, type SpawnOptionsWithoutStdio } from 'node:child_process';
-import type { AgentTraceEvent, ToolCallRecord } from '@finagent/core';
+import type { AgentTraceEvent, LlmModel, ToolCallRecord } from '@finagent/core';
 import { createCodeError } from './errors.ts';
-
 type SpawnProcess = Pick<ChildProcessWithoutNullStreams, 'stdin' | 'stdout' | 'stderr' | 'kill' | 'killed' | 'pid'> & {
   on: ChildProcessWithoutNullStreams['on'];
 };
@@ -24,10 +23,12 @@ export interface PiRpcClientOptions {
   command?: string;
   args?: string[];
   cwd?: string;
-  env?: NodeJS.ProcessEnv;
   sessionDir?: string;
+  /** Static env or a provider evaluated at each spawn (credential changes). */
+  env?: NodeJS.ProcessEnv | (() => NodeJS.ProcessEnv | Promise<NodeJS.ProcessEnv>);
   requestTimeoutMs?: number;
   healthTimeoutMs?: number;
+  controlTimeoutMs?: number;
   singleToolTimeoutMs?: number;
   maxToolCalls?: number;
   requiredEnvKeys?: string[];
@@ -51,6 +52,10 @@ export interface PiState {
   sessionName?: string;
   isStreaming?: boolean;
   messageCount?: number;
+  /** Active model descriptor (present on Pi 0.73+). */
+  model?: LlmModel;
+  /** Active thinking level (off/minimal/low/medium/high/xhigh/max). */
+  thinkingLevel?: string;
 }
 
 /** Events yielded by {@link PiRpcClient.promptStreaming}. */
@@ -89,11 +94,12 @@ interface PendingControl {
 export class PiRpcClient {
   private readonly command: string;
   private readonly args: string[];
+  private readonly env?: NodeJS.ProcessEnv | (() => NodeJS.ProcessEnv | Promise<NodeJS.ProcessEnv>);
   private readonly cwd?: string;
-  private readonly env?: NodeJS.ProcessEnv;
   private readonly sessionDir?: string;
   private readonly requestTimeoutMs: number;
   private readonly healthTimeoutMs: number;
+  private readonly controlTimeoutMs: number;
   private readonly singleToolTimeoutMs: number;
   private readonly maxToolCalls: number;
   private readonly requiredEnvKeys: string[];
@@ -120,6 +126,7 @@ export class PiRpcClient {
     this.sessionDir = options.sessionDir;
     this.requestTimeoutMs = options.requestTimeoutMs ?? 60_000;
     this.healthTimeoutMs = options.healthTimeoutMs ?? 5_000;
+    this.controlTimeoutMs = options.controlTimeoutMs ?? 90_000;
     this.singleToolTimeoutMs = options.singleToolTimeoutMs ?? 30_000;
     this.maxToolCalls = options.maxToolCalls ?? 8;
     this.requiredEnvKeys = options.requiredEnvKeys ?? [];
@@ -149,6 +156,45 @@ export class PiRpcClient {
   }
 
   /**
+   * List models available in the runtime (auth-configured only).
+   * First call can be slow while the runtime warms its model catalog.
+   */
+  async getAvailableModels(): Promise<LlmModel[]> {
+    const data = await this.sendControl<unknown>({ type: 'get_available_models' }, this.controlTimeoutMs);
+    const record = readRecord(data);
+    const models = record.models;
+    if (!Array.isArray(models)) {
+      throw createCodeError('PI_PROTOCOL_ERROR', 'Pi get_available_models returned no models list.');
+    }
+    return models.map((model) => readRecord(model) as unknown as LlmModel);
+  }
+
+  /** Switch the active model. Returns the model descriptor now in effect. */
+  async setModel(provider: string, modelId: string): Promise<LlmModel> {
+    const data = await this.sendControl<unknown>(
+      { type: 'set_model', provider, modelId },
+      this.controlTimeoutMs
+    );
+    return readRecord(data) as unknown as LlmModel;
+  }
+
+  /** Set the thinking level. The runtime coerces to the nearest supported level. */
+  async setThinkingLevel(level: string): Promise<void> {
+    await this.sendControl<unknown>({ type: 'set_thinking_level', level }, this.controlTimeoutMs);
+  }
+
+  /**
+   * Stop the runtime process and allow the next command to spawn a fresh one.
+   * Used when provider credentials change: the extension registers providers
+   * at process startup, so a new process is required to pick them up.
+   */
+  async restart(): Promise<void> {
+    await this.dispose();
+    this.exited = false;
+  }
+
+
+  /**
    * Abort the currently running prompt. The runtime stops streaming and the
    * active prompt stream settles as aborted.
    */
@@ -176,7 +222,7 @@ export class PiRpcClient {
    * or malformed output, and never hangs: every failure path settles it.
    */
   promptStreaming(content: string): PiPromptStream {
-    const proc = this.ensureStarted();
+    const spawnPromise = this.ensureStarted();
     const id = randomUUID();
     const queue: PiStreamEvent[] = [];
     const waiters: Array<(event: PiStreamEvent) => void> = [];
@@ -235,9 +281,17 @@ export class PiRpcClient {
       },
     };
     this.pendingPrompts.set(id, pending);
-    this.writeJson(proc, { type: 'prompt', id, message: content }, pending);
+    const self = this;
 
     const iterator = (async function* () {
+      let proc: SpawnProcess;
+      try {
+        proc = await spawnPromise;
+      } catch (error) {
+        pending.reject(error);
+        throw error;
+      }
+      self.writeJson(proc, { type: 'prompt', id, message: content }, pending);
       while (true) {
         const event = await next();
         if (event.kind === 'error') {
@@ -258,7 +312,7 @@ export class PiRpcClient {
   }
 
   async prompt(content: string): Promise<PiPromptResult> {
-    const proc = this.ensureStarted();
+    const proc = await this.ensureStarted();
     const id = randomUUID();
 
     return new Promise<PiPromptResult>((resolve, reject) => {
@@ -314,8 +368,8 @@ export class PiRpcClient {
     this.exited = true;
   }
 
-  private sendControl<T>(payload: Record<string, unknown>, timeoutMs: number): Promise<T> {
-    const proc = this.ensureStarted();
+  private async sendControl<T>(payload: Record<string, unknown>, timeoutMs: number): Promise<T> {
+    const proc = await this.ensureStarted();
     const id = randomUUID();
 
     return new Promise<T>((resolve, reject) => {
@@ -341,10 +395,13 @@ export class PiRpcClient {
     });
   }
 
-  private ensureStarted() {
+  private async ensureStarted(): Promise<SpawnProcess> {
     if (this.process && !this.exited) return this.process;
 
-    const env = { ...process.env, ...this.env };
+    const env = {
+      ...process.env,
+      ...(typeof this.env === 'function' ? await this.env() : this.env),
+    };
     const missingEnvKeys = this.requiredEnvKeys.filter((key) => !env[key]);
     if (missingEnvKeys.length > 0) {
       throw createCodeError(

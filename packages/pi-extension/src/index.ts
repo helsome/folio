@@ -14,8 +14,21 @@ interface Tool {
   ) => Promise<{ content: Array<{ type: string; text: string }> }>;
 }
 
+interface ProviderModelConfig {
+  id: string;
+  name?: string;
+  baseUrl?: string;
+  api?: string;
+  reasoning?: boolean;
+  contextWindow?: number;
+  maxTokens?: number;
+}
+
 interface ProviderConfig {
   baseUrl?: string;
+  apiKey?: string;
+  api?: string;
+  models?: ProviderModelConfig[];
 }
 
 interface AgentApi {
@@ -26,6 +39,7 @@ interface AgentApi {
 import { getQuoteTool } from './tools/getQuote.ts';
 import { getPortfolioTool } from './tools/getPortfolio.ts';
 import { getKlineTool, getIntradayTool } from './tools/getKline.ts';
+import { listSkillResourcesTool, readSkillResourceTool } from './tools/skillResources.ts';
 
 // Tool registry
 export const tools: Tool[] = [
@@ -33,12 +47,15 @@ export const tools: Tool[] = [
   getPortfolioTool,
   getKlineTool,
   getIntradayTool,
+  listSkillResourcesTool,
+  readSkillResourceTool,
 ];
 
 // Export individual tools
 export { getQuoteTool } from './tools/getQuote.ts';
 export { getPortfolioTool } from './tools/getPortfolio.ts';
 export { getKlineTool, getIntradayTool } from './tools/getKline.ts';
+export { listSkillResourcesTool, readSkillResourceTool } from './tools/skillResources.ts';
 
 // Register all tools with Pi Agent
 export function registerTools(agent: AgentApi) {
@@ -47,12 +64,51 @@ export function registerTools(agent: AgentApi) {
   }
 }
 
+interface ProviderOverride {
+  provider: string;
+  baseUrl?: string;
+  apiKey?: string;
+  api?: string;
+  models?: ProviderModelConfig[];
+}
+
+/** Parse Folio-owned provider overrides from FINAGENT_PROVIDER_OVERRIDES. */
+function readProviderOverrides(): ProviderOverride[] {
+  const raw = process.env.FINAGENT_PROVIDER_OVERRIDES;
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    if (!Array.isArray(parsed)) return [];
+    return parsed.filter(
+      (entry): entry is ProviderOverride =>
+        Boolean(entry) && typeof entry === 'object' && typeof entry.provider === 'string'
+    );
+  } catch {
+    return [];
+  }
+}
+
 export function registerProviderOverrides(agent: AgentApi) {
   if (typeof agent.registerProvider !== 'function') return;
 
-  agent.registerProvider('anthropic', {
-    baseUrl: process.env.ANTHROPIC_BASE_URL ?? 'https://api.minimaxi.com/anthropic',
-  });
+  // Legacy static override: keep the historical Anthropic base URL behavior
+  // unless Folio supplies explicit overrides for anthropic.
+  const overrides = readProviderOverrides();
+  const hasAnthropicOverride = overrides.some((entry) => entry.provider === 'anthropic');
+  if (!hasAnthropicOverride) {
+    agent.registerProvider('anthropic', {
+      baseUrl: process.env.ANTHROPIC_BASE_URL ?? 'https://api.minimaxi.com/anthropic',
+    });
+  }
+
+  for (const entry of overrides) {
+    const config: ProviderConfig = {};
+    if (entry.baseUrl !== undefined) config.baseUrl = entry.baseUrl;
+    if (entry.apiKey !== undefined) config.apiKey = entry.apiKey;
+    if (entry.api !== undefined) config.api = entry.api;
+    if (entry.models !== undefined) config.models = entry.models;
+    agent.registerProvider(entry.provider, config);
+  }
 }
 
 // Type exports

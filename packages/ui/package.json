@@ -8,9 +8,11 @@
     ".": "./src/index.ts"
   },
   "dependencies": {
+    "allotment": "^1.20.5",
     "class-variance-authority": "^0.7.1",
     "clsx": "^2.1.1",
     "jotai": "^2.10.0",
+    "klinecharts": "^10.0.2",
     "react": "^18.3.0",
     "react-dom": "^18.3.0",
     "tailwind-merge": "^2.5.4"

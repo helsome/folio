@@ -11,7 +11,7 @@
     "vite:dev": "cd apps/electron && bunx vite",
     "build": "bun run build:packages && bun run build:electron",
     "build:packages": "bun run --filter './packages/*' build",
-    "build:electron": "cd apps/electron && bunx vite build",
+    "build:electron": "cd apps/electron && bun run build",
     "typecheck": "bun run --filter './**' typecheck",
     "lint": "bun run --filter './**' lint"
   },

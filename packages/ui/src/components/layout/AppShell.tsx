@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { Sidebar } from './Sidebar';
-import { ChatArea } from '../chat/ChatArea';
 import { TitleBar } from './TitleBar';
 import { KernelBridge } from '../kernel/KernelBridge';
+import { WorkbenchShell } from './WorkbenchShell';
 import {
   FinagentClientProvider,
   fallbackClient,
@@ -22,10 +21,7 @@ export const AppShell: React.FC<AppShellProps> = ({ client = fallbackClient }) =
       <div className="mac-app-window flex h-screen flex-col overflow-hidden bg-background text-foreground">
         <TitleBar />
         <LongBridgeBanner />
-        <div className="flex flex-1 overflow-hidden">
-          <Sidebar />
-          <ChatArea />
-        </div>
+        <WorkbenchShell />
       </div>
     </FinagentClientProvider>
   );

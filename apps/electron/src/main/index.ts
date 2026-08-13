@@ -8,11 +8,12 @@ let mainWindow: BrowserWindow | null = null;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(__dirname, '../..');
 const workspaceRoot = join(__dirname, '../../../..');
+if (process.env.FINAGENT_USER_DATA_DIR) {
+  app.setPath('userData', process.env.FINAGENT_USER_DATA_DIR);
+}
+
 loadFinagentEnv({
-  roots: [
-    workspaceRoot,
-    appRoot,
-  ],
+  roots: [workspaceRoot, appRoot],
 });
 const agentKernelHost = new AgentKernelHost();
 const isDev = !app.isPackaged;
@@ -36,13 +37,13 @@ function createWindow() {
   agentKernelHost.attach(mainWindow);
 
   // Load the app
-  if (isDev) {
+  if (isDev && process.env.FINAGENT_FORCE_PROD_LOAD !== '1') {
     mainWindow.loadURL('http://localhost:5173');
     if (process.env.FINAGENT_OPEN_DEVTOOLS === '1') {
       mainWindow.webContents.openDevTools();
     }
   } else {
-    mainWindow.loadFile(join(__dirname, '../renderer/index.html'));
+    mainWindow.loadFile(join(__dirname, '../../dist/renderer/index.html'));
   }
 
   mainWindow.on('closed', () => {
@@ -128,6 +129,22 @@ ipcMain.handle('market:getPortfolio', async () =>
   toIpcResult(() => agentKernelHost.getPortfolio())
 );
 
+ipcMain.handle('market:getStaticInfo', async (_event, symbol: unknown) =>
+  toIpcResult(() => agentKernelHost.getStaticInfo(symbol))
+);
+
+ipcMain.handle('market:getCalcIndex', async (_event, symbol: unknown) =>
+  toIpcResult(() => agentKernelHost.getCalcIndex(symbol))
+);
+
+ipcMain.handle('market:getMarketStatus', async () =>
+  toIpcResult(() => agentKernelHost.getMarketStatus())
+);
+
+ipcMain.handle('market:getNews', async (_event, symbol: unknown) =>
+  toIpcResult(() => agentKernelHost.getNews(symbol))
+);
+
 ipcMain.handle('longbridge:getStatus', async () =>
   toIpcResult(() => agentKernelHost.getLongBridgeStatus())
 );
@@ -138,4 +155,70 @@ ipcMain.handle('alerts:load', async () =>
 
 ipcMain.handle('alerts:save', async (_event, alerts: unknown) =>
   toIpcResult(() => agentKernelHost.saveAlerts(alerts))
+);
+
+// LLM control plane
+ipcMain.handle('llm:getState', async () =>
+  toIpcResult(() => agentKernelHost.getLlmState())
+);
+
+ipcMain.handle('llm:listModels', async () =>
+  toIpcResult(() => agentKernelHost.listModels())
+);
+
+ipcMain.handle('llm:setModel', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.setModel(input))
+);
+
+ipcMain.handle('llm:listThinkingLevels', async () =>
+  toIpcResult(() => agentKernelHost.listThinkingLevels())
+);
+
+ipcMain.handle('llm:setThinkingLevel', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.setThinkingLevel(input))
+);
+
+ipcMain.handle('llm:getProviders', async () =>
+  toIpcResult(() => agentKernelHost.getProviders())
+);
+
+ipcMain.handle('llm:listCredentials', async () =>
+  toIpcResult(() => agentKernelHost.listCredentials())
+);
+
+ipcMain.handle('llm:setCredential', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.setCredential(input))
+);
+
+ipcMain.handle('llm:removeCredential', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.removeCredential(input))
+);
+
+ipcMain.handle('llm:setCustomProvider', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.setCustomProvider(input))
+);
+
+ipcMain.handle('llm:removeCustomProvider', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.removeCustomProvider(input))
+);
+
+ipcMain.handle('llm:testProvider', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.testProvider(input))
+);
+
+// Skills
+ipcMain.handle('skills:list', async () =>
+  toIpcResult(() => agentKernelHost.listSkills())
+);
+
+ipcMain.handle('skills:setEnabled', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.setSkillEnabled(input))
+);
+
+ipcMain.handle('skills:listResources', async (_event, skillId: unknown) =>
+  toIpcResult(() => agentKernelHost.listSkillResources(skillId))
+);
+
+ipcMain.handle('skills:readResource', async (_event, skillId: unknown, relativePath: unknown) =>
+  toIpcResult(() => agentKernelHost.readSkillResource(skillId, relativePath))
 );

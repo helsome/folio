@@ -39,8 +39,14 @@ export class LocalFinanceAgentBackend implements AgentBackend {
 
   async send(request: AgentRequest): Promise<ApiResult<AgentResponse>> {
     const session = this.getSession(request.sessionId);
-    const routed = routeFinanceIntent(request.content, session);
-
+    const workspaceSymbol =
+      typeof request.context?.activeSymbol === 'string' && request.context.activeSymbol.length > 0
+        ? request.context.activeSymbol.toUpperCase()
+        : undefined;
+    const routingSession = workspaceSymbol
+      ? { ...session, recentSymbols: [workspaceSymbol, ...session.recentSymbols] }
+      : session;
+    const routed = routeFinanceIntent(request.content, routingSession);
     if (routed.intent === 'unsupported') {
       session.lastIntent = routed.intent;
       const content = unsupportedFinanceMessage();

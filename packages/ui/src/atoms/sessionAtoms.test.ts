@@ -57,6 +57,10 @@ function makeClient(): FinagentClient {
       getQuote: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
       getKline: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
       getPortfolio: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      getStaticInfo: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      getCalcIndex: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      getMarketStatus: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      getNews: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
     },
     longbridge: {
       getStatus: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
@@ -64,6 +68,26 @@ function makeClient(): FinagentClient {
     alerts: {
       load: async () => ({ ok: true as const, data: [] }),
       save: async () => ({ ok: true as const, data: undefined }),
+    },
+    llm: {
+      getState: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      listModels: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      setModel: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      listThinkingLevels: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      setThinkingLevel: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      getProviders: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      listCredentials: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      setCredential: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      removeCredential: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      setCustomProvider: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      removeCustomProvider: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      testProvider: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+    },
+    skills: {
+      list: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      setEnabled: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      listResources: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      readResource: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
     },
   };
 }

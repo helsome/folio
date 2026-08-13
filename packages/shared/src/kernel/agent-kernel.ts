@@ -1,10 +1,11 @@
 import type { AgentRuntime, ApiResult, ToolDefinition } from '@finagent/core';
+import type { SkillHub } from '@finagent/skill-hub';
 import { JsonFileStore } from '../storage/json-file-store.ts';
 import { MessageRepository } from '../storage/message-repository.ts';
 import { RunRepository } from '../storage/run-repository.ts';
 import { SessionRepository } from '../storage/session-repository.ts';
 import { LocalRuntimeAdapter } from '../agent/local-runtime-adapter.ts';
-import { PiRuntimeAdapter } from '../agent/pi-runtime-adapter.ts';
+import { PiRuntimeAdapter, type LlmRuntimeApi } from '../agent/pi-runtime-adapter.ts';
 import { MarketDataService } from '../agent/market-data-service.ts';
 import { createCodeError } from '../agent/errors.ts';
 import type { PiRpcClientOptions } from '../agent/pi-rpc-client.ts';
@@ -23,6 +24,8 @@ export interface AgentKernelOptions {
   runtime?: AgentRuntime;
   marketData?: MarketDataService;
   rpc?: PiRpcClientOptions;
+  /** Skill hub used for progressive skill loading in the runtime prompt. */
+  skillHub?: SkillHub;
   now?: () => number;
 }
 
@@ -66,6 +69,14 @@ export class AgentKernel {
     return this.runtime.getTools();
   }
 
+  /** LLM control surface when the runtime is the Pi adapter; undefined in local mode. */
+  getLlmApi(): LlmRuntimeApi | undefined {
+    if (this.runtime instanceof PiRuntimeAdapter) {
+      return this.runtime.getLlmApi();
+    }
+    return undefined;
+  }
+
   /**
    * Delete a session and its persisted data, then dispose the corresponding
    * runtime session (e.g. remove the Pi conversation file). Rejects while a
@@ -75,7 +86,7 @@ export class AgentKernel {
     if (this.runs.hasActiveRun(sessionId)) {
       throw createCodeError(
         'RUN_IN_PROGRESS',
-        'Cannot delete a session while a run is active in it. Stop the run first.'
+        'A run is active in this session. Stop it before deleting the session.'
       );
     }
     await this.sessions.deleteSession(sessionId);
@@ -99,6 +110,7 @@ function createDefaultRuntime(
     marketData,
     sessionDir: options.piSessionDir,
     rpc: options.rpc,
+    skillHub: options.skillHub,
     now,
   });
 }

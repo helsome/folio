@@ -2,26 +2,34 @@
 
 ## Overview
 
-Folio is a desktop application that combines an AI conversational interface with financial market data from LongBridge. The agent layer is built on a persistent **Agent Kernel**: sessions, runs, and agent events are first-class entities owned by the main process, streamed to the UI over IPC, and persisted on disk so the app can be restarted without losing conversation state.
+Folio is an AI-native finance workbench: a desktop application that combines a professional financial workspace (watchlist, security header, K-line charts, overview, financials, news) with a context-aware agent copilot. The agent layer is built on a persistent **Agent Kernel**: sessions, runs, and agent events are first-class entities owned by the main process, streamed to the UI over IPC, and persisted on disk so the app can be restarted without losing conversation state.
 
 ---
 
 ## 1. Architecture Overview
 
 ```
-Folio Session
+Workbench Shell (Allotment: Sidebar | Finance Workspace | Agent Panel)
       │
       ▼
-SessionManager (persistence + lifecycle)
-      │
+Renderer atoms (view cache): activeSymbol / activeView / llmState
+      │  IPC (whitelisted: kernel:*, sessions:*, runs:*, agent:*, market:*,
+      │        llm:*, skills:*, alerts:*, longbridge:*)
       ▼
-RunManager (run lifecycle + event broadcast)
+AgentKernelHost (main process)
       │
-      ▼
-AgentRuntime (provider-agnostic abstraction)
+      ├── AgentKernel
+      │     ├── SessionManager (persistence + lifecycle)
+      │     ├── RunManager (run lifecycle + event broadcast)
+      │     └── AgentRuntime
+      │           ├── PiRuntimeAdapter ──► Pi Runtime (JSONL/stdio)
+      │           │      ├── run → promptStreaming (workspace context + skill index)
+      │           │      └── LlmRuntimeApi (listModels / setModel / thinking / test)
+      │           └── LocalRuntimeAdapter (deterministic / tests)
       │
-      ├── PiRuntimeAdapter ──► Pi Runtime (JSONL/stdio)
-      └── LocalRuntimeAdapter ─► LocalFinanceAgentBackend (deterministic / tests)
+      ├── MarketDataService (UI + Agent share one data layer)
+      ├── CredentialStore (safeStorage-encrypted, main process only)
+      └── SkillHub V2 (SKILL.md packages + references, progressive loading)
       │
       ▼
 AgentEvent Stream (run_started … run_completed)
@@ -116,12 +124,17 @@ RunManager invariants:
 interface AgentRuntime {
   getTools(): Promise<ApiResult<ToolDefinition[]>>;
   ensureSession({ id, title?, sessionPath?, recentSymbols? }): Promise<RuntimeSession>;
-  run({ sessionId, runId, content }): AsyncIterable<AgentEvent>;
+  run({ sessionId, runId, content, workspaceContext? }): AsyncIterable<AgentEvent>;
   cancel({ sessionId, runId }): Promise<void>;
   disposeSession?(sessionId): Promise<void>;
   dispose(): Promise<void>;
 }
 ```
+
+`workspaceContext` carries the renderer's current financial-object focus
+(`activeSymbol`, `activeView`, `selectedPosition`) — the ephemeral Workspace
+context, deliberately separate from Session (conversation) state. It is never
+persisted.
 
 ## 5. Pi Runtime Adapter
 
@@ -129,9 +142,9 @@ interface AgentRuntime {
 
 | Component | Responsibility |
 |-----------|----------------|
-| `PiRpcClient` | JSONL/stdio transport: `prompt`, `promptStreaming` (live raw events), `switchSession`, `getState`, `abortCurrentPrompt`, health checks, timeouts, process restart |
+| `PiRpcClient` | JSONL/stdio transport: `prompt`, `promptStreaming` (live raw events), `switchSession`, `getState`, `getAvailableModels`, `setModel`, `setThinkingLevel`, `restart`, `abortCurrentPrompt`, health checks, timeouts, process restart |
 | `PiEventAdapter` | Pure Pi-event → AgentEvent mapping per run |
-| `PiRuntimeAdapter` | `AgentRuntime` implementation: Folio session ↔ Pi session file lifecycle, prompt construction, symbol memory |
+| `PiRuntimeAdapter` | `AgentRuntime` implementation: Folio session ↔ Pi session file lifecycle, prompt construction (workspace context + progressive skill index), symbol memory, and the `LlmRuntimeApi` control plane |
 
 ### Session isolation and recovery
 
@@ -191,9 +204,15 @@ Storage root: `<userData>/store`; Pi session files: `<userData>/pi-sessions`. Wr
 | `kernel:hydrate` | invoke | Session list on startup |
 | `sessions:create` / `sessions:delete` | invoke | Session lifecycle |
 | `sessions:getMessages` / `sessions:listRuns` | invoke | Lazy transcript / run history |
-| `runs:start` / `runs:cancel` | invoke | Run lifecycle |
+| `runs:start` (`{sessionId, content, workspaceContext?}`) / `runs:cancel` | invoke | Run lifecycle |
 | `agent:event` | push | Live AgentEvent stream to the renderer |
-| `agent:getTools`, `market:*`, `longbridge:getStatus`, `alerts:*` | invoke | Market data and utilities (unchanged) |
+| `agent:getTools` | invoke | Tool definitions |
+| `market:getQuote` / `getKline` / `getPortfolio` / `getStaticInfo` / `getCalcIndex` / `getMarketStatus` / `getNews` | invoke | Market data (UI + Agent share this layer) |
+| `llm:getState` / `listModels` / `setModel` / `listThinkingLevels` / `setThinkingLevel` | invoke | LLM control plane (Pi model registry) |
+| `llm:getProviders` / `listCredentials` / `setCredential` / `removeCredential` | invoke | Provider status + credentials (secrets never cross IPC back to the renderer) |
+| `llm:setCustomProvider` / `removeCustomProvider` / `testProvider` | invoke | OpenAI-compatible custom providers + connection tests |
+| `skills:list` / `setEnabled` / `listResources` / `readResource` | invoke | SkillHub V2 surface |
+| `longbridge:getStatus`, `alerts:load` / `alerts:save` | invoke | Status and alerts |
 
 All handlers wrap results in the `{ ok, data | error }` envelope (`toIpcResult`).
 
@@ -201,16 +220,20 @@ All handlers wrap results in the `{ ok, data | error }` envelope (`toIpcResult`)
 
 - Sessions list: `sessionsAtom` (hydrated from kernel).
 - Messages: `messagesAtomFamily` per session, loaded lazily from the kernel.
+- Workspace context: `activeSymbolAtom` (single source of truth for the focused security), `activeViewAtom`, `navSectionAtom`, `agentPanelVisibleAtom`, derived `workspaceContextAtom` — UI-side Jotai state, distinct from session state.
+- LLM control plane: `llmStateAtom` + `llmModelsAtom`/`llmProvidersAtom` view caches hydrated from the Pi registry through `llm:*` IPC.
 - Runs: `runViewAtom` + `applyAgentEventAtom` reducer — a pure projection of the `agent:event` stream. `run_started` surfaces the user message; `tool_started`/`tool_completed` drive the live tool list; `message_delta` streams the answer; terminal events finalize the assistant message and clear the run view.
 - The `KernelBridge` component hydrates on mount and subscribes to the event stream.
 
 ## 10. Security Architecture
 
 - `contextIsolation: true`, `nodeIntegration: false`, `sandbox: true`.
-- IPC is whitelisted channel-by-channel in the preload (`index.ts` source, `index.cjs` runtime).
+- IPC is whitelisted channel-by-channel in the preload (`index.ts` source, `index.cjs` runtime, built with `bun run build:preload`).
+- **CredentialStore**: API keys and custom provider configs are encrypted at rest with Electron `safeStorage` (`<userData>/credentials.json`). The renderer sends secrets in once and only ever receives metadata back. Secret material is redacted from errors, logs, and traces (`redactSecrets`).
+- Provider overrides flow main → Pi spawn env (`FINAGENT_PROVIDER_OVERRIDES`) → the finagent extension's `registerProvider` — Folio-owned config, never touching the user's global Pi config. Credential changes restart the Pi subprocess (sessions survive).
 - LongBridge access stays behind `longbridge-tools` (parameterized execa array arguments, symbol validation).
+- Skill resources are read through path-safe loaders (`SkillHub.readSkillResource` / `read_skill_resource` tool): absolute paths, `..` traversal, and symlink escapes are rejected.
 - The renderer cannot reach `fs`, the database, the Pi process, or the LongBridge CLI directly.
-
 ---
 
 ## 11. Component Map
@@ -219,44 +242,59 @@ All handlers wrap results in the `{ ok, data | error }` envelope (`toIpcResult`)
 finagent/
 ├── packages/
 │   ├── core/                  # Types only: Session, Message, Run, AgentEvent,
-│   │                          #   ToolCall, RuntimeSession, AgentRuntime
+│   │                          #   WorkspaceContext, LlmModel, LlmRuntimeState,
+│   │                          #   ProviderStatus, CustomProviderConfig, …
 │   ├── shared/
-│   │   ├── agent/             # PiRpcClient, PiEventAdapter, PiRuntimeAdapter,
-│   │   │                      #   LocalRuntimeAdapter, LocalFinanceAgentBackend,
-│   │   │                      #   FinanceToolRegistry, MarketDataService
+│   │   ├── agent/             # PiRpcClient (+LLM control), PiEventAdapter,
+│   │   │                      #   PiRuntimeAdapter (+LlmRuntimeApi), LocalRuntimeAdapter,
+│   │   │                      #   LocalFinanceAgentBackend, FinanceToolRegistry,
+│   │   │                      #   MarketDataService
 │   │   ├── kernel/            # SessionManager, RunManager, AgentKernel
 │   │   └── storage/           # JsonFileStore, Session/Message/RunRepository
-│   ├── ui/                    # React components, atoms, KernelBridge, client
-│   ├── pi-extension/          # Pi tool metadata (registered into the Pi runtime)
-│   ├── longbridge-tools/      # LongBridge CLI wrapper
-│   └── skill-hub/             # Minimal SKILL.md loader + enable/disable (marketplace deferred)
+│   ├── ui/                    # React app: atoms (workspace/llm/session/run),
+│   │   │                      #   layout (WorkbenchShell/AppShell/Sidebar),
+│   │   │                      #   workspace (SecurityHeader/Overview/Chart/…),
+│   │   │                      #   chart (FinancialKLineChart + klineAdapter),
+│   │   │                      #   agent (AgentPanel/selectors/structured),
+│   │   │                      #   settings (Settings/Skills views), client
+│   ├── pi-extension/          # Pi tools (finance + skill resources) + provider overrides
+│   ├── longbridge-tools/      # LongBridge CLI wrapper (quote/kline/intraday/portfolio/
+│   │                          #   static/calc-index/market-status/news)
+│   └── skill-hub/             # SkillHub V2: SKILL.md packages + references,
+│                              #   path safety, matching, enable/disable
+├── skills/                    # Vendored official Longbridge skills (MIT)
 └── apps/electron/
-    └── src/
-        ├── main/              # index.ts (IPC), kernelHost.ts, loadEnv.ts
-        ├── preload/           # contextBridge API
-        └── renderer/          # React app, finagentClient
+    ├── src/
+    │   ├── main/              # index.ts (IPC), kernelHost.ts, credentialStore.ts, loadEnv.ts
+    │   ├── preload/           # contextBridge API (source index.ts, built index.cjs)
+    │   └── renderer/          # React entry, finagentClient
+    └── e2e/                   # Golden-path smoke (run.mjs, CDP-driven)
 ```
 
-## 12. Data Flow — Chat Query
+## 12. Data Flow — Workspace Query
 
 ```
-User: "分析一下我当前持仓最大的风险"
+User: clicks NVDA.US in the watchlist
     ↓
-ChatArea → client.kernel.startRun(sessionId, content)
+activeSymbolAtom = NVDA.US (single source of truth)
     ↓
-RunManager.startRun()
+SecurityHeader / Overview / Chart / News / AgentPanel context chip all follow
     ↓
-persist run + user message → emit run_started
+User: "最近走势怎么样？" → AgentPanel input
     ↓
-AgentRuntime.run() → Pi/Local event stream
+client.kernel.startRun(sessionId, content, workspaceContext)
     ↓
-tool_started / tool_completed / message_delta …
+RunManager.startRun() → AgentRuntime.run({…, workspaceContext})
     ↓
-IPC 'agent:event' → KernelBridge → run reducer → UI
+PiRuntimeAdapter builds the prompt: workspace context + skill metadata index
+    → Pi prompt (the agent loads relevant SKILL.md/references via
+      read_skill_resource when needed)
     ↓
-run_completed (or run_failed / cancelled)
+tool_started / tool_completed / message_delta … (AgentEvent stream)
     ↓
-RunManager persists assistant message + run outcome
+IPC 'agent:event' → KernelBridge → run reducer → ToolActivity + streaming answer
+    ↓
+run_completed (or run_failed / cancelled) → answer persisted to the transcript
 ```
 
-App restart: `kernel:hydrate` restores the session list, `sessions:getMessages` restores transcripts, and Pi session files restore runtime conversation context.
+App restart: `kernel:hydrate` restores the session list, `sessions:getMessages` restores transcripts, and Pi session files restore runtime conversation context (including the session's model and thinking level, via `get_state`).

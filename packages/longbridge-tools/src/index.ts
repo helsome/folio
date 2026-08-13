@@ -9,7 +9,19 @@ export { validateSymbol, validateSymbolOrThrow } from './validator.ts';
 export { LongBridgeError, isLongBridgeError } from './errors.ts';
 export type { ErrorCode } from './errors.ts';
 
-export { parseQuoteResponse, parsePortfolioResponse, parseKlineResponse, parseIntradayResponse } from './parser.ts';
+export {
+  parseQuoteResponse,
+  parsePortfolioResponse,
+  parseKlineResponse,
+  parseIntradayResponse,
+  parseStaticInfoResponse,
+  parseCalcIndexResponse,
+  parseMarketStatusResponse,
+  parseNewsResponse,
+} from './parser.ts';
+
+export { getStaticInfo, getCalcIndex, getMarketStatus, getNews } from './tools/reference.ts';
+export type { GetCalcIndexOptions, GetNewsOptions, GetStaticInfoOptions } from './tools/reference.ts';
 
 export { getQuote, getQuotes } from './tools/quote.ts';
 export type { GetQuoteOptions } from './tools/quote.ts';

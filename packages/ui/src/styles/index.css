@@ -59,6 +59,15 @@
   --accent-primary: 0.62 0.19 253;
   --text-primary: 0.19 0.012 260;
   --text-secondary: 0.45 0.01 270;
+
+  /* === FINANCE THEME TOKENS === */
+  --surface: oklch(0.975 0.002 260);
+  --surface-raised: oklch(1 0 0);
+  --border: color-mix(in srgb, var(--foreground) 10%, transparent);
+  --text: var(--foreground);
+  --text-muted: oklch(0.45 0.01 270);
+  --positive: oklch(0.55 0.17 145);
+  --negative: oklch(0.58 0.24 28);
 }
 
 .dark {
@@ -103,6 +112,15 @@
   --accent-primary: 0.68 0.18 253;
   --text-primary: 0.95 0.01 270;
   --text-secondary: 0.70 0.01 270;
+
+  /* === FINANCE THEME TOKENS === */
+  --surface: oklch(0.19 0.014 260);
+  --surface-raised: oklch(0.24 0.015 260);
+  --border: color-mix(in srgb, var(--foreground) 14%, transparent);
+  --text: var(--foreground);
+  --text-muted: oklch(0.70 0.01 270);
+  --positive: oklch(0.66 0.16 145);
+  --negative: oklch(0.66 0.20 28);
 }
 
 /* Z-Index Scale */
@@ -126,6 +144,13 @@
   --color-info: var(--info);
   --color-success: var(--success);
   --color-destructive: var(--destructive);
+  --color-surface: var(--surface);
+  --color-surface-raised: var(--surface-raised);
+  --color-border: var(--border);
+  --color-text: var(--text);
+  --color-text-muted: var(--text-muted);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
 }
 
 body {
@@ -302,4 +327,10 @@ input {
   background: color-mix(in srgb, white 72%, var(--background));
   border: 1px solid var(--mac-border);
   box-shadow: var(--shadow-minimal);
+}
+
+
+/* Finance terminal density: tabular numerals for numeric columns */
+.tnum {
+  font-variant-numeric: tabular-nums;
 }

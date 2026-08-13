@@ -67,12 +67,16 @@ class FakeAgentKernel {
   }
 
   getTools = async () => ({ ok: true, data: [{ name: 'get_quote' }] });
+  getLlmApi = () => undefined;
   dispose = async () => undefined;
 }
 
 mock.module('electron', () => ({
   app: {
     getPath: () => '/tmp/finagent-test',
+  },
+  safeStorage: {
+    isEncryptionAvailable: () => true,
   },
 }));
 
@@ -83,6 +87,17 @@ mock.module('@finagent/shared', () => ({
       super();
       lastMarketData = this;
     }
+  },
+}));
+
+mock.module('@finagent/skill-hub', () => ({
+  SkillHub: class {
+    loadSkills = async () => undefined;
+    listSkills = () => [];
+    listSkillMetadata = () => [];
+    setEnabled = async () => undefined;
+    listSkillResources = async () => [];
+    readSkillResource = async () => '';
   },
 }));
 

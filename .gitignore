@@ -16,3 +16,6 @@ packages/*/dist
 
 # OS/editor noise
 .DS_Store
+
+# E2E artifacts
+apps/electron/e2e/.user-data

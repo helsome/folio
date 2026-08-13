@@ -1,0 +1,39 @@
+import { atom } from 'jotai';
+import type { WorkspaceContext, WorkspaceView } from '@finagent/core';
+
+// ---------------------------------------------------------------------------
+// Workspace context: the current financial-object focus of the UI.
+//
+// Deliberately separate from Agent Session state. `activeSymbol` is the single
+// global source of truth for which security the workspace (Security Header,
+// Chart, Overview, Financials, News, Agent Panel context) is looking at.
+// ---------------------------------------------------------------------------
+
+/** The security the workspace is currently focused on (e.g. "NVDA.US"). */
+export const activeSymbolAtom = atom<string | null>(null);
+
+/** Which workspace view is visible: security views or app sections. */
+export const activeViewAtom = atom<WorkspaceView>('overview');
+
+/** Selected portfolio position (portfolio view). */
+export const selectedPositionAtom = atom<string | null>(null);
+
+/** Sidebar navigation section (app-level views). */
+export type NavSection = 'sessions' | 'watchlist' | 'portfolio' | 'alerts' | 'skills' | 'settings';
+
+export const navSectionAtom = atom<NavSection>('sessions');
+
+/** Whether the Agent Panel is visible (collapse/expand in the shell). */
+export const agentPanelVisibleAtom = atom<boolean>(true);
+
+/** Derived WorkspaceContext passed to agent runs and shared by all views. */
+export const workspaceContextAtom = atom<WorkspaceContext>((get) => {
+  const activeSymbol = get(activeSymbolAtom);
+  const activeView = get(activeViewAtom);
+  const selectedPosition = get(selectedPositionAtom);
+  return {
+    ...(activeSymbol ? { activeSymbol } : {}),
+    ...(activeView ? { activeView } : {}),
+    ...(selectedPosition ? { selectedPosition } : {}),
+  };
+});

@@ -69,6 +69,40 @@ export interface NewsItem {
   symbols: string[];
 }
 
+/** Static reference info for a security. */
+export interface StaticInfo {
+  symbol: string;
+  name: string;
+  exchange?: string;
+  currency?: string;
+  lotSize?: number;
+  totalShares?: number;
+  circulatingShares?: number;
+  eps?: number;
+  epsTtm?: number;
+  bps?: number;
+  dividend?: number;
+}
+
+/** Calculated financial indexes (PE, PB, dividend yield, market value…). */
+export interface CalcIndex {
+  symbol: string;
+  pe?: number;
+  pb?: number;
+  dpsRate?: number;
+  totalMarketValue?: number;
+  turnoverRate?: number;
+  ytdChangeRate?: number;
+  volumeRatio?: number;
+  amplitude?: number;
+}
+
+/** Per-exchange market session status. */
+export interface MarketStatus {
+  market: string;
+  status: string;
+}
+
 export interface AnalystRating {
   symbol: string;
   rating: 'buy' | 'neutral' | 'sell';
@@ -308,10 +342,106 @@ export interface AgentBackend {
   dispose?: () => Promise<void>;
 }
 
+export type WorkspaceView = 'overview' | 'chart' | 'financials' | 'news' | 'portfolio';
+
+/**
+ * Current financial-object context of the workspace.
+ *
+ * Deliberately separate from Agent Session state: a Session is the
+ * conversation scope, a WorkspaceContext is the security / view the user is
+ * currently looking at. It is ephemeral (per run) and never persisted.
+ */
+export interface WorkspaceContext {
+  activeSymbol?: string;
+  activeView?: WorkspaceView;
+  selectedPosition?: string;
+}
+
 export interface AgentRunInput {
   sessionId: string;
   runId: string;
   content: string;
+  workspaceContext?: WorkspaceContext;
+}
+
+/** A model as reported by the Pi model registry. */
+export interface LlmModel {
+  provider: string;
+  id: string;
+  name?: string;
+  api?: string;
+  baseUrl?: string;
+  reasoning?: boolean;
+  contextWindow?: number;
+  maxTokens?: number;
+  /** Supported thinking levels for this model: level → runtime mapping (null = unsupported). */
+  thinkingLevelMap?: Record<string, string | null>;
+}
+
+/** LLM runtime state reported to the renderer. */
+export interface LlmRuntimeState {
+  /** Agent runtime provider (local | pi-runtime). */
+  runtimeProvider: string;
+  model?: LlmModel;
+  thinkingLevel: string;
+  /** Thinking levels supported by the active model (empty in local mode). */
+  availableThinkingLevels: string[];
+  isStreaming: boolean;
+  sessionId?: string;
+  messageCount?: number;
+}
+
+export type ProviderStatusKind =
+  | 'connected'
+  | 'missing_credential'
+  | 'unavailable'
+  | 'runtime_error';
+
+export interface ProviderStatus {
+  provider: string;
+  displayName?: string;
+  status: ProviderStatusKind;
+  modelCount?: number;
+  message?: string;
+  custom?: boolean;
+}
+
+/** One custom (OpenAI-compatible) provider model definition. */
+export interface CustomProviderModel {
+  id: string;
+  name: string;
+  contextWindow?: number;
+  maxTokens?: number;
+  reasoning?: boolean;
+}
+
+/**
+ * Custom OpenAI-compatible provider configuration. `apiKey` only ever lives
+ * in the main process; the renderer sends it once and never reads it back.
+ */
+export interface CustomProviderConfig {
+  name: string;
+  displayName: string;
+  baseUrl: string;
+  api?: string;
+  apiKey?: string;
+  models: CustomProviderModel[];
+}
+
+/** Renderer-safe credential metadata (no secrets). */
+export interface CredentialInfo {
+  provider: string;
+  configured: boolean;
+  updatedAt?: number;
+  custom?: boolean;
+}
+
+export interface LlmTestResult {
+  ok: boolean;
+  message: string;
+  provider: string;
+  modelId: string;
+  latencyMs?: number;
 }
 
 /**

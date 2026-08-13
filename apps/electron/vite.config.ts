@@ -12,7 +12,7 @@ export default defineConfig({
   root: resolve(__dirname, 'src/renderer'),
   base: './',
   build: {
-    outDir: resolve(__dirname, '../../dist/electron/renderer'),
+    outDir: resolve(__dirname, 'dist/renderer'),
     emptyOutDir: true,
   },
   resolve: {

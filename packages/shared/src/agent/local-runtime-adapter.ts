@@ -57,6 +57,9 @@ export class LocalRuntimeAdapter implements AgentRuntime {
     const result = await this.backend.send({
       sessionId: input.sessionId,
       content: input.content,
+      ...(input.workspaceContext
+        ? { context: input.workspaceContext as unknown as Record<string, unknown> }
+        : {}),
     });
 
     if (this.abortedRunIds.delete(input.runId)) {
