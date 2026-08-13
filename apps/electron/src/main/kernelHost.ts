@@ -1,5 +1,6 @@
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { app, type BrowserWindow } from 'electron';
 import type {
   AgentEvent,
@@ -41,12 +42,20 @@ export class AgentKernelHost {
   private unsubscribe: (() => void) | null = null;
 
   constructor() {
+    // The Pi runtime resolves its extension path (`.pi/extensions/...`)
+    // relative to the spawned process cwd, so spawn it from the workspace
+    // root rather than the Electron app directory.
+    const workspaceRoot = join(
+      dirname(fileURLToPath(import.meta.url)),
+      '../../../../'
+    );
     this.kernel = new AgentKernel({
       storageDir: join(app.getPath('userData'), 'store'),
       piSessionDir: join(app.getPath('userData'), 'pi-sessions'),
       provider: readAgentProvider(),
       marketData: this.marketData,
       rpc: {
+        cwd: workspaceRoot,
         requiredEnvKeys: readRequiredLlmEnvKeys(),
       },
     });
