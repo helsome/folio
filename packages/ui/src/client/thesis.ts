@@ -1,21 +1,21 @@
 import type { InvestmentThesis, ResearchReport, ThesisImpact } from '@finagent/core';
+import { unwrapIpcResult } from './unwrap';
 
 /**
- * Defensive thesis client. The real channel (`window.electronAPI.thesis.*`) is
- * wired by the Lead at integration; until then every loader degrades to an
- * empty result so the panels render their graceful "no thesis"/"no report"
- * states instead of crashing.
+ * Defensive thesis client. The channel (`window.electronAPI.thesis.*`) answers
+ * with the `{ ok, data | error }` envelope; every loader unwraps it and
+ * degrades to an empty/null result so the panels render their graceful
+ * "no thesis"/"no report" states instead of crashing.
  */
 
-/** Minimal shape of the (not-yet-wired) electron API surface we consume. */
 interface ThesisElectronApi {
   thesis?: {
-    list?: (symbol?: string) => Promise<InvestmentThesis[]>;
-    getReport?: (symbol: string) => Promise<ResearchReport | null>;
-    saveFromReport?: (symbol: string) => Promise<InvestmentThesis>;
-    reEvaluate?: (symbol: string) => Promise<ThesisImpact>;
-    update?: (thesis: InvestmentThesis) => Promise<InvestmentThesis>;
-    listImpacts?: (symbol: string) => Promise<ThesisImpact[]>;
+    list?: (symbol?: string) => Promise<unknown>;
+    getReport?: (symbol: string) => Promise<unknown>;
+    saveFromReport?: (symbol: string) => Promise<unknown>;
+    reEvaluate?: (symbol: string) => Promise<unknown>;
+    update?: (thesis: InvestmentThesis) => Promise<unknown>;
+    listImpacts?: (symbol: string) => Promise<unknown>;
   };
 }
 
@@ -27,7 +27,7 @@ export async function loadTheses(symbol?: string): Promise<InvestmentThesis[]> {
   try {
     const loader = thesisApi()?.list;
     if (typeof loader !== 'function') return [];
-    return (await loader(symbol)) ?? [];
+    return unwrapIpcResult<InvestmentThesis[]>(await loader(symbol)) ?? [];
   } catch {
     return [];
   }
@@ -37,7 +37,7 @@ export async function loadResearchReport(symbol: string): Promise<ResearchReport
   try {
     const loader = thesisApi()?.getReport;
     if (typeof loader !== 'function') return null;
-    return await loader(symbol);
+    return unwrapIpcResult<ResearchReport | null>(await loader(symbol));
   } catch {
     return null;
   }
@@ -47,7 +47,7 @@ export async function saveThesisFromReport(symbol: string): Promise<InvestmentTh
   try {
     const loader = thesisApi()?.saveFromReport;
     if (typeof loader !== 'function') return null;
-    return await loader(symbol);
+    return unwrapIpcResult<InvestmentThesis>(await loader(symbol));
   } catch {
     return null;
   }
@@ -57,7 +57,7 @@ export async function reEvaluateThesis(symbol: string): Promise<ThesisImpact | n
   try {
     const loader = thesisApi()?.reEvaluate;
     if (typeof loader !== 'function') return null;
-    return await loader(symbol);
+    return unwrapIpcResult<ThesisImpact>(await loader(symbol));
   } catch {
     return null;
   }
@@ -67,7 +67,7 @@ export async function updateThesis(thesis: InvestmentThesis): Promise<Investment
   try {
     const loader = thesisApi()?.update;
     if (typeof loader !== 'function') return null;
-    return await loader(thesis);
+    return unwrapIpcResult<InvestmentThesis>(await loader(thesis));
   } catch {
     return null;
   }
@@ -77,7 +77,7 @@ export async function loadImpacts(symbol: string): Promise<ThesisImpact[]> {
   try {
     const loader = thesisApi()?.listImpacts;
     if (typeof loader !== 'function') return [];
-    return (await loader(symbol)) ?? [];
+    return unwrapIpcResult<ThesisImpact[]>(await loader(symbol)) ?? [];
   } catch {
     return [];
   }

@@ -126,7 +126,7 @@ async function main() {
       const tools = Array.isArray(inner) ? inner : inner?.data;
       if (!Array.isArray(tools)) throw new Error(`agent:getTools returned no tools: ${JSON.stringify(result)}`);
       const names = new Set(tools.map((tool) => tool.name));
-      for (const expected of ['get_quote', 'get_portfolio']) {
+      for (const expected of ['get_quote', 'get_portfolio', 'get_market_depth', 'get_financials', 'get_calendar_events']) {
         if (!names.has(expected)) {
           throw new Error(`finance tool missing: ${expected}; have [${[...names].join(', ')}]`);
         }

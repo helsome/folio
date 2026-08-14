@@ -1,14 +1,15 @@
 import type { Comparison } from '@finagent/core';
+import { unwrapIpcResult } from './unwrap';
 
 /**
- * Defensive compare client. The real channel (`window.electronAPI.compare.*`)
- * is wired by the Lead at integration; until then the loader degrades to `null`
- * and the Compare workspace renders its empty state.
+ * Defensive compare client. The channel (`window.electronAPI.compare.build`)
+ * answers with the `{ ok, data | error }` envelope; the loader unwraps it and
+ * degrades to `null` when the channel is absent or fails.
  */
 
 interface CompareElectronApi {
   compare?: {
-    build?: (symbols: string[]) => Promise<Comparison>;
+    build?: (symbols: string[]) => Promise<unknown>;
   };
 }
 
@@ -17,7 +18,7 @@ export async function loadComparison(symbols: string[]): Promise<Comparison | nu
     const api = (window as { electronAPI?: CompareElectronApi }).electronAPI;
     const loader = api?.compare?.build;
     if (typeof loader !== 'function') return null;
-    return await loader(symbols);
+    return unwrapIpcResult<Comparison>(await loader(symbols));
   } catch {
     return null;
   }

@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import type { SkillReadiness, SkillReadinessStatus } from '@finagent/core';
+import { unwrapIpcResult } from '../client/unwrap';
 
 /**
  * Skill readiness view state.
@@ -14,23 +15,24 @@ import type { SkillReadiness, SkillReadinessStatus } from '@finagent/core';
 /** Per-skill readiness snapshot, keyed by skill id. */
 export const skillReadinessAtom = atom<SkillReadiness[]>([]);
 
-/** Minimal shape of the (not-yet-wired) electron API surface we consume. */
+/** Minimal shape of the electron API surface we consume. */
 interface SkillReadinessElectronApi {
   skills?: {
-    readiness?: () => Promise<SkillReadiness[]>;
+    readiness?: () => Promise<unknown>;
   };
 }
 
 /**
  * Load readiness from the main process. Returns [] (graceful) when the IPC
- * channel is absent or fails, so the UI never crashes before the Lead wires it.
+ * channel is absent or fails, so the UI never crashes before wiring.
  */
 export async function loadSkillReadiness(): Promise<SkillReadiness[]> {
   try {
     const api = (window as { electronAPI?: SkillReadinessElectronApi }).electronAPI;
     const loader = api?.skills?.readiness;
     if (typeof loader !== 'function') return [];
-    return await loader();
+    const result = await loader();
+    return unwrapIpcResult<SkillReadiness[]>(result) ?? [];
   } catch {
     return [];
   }

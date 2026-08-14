@@ -173,7 +173,7 @@ const electronAPI: ElectronAPI = {
     },
   },
   compare: {
-    build: (symbols: string[]) => ipcRenderer.invoke('compare:build', symbols),
+    build: (symbols: string[]) => ipcRenderer.invoke('compare:build', { symbols }),
   },
   portfolioRisk: {
     analyze: () => ipcRenderer.invoke('portfolioRisk:analyze'),

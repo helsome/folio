@@ -1,12 +1,13 @@
 import { atom } from 'jotai';
 import type { ResearchReport, ResearchRunSummary, ResearchRunStatus } from '@finagent/core';
+import { unwrapIpcResult } from '../client/unwrap';
 
 /**
  * Deep Research view state.
  *
  * Runs and reports live in the main process (ResearchService); the UI hydrates
- * over IPC. The channels are wired by the Lead at integration; until then the
- * loaders degrade gracefully so the views never crash.
+ * over IPC. The main process answers with the `{ ok, data | error }` envelope;
+ * every loader below unwraps it and degrades to an empty result on failure.
  */
 
 /** Recent research runs, newest first (hydrated from `research:listRuns`). */
@@ -23,15 +24,15 @@ export const researchLoadingAtom = atom<boolean>(false);
 
 export type { ResearchReport, ResearchRunSummary, ResearchRunStatus };
 
-/** Minimal shape of the (not-yet-wired) electron API surface we consume. */
+/** Minimal shape of the electron API surface we consume. */
 interface ResearchElectronApi {
   research?: {
-    start?: (input: { symbol: string }) => Promise<ResearchRunSummary>;
-    cancel?: (input: { runId: string }) => Promise<void>;
-    listRuns?: () => Promise<ResearchRunSummary[]>;
-    getRun?: (input: { runId: string }) => Promise<ResearchRunSummary | undefined>;
-    listReports?: (input: { symbol?: string }) => Promise<ResearchReport[]>;
-    getReport?: (input: { reportId: string }) => Promise<ResearchReport | undefined>;
+    start?: (input: { symbol: string }) => Promise<unknown>;
+    cancel?: (input: { runId: string }) => Promise<unknown>;
+    listRuns?: () => Promise<unknown>;
+    getRun?: (input: { runId: string }) => Promise<unknown>;
+    listReports?: (input: { symbol?: string }) => Promise<unknown>;
+    getReport?: (input: { reportId: string }) => Promise<unknown>;
   };
 }
 
@@ -45,7 +46,9 @@ export async function startResearch(symbol: string): Promise<ResearchRunSummary 
   try {
     const research = api();
     if (!research?.start) return undefined;
-    return await research.start({ symbol: symbol.toUpperCase() });
+    return unwrapIpcResult<ResearchRunSummary>(
+      await research.start({ symbol: symbol.toUpperCase() })
+    ) ?? undefined;
   } catch {
     return undefined;
   }
@@ -65,7 +68,7 @@ export async function loadResearchRuns(): Promise<ResearchRunSummary[]> {
   try {
     const research = api();
     if (!research?.listRuns) return [];
-    return await research.listRuns();
+    return unwrapIpcResult<ResearchRunSummary[]>(await research.listRuns()) ?? [];
   } catch {
     return [];
   }
@@ -74,7 +77,7 @@ export async function loadResearchRuns(): Promise<ResearchRunSummary[]> {
 /** Fetch one run's latest summary (progress polling). */
 export async function loadResearchRun(runId: string): Promise<ResearchRunSummary | undefined> {
   try {
-    return await api()?.getRun?.({ runId });
+    return unwrapIpcResult<ResearchRunSummary | undefined>(await api()?.getRun?.({ runId })) ?? undefined;
   } catch {
     return undefined;
   }
@@ -85,7 +88,7 @@ export async function loadSymbolReports(symbol?: string): Promise<ResearchReport
   try {
     const research = api();
     if (!research?.listReports) return [];
-    return await research.listReports({ symbol });
+    return unwrapIpcResult<ResearchReport[]>(await research.listReports({ symbol })) ?? [];
   } catch {
     return [];
   }
@@ -94,7 +97,7 @@ export async function loadSymbolReports(symbol?: string): Promise<ResearchReport
 /** Fetch a full report by id. */
 export async function loadResearchReport(reportId: string): Promise<ResearchReport | undefined> {
   try {
-    return await api()?.getReport?.({ reportId });
+    return unwrapIpcResult<ResearchReport | undefined>(await api()?.getReport?.({ reportId })) ?? undefined;
   } catch {
     return undefined;
   }

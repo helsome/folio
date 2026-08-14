@@ -242,12 +242,25 @@ async function main() {
 
     // G. Compare NVDA / AMD with structured data
     try {
+      await page.getByRole('button', { name: /^Compare$/i }).first().click();
       await page.locator('[data-testid="compare-workspace"]').waitFor({ timeout: 15_000 });
-      // Two symbols trigger the automatic build (workspace contract).
+      const dumpCompare = async (label) => {
+        const info = await page.evaluate(() => {
+          const input = document.querySelector('[data-testid="compare-symbol-input"]');
+          const workspace = document.querySelector('[data-testid="compare-workspace"]');
+          return { input: input?.value, text: (workspace?.textContent ?? '').replace(/\s+/g, ' ').slice(0, 120) };
+        });
+        console.log(`G-DUMP ${label}:`, JSON.stringify(info));
+      };
+      await dumpCompare('mounted');
       await page.locator('[data-testid="compare-symbol-input"]').first().fill('NVDA.US');
+      await dumpCompare('filled1');
       await page.locator('[data-testid="compare-add"]').first().click();
+      await dumpCompare('added1');
       await page.locator('[data-testid="compare-symbol-input"]').first().fill('AMD.US');
+      await dumpCompare('filled2');
       await page.locator('[data-testid="compare-add"]').first().click();
+      await dumpCompare('added2');
       await page.locator('[data-testid="compare-table"]').waitFor({ timeout: 120_000 });
       const compareText = await page.locator('[data-testid="compare-table"]').first().textContent();
       if (!/Market Cap/.test(compareText ?? '') || !/NVDA/.test(compareText ?? '')) {
@@ -255,6 +268,14 @@ async function main() {
       }
       pass('G: compare workspace builds a structured comparison');
     } catch (error) {
+      console.log(
+        'COMPARE WORKSPACE DUMP:',
+        (await page
+          .locator('[data-testid="compare-workspace"]')
+          .first()
+          .textContent()
+          .catch(() => '(workspace missing)'))?.replace(/\s+/g, ' ').slice(0, 400)
+      );
       fail('G: compare workspace builds a structured comparison', error);
     }
 

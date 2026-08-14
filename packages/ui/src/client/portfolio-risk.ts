@@ -1,18 +1,17 @@
 import type { PortfolioRiskReport } from '@finagent/core';
+import { unwrapIpcResult } from './unwrap';
 
 /**
  * Defensive loader for the portfolio-risk analysis channel.
  *
- * Analysis runs in the main process (`PortfolioRiskService`) and is exposed
- * over IPC. The channel (`window.electronAPI.portfolioRisk.analyze()`) is not
- * wired yet — the loader returns `null` (graceful empty) until the Lead adds
- * it, so the UI never crashes before integration.
+ * Analysis runs in the main process (`PortfolioRiskService`) over IPC; the
+ * loader unwraps the `{ ok, data | error }` envelope and returns null on any
+ * failure so the UI degrades to a graceful empty state.
  */
 
-/** Minimal shape of the (not-yet-wired) electron API surface we consume. */
 interface PortfolioRiskElectronApi {
   portfolioRisk?: {
-    analyze?: () => Promise<PortfolioRiskReport>;
+    analyze?: () => Promise<unknown>;
   };
 }
 
@@ -21,7 +20,7 @@ export async function loadPortfolioRiskReport(): Promise<PortfolioRiskReport | n
     const api = (window as { electronAPI?: PortfolioRiskElectronApi }).electronAPI;
     const analyze = api?.portfolioRisk?.analyze;
     if (typeof analyze !== 'function') return null;
-    return await analyze();
+    return unwrapIpcResult<PortfolioRiskReport>(await analyze());
   } catch {
     return null;
   }

@@ -104,7 +104,7 @@ var electronAPI = {
     }
   },
   compare: {
-    build: (symbols) => import_electron.ipcRenderer.invoke("compare:build", symbols)
+    build: (symbols) => import_electron.ipcRenderer.invoke("compare:build", { symbols })
   },
   portfolioRisk: {
     analyze: () => import_electron.ipcRenderer.invoke("portfolioRisk:analyze")

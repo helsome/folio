@@ -32,27 +32,58 @@ export const PortfolioSection: React.FC = () => {
 
   const portfolio: Portfolio | null = cache.data;
 
+  // The risk analysis is a top-level action: it renders even when the
+  // portfolio fetch is loading, failed, or empty (the service records the
+  // failures honestly instead of hiding the action).
+  const riskSection = (
+    <div className="border-t border-[var(--mac-border)] pt-3">
+      <Button
+        variant="secondary"
+        size="sm"
+        onClick={() => void analyzeRisk().catch(() => {})}
+        disabled={riskCache.loading}
+      >
+        {riskCache.loading ? 'Analyzing…' : 'Analyze Portfolio'}
+      </Button>
+
+      {riskCache.loading && (
+        <div className="mt-3 h-24 animate-pulse rounded-[12px] bg-foreground/6" />
+      )}
+      {riskCache.error && (
+        <div className="mt-3 text-[12px] text-foreground/54">
+          Risk analysis failed: {riskCache.error}
+        </div>
+      )}
+      {riskCache.report && <PortfolioRiskPanel report={riskCache.report} />}
+    </div>
+  );
+
   if (cache.loading && !portfolio) {
     return (
       <div className="space-y-3 p-4">
         <div className="h-24 animate-pulse rounded-[12px] bg-foreground/6" />
         <div className="h-32 animate-pulse rounded-[12px] bg-foreground/6" />
+        {riskSection}
       </div>
     );
   }
 
   if (cache.error && !portfolio) {
     return (
-      <div className="p-4 text-[12px] text-foreground/54">
-        Portfolio unavailable: {cache.error}
+      <div className="space-y-3 p-4">
+        <div className="text-[12px] text-foreground/54">
+          Portfolio unavailable: {cache.error}
+        </div>
+        {riskSection}
       </div>
     );
   }
 
   if (!portfolio) {
     return (
-      <div className="flex h-full items-center justify-center p-4 text-[13px] text-foreground/44">
-        No portfolio data.
+      <div className="space-y-3 p-4">
+        <div className="text-[13px] text-foreground/44">No portfolio data.</div>
+        {riskSection}
       </div>
     );
   }
@@ -86,26 +117,7 @@ export const PortfolioSection: React.FC = () => {
           )}
         </div>
       </div>
-      <div className="border-t border-[var(--mac-border)] pt-3">
-        <Button
-          variant="secondary"
-          size="sm"
-          onClick={() => void analyzeRisk().catch(() => {})}
-          disabled={riskCache.loading}
-        >
-          {riskCache.loading ? 'Analyzing…' : 'Analyze Portfolio'}
-        </Button>
-
-        {riskCache.loading && (
-          <div className="mt-3 h-24 animate-pulse rounded-[12px] bg-foreground/6" />
-        )}
-        {riskCache.error && (
-          <div className="mt-3 text-[12px] text-foreground/54">
-            Risk analysis failed: {riskCache.error}
-          </div>
-        )}
-        {riskCache.report && <PortfolioRiskPanel report={riskCache.report} />}
-      </div>
+      {riskSection}
     </div>
   );
 };

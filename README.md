@@ -94,7 +94,7 @@ FINAGENT_AGENT_PROVIDER=local bun run dev
 
 ## Status & known limitations
 
-- Unit + integration: 324 tests green. Typecheck green. E2E steps A–D green; steps E–H (Deep Research → Thesis → Compare → Portfolio Risk golden paths) are wired and under final verification.
+- Unit + integration: 324 tests green. Typecheck green. E2E golden path A–H green (workbench → Deep Research → evidence-backed report → thesis → compare → portfolio risk, real Longbridge data). Packaged-app smoke green (20 capability tools, 13 skills, local run completes outside the source repo).
 - Packaging: unsigned `mac.target: 'dir'` build (signing/notarization and DMG target need Apple credentials); `electronDist` is pinned to the local install so packaging works without network.
 - The agent-backed synthesizers (research/thesis/risk) use the configured Pi runtime; with `FINAGENT_AGENT_PROVIDER=local` they degrade to deterministic local implementations.
 

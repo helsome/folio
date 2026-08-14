@@ -241,35 +241,69 @@ All handlers wrap results in the `{ ok, data | error }` envelope (`toIpcResult`)
 ```
 finagent/
 ├── packages/
-│   ├── core/                  # Types only: Session, Message, Run, AgentEvent,
-│   │                          #   WorkspaceContext, LlmModel, LlmRuntimeState,
-│   │                          #   ProviderStatus, CustomProviderConfig, …
+│   ├── core/                  # Types only: capability/research/thesis/alert-rule/
+│   │                          #   readiness/compare/portfolio-risk contracts +
+│   │                          #   kernel types (Session, Run, AgentEvent, …)
 │   ├── shared/
-│   │   ├── agent/             # PiRpcClient (+LLM control), PiEventAdapter,
-│   │   │                      #   PiRuntimeAdapter (+LlmRuntimeApi), LocalRuntimeAdapter,
-│   │   │                      #   LocalFinanceAgentBackend, FinanceToolRegistry,
-│   │   │                      #   MarketDataService
+│   │   ├── capabilities/      # Finance Capability Registry (single source of
+│   │   │                      #   truth): manifests (phase-one + phase-two),
+│   │   │                      #   registry, executor (concurrency/timeout/abort),
+│   │   │                      #   Pi tool adapter, skill readiness
+│   │   ├── research/          # Deep Research: planner, runner, synthesizers
+│   │   │                      #   (agent-backed + deterministic local), repository
+│   │   ├── thesis/            # InvestmentThesis: repository, converter,
+│   │   │                      #   impact evaluators, service (re-evaluate)
+│   │   ├── compare/           # Structured symbol comparison
+│   │   ├── alerts/            # Alert Engine v2: rule repository (v1 migration),
+│   │   │                      #   per-type evaluators, scheduler, event log
+│   │   ├── portfolio-risk/    # Allocation/concentration/signals + synthesizer
+│   │   ├── agent/             # PiRpcClient, adapters, LocalFinanceAgentBackend,
+│   │   │                      #   FinanceToolRegistry (capability-backed), MarketDataService
 │   │   ├── kernel/            # SessionManager, RunManager, AgentKernel
+│   │   ├── resources/         # ResourceLocator (dev repo vs packaged resourcesPath)
 │   │   └── storage/           # JsonFileStore, Session/Message/RunRepository
-│   ├── ui/                    # React app: atoms (workspace/llm/session/run),
-│   │   │                      #   layout (WorkbenchShell/AppShell/Sidebar),
-│   │   │                      #   workspace (SecurityHeader/Overview/Chart/…),
-│   │   │                      #   chart (FinancialKLineChart + klineAdapter),
-│   │   │                      #   agent (AgentPanel/selectors/structured),
-│   │   │                      #   settings (Settings/Skills views), client
-│   ├── pi-extension/          # Pi tools (finance + skill resources) + provider overrides
-│   ├── longbridge-tools/      # LongBridge CLI wrapper (quote/kline/intraday/portfolio/
-│   │                          #   static/calc-index/market-status/news)
+│   ├── ui/                    # React app: atoms (workspace/research/thesis/compare/
+│   │   │                      #   portfolio-risk/alert/skill-readiness/…),
+│   │   │                      #   layout, workspace, chart, agent, settings,
+│   │   │                      #   research/thesis/compare/portfolio components, client
+│   ├── pi-extension/          # Pi tools GENERATED from the capability registry
+│   │                          #   (+ skill-resource tools) + provider overrides
+│   ├── longbridge-tools/      # LongBridge CLI wrapper: 20+ fetchers, parsers,
+│   │                          #   typed results, real-CLI test fixtures
 │   └── skill-hub/             # SkillHub V2: SKILL.md packages + references,
-│                              #   path safety, matching, enable/disable
+│                              #   path safety, enable/disable, capability map
 ├── skills/                    # Vendored official Longbridge skills (MIT)
 └── apps/electron/
     ├── src/
-    │   ├── main/              # index.ts (IPC), kernelHost.ts, credentialStore.ts, loadEnv.ts
+    │   ├── main/              # index.ts (IPC), kernelHost.ts (V3 wiring:
+    │   │                      #   registry, services, alert engine, notifications),
+    │   │                      #   credentialStore.ts, loadEnv.ts
     │   ├── preload/           # contextBridge API (source index.ts, built index.cjs)
     │   └── renderer/          # React entry, finagentClient
-    └── e2e/                   # Golden-path smoke (run.mjs, CDP-driven)
+    └── e2e/                   # Golden-path A–H (run.mjs) + packaged smoke
 ```
+
+## 11.1 Capability Layer (V3)
+
+```
+Longbridge CLI ─► longbridge-tools fetchers ─► capability manifests
+                                                    │
+                                          Capability Registry (20 caps)
+                       ┌────────────────────┴──────────────────────┐
+                       │                    │                       │
+             Pi tools (generated)   UI availability +       Product workflows:
+             via pi-extension        Skill Readiness          research / thesis /
+                                                                alerts / compare /
+                                                                portfolio risk
+```
+
+Each capability manifest declares id/name/description/category/risk/auth, a
+TypeBox input schema, and an `execute` that returns `{ data, provenance,
+summary }`. `defineCapability` wraps execute with input validation. The
+`CapabilityExecutor` runs capabilities under timeout/abort with per-capability
+failure isolation — research, re-evaluation, alerts, compare, and risk all
+execute through it. All capabilities are read-only (`riskLevel: 'read'`); no
+order/trading capability exists.
 
 ## 12. Data Flow — Workspace Query
 
