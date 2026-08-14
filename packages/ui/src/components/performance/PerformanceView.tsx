@@ -6,14 +6,18 @@ import {
   performanceHorizonAtom,
   refreshPerformanceAtom,
 } from '../../atoms/performanceAtoms';
+import { CalibrationCard, type CalibrationRowView } from './CalibrationCard';
 import { PerformanceCard, type PerformanceRowView } from './PerformanceCard';
 
 /**
- * Performance (spec §36–38) — skill and strategy track records aggregated
- * from evaluated research opinions, tabbed by horizon (1w / 1m / 3m).
+ * Performance (spec §36–42) — skill and strategy track records aggregated
+ * from evaluated research opinions, tabbed by horizon (1w / 1m / 3m), plus
+ * the Advanced calibration section: how each track record would adjust a
+ * skill's weight, bounded and INFORMATIONAL ONLY (runtime weighting stays
+ * future work, spec §42).
  *
  * Mounted as the 'Performance' tab in Settings (SettingsView). Aggregations
- * arrive over IPC from the main-process PerformanceService; while the channel
+ * arrive over IPC from the main-process PerformanceService; while a channel
  * is unwired the loaders return [] and the cards show their empty states.
  */
 
@@ -73,6 +77,28 @@ export const PerformanceView: React.FC = () => {
     insufficientData: s.insufficientData,
   }));
 
+  const calibrationRows: CalibrationRowView[] = state.calibrations.map((c) => ({
+    id: c.skillId,
+    label: skillLabel(c.skillId),
+    baseWeight: c.baseWeight,
+    historicalAdjustment:
+      c.finalBoundedWeight === null ? undefined : c.finalBoundedWeight - c.baseWeight,
+    finalWeight: c.finalBoundedWeight ?? undefined,
+    samples: c.samples,
+    insufficientData: c.insufficientData,
+  }));
+
+  const strategyCalibrationRows: CalibrationRowView[] = state.strategyCalibrations.map((c) => ({
+    id: c.strategyId,
+    label: STRATEGY_NAMES[c.strategyId] ?? c.strategyId,
+    baseWeight: c.baseWeight,
+    historicalAdjustment:
+      c.finalBoundedWeight === null ? undefined : c.finalBoundedWeight - c.baseWeight,
+    finalWeight: c.finalBoundedWeight ?? undefined,
+    samples: c.samples,
+    insufficientData: c.insufficientData,
+  }));
+
   return (
     <div className="max-w-3xl" data-testid="performance-view">
       <header className="flex items-center justify-between gap-2">
@@ -112,6 +138,27 @@ export const PerformanceView: React.FC = () => {
           rows={strategyRows}
           emptyMessage="No evaluated strategy outcomes yet."
         />
+      </div>
+      <div className="mt-6 border-t mac-section-divider pt-4" data-testid="calibration-area">
+        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/44">
+          Calibration (Advanced)
+        </h3>
+        <p className="mt-1 text-[11px] text-text-muted">
+          Informational only — how each track record would adjust a weight, never outside the
+          bounded range. Runtime weighting is not applied in this version.
+        </p>
+        <div className="mt-3 flex flex-col gap-4">
+          <CalibrationCard
+            title="Skill Calibration"
+            rows={calibrationRows}
+            emptyMessage="No calibrated skill outcomes yet."
+          />
+          <CalibrationCard
+            title="Strategy Calibration"
+            rows={strategyCalibrationRows}
+            emptyMessage="No calibrated strategy outcomes yet."
+          />
+        </div>
       </div>
     </div>
   );

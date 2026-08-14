@@ -42,6 +42,8 @@ import type {
   NotificationEvent,
   SkillPerformance,
   StrategyPerformance,
+  SkillCalibration,
+  StrategyCalibration,
   PortfolioSnapshot,
   SessionMeta,
   SkillReadiness,
@@ -108,6 +110,8 @@ import {
   reportToMarkdown,
   reportToShareCard,
   redactForShare,
+  computeSkillCalibrations,
+  computeStrategyCalibrations,
   isRecord,
   type HistoryFetcher,
   type DailyBrief,
@@ -1324,6 +1328,28 @@ export class AgentKernelHost {
       throw createCodeError('PERFORMANCE_HORIZON_INVALID', 'Horizon must be 1w, 1m, or 3m.');
     }
     return this.performanceService.strategyPerformance(horizon);
+  }
+
+  async performanceSkillCalibration(input: unknown): Promise<SkillCalibration[]> {
+    const request = isRecord(input) ? input : {};
+    const horizon = request.horizon;
+    if (horizon !== '1w' && horizon !== '1m' && horizon !== '3m') {
+      throw createCodeError('PERFORMANCE_HORIZON_INVALID', 'Horizon must be 1w, 1m, or 3m.');
+    }
+    const opinions = await this.outcomeRepository.listOpinions();
+    const outcomes = await this.outcomeRepository.listOutcomes();
+    return computeSkillCalibrations(opinions, outcomes, horizon);
+  }
+
+  async performanceStrategyCalibration(input: unknown): Promise<StrategyCalibration[]> {
+    const request = isRecord(input) ? input : {};
+    const horizon = request.horizon;
+    if (horizon !== '1w' && horizon !== '1m' && horizon !== '3m') {
+      throw createCodeError('PERFORMANCE_HORIZON_INVALID', 'Horizon must be 1w, 1m, or 3m.');
+    }
+    const opinions = await this.outcomeRepository.listOpinions();
+    const outcomes = await this.outcomeRepository.listOutcomes();
+    return computeStrategyCalibrations(opinions, outcomes, horizon);
   }
 
   async automationListRules(): Promise<AutomationRule[]> {

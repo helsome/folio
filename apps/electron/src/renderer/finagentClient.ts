@@ -154,6 +154,9 @@ function createElectronClient(): FinagentClient {
     performance: {
       skill: (input) => ipcResult(window.electronAPI.performance.skill(input)),
       strategy: (input) => ipcResult(window.electronAPI.performance.strategy(input)),
+      calibration: (input) => ipcResult(window.electronAPI.performance.calibration(input)),
+      strategyCalibration: (input) =>
+        ipcResult(window.electronAPI.performance.strategyCalibration(input)),
     },
     automation: {
       listRules: () => ipcResult(window.electronAPI.automation.listRules()),

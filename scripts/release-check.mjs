@@ -65,6 +65,13 @@ const GATES = [
     args: ['run', 'test:fresh-install'],
     cwd: electronRoot,
   },
+  {
+    name: 'v5 e2e (discover/import/automation/outcome)',
+    command: 'bun',
+    args: ['run', 'test:v5'],
+    cwd: electronRoot,
+    env: { FINAGENT_AGENT_PROVIDER: 'local' },
+  },
 ];
 
 let failures = 0;

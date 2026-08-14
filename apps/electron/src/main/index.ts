@@ -422,6 +422,14 @@ ipcMain.handle('performance:strategy', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.performanceStrategyPerformance(input))
 );
 
+ipcMain.handle('performance:calibration', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.performanceSkillCalibration(input))
+);
+
+ipcMain.handle('performance:strategyCalibration', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.performanceStrategyCalibration(input))
+);
+
 ipcMain.handle('automation:listRules', async () =>
   toIpcResult(() => agentKernelHost.automationListRules())
 );

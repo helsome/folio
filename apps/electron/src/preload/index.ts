@@ -136,6 +136,8 @@ export interface ElectronAPI {
   performance: {
     skill: (input: { horizon: string }) => Promise<unknown>;
     strategy: (input: { horizon: string }) => Promise<unknown>;
+    calibration: (input: { horizon: string }) => Promise<unknown>;
+    strategyCalibration: (input: { horizon: string }) => Promise<unknown>;
   };
   automation: {
     listRules: () => Promise<unknown>;
@@ -315,6 +317,9 @@ const electronAPI: ElectronAPI = {
   performance: {
     skill: (input: { horizon: string }) => ipcRenderer.invoke('performance:skill', input),
     strategy: (input: { horizon: string }) => ipcRenderer.invoke('performance:strategy', input),
+    calibration: (input: { horizon: string }) => ipcRenderer.invoke('performance:calibration', input),
+    strategyCalibration: (input: { horizon: string }) =>
+      ipcRenderer.invoke('performance:strategyCalibration', input),
   },
   automation: {
     listRules: () => ipcRenderer.invoke('automation:listRules'),

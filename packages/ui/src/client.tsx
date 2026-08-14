@@ -29,6 +29,8 @@ import type {
   PerformanceHorizon,
   SkillPerformance,
   StrategyPerformance,
+  SkillCalibration,
+  StrategyCalibration,
   ResearchRunSummary,
   ResearchOpinion,
   ResearchOutcome,
@@ -164,6 +166,8 @@ export interface FinagentClient {
   performance?: {
     skill: (input: { horizon: PerformanceHorizon }) => Promise<ApiResult<SkillPerformance[]>>;
     strategy: (input: { horizon: PerformanceHorizon }) => Promise<ApiResult<StrategyPerformance[]>>;
+    calibration: (input: { horizon: PerformanceHorizon }) => Promise<ApiResult<SkillCalibration[]>>;
+    strategyCalibration: (input: { horizon: PerformanceHorizon }) => Promise<ApiResult<StrategyCalibration[]>>;
   };
   automation?: AutomationChannel;
   thesis?: {

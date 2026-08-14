@@ -1,8 +1,15 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { PerformanceHorizon, SkillPerformance, StrategyPerformance } from '@finagent/core'
+import type {
+  PerformanceHorizon,
+  SkillCalibration,
+  SkillPerformance,
+  StrategyCalibration,
+  StrategyPerformance,
+} from '@finagent/core'
 import { installHappyDom } from '../../test/setupHappyDom'
+import { CalibrationCard, type CalibrationRowView } from './CalibrationCard'
 import { PerformanceCard, type PerformanceRowView } from './PerformanceCard'
 import { PerformanceView } from './PerformanceView'
 
@@ -36,7 +43,9 @@ async function flushAsync(rounds = 5): Promise<void> {
 
 function installPerformanceApi(
   skills: SkillPerformance[],
-  strategies: StrategyPerformance[]
+  strategies: StrategyPerformance[],
+  calibrations: SkillCalibration[] = [],
+  strategyCalibrations: StrategyCalibration[] = []
 ): void {
   ;(window as { electronAPI?: unknown }).electronAPI = {
     performance: {
@@ -48,6 +57,8 @@ function installPerformanceApi(
         ok: true,
         data: strategies.filter((s) => s.horizon === horizon),
       }),
+      calibration: async () => ({ ok: true, data: calibrations }),
+      strategyCalibration: async () => ({ ok: true, data: strategyCalibrations }),
     },
   }
 }
@@ -182,5 +193,136 @@ describe('PerformanceView', () => {
     expect(text).not.toContain('0.00%')
     expect(text).toContain('—')
     expect(text).toContain('+1.50%')
+  })
+})
+
+describe('CalibrationCard', () => {
+  it('shows base weight, adjustment, bounded final weight and the Observational Only badge', () => {
+    const rows: CalibrationRowView[] = [
+      {
+        id: 'c1',
+        label: 'Skill One',
+        baseWeight: 1,
+        historicalAdjustment: 0.15,
+        finalWeight: 1.15,
+        samples: 50,
+        insufficientData: false,
+      },
+      {
+        id: 'c2',
+        label: 'Skill Two',
+        baseWeight: 1,
+        historicalAdjustment: undefined,
+        finalWeight: undefined,
+        samples: 5,
+        insufficientData: true,
+      },
+    ]
+    const text = renderText(
+      <CalibrationCard title="Skill Calibration" rows={rows} emptyMessage="empty" />
+    )
+    expect(text).toContain('Skill One')
+    expect(text).toContain('1.00')
+    expect(text).toContain('+0.15')
+    expect(text).toContain('1.15')
+    // Bounds are visible so a bounded weight is never presented as arbitrary.
+    expect(text).toContain('0.75')
+    expect(text).toContain('1.25')
+    expect(text).toContain('Skill Two')
+    expect(text).toContain('Observational Only')
+    // Below min samples the adjustment/final weight render '—', never 0.00.
+    expect(text).not.toContain('0.00%')
+  })
+
+  it('shows the empty message when there are no rows', () => {
+    const text = renderText(
+      <CalibrationCard title="Strategy Calibration" rows={[]} emptyMessage="No calibrated strategy outcomes yet." />
+    )
+    expect(text).toContain('No calibrated strategy outcomes yet.')
+  })
+})
+
+describe('CalibrationView wiring', () => {
+  it('renders calibration rows from the calibration channel with adjustments and badge', async () => {
+    installPerformanceApi(
+      [],
+      [],
+      [
+        {
+          skillId: 'longbridge-value-investing',
+          baseWeight: 1,
+          historicalReliability: 0.8,
+          sampleConfidence: 0.5,
+          unablePenalty: 0.005,
+          finalBoundedWeight: 1.15,
+          samples: 50,
+          insufficientData: false,
+        },
+        {
+          skillId: 'macro-watch',
+          baseWeight: 1,
+          historicalReliability: null,
+          sampleConfidence: null,
+          unablePenalty: null,
+          finalBoundedWeight: null,
+          samples: 12,
+          insufficientData: true,
+        },
+      ],
+      [
+        {
+          strategyId: 'value',
+          baseWeight: 1,
+          historicalReliability: 0.7,
+          sampleConfidence: 1,
+          unablePenalty: 0.01,
+          finalBoundedWeight: 1.09,
+          samples: 120,
+          insufficientData: false,
+        },
+      ]
+    )
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(<PerformanceView />)
+    })
+    await flushAsync()
+
+    const text = container.textContent ?? ''
+    expect(text).toContain('Calibration (Advanced)')
+    expect(text).toContain('Skill Calibration')
+    expect(text).toContain('Strategy Calibration')
+    expect(text).toContain('Longbridge Value Investing')
+    expect(text).toContain('1.00')
+    expect(text).toContain('+0.15')
+    expect(text).toContain('1.15')
+    expect(text).toContain('Macro Watch')
+    expect(text).toContain('Observational Only')
+    expect(text).toContain('Value')
+    expect(text).toContain('1.09')
+    // Bounded range is shown on the card.
+    expect(text).toContain('0.75')
+    expect(text).toContain('1.25')
+    // Informational-only disclaimer is visible.
+    expect(text).toContain('Informational only')
+  })
+
+  it('shows calibration empty states when the calibration channel is unwired', async () => {
+    // No electronAPI at all — every loader degrades to [].
+    delete (window as { electronAPI?: unknown }).electronAPI
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    await act(async () => {
+      root.render(<PerformanceView />)
+    })
+    await flushAsync()
+
+    const text = container.textContent ?? ''
+    expect(text).toContain('Calibration (Advanced)')
+    expect(text).toContain('No calibrated skill outcomes yet.')
+    expect(text).toContain('No calibrated strategy outcomes yet.')
   })
 })

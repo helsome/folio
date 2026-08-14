@@ -245,6 +245,8 @@ mock.module('@finagent/shared', () => ({
   reportToMarkdown: () => '',
   reportToShareCard: () => ({ svg: '', text: '' }),
   redactForShare: (report: unknown) => report,
+  computeSkillCalibrations: () => [],
+  computeStrategyCalibrations: () => [],
 }));
 
 mock.module('@finagent/skill-hub', () => ({

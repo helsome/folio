@@ -21,7 +21,8 @@
     "build:main": "bun build src/main/index.ts --outfile src/main/index.js --bundle --target node --format esm --external electron",
     "build:extension": "bun build ../../.pi/extensions/finagent/index.ts --outfile build/extensions/finagent/index.js --bundle --target node --format esm",
     "package": "bun run build && bun run build:extension && bun run package:builder",
-    "package:builder": "electron-builder"
+    "package:builder": "electron-builder",
+    "test:v5": "node e2e/v5.mjs"
   },
   "dependencies": {
     "@finagent/core": "workspace:*",

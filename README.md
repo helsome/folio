@@ -49,6 +49,7 @@ AI-native investment research workbench. A desktop app that combines a professio
 - **Market Pulse & Personal Impact** — indices/status/temperature/movers on Today, plus what-matters-to-me exposure for watchlist/portfolio symbols.
 - **Portfolio Import** — CSV/paste → draft with confidence + issues → confirm screen → manual portfolio account (separate from broker accounts) in the Account Selector.
 - **Report Export** — Markdown + share card (SVG + text) with privacy redaction (no portfolio/account data).
+- **Adaptive Calibration (informational)** — per-skill/strategy reliability from evaluated outcomes, bounded final weights (0.75–1.25), transparent Advanced view (base weight / historical adjustment / samples / Observational Only below 30 samples); no skill files are mutated, runtime weighting is future work.
 - **Test architecture** — four-level pyramid (unit → integration → hidden Electron → visible release); `FINAGENT_E2E_HIDDEN=1` by default, `FINAGENT_E2E_VISIBLE=1` / `FINAGENT_E2E_KEEP_OPEN=1` for debugging; root scripts `test:unit|integration|ui|e2e|e2e:visible|package-smoke|release`.
 
 ## Architecture
@@ -117,7 +118,7 @@ FINAGENT_AGENT_PROVIDER=local bun run dev
 
 ## Status & known limitations
 
-- Unit + integration: **887 tests green**. Typecheck green. E2E golden path A–H green; interaction audit + skills interactions green; fresh-install e2e green (packaged). `bun run release:check` runs all 7 release gates.
+- Unit + integration: **892 tests green**. Typecheck green. E2E golden path A–H + V5 e2e (Discover/Import/Automation/Outcome) green; interaction audit + skills interactions green; fresh-install e2e green (packaged). `bun run release:check` runs 8 release gates.
 - **Beta status**: all §64 release blockers closed; see `docs/release-gates.md` for the gate checklist and `docs/provider-b-decision.md` for the secondary-provider licensing decision.
 - Packaging: unsigned build (signing/notarization need Apple credentials; CI release workflow is secrets-gated and marks unsigned builds `NOT RELEASEABLE`); `electronDist` is pinned to the local install so packaging works without network.
 - The agent-backed synthesizers (research/thesis/risk) use the configured Pi runtime; with `FINAGENT_AGENT_PROVIDER=local` they degrade to deterministic local implementations.

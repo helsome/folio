@@ -1,9 +1,16 @@
-import type { PerformanceHorizon, SkillPerformance, StrategyPerformance } from '@finagent/core';
+import type {
+  PerformanceHorizon,
+  SkillCalibration,
+  SkillPerformance,
+  StrategyCalibration,
+  StrategyPerformance,
+} from '@finagent/core';
 import { unwrapIpcResult } from './unwrap';
 
 /**
  * Defensive loader for the V5 performance IPC surface
- * (`performance:skill` / `performance:strategy`).
+ * (`performance:skill` / `performance:strategy` / `performance:calibration` /
+ * `performance:strategyCalibration`).
  *
  * Aggregation runs in the main process (PerformanceService over the outcome
  * repository); the loader unwraps the `{ ok, data | error }` envelope and
@@ -15,6 +22,8 @@ interface PerformanceElectronApi {
   performance?: {
     skill?: (input: { horizon: PerformanceHorizon }) => Promise<unknown>;
     strategy?: (input: { horizon: PerformanceHorizon }) => Promise<unknown>;
+    calibration?: (input: { horizon: PerformanceHorizon }) => Promise<unknown>;
+    strategyCalibration?: (input: { horizon: PerformanceHorizon }) => Promise<unknown>;
   };
 }
 
@@ -40,6 +49,30 @@ export async function loadStrategyPerformance(horizon: PerformanceHorizon): Prom
     const performance = api();
     if (typeof performance?.strategy !== 'function') return [];
     return unwrapIpcResult<StrategyPerformance[]>(await performance.strategy({ horizon })) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Per-skill calibration for one horizon; [] when the channel is unwired or fails. */
+export async function loadSkillCalibration(horizon: PerformanceHorizon): Promise<SkillCalibration[]> {
+  try {
+    const performance = api();
+    if (typeof performance?.calibration !== 'function') return [];
+    return unwrapIpcResult<SkillCalibration[]>(await performance.calibration({ horizon })) ?? [];
+  } catch {
+    return [];
+  }
+}
+
+/** Per-strategy calibration for one horizon; [] when the channel is unwired or fails. */
+export async function loadStrategyCalibration(
+  horizon: PerformanceHorizon
+): Promise<StrategyCalibration[]> {
+  try {
+    const performance = api();
+    if (typeof performance?.strategyCalibration !== 'function') return [];
+    return unwrapIpcResult<StrategyCalibration[]>(await performance.strategyCalibration({ horizon })) ?? [];
   } catch {
     return [];
   }

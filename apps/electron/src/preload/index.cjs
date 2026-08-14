@@ -182,7 +182,9 @@ var electronAPI = {
   },
   performance: {
     skill: (input) => import_electron.ipcRenderer.invoke("performance:skill", input),
-    strategy: (input) => import_electron.ipcRenderer.invoke("performance:strategy", input)
+    strategy: (input) => import_electron.ipcRenderer.invoke("performance:strategy", input),
+    calibration: (input) => import_electron.ipcRenderer.invoke("performance:calibration", input),
+    strategyCalibration: (input) => import_electron.ipcRenderer.invoke("performance:strategyCalibration", input)
   },
   automation: {
     listRules: () => import_electron.ipcRenderer.invoke("automation:listRules"),

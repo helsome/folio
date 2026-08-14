@@ -120,5 +120,6 @@ export * from './outcome/index.ts';
 export * from './portfolio-import/index.ts';
 export * from './automation/index.ts';
 export * from './performance/index.ts';
+export * from './calibration/index.ts';
 export * from './pulse/index.ts';
 export * from './export/index.ts';
