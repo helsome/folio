@@ -92,8 +92,18 @@ export function parseQuoteResponse(output: string): Quote {
       prevClose,
     };
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse quote response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('quote', output);
   }
+}
+
+/** Parse failure with a user-safe message; raw CLI output only survives in `debug`. */
+function parseFailure(what: string, output: string): LongBridgeError {
+  const debug = output.length > 2000 ? `${output.slice(0, 2000)}…` : output;
+  return new LongBridgeError(
+    `Failed to parse ${what} response.`,
+    'LONGBRIDGE_PARSE_FAILURE',
+    debug
+  );
 }
 
 function parsePortfolioError(output: string): LongBridgeError {
@@ -131,7 +141,7 @@ export function parseKlineResponse(output: string, fallbackSymbol = ''): Kline[]
       volume: toNumber(k.volume, 'volume'),
     }));
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse kline response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('kline', output);
   }
 }
 
@@ -145,10 +155,7 @@ export function parseIntradayResponse(output: string): IntradayData[] {
       volume: d.volume,
     }));
   } catch (e) {
-    throw new LongBridgeError(
-      `Failed to parse intraday response: ${output}`,
-      'LONGBRIDGE_PARSE_FAILURE'
-    );
+    throw parseFailure('intraday', output);
   }
 }
 
@@ -188,7 +195,7 @@ export function parseStaticInfoResponse(output: string): StaticInfo {
       dividend: toOptionalNumber(data.dividend),
     };
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse static info response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('static info', output);
   }
 }
 
@@ -223,7 +230,7 @@ export function parseCalcIndexResponse(output: string): CalcIndex {
       amplitude: toOptionalNumber(data.amplitude),
     };
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse calc-index response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('calc-index', output);
   }
 }
 
@@ -240,7 +247,7 @@ export function parseMarketStatusResponse(output: string): MarketStatus[] {
     }
     return data.map((entry) => ({ market: entry.market, status: entry.status }));
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse market-status response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('market-status', output);
   }
 }
 
@@ -266,7 +273,7 @@ export function parseNewsResponse(output: string): NewsItem[] {
       symbols: [],
     }));
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse news response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('news', output);
   }
 }
 
@@ -331,7 +338,7 @@ export function parseDepthResponse(output: string): Depth {
       asks: (data.asks ?? []).map(level),
     };
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse depth response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('depth', output);
   }
 }
 
@@ -357,7 +364,7 @@ export function parseTradesResponse(output: string): TradeTick[] {
       type: t.type ?? '',
     }));
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse trades response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('trades', output);
   }
 }
 
@@ -392,7 +399,7 @@ export function parseCapitalFlowResponse(output: string): CapitalFlow {
       capitalOut: side(data.capital_out),
     };
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse capital flow response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('capital flow', output);
   }
 }
 
@@ -416,7 +423,7 @@ export function parseMarketTemperatureResponse(output: string): MarketTemperatur
       sentiment: toNumber(field('Sentiment'), 'sentiment'),
     };
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse market-temp response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('market-temp', output);
   }
 }
 
@@ -488,7 +495,7 @@ export function parseFinancialReportResponse(output: string, fallbackSymbol = ''
     }
     return { symbol: data.symbol || fallbackSymbol, report: data.report, statements };
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse financial-report response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('financial-report', output);
   }
 }
 
@@ -570,7 +577,7 @@ export function parseInstitutionRatingResponse(output: string, symbol = ''): Ins
         : undefined,
     };
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse institution-rating response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('institution-rating', output);
   }
 }
 
@@ -604,7 +611,7 @@ export function parseDividendResponse(output: string): DividendRecord[] {
       counterId: d.counter_id,
     }));
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse dividend response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('dividend', output);
   }
 }
 
@@ -643,7 +650,7 @@ export function parseEpsForecastResponse(output: string): EpsForecast[] {
       institutionTotal: f.institution_total,
     }));
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse forecast-eps response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('forecast-eps', output);
   }
 }
 
@@ -709,7 +716,7 @@ export function parseCalendarResponse(output: string): CalendarEvent[] {
     }
     return events;
   } catch (e) {
-    throw new LongBridgeError(`Failed to parse finance-calendar response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    throw parseFailure('finance-calendar', output);
   }
 }
 

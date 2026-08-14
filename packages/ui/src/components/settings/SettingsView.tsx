@@ -7,6 +7,7 @@ import { ModelsTab } from './ModelsTab';
 import { ConnectionsCenter } from './ConnectionsCenter';
 import { SkillsView } from './SkillsView';
 import { DiagnosticsTab } from './DiagnosticsTab';
+import { PerformanceView } from '../performance/PerformanceView';
 
 const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'general', label: 'General' },
@@ -14,6 +15,8 @@ const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'connections', label: 'Connections' },
   { id: 'skills', label: 'Skills' },
   { id: 'diagnostics', label: 'Diagnostics' },
+  // Performance tab (V5 spec §36–38) — aggregates opinion outcomes.
+  { id: 'performance', label: 'Performance' },
 ];
 
 export const SettingsView: React.FC = () => {
@@ -46,6 +49,7 @@ export const SettingsView: React.FC = () => {
         {tab === 'connections' && <ConnectionsCenter />}
         {tab === 'skills' && <SkillsView />}
         {tab === 'diagnostics' && <DiagnosticsTab />}
+        {tab === ('performance') && <PerformanceView />}
       </div>
     </main>
   );

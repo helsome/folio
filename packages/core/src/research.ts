@@ -57,6 +57,8 @@ export interface ResearchReport {
   id: string;
   symbol: string;
   generatedAt: number;
+  /** V5: research strategy that produced this report (spec §100). */
+  strategyId?: string;
   summary: string;
   stance: ResearchStance;
   /** 0..1. */

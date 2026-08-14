@@ -166,6 +166,85 @@ mock.module('@finagent/shared', () => ({
     setConfig = async () => undefined;
     subscribe = () => () => undefined;
   },
+  OutcomeRepository: class {
+    listOpinions = async () => [];
+    listOutcomes = async () => [];
+  },
+  OutcomeService: class {
+    createOpinionFromReport = async () => undefined;
+    evaluateDue = async () => [];
+  },
+  ScreeningService: class {
+    runScreening = async () => ({ candidates: [] });
+    listRuns = async () => [];
+    getRun = async () => undefined;
+  },
+  ScreeningRunRepository: class {
+    save = async () => undefined;
+    list = async () => [];
+    get = async () => undefined;
+  },
+  SCREENING_STRATEGIES: [],
+  ResearchDiffRepository: class {
+    save = async () => undefined;
+    getBySymbol = async () => undefined;
+  },
+  ManualPortfolioRepository: class {
+    list = async () => [];
+    create = async () => undefined;
+  },
+  buildDiff: async () => ({ changes: [], material: false }),
+  createDraft: () => ({ rows: [], warnings: [] }),
+  parseCsv: () => [],
+  parsePaste: () => [],
+  isRecord: (value: unknown) => typeof value === 'object' && value !== null,
+  PulseService: class {
+    snapshot = async () => ({
+      indices: [],
+      marketStatus: null,
+      temperature: null,
+      movers: [],
+      personalImpact: null,
+      failures: [],
+    });
+  },
+  PerformanceService: class {
+    skillPerformance = async () => [];
+    strategyPerformance = async () => [];
+  },
+  AutomationRuleRepository: class {
+    list = async () => [];
+    save = async () => undefined;
+    remove = async () => undefined;
+  },
+  AutomationRunRepository: class {
+    list = async () => [];
+    record = async () => undefined;
+  },
+  buildBrief: () => ({
+    generatedAt: 0,
+    items: [],
+    summary: '',
+    quiet: { count: 0, message: '' },
+  }),
+  runAutomation: async () => ({
+    id: 'run',
+    ruleId: 'rule',
+    ranAt: 0,
+    evaluated: 0,
+    materialChanges: 0,
+    analyzed: 0,
+    notified: false,
+    failures: [],
+  }),
+  runDue: () => [],
+  DEFAULT_BRIEF_HOUR: 16.5,
+  THESIS_REVIEW_DAY: 0,
+  THESIS_REVIEW_HOUR: 9,
+  WEEKDAYS: [1, 2, 3, 4, 5],
+  reportToMarkdown: () => '',
+  reportToShareCard: () => ({ svg: '', text: '' }),
+  redactForShare: (report: unknown) => report,
 }));
 
 mock.module('@finagent/skill-hub', () => ({

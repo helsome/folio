@@ -1,6 +1,11 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
+import { useAtom } from 'jotai';
 import type { ResearchReport, ResearchSection } from '@finagent/core';
+import { loadResearchDiff, researchDiffAtom } from '../../atoms/diffAtoms';
+import { loadResearchReport } from '../../atoms/researchAtoms';
 import { EvidenceList } from './EvidenceList';
+import { ExportMenu } from './ExportMenu';
+import { WhatChangedSection } from './WhatChangedSection';
 
 const STANCE_TONE: Record<ResearchReport['stance'], string> = {
   bullish: 'text-positive',
@@ -31,6 +36,30 @@ const VERDICT_LABEL: Record<ResearchSection['verdict'], string> = {
 /** Full Deep Research report: stance, sections, cases, catalysts, risks, evidence. */
 export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ report }) => {
   const confidence = Math.round(report.confidence * 100);
+  const [diffState, setDiffState] = useAtom(researchDiffAtom);
+  const [previousReport, setPreviousReport] = useState<ResearchReport | null>(null);
+
+  // Fetch the latest diff for this symbol; when a previous report exists the
+  // What Changed section renders. Degrades to a hidden section when the
+  // research:getDiff channel is unwired or the symbol has no history.
+  useEffect(() => {
+    let alive = true;
+    setDiffState({ loading: true, diff: null });
+    setPreviousReport(null);
+    void loadResearchDiff(report.symbol).then((diff) => {
+      if (!alive) return;
+      setDiffState({ loading: false, diff: diff ?? null });
+      if (diff) {
+        void loadResearchReport(diff.previousReportId).then((prev) => {
+          if (alive && prev) setPreviousReport(prev);
+        });
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [report.symbol, report.id, setDiffState]);
+
   return (
     <div className="flex flex-col gap-4" data-testid="research-report">
       <div className="rounded-[10px] border mac-list-row p-4">
@@ -43,13 +72,16 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
               {STANCE_LABEL[report.stance]}
             </h3>
           </div>
-          <div className="text-right">
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-              Confidence
+          <div className="flex items-start gap-3">
+            <div className="text-right">
+              <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+                Confidence
+              </div>
+              <div className="tnum mt-0.5 text-[16px] font-semibold text-foreground">
+                {confidence}%
+              </div>
             </div>
-            <div className="tnum mt-0.5 text-[16px] font-semibold text-foreground">
-              {confidence}%
-            </div>
+            <ExportMenu report={report} />
           </div>
         </div>
         <p className="mt-3 text-[13px] leading-relaxed text-foreground/85">{report.summary}</p>
@@ -61,6 +93,13 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
           {new Date(report.generatedAt).toLocaleString()}
         </div>
       </div>
+
+      {diffState.diff && (
+        <WhatChangedSection
+          diff={diffState.diff}
+          previousReport={previousReport ?? undefined}
+        />
+      )}
 
       <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
         {report.sections.map((section) => (

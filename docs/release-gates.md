@@ -19,27 +19,96 @@ labeled as an internal/unsigned build (spec §38–40).
 9. Critical action silently fails (no feedback, no error)
 10. `bun test`, `bun run typecheck`, or packaged smoke red
 
-## Test tiers (window policy)
+## Test pyramid (spec §59–67)
 
-Every E2E harness launches the real Electron app **hidden** (`FINAGENT_E2E_HIDDEN=1`);
-CDP keeps working while nothing appears on screen. `FINAGENT_E2E_VISIBLE=1`
-forces the window on for manual debugging only.
+Tests are organized in four levels; each level gates the next. Subagents,
+the Lead, and the release pipeline each run exactly the levels their role
+requires (see rules below). All levels must be green before a release tag.
 
-| Tier | What runs | Launches Folio? | When |
-|---|---|---|---|
-| Dev | `bun test` (unit/integration), UI tests | never | every iteration |
-| Local UI | Vitest/RTL-style component tests (bun test packages/ui) | never | every iteration |
-| Integration gate | `test:e2e`, `test:interactions`, `test:skills-interactions` | hidden Electron | before commit |
-| Release gate | `release:check` → package → `test:package-smoke`, `test:fresh-install` | hidden packaged Folio.app | once, at release |
+### LEVEL 1 — Unit (per-package, in the working tree)
 
-All harnesses also self-clean stale instances on their CDP port before spawning,
-so interrupted runs never leave zombie windows behind.
+| What | Command |
+|---|---|
+| Unit/integration tests in one package | `bun test packages/<pkg>` |
+| Typecheck one package | `bunx tsc --noEmit` (cwd = package) |
+
+- Runs on every iteration while a package is being changed.
+- **Subagent rule (spec §65):** a subagent runs ONLY `bun test packages/<pkg>`
+  and `bunx tsc --noEmit` inside its own touched packages. NEVER repo-wide
+  gates, NEVER launches Electron/Folio, no formatters/linters.
+- Whole-repo variant: `bun run test:unit`.
+
+### LEVEL 2 — Integration (repo-wide, in the working tree)
+
+| What | Command |
+|---|---|
+| Repo-wide unit/integration | `bun run test:unit` |
+| Repo-wide typecheck | `bun run typecheck` |
+| UI component tests | `bun run test:ui` (`bun test packages/ui`) |
+
+- `bun run test:integration` = test + typecheck in one command.
+- **Lead/CI rule (spec §66):** the Lead runs LEVEL 2 + LEVEL 3 after merging;
+  nothing below that is a release gate by itself.
+
+### LEVEL 3 — Hidden Electron E2E (real app, window never shown)
+
+| What | Command |
+|---|---|
+| Golden path A–H | `FINAGENT_AGENT_PROVIDER=local bun run test:e2e` |
+| Interaction contract sweep | `cd apps/electron && bun run test:interactions` |
+| Skills interactions | `cd apps/electron && bun run test:skills-interactions` |
+| Packaged app smoke | `bun run test:package-smoke` |
+| Fresh-install onboarding | `cd apps/electron && bun run test:fresh-install` |
+
+- Every harness launches the real Electron app **hidden**: it sets
+  `FINAGENT_E2E=1` and `FINAGENT_E2E_HIDDEN=1` in the spawn env.
+- **Hidden mode is real, not simulated (spec §61):** `FINAGENT_E2E_HIDDEN=1`
+  only sets `show: false` on the BrowserWindow (see `createWindow` in
+  apps/electron/src/main/index.ts). The window is still created, the renderer
+  loads and runs, and `--remote-debugging-port` keeps exposing it to CDP — the
+  full DOM + IPC surface is exercisable while nothing appears on the desktop.
+- Each harness self-cleans its own CDP port (pkill of its
+  `remote-debugging-port=NNNN`) before spawning, so interrupted runs never
+  leave zombie windows behind.
+
+### LEVEL 4 — Visible / Release (manual debugging + release gates)
+
+| What | Command |
+|---|---|
+| Visible E2E (manual debugging) | `bun run test:e2e:visible` |
+| Release gate suite | `bun run test:release` → `bun run release:check` |
+
+- `FINAGENT_E2E_VISIBLE=1` forces the window on for manual debugging only;
+  it takes precedence over `FINAGENT_E2E_HIDDEN=1`. Automated runs must stay
+  hidden.
+- **Release rule (spec §67):** `release:check` → package →
+  `test:package-smoke` + `test:fresh-install` against the packaged Folio.app
+  before a tag may be cut.
+
+### E2E flag contract
+
+| Flag | Set by | Effect |
+|---|---|---|
+| `FINAGENT_E2E=1` | every harness (spawn env) | Marks the process as an E2E harness run. Contract: main-process code MAY use it to distinguish test runs from real usage; today it carries no behavioral effect — hidden/visible is controlled by the two flags below. |
+| `FINAGENT_E2E_HIDDEN=1` | every harness (spawn env) | BrowserWindow created with `show: false` — renderer + CDP fully functional, nothing on screen. Default for all automated harnesses. |
+| `FINAGENT_E2E_VISIBLE=1` | manual debugging only | Forces the window visible even with `FINAGENT_E2E_HIDDEN=1` (visible = `VISIBLE==='1' || HIDDEN!=='1'`). Never set by automated runs. |
+| `FINAGENT_E2E_KEEP_OPEN=1` | debugging only | Harness does NOT kill the app when it finishes; it prints `KEEP_OPEN` + the CDP port and leaves the app running so you can attach. **NEVER set in automated runs or CI** (see caveat). |
+
+### KEEP_OPEN caveat (spec §63)
+
+`FINAGENT_E2E_KEEP_OPEN=1` is a debugging escape hatch: the harness skips its
+final kill, prints `KEEP_OPEN CDP port <port>` and exits, leaving the app
+running (hidden window + CDP still up). Automated runs — CI, `release:check`,
+`test:e2e`, `test:e2e:visible`, `test:package-smoke`, `test:fresh-install` —
+must never set it: they rely on the harness killing the app and reusing its
+CDP port on the next run. To clean up a kept-open instance:
+`pkill -f 'remote-debugging-port=<port>'`.
 
 ## Quality gates (run repeatedly, never only at the end, spec §69)
 
 | Gate | Command | Required |
 |---|---|---|
-| Unit/integration | `bun test` | 0 fail |
+| Unit/integration | `bun run test:unit` | 0 fail |
 | Typecheck | `bun run typecheck` | clean |
 | Build | `bun run build` | clean (renderer + preload + main + extension) |
 | Electron E2E | `FINAGENT_AGENT_PROVIDER=local bun run test:e2e` | golden path A–H green |

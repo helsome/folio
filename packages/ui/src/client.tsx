@@ -24,8 +24,14 @@ import type {
   ProviderHealth,
   ProviderStatus,
   Quote,
+  ResearchDiff,
   ResearchReport,
+  PerformanceHorizon,
+  SkillPerformance,
+  StrategyPerformance,
   ResearchRunSummary,
+  ResearchOpinion,
+  ResearchOutcome,
   Run,
   SessionMeta,
   Skill,
@@ -37,6 +43,9 @@ import type {
 } from '@finagent/core';
 import type { ConnectionsChannel, HealthChannel } from './client/connections';
 import type { DiagnosticsBundle } from './client/diagnostics';
+import type { MarketPulseSnapshot } from './client/pulse';
+import type { ScreeningChannel } from './client/screening';
+import type { AutomationChannel } from './client/automation';
 
 /** Renderer-safe capability metadata (schemas never cross IPC). */
 export interface CapabilityMetadata {
@@ -135,13 +144,28 @@ export interface FinagentClient {
     list: () => Promise<ApiResult<CapabilityMetadata[]>>;
   };
   research?: {
-    start: (input: { symbol: string }) => Promise<ApiResult<ResearchRunSummary>>;
+    start: (input: { symbol: string; strategyId?: string }) => Promise<ApiResult<ResearchRunSummary>>;
     cancel: (input: { runId: string }) => Promise<ApiResult<void>>;
     listRuns: () => Promise<ApiResult<ResearchRunSummary[]>>;
     getRun: (input: { runId: string }) => Promise<ApiResult<ResearchRunSummary | undefined>>;
     listReports: (input: { symbol?: string }) => Promise<ApiResult<ResearchReport[]>>;
     getReport: (input: { reportId: string }) => Promise<ApiResult<ResearchReport | undefined>>;
+    getDiff: (input: { symbol: string }) => Promise<ApiResult<ResearchDiff | undefined>>;
   };
+  screening?: ScreeningChannel;
+  outcome?: {
+    listOpinions: (input: { symbol?: string }) => Promise<ApiResult<ResearchOpinion[]>>;
+    listOutcomes: (input: { symbol?: string }) => Promise<ApiResult<ResearchOutcome[]>>;
+    evaluateDue: () => Promise<ApiResult<ResearchOutcome[]>>;
+  };
+  pulse?: {
+    snapshot: (input: unknown) => Promise<ApiResult<MarketPulseSnapshot>>;
+  };
+  performance?: {
+    skill: (input: { horizon: PerformanceHorizon }) => Promise<ApiResult<SkillPerformance[]>>;
+    strategy: (input: { horizon: PerformanceHorizon }) => Promise<ApiResult<StrategyPerformance[]>>;
+  };
+  automation?: AutomationChannel;
   thesis?: {
     list: (symbol?: string) => Promise<ApiResult<InvestmentThesis[]>>;
     getReport: (symbol: string) => Promise<ApiResult<ResearchReport | null>>;
@@ -238,6 +262,17 @@ export const fallbackClient: FinagentClient = {
     getRun: missingClient('research.getRun'),
     listReports: missingClient('research.listReports'),
     getReport: missingClient('research.getReport'),
+    getDiff: missingClient('research.getDiff'),
+  },
+  screening: {
+    run: missingClient('screening.run'),
+    listRuns: missingClient('screening.listRuns'),
+    getRun: missingClient('screening.getRun'),
+  },
+  outcome: {
+    listOpinions: missingClient('outcome.listOpinions'),
+    listOutcomes: missingClient('outcome.listOutcomes'),
+    evaluateDue: missingClient('outcome.evaluateDue'),
   },
   thesis: {
     list: missingClient('thesis.list'),

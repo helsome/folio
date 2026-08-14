@@ -27,7 +27,7 @@ export type { ResearchReport, ResearchRunSummary, ResearchRunStatus };
 /** Minimal shape of the electron API surface we consume. */
 interface ResearchElectronApi {
   research?: {
-    start?: (input: { symbol: string }) => Promise<unknown>;
+    start?: (input: ResearchStartInput) => Promise<unknown>;
     cancel?: (input: { runId: string }) => Promise<unknown>;
     listRuns?: () => Promise<unknown>;
     getRun?: (input: { runId: string }) => Promise<unknown>;
@@ -41,14 +41,27 @@ function api(): ResearchElectronApi['research'] {
   return electronApi?.research;
 }
 
-/** Start a Deep Research run for a symbol. Returns undefined when unwired. */
-export async function startResearch(symbol: string): Promise<ResearchRunSummary | undefined> {
+/** Input for a Deep Research start. `strategyId` is optional (V5 presets). */
+export interface ResearchStartInput {
+  symbol: string;
+  strategyId?: string;
+}
+
+/**
+ * Start a Deep Research run for a symbol with an optional research strategy.
+ * Returns undefined when unwired.
+ */
+export async function startResearch(
+  input: ResearchStartInput
+): Promise<ResearchRunSummary | undefined> {
   try {
     const research = api();
     if (!research?.start) return undefined;
-    return unwrapIpcResult<ResearchRunSummary>(
-      await research.start({ symbol: symbol.toUpperCase() })
-    ) ?? undefined;
+    return (
+      unwrapIpcResult<ResearchRunSummary>(
+        await research.start({ symbol: input.symbol.toUpperCase(), strategyId: input.strategyId })
+      ) ?? undefined
+    );
   } catch {
     return undefined;
   }

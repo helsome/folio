@@ -8,10 +8,15 @@ import type {
   ResearchSection,
   ResearchSynthesis,
   ResearchSynthesizer,
+  StrategyId,
 } from '@finagent/core';
 import type { CapabilityRegistry } from '@finagent/core';
 import { CapabilityExecutor, type RunOutcome } from '../capabilities/index.ts';
-import { planCapabilities, type PlannedCapability } from './planner.ts';
+import {
+  buildCapabilityInput,
+  planForStrategy,
+  type PlannedCapability,
+} from './planner.ts';
 
 const CONCURRENCY = 4;
 const TIMEOUT_MS = 20000;
@@ -26,6 +31,8 @@ export interface ResearchRunnerOptions {
 export interface ResearchRunRequest {
   symbol: string;
   runId: string;
+  /** V5: research strategy whose plan drives this run (optional, legacy plan otherwise). */
+  strategyId?: StrategyId;
   signal?: AbortSignal;
   onStatus?: (summary: ResearchRunSummary) => void | Promise<void>;
 }
@@ -61,7 +68,7 @@ export class ResearchRunner {
   async run(request: ResearchRunRequest): Promise<ResearchRunResult> {
     const { symbol, runId, signal } = request;
     const startedAt = this.now();
-    const plan = planCapabilities(symbol, this.registry);
+    const plan = planForStrategy(request.strategyId, this.registry);
     const plannedIds = plan.map((p) => p.capabilityId);
 
     const base = {
@@ -83,7 +90,10 @@ export class ResearchRunner {
 
     const specs = plan
       .filter((p) => p.available)
-      .map((p) => ({ cap: this.registry.get(p.capabilityId)!, input: { symbol } }));
+      .map((p) => ({
+        cap: this.registry.get(p.capabilityId)!,
+        input: buildCapabilityInput(p.capabilityId, symbol),
+      }));
 
     const outcomes = await this.executor.runAll(specs, {
       concurrency: CONCURRENCY,
@@ -139,6 +149,7 @@ export class ResearchRunner {
     const report = assembleReport({
       runId,
       symbol,
+      strategyId: request.strategyId,
       generatedAt: this.now(),
       plan,
       outcomes,
@@ -206,12 +217,13 @@ function computeRunStatus(plan: PlannedCapability[], successIds: string[]): Rese
 function assembleReport(args: {
   runId: string;
   symbol: string;
+  strategyId?: string;
   generatedAt: number;
   plan: PlannedCapability[];
   outcomes: RunOutcome[];
   synthesis: ResearchSynthesis;
 }): ResearchReport {
-  const { runId, symbol, generatedAt, plan, outcomes, synthesis } = args;
+  const { runId, symbol, strategyId, generatedAt, plan, outcomes, synthesis } = args;
 
   const outcomeByCapability = new Map(outcomes.map((o) => [o.record.capabilityId, o]));
 
@@ -258,6 +270,7 @@ function assembleReport(args: {
   return {
     id: `report-${runId}`,
     symbol,
+    ...(strategyId ? { strategyId } : {}),
     generatedAt,
     summary: synthesis.summary,
     stance: synthesis.stance,

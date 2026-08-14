@@ -20,7 +20,11 @@ import { useFinagentClient, type FinagentClient } from '../../client'
 import { formatMoney, formatPercent } from '../../lib/money'
 import { PortfolioCard } from '../portfolio/PortfolioCard'
 import { Button } from '../primitives/Button'
+import { Dialog } from '../primitives/Dialog'
 import { SectionState, TodaySection } from './TodaySection'
+import { DailyBriefSection } from './DailyBriefSection'
+import { AutomationRulesView } from '../automation/AutomationRulesView'
+import { MarketPulse } from '../pulse/MarketPulse'
 
 const MOVER_ROWS = 5
 const EVENT_ROWS = 10
@@ -80,6 +84,7 @@ export const TodayView: React.FC = () => {
   const [thesesLoading, setThesesLoading] = useState(true)
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(true)
+  const [automationOpen, setAutomationOpen] = useState(false)
 
   useEffect(() => {
     let cancelled = false
@@ -285,6 +290,13 @@ export const TodayView: React.FC = () => {
         <Button variant="outline" size="sm" onClick={handleCompare}>Compare</Button>
       </div>
 
+      <div className="mb-3">
+        <DailyBriefSection onManage={() => setAutomationOpen(true)} />
+      </div>
+      <div className="mb-3">
+        <MarketPulse />
+      </div>
+
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
         <TodaySection title="Portfolio">{portfolioContent}</TodaySection>
         <TodaySection title="Watchlist movers">{moversContent}</TodaySection>
@@ -293,6 +305,10 @@ export const TodayView: React.FC = () => {
         <TodaySection title="Recent research">{researchContent}</TodaySection>
         <TodaySection title="Theses needing review">{thesesContent}</TodaySection>
       </div>
+
+      <Dialog open={automationOpen} onClose={() => setAutomationOpen(false)} title="Automation">
+        <AutomationRulesView />
+      </Dialog>
     </div>
   )
 }

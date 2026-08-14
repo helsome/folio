@@ -25,13 +25,33 @@ import type {
   ResearchSynthesis,
   ResearchSynthesisInput,
   Run,
+  ScreeningRun,
+  ScreeningQuery,
+  ScreeningStrategy,
+  ResearchDiff,
+  ResearchOpinion,
+  ResearchOutcome,
+  PortfolioImportDraft,
+  PortfolioImportRow,
+  ManualPortfolio,
+  ImportSource,
+  Holding,
+  Kline,
+  AutomationRule,
+  AutomationRun,
+  NotificationEvent,
+  SkillPerformance,
+  StrategyPerformance,
+  PortfolioSnapshot,
   SessionMeta,
   SkillReadiness,
   ThesisImpact,
   ThesisImpactInput,
   ToolDefinition,
   WorkspaceContext,
+  StrategyId,
 } from '@finagent/core';
+import { STRATEGY_IDS } from '@finagent/core';
 import {
   AgentKernel,
   AlertEngine,
@@ -63,6 +83,38 @@ import {
   ThesisService,
   type AnyProvider,
   type PortfolioRiskSynthesisInput,
+  OutcomeRepository,
+  OutcomeService,
+  PulseService,
+  PerformanceService,
+  AutomationRuleRepository,
+  AutomationRunRepository,
+  ScreeningService,
+  ScreeningRunRepository,
+  SCREENING_STRATEGIES,
+  ResearchDiffRepository,
+  ManualPortfolioRepository,
+  buildDiff,
+  buildBrief,
+  runAutomation,
+  runDue,
+  DEFAULT_BRIEF_HOUR,
+  THESIS_REVIEW_DAY,
+  THESIS_REVIEW_HOUR,
+  WEEKDAYS,
+  createDraft,
+  parseCsv,
+  parsePaste,
+  reportToMarkdown,
+  reportToShareCard,
+  redactForShare,
+  isRecord,
+  type HistoryFetcher,
+  type DailyBrief,
+  type BriefPortfolioSummary,
+  type MarketPulseSnapshot,
+  type ShareCard,
+  type WatchlistQuote,
 } from '@finagent/shared';
 import {
   LongbridgeBrokerAccountProvider,
@@ -141,6 +193,17 @@ export class AgentKernelHost {
   private readonly registry: CapabilityRegistry;
   private readonly executor: CapabilityExecutor;
   private readonly researchService: ResearchService;
+  private readonly outcomeRepository: OutcomeRepository;
+  private readonly outcomeService: OutcomeService;
+  private readonly screeningService: ScreeningService;
+  private readonly diffRepository: ResearchDiffRepository;
+  private readonly importRepository: ManualPortfolioRepository;
+  private readonly pulseService: PulseService;
+  private readonly performanceService: PerformanceService;
+  private readonly automationRules: AutomationRuleRepository;
+  private readonly automationRuns: AutomationRunRepository;
+  private automationTimer: ReturnType<typeof setInterval> | null = null;
+  private readonly lastAutomationRunByRule = new Map<string, string>();
   private readonly thesisRepository: ThesisRepository;
   private readonly thesisService: ThesisService;
   private readonly alertRepository: AlertRuleRepository;
@@ -196,7 +259,38 @@ export class AgentKernelHost {
           ? new LocalResearchSynthesizer()
           : createAgentSynthesizer(this.runResearchSynthesis),
       repository: new ResearchReportRepository(new JsonFileStore(join(userData, 'store'))),
+      onReport: (report) => {
+        void this.outcomeService.createOpinionFromReport(report);
+        void this.saveDiffForReport(report);
+      },
     });
+
+    // V5 outcome evaluation: opinions snapshotted from reports, outcomes
+    // evaluated when their horizon is reached (spec §29–35).
+    this.outcomeRepository = new OutcomeRepository(new JsonFileStore(userData));
+    this.outcomeService = new OutcomeService({ repository: this.outcomeRepository });
+
+    // V5 screening + import services (spec §5–10, §43–49).
+    this.screeningService = new ScreeningService({
+      registry: this.registry,
+      executor: this.executor,
+      repository: new ScreeningRunRepository(new JsonFileStore(userData)),
+    });
+    this.diffRepository = new ResearchDiffRepository(new JsonFileStore(userData));
+    this.importRepository = new ManualPortfolioRepository(new JsonFileStore(userData));
+
+    // V5 market pulse + performance (spec §50–52, §36–38).
+    this.pulseService = new PulseService({
+      registry: this.registry,
+      screening: this.screeningService,
+      executor: this.executor,
+    });
+    this.performanceService = new PerformanceService(this.outcomeRepository);
+
+    // V5 scheduled research (spec §21–25): five default rules, seeded once.
+    this.automationRules = new AutomationRuleRepository(new JsonFileStore(userData));
+    this.automationRuns = new AutomationRunRepository(new JsonFileStore(userData));
+    void this.seedAutomationRules();
 
     this.thesisRepository = new ThesisRepository({ storageDir: join(userData, 'thesis') });
     this.thesisService = new ThesisService({
@@ -240,6 +334,8 @@ export class AgentKernelHost {
     });
     void this.skillHub.loadSkills();
     this.alertEngine.start();
+    void this.outcomeService.evaluateDue(undefined, this.fetchOutcomeHistory);
+    this.startAutomationScheduler();
   }
 
   /** Forward kernel events to the window's renderer. */
@@ -421,7 +517,13 @@ export class AgentKernelHost {
 
   async researchStart(input: unknown): Promise<ResearchRunSummary> {
     const request = requireObject(input);
-    return this.researchService.start(requireString(request.symbol, 'symbol').toUpperCase());
+    const symbol = requireString(request.symbol, 'symbol').toUpperCase();
+    const strategyId =
+      typeof request.strategyId === 'string' &&
+      (STRATEGY_IDS as readonly string[]).includes(request.strategyId)
+        ? (request.strategyId as StrategyId)
+        : undefined;
+    return this.researchService.start(symbol, strategyId);
   }
 
   async researchCancel(input: unknown): Promise<void> {
@@ -1044,6 +1146,380 @@ export class AgentKernelHost {
 
   async coverageMatrix(): Promise<ProviderCoverage[]> {
     return this.providerRouter.coverage();
+  }
+
+  // -------------------------------------------------------------------------
+  // V5: screening / diff / outcome / import (spec §5–49)
+  // -------------------------------------------------------------------------
+
+  async screeningRun(input: unknown): Promise<ScreeningRun> {
+    const request = requireObject(input);
+    const strategy = requireString(request.strategy, 'strategy');
+    if (!SCREENING_STRATEGIES.some((def) => def.id === strategy)) {
+      throw createCodeError('SCREENING_STRATEGY_INVALID', `Unknown screening strategy: ${strategy}`);
+    }
+    const query: ScreeningQuery = {
+      strategy: strategy as ScreeningStrategy,
+      universe: Array.isArray(request.universe) ? request.universe.map(String) : undefined,
+      market: typeof request.market === 'string' ? request.market : undefined,
+      filters: isRecord(request.filters) ? request.filters : undefined,
+      limit: typeof request.limit === 'number' ? request.limit : 20,
+    };
+    return this.screeningService.runScreening(query);
+  }
+
+  async screeningListRuns(): Promise<ScreeningRun[]> {
+    return this.screeningService.listRuns();
+  }
+
+  async screeningGetRun(input: unknown): Promise<ScreeningRun | undefined> {
+    const request = requireObject(input);
+    return this.screeningService.getRun(requireString(request.runId, 'runId'));
+  }
+
+  async researchGetDiff(input: unknown): Promise<ResearchDiff | undefined> {
+    const request = requireObject(input);
+    const symbol = requireString(request.symbol, 'symbol').toUpperCase();
+    const cached = await this.diffRepository.getBySymbol(symbol);
+    if (cached) return cached;
+    // Fallback: build on demand from the two latest reports.
+    const reports = await this.researchService.listReports(symbol);
+    if (reports.length < 2) return undefined;
+    const sorted = [...reports].sort((a, b) => b.generatedAt - a.generatedAt);
+    const diff = await buildDiff(sorted[1]!, sorted[0]!, {
+      thesis: await this.latestThesisFor(symbol),
+    });
+    await this.diffRepository.save(diff);
+    return diff;
+  }
+
+  async outcomeListOpinions(input: unknown): Promise<ResearchOpinion[]> {
+    const request = isRecord(input) ? input : {};
+    return this.outcomeRepository.listOpinions(
+      typeof request.symbol === 'string' ? request.symbol.toUpperCase() : undefined
+    );
+  }
+
+  async outcomeListOutcomes(input: unknown): Promise<ResearchOutcome[]> {
+    const request = isRecord(input) ? input : {};
+    return this.outcomeRepository.listOutcomes(
+      typeof request.symbol === 'string' ? request.symbol.toUpperCase() : undefined
+    );
+  }
+
+  async outcomeEvaluateDue(): Promise<ResearchOutcome[]> {
+    return this.outcomeService.evaluateDue(undefined, this.fetchOutcomeHistory);
+  }
+
+  async importParse(input: unknown): Promise<PortfolioImportDraft> {
+    const request = requireObject(input);
+    const source = requireString(request.source, 'source');
+    const text = requireString(request.text, 'text');
+    let rows: PortfolioImportRow[];
+    if (source === 'csv') {
+      rows = parseCsv(text);
+    } else if (source === 'paste') {
+      rows = parsePaste(text);
+    } else {
+      throw createCodeError('IMPORT_SOURCE_INVALID', 'Unsupported import source.');
+    }
+    return createDraft(source as ImportSource, rows);
+  }
+
+  async importConfirm(input: unknown): Promise<ManualPortfolio> {
+    const request = requireObject(input);
+    const draft = requireObject(request.draft) as unknown as PortfolioImportDraft;
+    const name = requireString(request.name, 'name');
+    const rows = Array.isArray(draft.rows) ? draft.rows : [];
+    if (rows.length === 0) {
+      throw createCodeError('IMPORT_EMPTY', 'Nothing to import — the draft has no rows.');
+    }
+    const holdings: Holding[] = rows
+      .filter((row) => row.symbol && row.issues.length === 0)
+      .map((row) => ({
+        symbol: row.symbol.toUpperCase(),
+        name: row.name ?? '',
+        currency: row.currency,
+        quantity: row.quantity,
+        costPrice: row.costPrice,
+      }));
+    return this.importRepository.create({ name, holdings });
+  }
+
+  async listManualPortfolios(): Promise<ManualPortfolio[]> {
+    return this.importRepository.list();
+  }
+
+  private async latestThesisFor(symbol: string): Promise<InvestmentThesis | undefined> {
+    try {
+      const theses = await this.thesisRepository.getBySymbol(symbol);
+      return theses[0];
+    } catch {
+      return undefined;
+    }
+  }
+
+  /** Persist a diff when a symbol gets a NEW report over an older one (spec §17–19). */
+  private async saveDiffForReport(report: ResearchReport): Promise<void> {
+    try {
+      const older = (await this.researchService.listReports(report.symbol))
+        .filter((other) => other.id !== report.id)
+        .sort((a, b) => b.generatedAt - a.generatedAt);
+      if (older.length === 0) return;
+      const diff = await buildDiff(older[0]!, report, {
+        thesis: await this.latestThesisFor(report.symbol),
+      });
+      await this.diffRepository.save(diff);
+    } catch {
+      // Diff persistence is best-effort; the UI can build on demand.
+    }
+  }
+
+  /** Historical daily bars for outcome evaluation (spec §32). */
+  private fetchOutcomeHistory: HistoryFetcher = async (symbol) => {
+    const capability = this.registry.get('market.kline');
+    if (!capability) return null;
+    const outcome = await this.executor.run(
+      capability,
+      { symbol, period: '1d', limit: 200 },
+      { timeoutMs: 20_000 }
+    );
+    if (outcome.record.status !== 'success' || !outcome.result) return null;
+    return (outcome.result.data as Kline[] | undefined) ?? null;
+  };
+
+  // -------------------------------------------------------------------------
+  // V5 Phase 2: pulse / performance / automation / export (spec §21–55)
+  // -------------------------------------------------------------------------
+
+  async pulseSnapshot(input: unknown): Promise<MarketPulseSnapshot> {
+    const request = isRecord(input) ? input : {};
+    const watchlistRaw = Array.isArray(request.watchlist) ? request.watchlist : undefined;
+    const watchlist: WatchlistQuote[] = Array.isArray(watchlistRaw)
+      ? (watchlistRaw as unknown as WatchlistQuote[])
+      : [];
+    const portfolioSummary = isRecord(request.portfolioSummary)
+      ? (request.portfolioSummary as unknown as PortfolioSnapshot)
+      : undefined;
+    return this.pulseService.snapshot({
+      watchlist,
+      portfolioSummary,
+      market: 'US',
+    });
+  }
+
+  async performanceSkillPerformance(input: unknown): Promise<SkillPerformance[]> {
+    const request = isRecord(input) ? input : {};
+    const horizon = request.horizon;
+    if (horizon !== '1w' && horizon !== '1m' && horizon !== '3m') {
+      throw createCodeError('PERFORMANCE_HORIZON_INVALID', 'Horizon must be 1w, 1m, or 3m.');
+    }
+    return this.performanceService.skillPerformance(horizon);
+  }
+
+  async performanceStrategyPerformance(input: unknown): Promise<StrategyPerformance[]> {
+    const request = isRecord(input) ? input : {};
+    const horizon = request.horizon;
+    if (horizon !== '1w' && horizon !== '1m' && horizon !== '3m') {
+      throw createCodeError('PERFORMANCE_HORIZON_INVALID', 'Horizon must be 1w, 1m, or 3m.');
+    }
+    return this.performanceService.strategyPerformance(horizon);
+  }
+
+  async automationListRules(): Promise<AutomationRule[]> {
+    return this.automationRules.list();
+  }
+
+  async automationSaveRule(input: unknown): Promise<AutomationRule> {
+    const request = requireObject(input);
+    const rule = request.rule as unknown as AutomationRule;
+    if (!rule || typeof rule.type !== 'string') {
+      throw createCodeError('AUTOMATION_RULE_INVALID', 'A valid automation rule is required.');
+    }
+    return this.automationRules.save(rule);
+  }
+
+  async automationRemoveRule(input: unknown): Promise<void> {
+    const request = requireObject(input);
+    await this.automationRules.remove(requireString(request.ruleId, 'ruleId'));
+  }
+
+  async automationRunRule(input: unknown): Promise<AutomationRun> {
+    const request = requireObject(input);
+    const ruleId = requireString(request.ruleId, 'ruleId');
+    const rule = (await this.automationRules.list()).find((r) => r.id === ruleId);
+    if (!rule) throw createCodeError('AUTOMATION_RULE_NOT_FOUND', 'Unknown automation rule.');
+    const run = await this.executeAutomation(rule);
+    await this.automationRuns.record(run);
+    return run;
+  }
+
+  async automationListRuns(): Promise<AutomationRun[]> {
+    return this.automationRuns.list();
+  }
+
+  async automationBuildBrief(): Promise<DailyBrief> {
+    const [runs, alerts, diffs] = await Promise.all([
+      this.automationRuns.list(),
+      this.alertEventLog.list(),
+      this.diffRepository.list(),
+    ]);
+    let portfolio: BriefPortfolioSummary[] = [];
+    try {
+      const snapshot = await this.marketData.getPortfolio();
+      const holdings = snapshot.holdings ?? [];
+      const total = snapshot.totalAssets;
+      portfolio = holdings
+        .filter((holding) => typeof holding.marketValue === 'number' && typeof total === 'number')
+        .map((holding) => ({
+          label: `${holding.symbol} · ${(((holding.marketValue ?? 0) / (total ?? 1)) * 100).toFixed(1)}% of portfolio`,
+          symbol: holding.symbol,
+        }));
+    } catch {
+      // No portfolio — brief renders without the portfolio section.
+    }
+    return buildBrief({ runs, alerts, diffs, portfolio, movers: [] }, Date.now());
+  }
+
+  async exportMarkdown(input: unknown): Promise<string> {
+    const request = requireObject(input);
+    const report = await this.researchService.getReport(requireString(request.reportId, 'reportId'));
+    if (!report) throw createCodeError('REPORT_NOT_FOUND', 'Unknown research report.');
+    return reportToMarkdown(redactForShare(report));
+  }
+
+  async exportShareCard(input: unknown): Promise<ShareCard> {
+    const request = requireObject(input);
+    const report = await this.researchService.getReport(requireString(request.reportId, 'reportId'));
+    if (!report) throw createCodeError('REPORT_NOT_FOUND', 'Unknown research report.');
+    return reportToShareCard(redactForShare(report));
+  }
+
+  private async seedAutomationRules(): Promise<void> {
+    try {
+      const existing = await this.automationRules.list();
+      if (existing.length > 0) return;
+      const now = Date.now();
+      const defaults: AutomationRule[] = [
+        {
+          id: 'watchlist-daily-review',
+          type: 'watchlist-daily-review',
+          enabled: true,
+          hour: DEFAULT_BRIEF_HOUR,
+          days: [...WEEKDAYS],
+          symbols: ['AAPL.US', 'TSLA.US', 'NVDA.US'],
+          strategyId: 'comprehensive',
+          notify: 'material-only',
+          createdAt: now,
+        },
+        {
+          id: 'portfolio-daily-brief',
+          type: 'portfolio-daily-brief',
+          enabled: true,
+          hour: DEFAULT_BRIEF_HOUR,
+          days: [...WEEKDAYS],
+          strategyId: 'comprehensive',
+          notify: 'material-only',
+          createdAt: now,
+        },
+        {
+          id: 'weekly-thesis-review',
+          type: 'weekly-thesis-review',
+          enabled: true,
+          hour: THESIS_REVIEW_HOUR,
+          days: [THESIS_REVIEW_DAY],
+          strategyId: 'risk-review',
+          notify: 'material-only',
+          createdAt: now,
+        },
+        {
+          id: 'pre-earnings-research',
+          type: 'pre-earnings-research',
+          enabled: true,
+          strategyId: 'earnings',
+          notify: 'material-only',
+          createdAt: now,
+        },
+        {
+          id: 'post-earnings-research',
+          type: 'post-earnings-research',
+          enabled: true,
+          strategyId: 'earnings',
+          notify: 'material-only',
+          createdAt: now,
+        },
+      ];
+      for (const rule of defaults) {
+        await this.automationRules.save(rule);
+      }
+    } catch {
+      // Seeding is best-effort; rules can be created in the UI.
+    }
+  }
+
+  private startAutomationScheduler(): void {
+    this.automationTimer = setInterval(() => {
+      void this.tickAutomations();
+    }, 60_000);
+  }
+
+  private async tickAutomations(): Promise<void> {
+    try {
+      const rules = await this.automationRules.list();
+      const now = Date.now();
+      const todayKey = new Date(now).toDateString();
+      for (const rule of runDue(rules, now)) {
+        if (this.lastAutomationRunByRule.get(rule.id) === todayKey) continue;
+        try {
+          const run = await this.executeAutomation(rule);
+          await this.automationRuns.record(run);
+          this.lastAutomationRunByRule.set(rule.id, todayKey);
+        } catch {
+          // A failing rule never blocks the other rules.
+        }
+      }
+    } catch {
+      // Scheduler tick is best-effort.
+    }
+  }
+
+  private async executeAutomation(rule: AutomationRule): Promise<AutomationRun> {
+    return runAutomation(rule, {
+      registry: this.registry,
+      diffRepo: this.diffRepository,
+      researchStart: (symbol, strategyId) => this.researchService.start(symbol, strategyId),
+      notify: (event) => void this.dispatchNotification(event),
+      portfolioSymbols: async () => {
+        try {
+          const snapshot = await this.marketData.getPortfolio();
+          return (snapshot.holdings ?? []).map((holding) => holding.symbol);
+        } catch {
+          return [];
+        }
+      },
+      thesisSymbols: async () => {
+        try {
+          const summaries = await this.thesisRepository.list();
+          return summaries.map((thesis) => thesis.symbol);
+        } catch {
+          return [];
+        }
+      },
+    });
+  }
+
+  /** Unified V5 notification dispatcher (spec §56–57): OS + in-app push. */
+  private dispatchNotification(event: NotificationEvent): void {
+    try {
+      if (Notification.isSupported()) {
+        new Notification({ title: event.title, body: event.message }).show();
+      }
+    } catch {
+      // OS notification best-effort.
+    }
+    if (this.window && !this.window.isDestroyed()) {
+      this.window.webContents.send('notification:event', event);
+    }
   }
 
   // -------------------------------------------------------------------------

@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { PortfolioFailureKind } from '@finagent/core';
 import {
@@ -8,13 +8,17 @@ import {
   portfolioViewAtom,
   selectedPositionAtom,
   activeSymbolAtom,
+  isManualAccountId,
+  manualAccountId,
 } from '../../atoms';
+import { manualPortfoliosAtom, refreshManualPortfoliosAtom } from '../../atoms/portfolioImportAtoms';
 import { portfolioRiskCacheAtom, analyzePortfolioRiskAtom } from '../../atoms/portfolioRiskAtoms';
 import { useFinagentClient } from '../../client';
 import { PortfolioCard } from '../portfolio/PortfolioCard';
 import { HoldingRow } from '../portfolio/HoldingRow';
 import { AssetPieChart } from '../portfolio/AssetPieChart';
 import { PortfolioRiskPanel } from '../portfolio/PortfolioRiskPanel';
+import { ImportDialog } from '../portfolio/ImportDialog';
 import { Button } from '../primitives/Button';
 import { formatFreshness } from '../../lib/money';
 
@@ -38,12 +42,18 @@ export const PortfolioSection: React.FC = () => {
   const setActiveSymbol = useSetAtom(activeSymbolAtom);
   const riskCache = useAtomValue(portfolioRiskCacheAtom);
   const analyzeRisk = useSetAtom(analyzePortfolioRiskAtom);
+  const manualState = useAtomValue(manualPortfoliosAtom);
+  const refreshManualPortfolios = useSetAtom(refreshManualPortfoliosAtom);
+  const [importOpen, setImportOpen] = useState(false);
 
   useEffect(() => {
     fetchPortfolio(client).catch(() => {
       /* error surfaced via portfolioCacheAtom.failure */
     });
-  }, [client, fetchPortfolio]);
+    refreshManualPortfolios().catch(() => {
+      /* error surfaced via manualPortfoliosAtom.error */
+    });
+  }, [client, fetchPortfolio, refreshManualPortfolios]);
 
   // The risk analysis is a top-level action: it renders even when the
   // portfolio fetch is loading, failed, or empty.
@@ -109,10 +119,19 @@ export const PortfolioSection: React.FC = () => {
   };
 
   const isPartial = cache.failure?.kind === 'partial';
+  const showAccountSelector =
+    view.accounts.length > 1 || manualState.portfolios.length > 0;
 
   return (
     <div className="space-y-3 overflow-y-auto p-4">
-      {view.accounts.length > 1 && (
+      <div className="flex items-center justify-between">
+        <h2 className="text-[13px] font-semibold text-foreground">Portfolio</h2>
+        <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>
+          Import…
+        </Button>
+      </div>
+
+      {showAccountSelector && (
         <label className="flex items-center gap-2 text-[12px] text-foreground/54">
           Account
           <select
@@ -124,6 +143,11 @@ export const PortfolioSection: React.FC = () => {
             {view.accounts.map((account) => (
               <option key={account.id} value={account.id}>
                 {account.name} ({account.currency ?? '—'})
+              </option>
+            ))}
+            {manualState.portfolios.map((portfolio) => (
+              <option key={portfolio.id} value={manualAccountId(portfolio.id)}>
+                {portfolio.name} (Manual)
               </option>
             ))}
           </select>
@@ -160,10 +184,21 @@ export const PortfolioSection: React.FC = () => {
       </div>
 
       <div className="text-[11px] text-foreground/44">
-        {formatFreshness('Longbridge', view.snapshot.fetchedAt)}
+        {formatFreshness(
+          isManualAccountId(selectedAccount) ? 'Manual portfolio' : 'Longbridge',
+          view.snapshot.fetchedAt
+        )}
       </div>
 
       {riskSection}
+
+      <ImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => {
+          void refreshManualPortfolios().catch(() => {})
+        }}
+      />
     </div>
   );
 };

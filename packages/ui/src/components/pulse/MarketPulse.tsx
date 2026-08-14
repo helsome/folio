@@ -1,0 +1,216 @@
+import React, { useEffect } from 'react'
+import { useAtomValue, useSetAtom } from 'jotai'
+import type { ScreeningCandidate } from '@finagent/core'
+import { loadPulseAtom, pulseCacheAtom } from '../../atoms/pulseAtoms'
+import { useFinagentClient } from '../../client'
+import {
+  partitionPulseMovers,
+  toFiniteNumber,
+  type PulseImpactSign,
+  type PulseMarketIndex,
+  type PulsePersonalImpactItem,
+} from '../../client/pulse'
+import { formatPercent } from '../../lib/money'
+import { SectionState, TodaySection } from '../today/TodaySection'
+
+const DASH = '\u2014'
+
+/**
+ * Market Pulse card for the Today dashboard (spec §51–52). Standalone: no
+ * props, self-loads via its own atoms (`pulseAtoms` × `useFinagentClient`).
+ *
+ * Every number is REAL capability data produced by the main-process
+ * `PulseService`; when a section has nothing, it renders an honest empty
+ * state — the card never fabricates a quote or a change.
+ */
+
+function changeColor(changePercent: number | undefined): string {
+  if (changePercent === undefined) return 'text-foreground/42'
+  if (changePercent > 0) return 'text-[var(--mac-green)]'
+  if (changePercent < 0) return 'text-[var(--mac-red)]'
+  return 'text-foreground/42'
+}
+
+function formatPrice(value: number | undefined): string {
+  if (value === undefined || !Number.isFinite(value)) return DASH
+  return value.toLocaleString(undefined, { maximumFractionDigits: 2 })
+}
+
+function formatExposure(value: number | undefined): string {
+  if (value === undefined || !Number.isFinite(value)) return DASH
+  return `${value.toFixed(1)}%`
+}
+
+function impactLabel(impact: PulseImpactSign): string {
+  switch (impact) {
+    case 'positive':
+      return 'Positive'
+    case 'negative':
+      return 'Negative'
+    default:
+      return 'Neutral'
+  }
+}
+
+function impactColor(impact: PulseImpactSign): string {
+  switch (impact) {
+    case 'positive':
+      return 'text-[var(--mac-green)]'
+    case 'negative':
+      return 'text-[var(--mac-red)]'
+    default:
+      return 'text-foreground/48'
+  }
+}
+
+const IndexLine: React.FC<{ index: PulseMarketIndex }> = ({ index }) => (
+  <span className="inline-flex items-baseline gap-1.5 text-[13px]" data-testid="pulse-index">
+    <span className="font-medium text-foreground/80">{index.name}</span>
+    <span className="text-foreground/42">{index.symbol}</span>
+    <span className="tabular-nums text-foreground/64">{formatPrice(index.lastPrice)}</span>
+    <span className={`tabular-nums ${changeColor(index.changePercent)}`}>
+      {formatPercent(index.changePercent)}
+    </span>
+  </span>
+)
+
+const StatusLine: React.FC<{ statuses: { market: string; status: string }[] }> = ({ statuses }) => (
+  <div className="text-[13px] text-foreground/64" data-testid="pulse-market-status">
+    {statuses.map((status) => `${status.market} · ${status.status}`).join('  ')}
+  </div>
+)
+
+const TemperatureChip: React.FC<{ score?: number; label?: string; market?: string }> = ({
+  score,
+  label,
+  market,
+}) => {
+  const tone = score === undefined ? 'text-foreground/42' : score >= 60 ? 'text-[var(--mac-green)]' : score <= 40 ? 'text-[var(--mac-red)]' : 'text-foreground/64'
+  return (
+    <span className="inline-flex items-center gap-1.5" data-testid="pulse-temperature">
+      <span className={`rounded-full border border-foreground/10 px-2 py-0.5 text-[12px] tabular-nums ${tone}`}>
+        {score === undefined ? DASH : `${score}/100`}
+      </span>
+      {label && <span className="text-[13px] text-foreground/64">{label}</span>}
+      {market && <span className="text-[12px] text-foreground/42">{market}</span>}
+    </span>
+  )
+}
+
+const MoverRow: React.FC<{ mover: ScreeningCandidate }> = ({ mover }) => {
+  const changePercent = toFiniteNumber(mover.metrics.changePercent)
+  return (
+    <li className="flex items-baseline justify-between gap-2 text-[13px]" data-testid="pulse-mover-row">
+      <span className="truncate font-medium text-foreground/80">{mover.symbol}</span>
+      <span className={`tabular-nums ${changeColor(changePercent)}`}>{formatPercent(changePercent)}</span>
+    </li>
+  )
+}
+
+const MoverColumn: React.FC<{ title: string; movers: ScreeningCandidate[] }> = ({ title, movers }) => (
+  <div>
+    <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">{title}</h4>
+    {movers.length === 0 ? (
+      <p className="py-1 text-[13px] text-foreground/42">No movers</p>
+    ) : (
+      <ul className="space-y-1">
+        {movers.map((mover) => (
+          <MoverRow key={mover.symbol} mover={mover} />
+        ))}
+      </ul>
+    )}
+  </div>
+)
+
+const ImpactRow: React.FC<{ item: PulsePersonalImpactItem }> = ({ item }) => (
+  <li className="flex items-center justify-between gap-2 text-[13px]" data-testid="pulse-impact-row">
+    <span className="truncate font-medium text-foreground/80">{item.symbol}</span>
+    <span className="flex items-center gap-3 tabular-nums">
+      <span className="text-foreground/64" title="Watchlist weight share">
+        {formatExposure(item.watchlistExposurePercent)}
+      </span>
+      {item.portfolioExposurePercent !== undefined && (
+        <span className="text-foreground/64" title="Portfolio exposure">
+          {formatExposure(item.portfolioExposurePercent)}
+        </span>
+      )}
+      <span className={`text-[12px] ${impactColor(item.impact)}`}>{impactLabel(item.impact)}</span>
+    </span>
+  </li>
+)
+
+export const MarketPulse: React.FC = () => {
+  const client = useFinagentClient()
+  const { snapshot, loading, error } = useAtomValue(pulseCacheAtom)
+  const loadPulse = useSetAtom(loadPulseAtom)
+
+  useEffect(() => {
+    loadPulse(client)
+  }, [client, loadPulse])
+
+  const movers = snapshot ? partitionPulseMovers(snapshot.movers) : { gainers: [], losers: [] }
+  const statuses = snapshot?.marketStatus ?? []
+  const temperature = snapshot?.temperature ?? null
+
+  return (
+    <TodaySection title="Market Pulse">
+      {loading ? (
+        <SectionState kind="loading" />
+      ) : error && !snapshot ? (
+        <SectionState kind="error" message={error} />
+      ) : (
+        <div className="space-y-3" data-testid="pulse-snapshot">
+          <div className="flex flex-wrap gap-x-4 gap-y-1" data-testid="pulse-indices">
+            {snapshot && snapshot.indices.length > 0 ? (
+              snapshot.indices.map((index) => <IndexLine key={index.symbol} index={index} />)
+            ) : (
+              <span className="text-[13px] text-foreground/42">Index quotes unavailable</span>
+            )}
+          </div>
+
+          {snapshot && statuses.length > 0 ? (
+            <StatusLine statuses={statuses} />
+          ) : (
+            <p className="text-[13px] text-foreground/42">Market status unavailable</p>
+          )}
+
+          {snapshot && temperature ? (
+            <TemperatureChip
+              score={temperature.score}
+              label={temperature.label}
+              market={temperature.market}
+            />
+          ) : (
+            <p className="text-[13px] text-foreground/42">Market temperature unavailable</p>
+          )}
+
+          <div className="grid grid-cols-2 gap-3" data-testid="pulse-movers">
+            <MoverColumn title="Top gainers" movers={movers.gainers} />
+            <MoverColumn title="Top losers" movers={movers.losers} />
+          </div>
+
+          <div data-testid="pulse-personal-impact">
+            <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
+              What matters to me
+            </h4>
+            {snapshot?.personalImpact && snapshot.personalImpact.items.length > 0 ? (
+              <ul className="space-y-1">
+                {snapshot.personalImpact.items.map((item) => (
+                  <ImpactRow key={item.symbol} item={item} />
+                ))}
+              </ul>
+            ) : (
+              <p className="py-1 text-[13px] text-foreground/42">No movers in your watchlist</p>
+            )}
+          </div>
+
+          {snapshot && snapshot.failures.length > 0 && (
+            <p className="pt-1 text-[12px] text-foreground/42" data-testid="pulse-failures-note">
+              Some market data unavailable
+            </p>
+          )}
+        </div>
+      )}
+    </TodaySection>
+  )
+}

@@ -69,6 +69,7 @@ function createElectronClient(): FinagentClient {
       getRun: (input) => ipcResult(window.electronAPI.research.getRun(input)),
       listReports: (input) => ipcResult(window.electronAPI.research.listReports(input)),
       getReport: (input) => ipcResult(window.electronAPI.research.getReport(input)),
+      getDiff: (input) => ipcResult(window.electronAPI.research.getDiff(input)),
     },
     thesis: {
       list: (symbol?) => ipcResult(window.electronAPI.thesis.list(symbol)),
@@ -136,6 +137,31 @@ function createElectronClient(): FinagentClient {
       getCompleted: () => ipcResult(window.electronAPI.onboarding.getCompleted()),
       setCompleted: (completed: boolean) =>
         ipcResult(window.electronAPI.onboarding.setCompleted({ completed })),
+    },
+    screening: {
+      run: (input) => ipcResult(window.electronAPI.screening.run(input)),
+      listRuns: () => ipcResult(window.electronAPI.screening.listRuns()),
+      getRun: (input) => ipcResult(window.electronAPI.screening.getRun(input)),
+    },
+    outcome: {
+      listOpinions: (input) => ipcResult(window.electronAPI.outcome.listOpinions(input)),
+      listOutcomes: (input) => ipcResult(window.electronAPI.outcome.listOutcomes(input)),
+      evaluateDue: () => ipcResult(window.electronAPI.outcome.evaluateDue()),
+    },
+    pulse: {
+      snapshot: (input) => ipcResult(window.electronAPI.pulse.snapshot(input)),
+    },
+    performance: {
+      skill: (input) => ipcResult(window.electronAPI.performance.skill(input)),
+      strategy: (input) => ipcResult(window.electronAPI.performance.strategy(input)),
+    },
+    automation: {
+      listRules: () => ipcResult(window.electronAPI.automation.listRules()),
+      saveRule: (rule) => ipcResult(window.electronAPI.automation.saveRule({ rule })),
+      removeRule: (ruleId) => ipcResult(window.electronAPI.automation.removeRule({ ruleId })),
+      runRule: (input) => ipcResult(window.electronAPI.automation.runRule(input)),
+      listRuns: () => ipcResult(window.electronAPI.automation.listRuns()),
+      buildBrief: () => ipcResult(window.electronAPI.automation.buildBrief()),
     },
   };
 }

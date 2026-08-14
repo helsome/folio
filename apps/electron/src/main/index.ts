@@ -368,6 +368,92 @@ ipcMain.handle('onboarding:setCompleted', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.setOnboardingCompleted(input))
 );
 
+// V5: screening / diff / outcome / import (spec §5–49)
+ipcMain.handle('screening:run', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.screeningRun(input))
+);
+
+ipcMain.handle('screening:listRuns', async () =>
+  toIpcResult(() => agentKernelHost.screeningListRuns())
+);
+
+ipcMain.handle('screening:getRun', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.screeningGetRun(input))
+);
+
+ipcMain.handle('research:getDiff', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.researchGetDiff(input))
+);
+
+ipcMain.handle('outcome:listOpinions', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.outcomeListOpinions(input))
+);
+
+ipcMain.handle('outcome:listOutcomes', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.outcomeListOutcomes(input))
+);
+
+ipcMain.handle('outcome:evaluateDue', async () =>
+  toIpcResult(() => agentKernelHost.outcomeEvaluateDue())
+);
+
+ipcMain.handle('import:parse', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.importParse(input))
+);
+
+ipcMain.handle('import:confirm', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.importConfirm(input))
+);
+
+ipcMain.handle('portfolio:listManual', async () =>
+  toIpcResult(() => agentKernelHost.listManualPortfolios())
+);
+
+// V5 Phase 2: pulse / performance / automation / export
+ipcMain.handle('pulse:snapshot', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.pulseSnapshot(input))
+);
+
+ipcMain.handle('performance:skill', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.performanceSkillPerformance(input))
+);
+
+ipcMain.handle('performance:strategy', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.performanceStrategyPerformance(input))
+);
+
+ipcMain.handle('automation:listRules', async () =>
+  toIpcResult(() => agentKernelHost.automationListRules())
+);
+
+ipcMain.handle('automation:saveRule', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.automationSaveRule(input))
+);
+
+ipcMain.handle('automation:removeRule', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.automationRemoveRule(input))
+);
+
+ipcMain.handle('automation:runRule', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.automationRunRule(input))
+);
+
+ipcMain.handle('automation:listRuns', async () =>
+  toIpcResult(() => agentKernelHost.automationListRuns())
+);
+
+ipcMain.handle('automation:buildBrief', async () =>
+  toIpcResult(() => agentKernelHost.automationBuildBrief())
+);
+
+ipcMain.handle('export:markdown', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.exportMarkdown(input))
+);
+
+ipcMain.handle('export:shareCard', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.exportShareCard(input))
+);
+
 // Controlled external open (spec §10): http/https only, never a shell.
 ipcMain.handle('openExternal', async (_event, url: unknown) =>
   toIpcResult(async () => {

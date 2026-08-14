@@ -32,6 +32,20 @@ const packagedBinary = join(
 const CDP_PORT = 9347;
 const userDataDir = join(appRoot, 'e2e/.user-data-fresh');
 
+// FINAGENT_E2E_KEEP_OPEN=1 — debugging only, NEVER in automated runs: leave
+// the app running when the harness finishes and print where it is, instead of
+// killing it. Automated runs/CI rely on the harness cleaning up its port.
+const KEEP_OPEN = process.env.FINAGENT_E2E_KEEP_OPEN === '1';
+function shutdown(appProcess) {
+  if (KEEP_OPEN) {
+    console.log(
+      `KEEP_OPEN CDP port ${CDP_PORT} — app left running; clean up yourself: pkill -f 'remote-debugging-port=${CDP_PORT}'`
+    );
+    return
+  }
+  appProcess.kill()
+}
+
 let failures = 0;
 function pass(name) {
   console.log(`PASS  ${name}`);
@@ -54,6 +68,7 @@ function freshUserEnv() {
     ...process.env,
     PATH: pathEntries.join(':'),
     FINAGENT_AGENT_PROVIDER: 'local',
+    FINAGENT_E2E: '1',
     FINAGENT_E2E_HIDDEN: '1',
     FINAGENT_USER_DATA_DIR: userDataDir,
   };
@@ -167,7 +182,7 @@ async function main() {
   } catch (error) {
     fail('harness setup', error);
   } finally {
-    child.kill();
+    shutdown(child)
   }
 
   // F5. Relaunch: onboarding must NOT reappear.
@@ -190,7 +205,7 @@ async function main() {
   } catch (error) {
     fail('F5: relaunch preserves completion (no wizard)', error);
   } finally {
-    child.kill();
+    shutdown(child)
   }
 
   if (failures > 0) {

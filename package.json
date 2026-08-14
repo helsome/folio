@@ -14,6 +14,13 @@
     "build:electron": "cd apps/electron && bun run build",
     "typecheck": "bun run --filter './**' typecheck",
     "lint": "bun run --filter './**' lint",
+    "test:unit": "bun test",
+    "test:integration": "bun test && bun run typecheck",
+    "test:ui": "bun test packages/ui",
+    "test:e2e": "cd apps/electron && bun run test:e2e",
+    "test:e2e:visible": "cd apps/electron && FINAGENT_E2E_VISIBLE=1 bun run test:e2e",
+    "test:package-smoke": "cd apps/electron && bun run test:package-smoke",
+    "test:release": "bun run release:check",
     "release:check": "bun run scripts/release-check.mjs",
     "release:package": "bun run scripts/release-package.mjs"
   },

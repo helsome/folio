@@ -46,12 +46,13 @@ export interface ElectronAPI {
     list: () => Promise<unknown>;
   };
   research: {
-    start: (input: { symbol: string }) => Promise<unknown>;
+    start: (input: { symbol: string; strategyId?: string }) => Promise<unknown>;
     cancel: (input: { runId: string }) => Promise<unknown>;
     listRuns: () => Promise<unknown>;
     getRun: (input: { runId: string }) => Promise<unknown>;
     listReports: (input: { symbol?: string }) => Promise<unknown>;
     getReport: (input: { reportId: string }) => Promise<unknown>;
+    getDiff: (input: { symbol: string }) => Promise<unknown>;
   };
   thesis: {
     list: (symbol?: string) => Promise<unknown>;
@@ -114,6 +115,41 @@ export interface ElectronAPI {
     getCompleted: () => Promise<unknown>;
     setCompleted: (input: { completed: boolean }) => Promise<unknown>;
   };
+  screening: {
+    run: (input: unknown) => Promise<unknown>;
+    listRuns: () => Promise<unknown>;
+    getRun: (input: { runId: string }) => Promise<unknown>;
+  };
+  outcome: {
+    listOpinions: (input: { symbol?: string }) => Promise<unknown>;
+    listOutcomes: (input: { symbol?: string }) => Promise<unknown>;
+    evaluateDue: () => Promise<unknown>;
+  };
+  portfolioImport: {
+    parse: (input: { source: string; text: string }) => Promise<unknown>;
+    confirm: (input: unknown) => Promise<unknown>;
+    listManual: () => Promise<unknown>;
+  };
+  pulse: {
+    snapshot: (input: unknown) => Promise<unknown>;
+  };
+  performance: {
+    skill: (input: { horizon: string }) => Promise<unknown>;
+    strategy: (input: { horizon: string }) => Promise<unknown>;
+  };
+  automation: {
+    listRules: () => Promise<unknown>;
+    saveRule: (input: { rule: unknown }) => Promise<unknown>;
+    removeRule: (input: { ruleId: string }) => Promise<unknown>;
+    runRule: (input: { ruleId: string }) => Promise<unknown>;
+    listRuns: () => Promise<unknown>;
+    buildBrief: () => Promise<unknown>;
+    onNotification: (callback: (event: unknown) => void) => () => void;
+  };
+  export: {
+    markdown: (input: { reportId: string }) => Promise<unknown>;
+    shareCard: (input: { reportId: string }) => Promise<unknown>;
+  };
 }
 
 const electronAPI: ElectronAPI = {
@@ -175,12 +211,13 @@ const electronAPI: ElectronAPI = {
     list: () => ipcRenderer.invoke('capabilities:list'),
   },
   research: {
-    start: (input: { symbol: string }) => ipcRenderer.invoke('research:start', input),
+    start: (input: { symbol: string; strategyId?: string }) => ipcRenderer.invoke('research:start', input),
     cancel: (input: { runId: string }) => ipcRenderer.invoke('research:cancel', input),
     listRuns: () => ipcRenderer.invoke('research:listRuns'),
     getRun: (input: { runId: string }) => ipcRenderer.invoke('research:getRun', input),
     listReports: (input: { symbol?: string }) => ipcRenderer.invoke('research:listReports', input),
     getReport: (input: { reportId: string }) => ipcRenderer.invoke('research:getReport', input),
+    getDiff: (input: { symbol: string }) => ipcRenderer.invoke('research:getDiff', input),
   },
   thesis: {
     list: (symbol?: string) => ipcRenderer.invoke('thesis:list', symbol),
@@ -256,6 +293,47 @@ const electronAPI: ElectronAPI = {
   onboarding: {
     getCompleted: () => ipcRenderer.invoke('onboarding:getCompleted'),
     setCompleted: (input: { completed: boolean }) => ipcRenderer.invoke('onboarding:setCompleted', input),
+  },
+  screening: {
+    run: (input: unknown) => ipcRenderer.invoke('screening:run', input),
+    listRuns: () => ipcRenderer.invoke('screening:listRuns'),
+    getRun: (input: { runId: string }) => ipcRenderer.invoke('screening:getRun', input),
+  },
+  outcome: {
+    listOpinions: (input: { symbol?: string }) => ipcRenderer.invoke('outcome:listOpinions', input),
+    listOutcomes: (input: { symbol?: string }) => ipcRenderer.invoke('outcome:listOutcomes', input),
+    evaluateDue: () => ipcRenderer.invoke('outcome:evaluateDue'),
+  },
+  portfolioImport: {
+    parse: (input: { source: string; text: string }) => ipcRenderer.invoke('import:parse', input),
+    confirm: (input: unknown) => ipcRenderer.invoke('import:confirm', input),
+    listManual: () => ipcRenderer.invoke('portfolio:listManual'),
+  },
+  pulse: {
+    snapshot: (input: unknown) => ipcRenderer.invoke('pulse:snapshot', input),
+  },
+  performance: {
+    skill: (input: { horizon: string }) => ipcRenderer.invoke('performance:skill', input),
+    strategy: (input: { horizon: string }) => ipcRenderer.invoke('performance:strategy', input),
+  },
+  automation: {
+    listRules: () => ipcRenderer.invoke('automation:listRules'),
+    saveRule: (input: { rule: unknown }) => ipcRenderer.invoke('automation:saveRule', input),
+    removeRule: (input: { ruleId: string }) => ipcRenderer.invoke('automation:removeRule', input),
+    runRule: (input: { ruleId: string }) => ipcRenderer.invoke('automation:runRule', input),
+    listRuns: () => ipcRenderer.invoke('automation:listRuns'),
+    buildBrief: () => ipcRenderer.invoke('automation:buildBrief'),
+    onNotification: (callback: (event: unknown) => void) => {
+      const listener = (_event: unknown, event: unknown) => callback(event);
+      ipcRenderer.on('notification:event', listener);
+      return () => {
+        ipcRenderer.removeListener('notification:event', listener);
+      };
+    },
+  },
+  export: {
+    markdown: (input: { reportId: string }) => ipcRenderer.invoke('export:markdown', input),
+    shareCard: (input: { reportId: string }) => ipcRenderer.invoke('export:shareCard', input),
   },
 };
 

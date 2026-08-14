@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 import type { Holding, PortfolioAccount, PortfolioFailure, PortfolioSnapshot } from '@finagent/core';
 import type { FinagentClient } from '../client';
 import { portfolioFailureFromError, portfolioFailureFromSnapshot } from '../lib/portfolioFailure';
+import { manualPortfoliosAtom } from './portfolioImportAtoms';
 
 const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
@@ -68,6 +69,24 @@ export const isPortfolioStaleAtom = atom((get) => {
 /** Selected account id; `null` = "All accounts" (the combined overview). */
 export const selectedAccountIdAtom = atom<string | null>(null);
 
+// ── Manual portfolio accounts (spec §49) ────────────────────────────────────
+// Manual portfolios share the broker account selector via a `manual:` id
+// prefix. `portfolioViewAtom` routes those selections to the manual portfolio
+// data instead of the broker snapshot; the two are never merged.
+
+/** Account-id prefix selecting a manual portfolio. */
+export const MANUAL_ACCOUNT_PREFIX = 'manual:';
+
+/** True when an account id selects a manual portfolio. */
+export function isManualAccountId(id: string | null): id is string {
+  return id !== null && id.startsWith(MANUAL_ACCOUNT_PREFIX);
+}
+
+/** Selector value for a manual portfolio account. */
+export function manualAccountId(portfolioId: string): string {
+  return `${MANUAL_ACCOUNT_PREFIX}${portfolioId}`;
+}
+
 /** Derive the market (US/HK/…) from a symbol suffix, e.g. `1810.HK` → `HK`. */
 export function holdingMarket(symbol: string): string | undefined {
   const dot = symbol.lastIndexOf('.');
@@ -90,10 +109,42 @@ export interface PortfolioView {
 }
 
 export const portfolioViewAtom = atom<PortfolioView | null>((get) => {
+  const selectedId = get(selectedAccountIdAtom);
+
+  // A manual-portfolio selection renders from manual data — no broker
+  // snapshot involved (spec §49: manual and broker accounts stay separate).
+  if (isManualAccountId(selectedId)) {
+    const portfolio = get(manualPortfoliosAtom).portfolios.find(
+      (p) => p.id === selectedId.slice(MANUAL_ACCOUNT_PREFIX.length)
+    );
+    if (!portfolio) return null;
+    const snapshot: PortfolioSnapshot = {
+      accounts: [],
+      holdings: portfolio.holdings,
+      fetchedAt: portfolio.updatedAt,
+      ...(portfolio.currency !== undefined ? { baseCurrency: portfolio.currency } : {}),
+    };
+    return {
+      snapshot,
+      accounts: [],
+      account: {
+        id: selectedId,
+        name: portfolio.name,
+        ...(portfolio.currency !== undefined ? { currency: portfolio.currency } : {}),
+      },
+      holdings: portfolio.holdings,
+      baseCurrency: portfolio.currency,
+      totalAssets: undefined,
+      marketValue: undefined,
+      cash: undefined,
+      totalPnL: undefined,
+      todayPnL: undefined,
+    };
+  }
+
   const snapshot = get(portfolioCacheAtom).data;
   if (!snapshot) return null;
 
-  const selectedId = get(selectedAccountIdAtom);
   const account = selectedId === null
     ? null
     : snapshot.accounts.find((a) => a.id === selectedId) ?? null;

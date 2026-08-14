@@ -33,14 +33,16 @@ export type NavSection =
   | 'thesis'
   | 'compare'
   // Folio V4 "Today" dashboard (spec §31–32) — mounted by the Lead.
-  | 'today';
+  | 'today'
+  // Folio V5 "Discover" (spec §4–5) — mounted by the Lead.
+  | 'discover';
 
 export const navSectionAtom = atom<NavSection>('sessions');
 
 /** Whether the Agent Panel is visible (collapse/expand in the shell). */
 export const agentPanelVisibleAtom = atom<boolean>(true);
 /** Active tab within the Settings section. */
-export type SettingsTab = 'general' | 'llm' | 'connections' | 'skills' | 'diagnostics';
+export type SettingsTab = 'general' | 'llm' | 'connections' | 'skills' | 'diagnostics' | 'performance';
 
 /** Which Settings tab is selected (drives SettingsView and the ErrorBoundary fallback). */
 export const settingsTabAtom = atom<SettingsTab>('general');

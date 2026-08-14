@@ -19,6 +19,11 @@ const NAV_ITEMS: Array<{ key: NavSection; label: string; path: string }> = [
     path: 'M2.5 8.5h11a3 3 0 0 1-3 3h-5a3 3 0 0 1-3-3zM2.5 8.5a3 3 0 0 1 3-3h5a3 3 0 0 1 3 3M8 3.5V2M5 3.5V2M11 3.5V2',
   },
   {
+    key: 'discover',
+    label: 'Discover',
+    path: 'M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zm0 2v3.5l2.3 1.4',
+  },
+  {
     key: 'portfolio',
     label: 'Portfolio',
     path: 'M2.5 5.5h11v8h-11zM6 5.5V4a1.5 1.5 0 0 1 1.5-1.5h1A1.5 1.5 0 0 1 10 4v1.5',

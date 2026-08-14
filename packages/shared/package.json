@@ -9,8 +9,10 @@
     "./capabilities": "./src/capabilities/index.ts",
     "./resources": "./src/resources/index.ts",
     "./thesis": "./src/thesis/index.ts",
+    "./research-diff": "./src/research-diff/index.ts",
     "./compare": "./src/compare/index.ts",
     "./portfolio-risk": "./src/portfolio-risk/index.ts",
+    "./portfolio-import": "./src/portfolio-import/index.ts",
     "./diagnostics": "./src/diagnostics/index.ts",
     "./providers/longbridge": "./src/providers/longbridge/index.ts",
     "./providers/massive": "./src/providers/massive/index.ts"

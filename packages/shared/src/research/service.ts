@@ -1,6 +1,13 @@
-import type { CapabilityRegistry, ResearchReport, ResearchRunSummary, ResearchSynthesizer } from '@finagent/core';
+import type {
+  CapabilityRegistry,
+  ResearchReport,
+  ResearchRunSummary,
+  ResearchSynthesizer,
+  StrategyId,
+} from '@finagent/core';
 import { createCodeError } from '../agent/errors.ts';
-import { planCapabilities } from './planner.ts';
+import { isStrategyId } from '../strategies/presets.ts';
+import { planForStrategy } from './planner.ts';
 import { ResearchReportRepository } from './repository.ts';
 import { ResearchRunner } from './runner.ts';
 
@@ -9,6 +16,8 @@ export interface ResearchServiceOptions {
   synthesizer: ResearchSynthesizer;
   repository: ResearchReportRepository;
   now?: () => number;
+  /** V5: called after a report is persisted (opinion creation hook). */
+  onReport?: (report: ResearchReport) => Promise<void> | void;
 }
 
 interface ActiveRun {
@@ -28,6 +37,7 @@ export class ResearchService {
   private readonly repository: ResearchReportRepository;
   private readonly now: () => number;
   private readonly runner: ResearchRunner;
+  private readonly onReport?: (report: ResearchReport) => Promise<void> | void;
 
   private readonly active = new Map<string, ActiveRun>();
   private readonly memory = new Map<string, ResearchRunSummary>();
@@ -38,6 +48,7 @@ export class ResearchService {
     this.synthesizer = options.synthesizer;
     this.repository = options.repository;
     this.now = options.now ?? Date.now;
+    this.onReport = options.onReport;
     this.runner = new ResearchRunner({
       registry: this.registry,
       synthesizer: this.synthesizer,
@@ -48,10 +59,16 @@ export class ResearchService {
     void this.recoverStaleRuns();
   }
 
-  async start(symbol: string): Promise<ResearchRunSummary> {
+  async start(symbol: string, strategyId?: StrategyId): Promise<ResearchRunSummary> {
     const key = normalizeSymbol(symbol);
     if (!key) {
       throw createCodeError('RESEARCH_SYMBOL_INVALID', 'Research requires a non-empty symbol.');
+    }
+    if (strategyId !== undefined && !isStrategyId(strategyId)) {
+      throw createCodeError(
+        'RESEARCH_STRATEGY_INVALID',
+        `Unknown research strategy: ${String(strategyId)}.`
+      );
     }
     if (this.active.has(key)) {
       throw createCodeError(
@@ -66,7 +83,7 @@ export class ResearchService {
       symbol: key,
       status: 'queued',
       startedAt: this.now(),
-      plannedCapabilities: planCapabilities(key, this.registry).map((p) => p.capabilityId),
+      plannedCapabilities: planForStrategy(strategyId, this.registry).map((p) => p.capabilityId),
       completedCapabilities: [],
       failedCapabilities: [],
     };
@@ -76,7 +93,7 @@ export class ResearchService {
     this.memory.set(runId, summary);
     await this.repository.saveRunSummary(summary);
 
-    void this.execute(key, runId, controller.signal);
+    void this.execute(key, runId, controller.signal, strategyId);
     return summary;
   }
 
@@ -118,11 +135,17 @@ export class ResearchService {
     return [...merged.values()].sort((a, b) => b.startedAt - a.startedAt);
   }
 
-  private async execute(key: string, runId: string, signal: AbortSignal): Promise<void> {
+  private async execute(
+    key: string,
+    runId: string,
+    signal: AbortSignal,
+    strategyId?: StrategyId
+  ): Promise<void> {
     try {
       const result = await this.runner.run({
         symbol: key,
         runId,
+        strategyId,
         signal,
         onStatus: async (summary) => {
           this.memory.set(runId, summary);
@@ -132,6 +155,7 @@ export class ResearchService {
       this.memory.set(runId, result.summary);
       if (result.report) {
         await this.repository.saveReport(result.report);
+        await this.onReport?.(result.report);
       }
     } finally {
       this.active.delete(key);

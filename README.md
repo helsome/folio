@@ -40,6 +40,17 @@ AI-native investment research workbench. A desktop app that combines a professio
 - **Data freshness (spec §34)** — quote header, chart (last bar), watchlist, compare, and portfolio all show a `Longbridge · Updated HH:MM:SS` line from the data's own timestamp; nothing is ever presented as fresher than it is.
 - **Release pipeline** — `bun run release:check` (unit, typecheck, build, E2E, package, packaged smoke), `release:package` (DMG + SHA256SUMS), CI `release.yml` on `v*` tags with signing/notarization behind secrets, About view (version/channel/build), semver + channel metadata.
 
+### V5 — Discover, Automation & Learning Loop
+- **Discover / Screener** — sidebar entry with 17 deterministic screening tasks (market movers, fundamental, technical, events) over a bounded universe; every candidate carries reasons, metrics, and evidence run ids; actions flow into Research (strategy carried forward), Compare, and Watch; runs are persisted as history.
+- **Research Strategies** — 8 product-facing presets (Comprehensive / Value / Growth / Technical / Earnings / Event Driven / Risk Review / Income) mapping to real skills + capabilities; the strategy rides the research run and is persisted on the report.
+- **Research Diff** — re-researching a symbol builds a structured What Changed view (verdict flips, valuation/rating moves, new risks, confidence deltas) with deterministic materiality; thesis impact is derived from the diff.
+- **Scheduled Research & Daily Brief** — five automations (watchlist daily review, portfolio brief, weekly thesis review, pre/post earnings) with material-change filtering: lightweight refresh first, expensive research only for material symbols, notifications for the rest; Today shows the Daily Brief with explainable sources (Portfolio / Watchlist / Thesis / Alert / Automation).
+- **Outcome Evaluation** — every report snapshots a ResearchOpinion (stance, confidence, horizon, entry snapshot); at horizon end the Outcome Engine scores it against historical prices (bullish→positive, bearish→negative, neutral→bounded, versioned); Skill/Strategy Performance views aggregate with a 30-sample minimum gate (Observational Only below).
+- **Market Pulse & Personal Impact** — indices/status/temperature/movers on Today, plus what-matters-to-me exposure for watchlist/portfolio symbols.
+- **Portfolio Import** — CSV/paste → draft with confidence + issues → confirm screen → manual portfolio account (separate from broker accounts) in the Account Selector.
+- **Report Export** — Markdown + share card (SVG + text) with privacy redaction (no portfolio/account data).
+- **Test architecture** — four-level pyramid (unit → integration → hidden Electron → visible release); `FINAGENT_E2E_HIDDEN=1` by default, `FINAGENT_E2E_VISIBLE=1` / `FINAGENT_E2E_KEEP_OPEN=1` for debugging; root scripts `test:unit|integration|ui|e2e|e2e:visible|package-smoke|release`.
+
 ## Architecture
 
 ```
@@ -106,7 +117,7 @@ FINAGENT_AGENT_PROVIDER=local bun run dev
 
 ## Status & known limitations
 
-- Unit + integration: **507 tests green**. Typecheck green. E2E golden path A–H green; interaction audit (59 controls) + skills-interactions (9) green; **fresh-install E2E green** (clean userData → onboarding wizard → disclaimer gating → skip → workbench → restart → state preserved, against the packaged app). Packaged smoke green (20 capability tools, 13 skills, local run completes outside the source repo). DMG + checksums build via `bun run release:package`.
+- Unit + integration: **887 tests green**. Typecheck green. E2E golden path A–H green; interaction audit + skills interactions green; fresh-install e2e green (packaged). `bun run release:check` runs all 7 release gates.
 - **Beta status**: all §64 release blockers closed; see `docs/release-gates.md` for the gate checklist and `docs/provider-b-decision.md` for the secondary-provider licensing decision.
 - Packaging: unsigned build (signing/notarization need Apple credentials; CI release workflow is secrets-gated and marks unsigned builds `NOT RELEASEABLE`); `electronDist` is pinned to the local install so packaging works without network.
 - The agent-backed synthesizers (research/thesis/risk) use the configured Pi runtime; with `FINAGENT_AGENT_PROVIDER=local` they degrade to deterministic local implementations.

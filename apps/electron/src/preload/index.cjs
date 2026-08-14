@@ -86,7 +86,8 @@ var electronAPI = {
     listRuns: () => import_electron.ipcRenderer.invoke("research:listRuns"),
     getRun: (input) => import_electron.ipcRenderer.invoke("research:getRun", input),
     listReports: (input) => import_electron.ipcRenderer.invoke("research:listReports", input),
-    getReport: (input) => import_electron.ipcRenderer.invoke("research:getReport", input)
+    getReport: (input) => import_electron.ipcRenderer.invoke("research:getReport", input),
+    getDiff: (input) => import_electron.ipcRenderer.invoke("research:getDiff", input)
   },
   thesis: {
     list: (symbol) => import_electron.ipcRenderer.invoke("thesis:list", symbol),
@@ -160,6 +161,47 @@ var electronAPI = {
   onboarding: {
     getCompleted: () => import_electron.ipcRenderer.invoke("onboarding:getCompleted"),
     setCompleted: (input) => import_electron.ipcRenderer.invoke("onboarding:setCompleted", input)
+  },
+  screening: {
+    run: (input) => import_electron.ipcRenderer.invoke("screening:run", input),
+    listRuns: () => import_electron.ipcRenderer.invoke("screening:listRuns"),
+    getRun: (input) => import_electron.ipcRenderer.invoke("screening:getRun", input)
+  },
+  outcome: {
+    listOpinions: (input) => import_electron.ipcRenderer.invoke("outcome:listOpinions", input),
+    listOutcomes: (input) => import_electron.ipcRenderer.invoke("outcome:listOutcomes", input),
+    evaluateDue: () => import_electron.ipcRenderer.invoke("outcome:evaluateDue")
+  },
+  portfolioImport: {
+    parse: (input) => import_electron.ipcRenderer.invoke("import:parse", input),
+    confirm: (input) => import_electron.ipcRenderer.invoke("import:confirm", input),
+    listManual: () => import_electron.ipcRenderer.invoke("portfolio:listManual")
+  },
+  pulse: {
+    snapshot: (input) => import_electron.ipcRenderer.invoke("pulse:snapshot", input)
+  },
+  performance: {
+    skill: (input) => import_electron.ipcRenderer.invoke("performance:skill", input),
+    strategy: (input) => import_electron.ipcRenderer.invoke("performance:strategy", input)
+  },
+  automation: {
+    listRules: () => import_electron.ipcRenderer.invoke("automation:listRules"),
+    saveRule: (input) => import_electron.ipcRenderer.invoke("automation:saveRule", input),
+    removeRule: (input) => import_electron.ipcRenderer.invoke("automation:removeRule", input),
+    runRule: (input) => import_electron.ipcRenderer.invoke("automation:runRule", input),
+    listRuns: () => import_electron.ipcRenderer.invoke("automation:listRuns"),
+    buildBrief: () => import_electron.ipcRenderer.invoke("automation:buildBrief"),
+    onNotification: (callback) => {
+      const listener = (_event, event) => callback(event);
+      import_electron.ipcRenderer.on("notification:event", listener);
+      return () => {
+        import_electron.ipcRenderer.removeListener("notification:event", listener);
+      };
+    }
+  },
+  export: {
+    markdown: (input) => import_electron.ipcRenderer.invoke("export:markdown", input),
+    shareCard: (input) => import_electron.ipcRenderer.invoke("export:shareCard", input)
   }
 };
 import_electron.contextBridge.exposeInMainWorld("electronAPI", electronAPI);

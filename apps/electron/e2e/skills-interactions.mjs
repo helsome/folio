@@ -31,6 +31,20 @@ const electronBinary = join(
 const CDP_PORT = 9338;
 const CDP_URL = `http://127.0.0.1:${CDP_PORT}`;
 
+// FINAGENT_E2E_KEEP_OPEN=1 — debugging only, NEVER in automated runs: leave
+// the app running when the harness finishes and print where it is, instead of
+// killing it. Automated runs/CI rely on the harness cleaning up its port.
+const KEEP_OPEN = process.env.FINAGENT_E2E_KEEP_OPEN === '1';
+function shutdown(appProcess) {
+  if (KEEP_OPEN) {
+    console.log(
+      `KEEP_OPEN CDP port ${CDP_PORT} — app left running; clean up yourself: pkill -f 'remote-debugging-port=${CDP_PORT}'`
+    );
+    return
+  }
+  appProcess.kill()
+}
+
 let failures = 0;
 function pass(name) {
   console.log(`PASS  ${name}`);
@@ -93,6 +107,7 @@ async function main() {
         ...process.env,
         FINAGENT_AGENT_PROVIDER: 'local',
         FINAGENT_FORCE_PROD_LOAD: '1',
+        FINAGENT_E2E: '1',
         FINAGENT_E2E_HIDDEN: '1',
         FINAGENT_USER_DATA_DIR: userDataDir,
       },
@@ -267,7 +282,7 @@ async function main() {
     fail('harness setup', error);
   } finally {
     await browser?.close().catch(() => undefined);
-    electronProcess.kill();
+    shutdown(electronProcess)
   }
 
   if (failures > 0) {

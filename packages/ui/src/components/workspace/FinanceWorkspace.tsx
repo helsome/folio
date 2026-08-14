@@ -15,6 +15,7 @@ import { ResearchPanel } from '../research/ResearchPanel';
 import { ThesisPanel } from '../thesis/ThesisPanel';
 import { CompareWorkspace } from '../compare/CompareWorkspace';
 import { TodayView } from '../today/TodayView';
+import { DiscoverView } from '../discover/DiscoverView';
 const WORKSPACE_TABS: { value: WorkspaceView; label: string }[] = [
   { value: 'overview', label: 'Overview' },
   { value: 'chart', label: 'Chart' },
@@ -29,6 +30,9 @@ export const FinanceWorkspace: React.FC = () => {
 
   let content: React.ReactNode;
   switch (navSection) {
+    case 'discover':
+      content = <DiscoverView />;
+      break;
     case 'today':
       content = <TodayView />;
       break;

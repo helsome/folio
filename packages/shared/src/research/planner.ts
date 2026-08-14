@@ -1,4 +1,5 @@
-import type { CapabilityRegistry } from '@finagent/core';
+import type { CapabilityRegistry, StrategyId } from '@finagent/core';
+import { strategyCapabilityIds } from '../strategies/planner.ts';
 
 /**
  * Ordered capability plan for a Deep Research run. Fixed so reports are
@@ -55,4 +56,35 @@ export function planCapabilities(
     capabilityId,
     available: registered.has(capabilityId),
   }));
+}
+
+/**
+ * Build the ordered plan for a strategy (V5). `strategyId` undefined keeps
+ * the legacy fixed plan (`basePlan`, default `RESEARCH_CAPABILITY_PLAN`); a
+ * strategy id resolves to that strategy's capability list, which is always a
+ * subset of the comprehensive plan in canonical order.
+ */
+export function planForStrategy(
+  strategyId: StrategyId | undefined,
+  registry: CapabilityRegistry,
+  basePlan: readonly string[] = RESEARCH_CAPABILITY_PLAN
+): PlannedCapability[] {
+  const ids = strategyCapabilityIds(strategyId, basePlan);
+  const registered = new Set(registry.list().map((cap) => cap.id));
+  return ids.map((capabilityId) => ({
+    capabilityId,
+    available: registered.has(capabilityId),
+  }));
+}
+
+/**
+ * Runner-style input for a planned capability. Most capabilities are
+ * symbol-scoped; `research.events` (finance calendar) requires a structured
+ * query instead of a bare symbol.
+ */
+export function buildCapabilityInput(capabilityId: string, symbol: string): unknown {
+  if (capabilityId === 'research.events') {
+    return { eventType: 'financial', symbols: [symbol] };
+  }
+  return { symbol };
 }

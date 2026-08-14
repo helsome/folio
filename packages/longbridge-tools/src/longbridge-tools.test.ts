@@ -24,7 +24,12 @@ const {
   getKline,
   getPortfolio,
   getQuote,
+  parseCalcIndexResponse,
+  parseKlineResponse,
+  parseMarketStatusResponse,
+  parseNewsResponse,
   parseQuoteResponse,
+  parseStaticInfoResponse,
 } = await import('./index');
 
 const quoteJson = JSON.stringify({
@@ -234,6 +239,30 @@ describe('LongBridge errors', () => {
         name: 'LongBridgeError',
         code: 'LONGBRIDGE_PARSE_FAILURE',
       });
+    }
+  });
+
+  it('never leaks raw CLI output into parse-failure messages (spec §64 blocker #1)', () => {
+    const garbage = '<html><body>rate limited \u00b7 <script>window.x=1</script></body></html>';
+    for (const parse of [
+      () => parseQuoteResponse(garbage),
+      () => parseKlineResponse(garbage),
+      () => parseNewsResponse(garbage),
+      () => parseStaticInfoResponse(garbage),
+      () => parseCalcIndexResponse(garbage),
+      () => parseMarketStatusResponse(garbage),
+    ]) {
+      try {
+        parse();
+        expect.unreachable?.('expected a parse failure');
+      } catch (error) {
+        const lbError = error as LongBridgeError;
+        expect(lbError).toBeInstanceOf(LongBridgeError);
+        expect(lbError.code).toBe('LONGBRIDGE_PARSE_FAILURE');
+        expect(lbError.message).not.toContain('rate limited');
+        expect(lbError.message).not.toContain('<html>');
+        expect(lbError.debug).toContain('rate limited');
+      }
     }
   });
 });

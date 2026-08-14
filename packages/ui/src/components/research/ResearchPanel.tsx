@@ -1,7 +1,8 @@
 import React, { useEffect, useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
-import type { ResearchRunSummary, ResearchReport } from '@finagent/core';
+import type { ResearchRunSummary, ResearchReport, StrategyId } from '@finagent/core';
 import { activeSymbolAtom } from '../../atoms';
+import { pendingResearchStrategyAtom } from '../../atoms/discoverAtoms';
 import {
   researchRunsAtom,
   researchReportAtom,
@@ -15,6 +16,7 @@ import {
   TERMINAL_RUN_STATUSES,
 } from '../../atoms/researchAtoms';
 import { ResearchReportView } from './ResearchReportView';
+import { DEFAULT_STRATEGY_ID, StrategyPicker } from './StrategyPicker';
 
 const POLL_MS = 900;
 
@@ -26,6 +28,16 @@ export const ResearchPanel: React.FC = () => {
   const [report, setReport] = useAtom(researchReportAtom);
   const [loading, setLoading] = useAtom(researchLoadingAtom);
   const [error, setError] = useState<string | null>(null);
+  const [strategyId, setStrategyId] = useState<StrategyId>(DEFAULT_STRATEGY_ID);
+  const [pendingStrategy, setPendingStrategy] = useAtom(pendingResearchStrategyAtom);
+
+  // Discover → Research: a candidate card carries a recommended strategy.
+  useEffect(() => {
+    if (pendingStrategy) {
+      setStrategyId(pendingStrategy);
+      setPendingStrategy(null);
+    }
+  }, [pendingStrategy, setPendingStrategy]);
 
   useEffect(() => {
     void loadResearchRuns().then(setRuns);
@@ -79,7 +91,7 @@ export const ResearchPanel: React.FC = () => {
     setLoading(true);
     setError(null);
     try {
-      const started = await startResearch(symbol);
+      const started = await startResearch({ symbol, strategyId });
       if (started) {
         setRuns((current) => [started, ...current.filter((run) => run.id !== started.id)]);
       } else {
@@ -132,6 +144,12 @@ export const ResearchPanel: React.FC = () => {
       </div>
 
       {error && <div className="px-4 pt-3 text-[12.5px] text-negative">{error}</div>}
+
+      {symbol && !activeRun && (
+        <div className="px-4 pt-3">
+          <StrategyPicker value={strategyId} onChange={setStrategyId} />
+        </div>
+      )}
 
       <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
         {activeRun && (
