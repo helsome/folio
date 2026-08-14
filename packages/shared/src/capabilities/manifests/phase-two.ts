@@ -1,17 +1,14 @@
 import { Type } from '@sinclair/typebox';
-import type { FinanceCapability } from '@finagent/core';
+import type { AccountAssets, CashFlowRecord, FinanceCapability, Holding } from '@finagent/core';
 import type {
-  Assets,
   CalendarEvent,
   CapitalFlow,
-  CashFlowRecord,
   Depth,
   DividendRecord,
   EpsForecast,
   FinancialReport,
   InstitutionRating,
   MarketTemperature,
-  Position,
   TradeTick,
 } from '@finagent/longbridge-tools';
 import { defineCapability } from '../define.ts';
@@ -346,8 +343,8 @@ export function createResearchEventsCapability(
 
 export function createPortfolioPositionsCapability(
   fetchers: CapabilityFetchers = defaultCapabilityFetchers
-): FinanceCapability<Record<string, never>, Position[]> {
-  return defineCapability<Record<string, never>, Position[]>({
+): FinanceCapability<Record<string, never>, Holding[]> {
+  return defineCapability<Record<string, never>, Holding[]>({
     id: 'portfolio.positions',
     name: 'Positions',
     toolName: 'get_positions',
@@ -355,7 +352,7 @@ export function createPortfolioPositionsCapability(
     riskLevel: 'read',
     auth: 'account',
     description:
-      'Get the current stock positions across all sub-accounts: symbol, name, quantity, available quantity, cost price, currency, and market. Use this when the user asks about their holdings.',
+      'Get the current stock positions across all sub-accounts: symbol, name, quantity, available quantity, cost price, and currency. Use this when the user asks about their holdings.',
     inputSchema: Type.Object({}),
     async execute(_input, ctx) {
       const positions = await fetchers.getAccountPositions();
@@ -372,8 +369,8 @@ export function createPortfolioPositionsCapability(
 
 export function createPortfolioAssetsCapability(
   fetchers: CapabilityFetchers = defaultCapabilityFetchers
-): FinanceCapability<{ currency?: string }, Assets[]> {
-  return defineCapability<{ currency?: string }, Assets[]>({
+): FinanceCapability<{ currency?: string }, AccountAssets[]> {
+  return defineCapability<{ currency?: string }, AccountAssets[]>({
     id: 'portfolio.assets',
     name: 'Account Assets',
     toolName: 'get_assets',
@@ -392,7 +389,7 @@ export function createPortfolioAssetsCapability(
         data: assets,
         provenance: { provider: 'longbridge', fetchedAt: (ctx?.now ?? Date.now)(), stale: false },
         summary: primary
-          ? `Assets: net $${primary.netAssets.toFixed(2)}, cash $${primary.totalCash.toFixed(2)}, buy power $${primary.buyPower.toFixed(2)}.`
+          ? `Assets: net ${formatMoney(primary.netAssets, primary.currency)}, cash ${formatMoney(primary.totalCash, primary.currency)}, buy power ${formatMoney(primary.buyPower, primary.currency)}.`
           : 'No asset records returned.',
       };
     },
@@ -412,7 +409,7 @@ export function createPortfolioCashFlowCapability(
     riskLevel: 'read',
     auth: 'account',
     description:
-      'Get cash-flow records (deposits, withdrawals, dividends, settlements) with balances. Use this to review recent account money movements.',
+      'Get cash-flow records (deposits, withdrawals, dividends, settlements) with amounts. Use this to review recent account money movements.',
     inputSchema: Type.Object({
       start: Type.Optional(Type.String({ description: 'Start date (YYYY-MM-DD), default 30 days ago' })),
       end: Type.Optional(Type.String({ description: 'End date (YYYY-MM-DD), default today' })),
@@ -458,6 +455,18 @@ export function createPhaseTwoCapabilities(
 
 function fmt(value: number): string {
   return value.toLocaleString(undefined, { maximumFractionDigits: 0 });
+}
+
+const MONEY_CURRENCIES: Record<string, true> = { USD: true, HKD: true, CNY: true, SGD: true };
+
+function formatMoney(value: number | undefined, currency?: string): string {
+  if (value === undefined || !Number.isFinite(value)) return '—';
+  const code = (currency ?? '').trim().toUpperCase();
+  if (code !== '' && MONEY_CURRENCIES[code] === true) {
+    return new Intl.NumberFormat(undefined, { style: 'currency', currency: code }).format(value);
+  }
+  const number = value.toLocaleString(undefined, { maximumFractionDigits: 2 });
+  return code !== '' ? `${number} ${code}` : number;
 }
 
 function formatStatementNames(

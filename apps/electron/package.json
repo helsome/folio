@@ -1,7 +1,10 @@
 {
   "name": "@finagent/electron",
-  "version": "0.1.0",
+  "version": "0.4.0-beta.1",
   "private": true,
+  "folio": {
+    "channel": "beta"
+  },
   "type": "module",
   "main": "./src/main/index.js",
   "scripts": {
@@ -10,11 +13,15 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "test:e2e": "node e2e/run.mjs",
+    "test:interactions": "node e2e/interactions.mjs",
+    "test:skills-interactions": "node e2e/skills-interactions.mjs",
+    "test:fresh-install": "node e2e/fresh-install.mjs",
     "test:package-smoke": "node e2e/package-smoke.mjs",
     "build:preload": "bun build src/preload/index.ts --outfile src/preload/index.cjs --target node --format cjs --external electron",
     "build:main": "bun build src/main/index.ts --outfile src/main/index.js --bundle --target node --format esm --external electron",
     "build:extension": "bun build ../../.pi/extensions/finagent/index.ts --outfile build/extensions/finagent/index.js --bundle --target node --format esm",
-    "package": "bun run build && bun run build:extension && electron-builder"
+    "package": "bun run build && bun run build:extension && bun run package:builder",
+    "package:builder": "electron-builder"
   },
   "dependencies": {
     "@finagent/core": "workspace:*",
@@ -61,7 +68,10 @@
       }
     ],
     "mac": {
-      "target": "dir",
+      "target": [
+        "dir",
+        "dmg"
+      ],
       "icon": "assets/icon.icns",
       "identity": null
     }

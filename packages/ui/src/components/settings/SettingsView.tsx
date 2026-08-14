@@ -1,20 +1,23 @@
-import React, { useState } from 'react';
+import React from 'react';
+import { useAtom } from 'jotai';
+import type { SettingsTab } from '../../atoms';
+import { settingsTabAtom } from '../../atoms';
 import { GeneralTab } from './GeneralTab';
 import { ModelsTab } from './ModelsTab';
-import { LongbridgeTab } from './LongbridgeTab';
+import { ConnectionsCenter } from './ConnectionsCenter';
 import { SkillsView } from './SkillsView';
-
-type SettingsTab = 'general' | 'models' | 'longbridge' | 'skills';
+import { DiagnosticsTab } from './DiagnosticsTab';
 
 const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'general', label: 'General' },
-  { id: 'models', label: 'Models' },
-  { id: 'longbridge', label: 'Longbridge' },
+  { id: 'llm', label: 'LLM' },
+  { id: 'connections', label: 'Connections' },
   { id: 'skills', label: 'Skills' },
+  { id: 'diagnostics', label: 'Diagnostics' },
 ];
 
 export const SettingsView: React.FC = () => {
-  const [tab, setTab] = useState<SettingsTab>('general');
+  const [tab, setTab] = useAtom(settingsTabAtom);
 
   return (
     <main className="mac-main-surface flex h-full flex-1 flex-col">
@@ -39,9 +42,10 @@ export const SettingsView: React.FC = () => {
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         {tab === 'general' && <GeneralTab />}
-        {tab === 'models' && <ModelsTab />}
-        {tab === 'longbridge' && <LongbridgeTab />}
+        {tab === 'llm' && <ModelsTab />}
+        {tab === 'connections' && <ConnectionsCenter />}
         {tab === 'skills' && <SkillsView />}
+        {tab === 'diagnostics' && <DiagnosticsTab />}
       </div>
     </main>
   );

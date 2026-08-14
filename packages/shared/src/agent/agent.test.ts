@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { Kline, Portfolio, Quote } from '@finagent/core';
+import type { Kline, PortfolioSnapshot, Quote } from '@finagent/core';
 import { LocalFinanceAgentBackend } from './local-finance-agent-backend.ts';
 import { MarketDataService } from './market-data-service.ts';
 import { routeFinanceIntent } from './intent-router.ts';
@@ -39,21 +39,26 @@ const klineUp: Kline = {
   close: 202,
 };
 
-const portfolio: Portfolio = {
-  totalValue: 10000,
+const portfolio: PortfolioSnapshot = {
+  baseCurrency: 'USD',
+  totalAssets: 10000,
   cash: 1500,
-  positions: [
+  accounts: [],
+  holdings: [
     {
       symbol: 'AAPL.US',
       name: 'Apple',
+      currency: 'USD',
       quantity: 10,
-      avgCost: 180,
-      lastPrice: 200,
+      costPrice: 180,
+      marketPrice: 200,
       marketValue: 2000,
+      marketValueBase: 2000,
       unrealizedPnL: 200,
       unrealizedPnLPercent: 11.11,
     },
   ],
+  fetchedAt: 0,
 };
 
 describe('routeFinanceIntent', () => {

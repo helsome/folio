@@ -129,6 +129,37 @@ var electronAPI = {
     listResources: (skillId) => import_electron.ipcRenderer.invoke("skills:listResources", skillId),
     readResource: (skillId, relativePath) => import_electron.ipcRenderer.invoke("skills:readResource", skillId, relativePath),
     readiness: () => import_electron.ipcRenderer.invoke("skills:readiness")
+  },
+  about: {
+    get: () => import_electron.ipcRenderer.invoke("app:about")
+  },
+  diagnostics: {
+    collect: () => import_electron.ipcRenderer.invoke("diagnostics:collect"),
+    export: () => import_electron.ipcRenderer.invoke("diagnostics:export")
+  },
+  health: {
+    check: () => import_electron.ipcRenderer.invoke("health:check")
+  },
+  openExternal: (url) => import_electron.ipcRenderer.invoke("openExternal", url),
+  connections: {
+    list: () => import_electron.ipcRenderer.invoke("connections:list"),
+    connect: (input) => import_electron.ipcRenderer.invoke("connections:connect", input),
+    cancelConnect: (input) => import_electron.ipcRenderer.invoke("connections:cancelConnect", input),
+    disconnect: (input) => import_electron.ipcRenderer.invoke("connections:disconnect", input),
+    test: (input) => import_electron.ipcRenderer.invoke("connections:test", input),
+    setConfig: (input) => import_electron.ipcRenderer.invoke("connections:setConfig", input),
+    coverage: () => import_electron.ipcRenderer.invoke("connections:coverage"),
+    onChanged: (callback) => {
+      const listener = (_event, entries) => callback(entries);
+      import_electron.ipcRenderer.on("connections:changed", listener);
+      return () => {
+        import_electron.ipcRenderer.removeListener("connections:changed", listener);
+      };
+    }
+  },
+  onboarding: {
+    getCompleted: () => import_electron.ipcRenderer.invoke("onboarding:getCompleted"),
+    setCompleted: (input) => import_electron.ipcRenderer.invoke("onboarding:setCompleted", input)
   }
 };
 import_electron.contextBridge.exposeInMainWorld("electronAPI", electronAPI);

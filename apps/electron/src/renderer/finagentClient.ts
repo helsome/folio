@@ -108,6 +108,35 @@ function createElectronClient(): FinagentClient {
         ipcResult(window.electronAPI.skills.readResource(skillId, relativePath)),
       readiness: () => ipcResult(window.electronAPI.skills.readiness()),
     },
+    about: {
+      get: () => ipcResult(window.electronAPI.about.get()),
+    },
+    diagnostics: {
+      collect: () => ipcResult(window.electronAPI.diagnostics.collect()),
+      export: () => ipcResult(window.electronAPI.diagnostics.export()),
+    },
+    health: {
+      check: () => ipcResult(window.electronAPI.health.check()),
+    },
+    openExternal: (url) => ipcResult(window.electronAPI.openExternal(url)),
+    connections: {
+      list: () => ipcResult(window.electronAPI.connections.list()),
+      connect: (providerId) => ipcResult(window.electronAPI.connections.connect({ providerId })),
+      cancelConnect: (providerId) => ipcResult(window.electronAPI.connections.cancelConnect({ providerId })),
+      disconnect: (providerId) => ipcResult(window.electronAPI.connections.disconnect({ providerId })),
+      test: (providerId) => ipcResult(window.electronAPI.connections.test({ providerId })),
+      setConfig: (providerId, config) => ipcResult(window.electronAPI.connections.setConfig({ providerId, config })),
+      coverage: () => ipcResult(window.electronAPI.connections.coverage()),
+      onChanged: (callback) =>
+        window.electronAPI.connections.onChanged((entries) =>
+          callback(entries as Parameters<typeof callback>[0])
+        ),
+    },
+    onboarding: {
+      getCompleted: () => ipcResult(window.electronAPI.onboarding.getCompleted()),
+      setCompleted: (completed: boolean) =>
+        ipcResult(window.electronAPI.onboarding.setCompleted({ completed })),
+    },
   };
 }
 

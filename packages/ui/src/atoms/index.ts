@@ -5,3 +5,4 @@ export * from './portfolioAtoms';
 export * from './alertAtoms';
 export * from './workspaceAtoms';
 export * from './llmAtoms';
+export * from './onboardingAtoms';

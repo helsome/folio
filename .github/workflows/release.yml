@@ -1,0 +1,98 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  release:
+    runs-on: macos-latest
+    timeout-minutes: 60
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      - name: Unit/integration tests
+        run: bun test
+
+      - name: Typecheck
+        run: bun run typecheck
+
+      - name: Build
+        run: bun run build
+
+      - name: Electron E2E (local provider)
+        working-directory: apps/electron
+        run: bun run test:e2e
+        env:
+          FINAGENT_AGENT_PROVIDER: local
+
+      # Signing/notarization are opt-in: a build is only releaseable when every
+      # Apple secret is present. The values are consumed below; never echo them.
+      - name: Classify build (signed vs internal)
+        id: buildtype
+        run: |
+          if [ -n "$APPLE_CERTIFICATE_BASE64" ] && [ -n "$APPLE_CERT_PASSWORD" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
+            echo "internal=false" >> "$GITHUB_OUTPUT"
+            echo "channel=beta" >> "$GITHUB_OUTPUT"
+          else
+            echo "internal=true" >> "$GITHUB_OUTPUT"
+            echo "channel=internal" >> "$GITHUB_OUTPUT"
+          fi
+        env:
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Package (DMG + checksums)
+        run: bun run release:package
+        env:
+          FINAGENT_BUILD_SHA: ${{ github.sha }}
+          FINAGENT_CHANNEL: ${{ steps.buildtype.outputs.channel }}
+          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+          APPLE_ID: ${{ secrets.APPLE_ID }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
+
+      - name: Packaged smoke
+        working-directory: apps/electron
+        run: bun run test:package-smoke
+
+      - name: Verify checksums
+        working-directory: dist/release
+        run: shasum -a 256 -c SHA256SUMS.txt
+
+      - name: Write release notes
+        run: |
+          if [ "${{ steps.buildtype.outputs.internal }}" = "true" ]; then
+            printf '%s\n\n%s\n' "# Folio ${{ github.ref_name }}" "INTERNAL BUILD — NOT RELEASEABLE" > release-notes.md
+          else
+            printf '%s\n\n%s\n' "# Folio ${{ github.ref_name }}" "Signed and notarized." > release-notes.md
+          fi
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            dist/release/*.dmg
+            dist/release/SHA256SUMS.txt
+          body_path: release-notes.md
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

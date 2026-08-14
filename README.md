@@ -28,6 +28,17 @@ AI-native investment research workbench. A desktop app that combines a professio
 - **Portfolio Risk Center** — allocation, concentration (top-1/top-5/Herfindahl), risk signals (concentration, large positions, upcoming earnings, news exposure, drawdown) with an agent-written summary.
 - **Packaged app** — `bun run package` produces a self-contained `Folio.app` that loads skills, the Pi extension, and market data from outside the source repo (resource locator + `extraResources`).
 
+### V4 — Release Candidate & Financial Provider Platform
+- **Financial Provider Platform** — market data and brokerage accounts are separate domains: `FinancialDataProvider` (capability-based `execute`) and `BrokerAccountProvider` (portfolio/positions/assets/cash flow), both returning `ProviderResult` with honest provenance (real provider id, fetched time, delayed/stale flags). A `ProviderRouter` (primary + optional fallback) serves every capability; the registry, agent tools, research, alerts, compare, and risk all execute through it — no business layer imports a vendor directly.
+- **Longbridge connector** — first-class Connections entry: CLI detection, in-app device-authorization login (verification URL → browser → poll), health probes, permission parsing from `quote_level` (per-market entitlements, delayed-only → Permission Limited), disconnect, and a capability coverage matrix.
+- **Massive (Polygon.io) adapter** — secondary market-data provider (quote/kline/profile, US, BYOK API key, fallback slot) proving the router architecture; licensing-first decision in `docs/provider-b-decision.md`.
+- **Portfolio reliability** — real-CLI shape normalized into a provider-neutral `PortfolioSnapshot` (multi-currency, unicode names, per-account data, optional numerics); distinct empty/partial/error states; never NaN / `[object Object]` / raw CLI output in the UI.
+- **Skills Center** — search + status filters, detail drawer (capabilities ✓/✕, triggers, references, version/author), optimistic toggles with rollback and visible errors, raw markdown moved to Advanced/Developer details.
+- **Onboarding & Connections Center** — first-run wizard (welcome/disclaimers → Connect AI → financial data → optional broker → environment health check), one-time disclaimers (re-accessible in Settings/About), completion persisted in the main process; Connections tab with status cards, capability matrix, and BYOK key entry.
+- **Today + ⌘K** — lightweight home (portfolio snapshot, watchlist movers, triggered alerts, upcoming events, recent research, theses needing review, quick actions) and a command palette for symbols/navigation/actions.
+- **Diagnostics & recovery** — Settings → Diagnostics (version, platform, runtimes, providers, skills, capabilities, resource location, last errors), redacted support-bundle export (keys/tokens/credentials never included), workspace-level React error boundaries with Retry / Open Diagnostics.
+- **Release pipeline** — `bun run release:check` (unit, typecheck, build, E2E, package, packaged smoke), `release:package` (DMG + SHA256SUMS), CI `release.yml` on `v*` tags with signing/notarization behind secrets, About view (version/channel/build), semver + channel metadata.
+
 ## Architecture
 
 ```
@@ -94,9 +105,11 @@ FINAGENT_AGENT_PROVIDER=local bun run dev
 
 ## Status & known limitations
 
-- Unit + integration: 324 tests green. Typecheck green. E2E golden path A–H green (workbench → Deep Research → evidence-backed report → thesis → compare → portfolio risk, real Longbridge data). Packaged-app smoke green (20 capability tools, 13 skills, local run completes outside the source repo).
-- Packaging: unsigned `mac.target: 'dir'` build (signing/notarization and DMG target need Apple credentials); `electronDist` is pinned to the local install so packaging works without network.
+- Unit + integration: **507 tests green**. Typecheck green. E2E golden path A–H green; interaction audit (59 controls) + skills-interactions (9) green; **fresh-install E2E green** (clean userData → onboarding wizard → disclaimer gating → skip → workbench → restart → state preserved, against the packaged app). Packaged smoke green (20 capability tools, 13 skills, local run completes outside the source repo). DMG + checksums build via `bun run release:package`.
+- **Beta status**: all §64 release blockers closed; see `docs/release-gates.md` for the gate checklist and `docs/provider-b-decision.md` for the secondary-provider licensing decision.
+- Packaging: unsigned build (signing/notarization need Apple credentials; CI release workflow is secrets-gated and marks unsigned builds `NOT RELEASEABLE`); `electronDist` is pinned to the local install so packaging works without network.
 - The agent-backed synthesizers (research/thesis/risk) use the configured Pi runtime; with `FINAGENT_AGENT_PROVIDER=local` they degrade to deterministic local implementations.
+- Massive (Polygon.io) is a **fallback** market-data provider: free tier is end-of-day/delayed with `Individual use` terms — commercial distribution needs a Massive Business plan (see the decision record).
 
 ## Documentation
 

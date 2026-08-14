@@ -2,7 +2,7 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import type { AgentEvent, Kline, Portfolio, Quote } from '@finagent/core';
+import type { AgentEvent, Kline, PortfolioSnapshot, Quote } from '@finagent/core';
 import { AgentKernel } from './agent-kernel.ts';
 import { MarketDataService } from '../agent/market-data-service.ts';
 
@@ -29,21 +29,26 @@ const kline: Kline = {
   volume: 4567,
 };
 
-const portfolio: Portfolio = {
-  totalValue: 10000,
+const portfolio: PortfolioSnapshot = {
+  baseCurrency: 'USD',
+  totalAssets: 10000,
   cash: 1500,
-  positions: [
+  accounts: [],
+  holdings: [
     {
       symbol: 'AAPL.US',
       name: 'Apple',
+      currency: 'USD',
       quantity: 10,
-      avgCost: 180,
-      lastPrice: 200,
+      costPrice: 180,
+      marketPrice: 200,
       marketValue: 2000,
+      marketValueBase: 2000,
       unrealizedPnL: 200,
       unrealizedPnLPercent: 11.11,
     },
   ],
+  fetchedAt: 0,
 };
 
 let dir = '';

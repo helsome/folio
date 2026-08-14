@@ -42,6 +42,16 @@ function fail(name, error) {
   console.error(String(error?.stack ?? error).slice(0, 2000));
 }
 
+async function waitForPage(context, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const pages = context.pages();
+    if (pages.length > 0) return pages[pages.length - 1];
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error('No renderer page appeared in time');
+}
+
 async function waitForCdp(timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -61,6 +71,14 @@ async function main() {
     console.error(`Electron binary not found: ${electronBinary}`);
     process.exit(1);
   }
+  // Stale instances from interrupted runs hold the CDP port and would be the
+  // ones we connect to — kill them first, then spawn fresh.
+  try {
+    execSync(`pkill -f 'remote-debugging-port=${CDP_PORT}' || true`, { stdio: 'ignore' });
+  } catch {
+    // Nothing to clean.
+  }
+  execSync('bun run build:preload', { cwd: appRoot, stdio: 'pipe' });
   execSync('bunx vite build', { cwd: appRoot, stdio: 'pipe' });
 
   // Deterministic golden path: always start from a fresh userData dir.
@@ -77,6 +95,7 @@ async function main() {
         ...process.env,
         FINAGENT_AGENT_PROVIDER: 'local',
         FINAGENT_FORCE_PROD_LOAD: '1',
+        FINAGENT_E2E_HIDDEN: '1',
         FINAGENT_USER_DATA_DIR: join(appRoot, 'e2e/.user-data'),
       },
     }
@@ -87,10 +106,13 @@ async function main() {
     await waitForCdp(60_000);
     browser = await chromium.connectOverCDP(CDP_URL, { timeout: 30_000 });
     const context = browser.contexts()[0];
-    await context.waitForEvent('page', { timeout: 30_000 }).catch(() => undefined);
-    const pages = context.pages();
-    const page = pages[pages.length - 1];
+    const page = await waitForPage(context, 30_000);
     await page.waitForLoadState('domcontentloaded');
+
+    const apiKeys = await page
+      .evaluate(() => Object.keys(window.electronAPI ?? {}))
+      .catch(() => ['eval-failed'])
+    console.log('API KEYS:', JSON.stringify(apiKeys))
 
     // A. Three-pane workbench + session bootstrap
     try {
@@ -112,7 +134,28 @@ async function main() {
       await inp.first().waitFor({ timeout: 15_000 });
       pass('A: three-pane workbench renders + session created');
     } catch (error) {
-      fail('A: three-pane workbench renders + session created', error);
+      const diag = await page
+        .evaluate(async () => {
+          const overlay = document.querySelector('[data-testid="onboarding-overlay"]');
+          let statuses = []
+          let rawErr = null
+          try {
+            const raw = await window.electronAPI.connections.list()
+            statuses = raw?.ok ? raw.data.map((e) => e.status) : []
+            rawErr = raw && !raw.ok ? JSON.stringify(raw.error) : null
+          } catch (e) {
+            rawErr = String(e).slice(0, 200)
+          }
+          return {
+            overlay: !!overlay,
+            overlayText: overlay ? overlay.textContent.slice(0, 80) : null,
+            statuses,
+            rawErr,
+          }
+        })
+        .catch(() => ({ evalFailed: true }))
+      console.log('A-DIAG:', JSON.stringify(diag))
+      fail('A: three-pane workbench renders + session created', error)
     }
 
     // A2. Resize the agent panel by dragging the right sash; the layout must

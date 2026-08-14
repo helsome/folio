@@ -14,7 +14,7 @@ import { SettingsView } from '../settings/SettingsView';
 import { ResearchPanel } from '../research/ResearchPanel';
 import { ThesisPanel } from '../thesis/ThesisPanel';
 import { CompareWorkspace } from '../compare/CompareWorkspace';
-
+import { TodayView } from '../today/TodayView';
 const WORKSPACE_TABS: { value: WorkspaceView; label: string }[] = [
   { value: 'overview', label: 'Overview' },
   { value: 'chart', label: 'Chart' },
@@ -22,11 +22,16 @@ const WORKSPACE_TABS: { value: WorkspaceView; label: string }[] = [
   { value: 'news', label: 'News' },
 ];
 
+
+
 export const FinanceWorkspace: React.FC = () => {
   const navSection = useAtomValue(navSectionAtom);
 
   let content: React.ReactNode;
   switch (navSection) {
+    case 'today':
+      content = <TodayView />;
+      break;
     case 'portfolio':
       content = <PortfolioSection />;
       break;

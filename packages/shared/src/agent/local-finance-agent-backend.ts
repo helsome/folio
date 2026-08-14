@@ -5,7 +5,7 @@ import type {
   AgentSessionSnapshot,
   ApiResult,
   Kline,
-  Portfolio,
+  PortfolioSnapshot,
   Quote,
   ToolCallRecord,
   ToolDefinition,
@@ -159,8 +159,8 @@ export class LocalFinanceAgentBackend implements AgentBackend {
       }
     };
 
-    const portfolio = await executeStep('get_portfolio', {}) as Portfolio | undefined;
-    const positions = portfolio?.positions ?? [];
+    const portfolio = await executeStep('get_portfolio', {}) as PortfolioSnapshot | undefined;
+    const positions = portfolio?.holdings ?? [];
     const symbols = positions.map((position) => position.symbol).slice(0, 5);
     const quotes = new Map<string, Quote>();
     const klines = new Map<string, Kline[]>();
@@ -216,7 +216,7 @@ function intentToToolName(intent: 'quote' | 'kline' | 'portfolio' | 'intraday'):
 }
 
 function composePortfolioRiskAnswer(
-  portfolio: Portfolio | undefined,
+  portfolio: PortfolioSnapshot | undefined,
   quotes: Map<string, Quote>,
   klines: Map<string, Kline[]>,
   toolCalls: ToolCallRecord[]
@@ -225,18 +225,24 @@ function composePortfolioRiskAnswer(
     return '无法完成组合风险分析：持仓数据不可用。请检查 LongBridge 连接后重试。';
   }
 
-  const investedValue = Math.max(portfolio.totalValue - portfolio.cash, 0);
-  const cashRatio = portfolio.totalValue > 0 ? portfolio.cash / portfolio.totalValue : 0;
-  const sortedPositions = [...portfolio.positions].sort((a, b) => b.marketValue - a.marketValue);
+  const totalValue = portfolio.totalAssets ?? 0;
+  const cash = portfolio.cash ?? 0;
+  const investedValue = Math.max(totalValue - cash, 0);
+  const cashRatio = totalValue > 0 ? cash / totalValue : 0;
+  const sortedPositions = [...portfolio.holdings].sort(
+    (a, b) => (b.marketValueBase ?? b.marketValue ?? 0) - (a.marketValueBase ?? a.marketValue ?? 0)
+  );
   const topPosition = sortedPositions[0];
-  const topWeight = topPosition && portfolio.totalValue > 0 ? topPosition.marketValue / portfolio.totalValue : 0;
+  const topPositionValue = topPosition ? (topPosition.marketValueBase ?? topPosition.marketValue ?? 0) : 0;
+  const topWeight = topPosition && totalValue > 0 ? topPositionValue / totalValue : 0;
   const failedCalls = toolCalls.filter((toolCall) => toolCall.status === 'error');
   const volatilityLines = sortedPositions.slice(0, 5).map((position) => {
     const series = klines.get(position.symbol) ?? [];
     const volatility = estimateVolatility(series);
     const quote = quotes.get(position.symbol);
     const dayMove = quote ? `${quote.changePercent.toFixed(2)}%` : 'n/a';
-    const weight = portfolio.totalValue > 0 ? position.marketValue / portfolio.totalValue : 0;
+    const positionValue = position.marketValueBase ?? position.marketValue ?? 0;
+    const weight = totalValue > 0 ? positionValue / totalValue : 0;
     return `- ${position.symbol}: weight ${formatPercent(weight)}, 30d vol ${volatility}, day ${dayMove}`;
   });
 
@@ -246,7 +252,7 @@ function composePortfolioRiskAnswer(
   return [
     'Portfolio Risk Summary',
     '----------------------',
-    `Total value: $${portfolio.totalValue.toFixed(2)} | Invested: $${investedValue.toFixed(2)} | Cash: ${formatPercent(cashRatio)}`,
+    `Total value: $${totalValue.toFixed(2)} | Invested: $${investedValue.toFixed(2)} | Cash: ${formatPercent(cashRatio)}`,
     `Concentration risk: ${concentrationRisk}${topPosition ? ` (${topPosition.symbol} ${formatPercent(topWeight)})` : ''}`,
     `Market volatility risk: ${marketRisk}`,
     '',

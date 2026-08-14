@@ -4,8 +4,8 @@ import type {
   FinanceCapability,
   Kline,
   NewsItem,
-  Portfolio,
-  Position,
+  PortfolioSnapshot,
+  Holding,
   Quote,
 } from '@finagent/core';
 import { defineCapability } from '../capabilities/define.ts';
@@ -73,13 +73,14 @@ function readSymbol(input: unknown): string {
   return '';
 }
 
-function position(symbol: string, overrides: Partial<Position> = {}): Position {
+function holding(symbol: string, overrides: Partial<Holding> = {}): Holding {
   return {
     symbol,
     name: symbol,
+    currency: 'USD',
     quantity: 1,
-    avgCost: 1,
-    lastPrice: 1,
+    costPrice: 1,
+    marketPrice: 1,
     marketValue: 0,
     unrealizedPnL: 0,
     unrealizedPnLPercent: 0,
@@ -87,11 +88,15 @@ function position(symbol: string, overrides: Partial<Position> = {}): Position {
   };
 }
 
-function portfolio(positions: Position[], totalValue?: number): Portfolio {
+function portfolio(holdings: Holding[], marketValue?: number): PortfolioSnapshot {
   return {
-    totalValue: totalValue ?? positions.reduce((sum, p) => sum + p.marketValue, 0),
+    baseCurrency: 'USD',
+    totalAssets: marketValue ?? holdings.reduce((sum, h) => sum + (h.marketValue ?? 0), 0),
+    marketValue,
     cash: 0,
-    positions,
+    accounts: [],
+    holdings,
+    fetchedAt: FIXED_NOW,
   };
 }
 
@@ -133,9 +138,9 @@ function news(symbol: string, timestampsSec: number[]): NewsItem[] {
   }));
 }
 
-const summaryCap = (data: Portfolio) =>
+const summaryCap = (data: PortfolioSnapshot) =>
   makeCap('portfolio.summary', 'get_portfolio', emptySchema, () => data);
-const positionsCap = (data: Position[]) =>
+const positionsCap = (data: Holding[]) =>
   makeCap('portfolio.positions', 'get_positions', emptySchema, () => data);
 const quoteCap = (price = 10) =>
   makeCap('market.quote', 'get_quote', symbolSchema, (input) => quote(readSymbol(input), price));
@@ -145,12 +150,12 @@ const quoteCap = (price = 10) =>
 describe('PortfolioRiskService allocation + concentration', () => {
   it('computes allocation weights and concentration from a portfolio', async () => {
     const data = portfolio([
-      position('AAA.US', { marketValue: 400 }),
-      position('BBB.US', { marketValue: 300 }),
-      position('CCC.US', { marketValue: 200 }),
-      position('DDD.US', { marketValue: 100 }),
+      holding('AAA.US', { marketValue: 400 }),
+      holding('BBB.US', { marketValue: 300 }),
+      holding('CCC.US', { marketValue: 200 }),
+      holding('DDD.US', { marketValue: 100 }),
     ]);
-    const service = makeService([summaryCap(data), positionsCap(data.positions), quoteCap()]);
+    const service = makeService([summaryCap(data), positionsCap(data.holdings), quoteCap()]);
 
     const report = await service.analyze();
 
@@ -168,8 +173,8 @@ describe('PortfolioRiskService allocation + concentration', () => {
 
   it('derives market value from the quote when positions lack it', async () => {
     const service = makeService([
-      summaryCap({ totalValue: 0, cash: 0, positions: [] }),
-      positionsCap([position('AAA.US', { quantity: 10, marketValue: 0 })]),
+      summaryCap({ baseCurrency: "USD", accounts: [], holdings: [], fetchedAt: 0 }),
+      positionsCap([holding('AAA.US', { quantity: 10, marketValue: 0 })]),
       quoteCap(12),
     ]);
 
@@ -183,10 +188,10 @@ describe('PortfolioRiskService allocation + concentration', () => {
 describe('PortfolioRiskService partial data', () => {
   it('excludes a position whose quote is missing and records the failure', async () => {
     const service = makeService([
-      summaryCap({ totalValue: 0, cash: 0, positions: [] }),
+      summaryCap({ baseCurrency: "USD", accounts: [], holdings: [], fetchedAt: 0 }),
       positionsCap([
-        position('AAA.US', { quantity: 10, marketValue: 0 }),
-        position('BAD.US', { quantity: 5, marketValue: 0 }),
+        holding('AAA.US', { quantity: 10, marketValue: 0 }),
+        holding('BAD.US', { quantity: 5, marketValue: 0 }),
       ]),
       makeCap('market.quote', 'get_quote', symbolSchema, (input) => {
         const symbol = readSymbol(input);
@@ -205,8 +210,8 @@ describe('PortfolioRiskService partial data', () => {
   });
 
   it('skips the earnings signal and notes a missing research.events capability', async () => {
-    const data = portfolio([position('AAA.US', { marketValue: 100 })]);
-    const service = makeService([summaryCap(data), positionsCap(data.positions)]);
+    const data = portfolio([holding('AAA.US', { marketValue: 100 })]);
+    const service = makeService([summaryCap(data), positionsCap(data.holdings)]);
 
     const report = await service.analyze();
 
@@ -222,11 +227,11 @@ describe('PortfolioRiskService partial data', () => {
 describe('PortfolioRiskService signals', () => {
   it('flags high concentration when the top position exceeds 30%', async () => {
     const data = portfolio([
-      position('AAA.US', { marketValue: 40 }),
-      position('BBB.US', { marketValue: 30 }),
-      position('CCC.US', { marketValue: 30 }),
+      holding('AAA.US', { marketValue: 40 }),
+      holding('BBB.US', { marketValue: 30 }),
+      holding('CCC.US', { marketValue: 30 }),
     ]);
-    const service = makeService([summaryCap(data), positionsCap(data.positions), quoteCap()]);
+    const service = makeService([summaryCap(data), positionsCap(data.holdings), quoteCap()]);
 
     const report = await service.analyze();
 
@@ -234,11 +239,11 @@ describe('PortfolioRiskService signals', () => {
   });
 
   it('emits an earnings signal only when an event falls within the 7-day horizon', async () => {
-    const data = portfolio([position('AAA.US', { marketValue: 100 })]);
+    const data = portfolio([holding('AAA.US', { marketValue: 100 })]);
 
     const within = makeService([
       summaryCap(data),
-      positionsCap(data.positions),
+      positionsCap(data.holdings),
       quoteCap(),
       makeCap('research.events', 'get_calendar_events', emptySchema, () => ({
         events: [{ symbol: 'AAA.US', type: 'earnings', date: FIXED_NOW + 3 * DAY_MS }],
@@ -248,7 +253,7 @@ describe('PortfolioRiskService signals', () => {
 
     const outside = makeService([
       summaryCap(data),
-      positionsCap(data.positions),
+      positionsCap(data.holdings),
       quoteCap(),
       makeCap('research.events', 'get_calendar_events', emptySchema, () => ({
         events: [{ symbol: 'AAA.US', type: 'earnings', date: FIXED_NOW + 30 * DAY_MS }],
@@ -258,7 +263,7 @@ describe('PortfolioRiskService signals', () => {
   });
 
   it('applies drawdown thresholds (high >35%, medium >20%, none otherwise)', async () => {
-    const data = portfolio([position('AAA.US', { marketValue: 100 })]);
+    const data = portfolio([holding('AAA.US', { marketValue: 100 })]);
     const klineCap = (high: number, close: number) =>
       makeCap('market.kline', 'get_kline', klineSchema, (input) =>
         flatKlines(readSymbol(input), high, close)
@@ -266,7 +271,7 @@ describe('PortfolioRiskService signals', () => {
 
     const sharp = makeService([
       summaryCap(data),
-      positionsCap(data.positions),
+      positionsCap(data.holdings),
       quoteCap(),
       klineCap(100, 60),
     ]);
@@ -274,7 +279,7 @@ describe('PortfolioRiskService signals', () => {
 
     const moderate = makeService([
       summaryCap(data),
-      positionsCap(data.positions),
+      positionsCap(data.holdings),
       quoteCap(),
       klineCap(100, 75),
     ]);
@@ -284,7 +289,7 @@ describe('PortfolioRiskService signals', () => {
 
     const healthy = makeService([
       summaryCap(data),
-      positionsCap(data.positions),
+      positionsCap(data.holdings),
       quoteCap(),
       klineCap(100, 90),
     ]);
@@ -293,13 +298,13 @@ describe('PortfolioRiskService signals', () => {
 
   it('emits sector exposure only when profile data includes a sector', async () => {
     const data = portfolio([
-      position('AAA.US', { marketValue: 60 }),
-      position('BBB.US', { marketValue: 40 }),
+      holding('AAA.US', { marketValue: 60 }),
+      holding('BBB.US', { marketValue: 40 }),
     ]);
 
     const withSector = makeService([
       summaryCap(data),
-      positionsCap(data.positions),
+      positionsCap(data.holdings),
       quoteCap(),
       makeCap('company.profile', 'get_company_profile', symbolSchema, (input) => {
         const symbol = readSymbol(input);
@@ -312,7 +317,7 @@ describe('PortfolioRiskService signals', () => {
 
     const noSector = makeService([
       summaryCap(data),
-      positionsCap(data.positions),
+      positionsCap(data.holdings),
       quoteCap(),
       makeCap('company.profile', 'get_company_profile', symbolSchema, (input) => ({
         symbol: readSymbol(input),
@@ -325,7 +330,7 @@ describe('PortfolioRiskService signals', () => {
 
 describe('PortfolioRiskService synthesizer + failure isolation', () => {
   it('delegates the summary to the injected synthesizer', async () => {
-    const data = portfolio([position('AAA.US', { marketValue: 100 })]);
+    const data = portfolio([holding('AAA.US', { marketValue: 100 })]);
     let captured: PortfolioRiskSynthesisInput | undefined;
     const synthesizer: PortfolioRiskSynthesizer = async (input) => {
       captured = input;
@@ -333,7 +338,7 @@ describe('PortfolioRiskService synthesizer + failure isolation', () => {
     };
 
     const report = await makeService(
-      [summaryCap(data), positionsCap(data.positions), quoteCap()],
+      [summaryCap(data), positionsCap(data.holdings), quoteCap()],
       synthesizer
     ).analyze();
 
@@ -344,12 +349,12 @@ describe('PortfolioRiskService synthesizer + failure isolation', () => {
   });
 
   it('isolates a failing capability and still produces a report', async () => {
-    const data = portfolio([position('AAA.US', { marketValue: 100 })]);
+    const data = portfolio([holding('AAA.US', { marketValue: 100 })]);
     const service = makeService([
       makeCap('portfolio.summary', 'get_portfolio', emptySchema, () => {
         throw new Error('summary boom');
       }),
-      positionsCap(data.positions),
+      positionsCap(data.holdings),
       quoteCap(),
     ]);
 

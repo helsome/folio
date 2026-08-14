@@ -190,11 +190,13 @@ describe('dividend', () => {
 });
 
 describe('position_weight', () => {
-  function portfolio(totalValue: number, marketValue: number): object {
+  function portfolio(totalAssets: number, marketValue: number): object {
     return {
-      totalValue,
-      cash: 0,
-      positions: [{ symbol: 'NVDA.US', name: 'Nvidia', quantity: 1, avgCost: 0, lastPrice: 0, marketValue, unrealizedPnL: 0, unrealizedPnLPercent: 0 }],
+      baseCurrency: 'USD',
+      totalAssets,
+      holdings: [{ symbol: 'NVDA.US', name: 'Nvidia', currency: 'USD', quantity: 1, costPrice: 0, marketPrice: 0, marketValue, unrealizedPnL: 0, unrealizedPnLPercent: 0 }],
+      accounts: [],
+      fetchedAt: 0,
     };
   }
 
@@ -224,10 +226,9 @@ describe('position_weight', () => {
     expect(await evaluateRule(r, registry, { now })).toBeNull();
   });
 });
-
 describe('portfolio_drawdown', () => {
   it('triggers when drawdown exceeds the threshold', async () => {
-    const registry = makeRegistry({ 'portfolio.summary': { totalValue: 80, cash: 0, positions: [] } });
+    const registry = makeRegistry({ 'portfolio.summary': { baseCurrency: 'USD', totalAssets: 80, holdings: [], accounts: [], fetchedAt: 0 } });
     const r = rule({}, { type: 'portfolio_drawdown', threshold: 0.1 });
     const snapshots = makeSnapshotContext({ [r.id]: { peakValue: 100 } });
     const event = await evaluateRule(r, registry, { now, ...snapshots });
@@ -235,9 +236,8 @@ describe('portfolio_drawdown', () => {
     expect(event?.payload?.drawdown).toBeCloseTo(0.2);
     expect(event?.payload?.peak).toBe(100);
   });
-
   it('does not trigger below the threshold (and resets peak on a new high)', async () => {
-    const registry = makeRegistry({ 'portfolio.summary': { totalValue: 95, cash: 0, positions: [] } });
+    const registry = makeRegistry({ 'portfolio.summary': { baseCurrency: 'USD', totalAssets: 95, holdings: [], accounts: [], fetchedAt: 0 } });
     const r = rule({}, { type: 'portfolio_drawdown', threshold: 0.1 });
     const snapshots = makeSnapshotContext({ [r.id]: { peakValue: 100 } });
     expect(await evaluateRule(r, registry, { now, ...snapshots })).toBeNull();

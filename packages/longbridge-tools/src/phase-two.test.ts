@@ -153,7 +153,7 @@ describe('phase-2 parser normalization', () => {
   it('parses cash-flow fixture', () => {
     const flows = parseCashFlowResponse(JSON.stringify(loadFixture('cash-flow')));
     expect(flows.length).toBeGreaterThan(0);
-    expect(typeof flows[0].balance).toBe('number');
+    expect(typeof flows[0].amount).toBe('number');
     expect(flows[0].timestamp).toBeGreaterThan(1_600_000_000);
   });
 });

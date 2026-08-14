@@ -6,7 +6,7 @@ import type {
   CapabilityRegistry,
   MarketStatus,
   NewsItem,
-  Portfolio,
+  PortfolioSnapshot,
   Quote,
   SymbolAlertRuleBase,
 } from '@finagent/core';
@@ -300,20 +300,21 @@ async function evaluatePositionWeight(
   registry: CapabilityRegistry,
   ctx: AlertEvaluatorContext
 ): Promise<AlertTriggerEvent | null> {
-  const summary = await run<Portfolio>(registry, 'portfolio.summary', {}, ctx.now);
-  if (!summary || typeof summary.totalValue !== 'number' || summary.totalValue <= 0) return null;
+  const summary = await run<PortfolioSnapshot>(registry, 'portfolio.summary', {}, ctx.now);
+  if (!summary || typeof summary.totalAssets !== 'number' || summary.totalAssets <= 0) return null;
 
   const rawPositions = await run<RawHoldingData[]>(registry, 'portfolio.positions', {}, ctx.now);
 
-  // Market value comes from `portfolio.summary` (enriched positions); the raw
+  // Market value comes from `portfolio.summary` (enriched holdings); the raw
   // `portfolio.positions` holding confirms the symbol is actually in the book.
-  const enriched = summary.positions.find((p) => sameSymbol(p.symbol, rule.symbol));
+  const enriched = summary.holdings.find((p) => sameSymbol(p.symbol, rule.symbol));
   const held =
     enriched !== undefined || (rawPositions?.some((p) => sameSymbol(p.symbol, rule.symbol)) ?? false);
   if (!held) return null;
-  if (!enriched || typeof enriched.marketValue !== 'number') return null; // held, value unknown
+  const holdingValue = enriched ? (enriched.marketValueBase ?? enriched.marketValue) : undefined;
+  if (typeof holdingValue !== 'number') return null; // held, value unknown
 
-  const weight = enriched.marketValue / summary.totalValue;
+  const weight = holdingValue / summary.totalAssets;
   const minWeight = rule.minWeight ?? 0;
   const maxWeight = rule.maxWeight ?? Infinity;
   if (weight >= minWeight && weight <= maxWeight) return null;
@@ -331,9 +332,9 @@ async function evaluateDrawdown(
   registry: CapabilityRegistry,
   ctx: AlertEvaluatorContext
 ): Promise<AlertTriggerEvent | null> {
-  const summary = await run<Portfolio>(registry, 'portfolio.summary', {}, ctx.now);
-  if (!summary || typeof summary.totalValue !== 'number' || summary.totalValue <= 0) return null;
-  const current = summary.totalValue;
+  const summary = await run<PortfolioSnapshot>(registry, 'portfolio.summary', {}, ctx.now);
+  if (!summary || typeof summary.totalAssets !== 'number' || summary.totalAssets <= 0) return null;
+  const current = summary.totalAssets;
   const snapshot = await ctx.getRuleSnapshot(rule.id);
   let peak = snapshot.peakValue ?? current;
   if (current > peak) {
@@ -343,10 +344,12 @@ async function evaluateDrawdown(
   }
   const drawdown = (peak - current) / peak;
   if (drawdown <= rule.threshold) return null;
+  const currency = summary.baseCurrency ?? 'USD';
+  const fmt = new Intl.NumberFormat(undefined, { style: 'currency', currency });
   return makeEvent(rule, ctx.now(), {
     title: 'Portfolio drawdown alert',
-    message: `Drawdown ${(drawdown * 100).toFixed(1)}% from peak $${peak.toFixed(2)}.`,
-    payload: { drawdown, peak },
+    message: `Drawdown ${(drawdown * 100).toFixed(1)}% from peak ${fmt.format(peak)}.`,
+    payload: { drawdown, peak, currency },
   });
 }
 

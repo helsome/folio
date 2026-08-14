@@ -81,6 +81,9 @@ mock.module('electron', () => ({
   Notification: {
     isSupported: () => false,
   },
+  shell: {
+    openExternal: async () => undefined,
+  },
 }));
 
 const noopStore = class {
@@ -144,6 +147,25 @@ mock.module('@finagent/shared', () => ({
   computeSkillReadiness: () => undefined,
   parseSynthesisJson: (text: string) => JSON.parse(text),
   parseImpactJson: (text: string) => JSON.parse(text),
+  createRouterFetchers: () => ({}),
+  MassiveFinancialDataProvider: class {
+    clearCache = () => undefined;
+  },
+  ProviderRouter: class {
+    register = () => undefined;
+    setRouting = () => undefined;
+    get = () => undefined;
+    list = () => [];
+    coverage = () => [];
+  },
+  ConnectionStore: class {
+    list = async () => [];
+    get = async () => undefined;
+    getConfig = async () => undefined;
+    update = async () => undefined;
+    setConfig = async () => undefined;
+    subscribe = () => () => undefined;
+  },
 }));
 
 mock.module('@finagent/skill-hub', () => ({

@@ -24,7 +24,7 @@ function fakeMarketData() {
       { symbol: 'NVDA.US', timestamp: 2, open: 191, high: 194, low: 190, close: 193, volume: 1200 },
     ],
     getIntraday: async () => [],
-    getPortfolio: async () => ({ totalValue: 100, cash: 100, positions: [] }),
+    getPortfolio: async () => ({ baseCurrency: 'USD', accounts: [], holdings: [], fetchedAt: 0 }),
     getLongBridgeStatus: async () => ({ installed: true, available: true } as never),
   } as never;
 }

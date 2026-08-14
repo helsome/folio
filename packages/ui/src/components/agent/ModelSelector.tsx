@@ -104,7 +104,7 @@ export const ModelSelector: React.FC<ModelSelectorProps> = ({ disabled = false }
       {open && (
         <div
           role="listbox"
-          className="absolute left-0 top-full z-[--z-index-dropdown] mt-1.5 max-h-72 w-64 overflow-y-auto rounded-[12px] border border-[var(--mac-border)] bg-[var(--mac-surface-solid)] shadow-middle"
+          className="absolute left-0 top-full z-(--z-index-dropdown) mt-1.5 max-h-72 w-64 overflow-y-auto rounded-[12px] border border-[var(--mac-border)] bg-[var(--mac-surface-solid)] shadow-middle"
         >
           {groups.length === 0 && !state.loading && (
             <div className="px-3 py-4 text-center text-[12px] text-foreground/42">No models available</div>

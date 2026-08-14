@@ -1,6 +1,6 @@
 import { executeLongBridge } from '../executor.ts';
 import { parseCashFlowResponse } from '../parser.ts';
-import type { CashFlowRecord } from '../types.ts';
+import type { CashFlowRecord } from '@finagent/core';
 
 export interface GetCashFlowOptions {
   /** Start date (YYYY-MM-DD), defaults to 30 days ago. */

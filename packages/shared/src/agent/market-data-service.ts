@@ -1,25 +1,25 @@
 import type {
+  AccountAssets,
   CalcIndex,
+  CashFlowRecord,
+  Holding,
   IntradayData,
   Kline,
   MarketStatus,
   NewsItem,
-  Portfolio,
+  PortfolioSnapshot,
   Quote,
   StaticInfo,
 } from '@finagent/core';
 import type {
-  Assets,
   CalendarEvent,
   CapitalFlow,
-  CashFlowRecord,
   Depth,
   DividendRecord,
   EpsForecast,
   FinancialReport,
   InstitutionRating,
   MarketTemperature,
-  Position,
   TradeTick,
 } from '@finagent/longbridge-tools';
 import {
@@ -64,7 +64,7 @@ export interface MarketDataFetchers {
   getQuote: (symbol: string) => Promise<Quote>;
   getKline: (options: GetKlineOptions) => Promise<Kline[]>;
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
-  getPortfolio: () => Promise<Portfolio>;
+  getPortfolio: () => Promise<PortfolioSnapshot>;
   getLongBridgeStatus: () => Promise<LongBridgeStatus>;
   getStaticInfo: (symbol: string) => Promise<StaticInfo>;
   getCalcIndex: (symbol: string) => Promise<CalcIndex>;
@@ -83,8 +83,8 @@ export interface MarketDataFetchers {
   getDividends: (symbol: string) => Promise<DividendRecord[]>;
   getEpsForecasts: (symbol: string) => Promise<EpsForecast[]>;
   getCalendarEvents: (options: GetCalendarEventsOptions) => Promise<CalendarEvent[]>;
-  getAccountPositions: () => Promise<Position[]>;
-  getAssets: (currency?: string) => Promise<Assets[]>;
+  getAccountPositions: () => Promise<Holding[]>;
+  getAssets: (currency?: string) => Promise<AccountAssets[]>;
   getCashFlow: (options?: GetCashFlowOptions) => Promise<CashFlowRecord[]>;
 }
 

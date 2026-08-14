@@ -18,6 +18,9 @@ mock.module('electron', () => ({
         ? Buffer.from(buffer.toString('utf8').slice(4), 'base64').toString('utf8')
         : '',
   },
+  shell: {
+    openExternal: async () => undefined,
+  },
   Notification: {
     isSupported: () => false,
   },

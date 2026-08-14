@@ -32,6 +32,31 @@ export {
   parseCashFlowResponse,
 } from './parser.ts';
 
+export {
+  classifyPortfolioFailure,
+  computeUnrealizedPnL,
+  computeUnrealizedPnLPercent,
+  isEmptySnapshot,
+  isPartialSnapshot,
+  normalizeAssets,
+  normalizeCashFlow,
+  normalizePortfolioSnapshot,
+  normalizePositions,
+  toEpochSeconds,
+  toFiniteNumber,
+} from './normalizer.ts';
+export type {
+  RawAssetsResponse,
+  RawCashBalance,
+  RawCashFlowRecord,
+  RawCashInfo,
+  RawMarketAccount,
+  RawPortfolioHolding,
+  RawPortfolioOverview,
+  RawPortfolioResponse,
+  RawPosition,
+} from './normalizer.ts';
+
 export { getStaticInfo, getCalcIndex, getMarketStatus, getNews } from './tools/reference.ts';
 export type { GetCalcIndexOptions, GetNewsOptions, GetStaticInfoOptions } from './tools/reference.ts';
 
@@ -69,16 +94,13 @@ export { getAssets } from './tools/assets.ts';
 export { getCashFlow } from './tools/cash-flow.ts';
 export type { GetCashFlowOptions } from './tools/cash-flow.ts';
 
-export type { Quote, Portfolio, Kline, IntradayData } from '@finagent/core';
+export type { Quote, Kline, IntradayData } from '@finagent/core';
 
 export type {
-  Assets,
   CalendarEvent,
   CalendarEventData,
   CapitalFlow,
   CapitalFlowSide,
-  CashFlowRecord,
-  CashInfo,
   Depth,
   DepthLevel,
   DividendRecord,
@@ -90,7 +112,6 @@ export type {
   FinancialStatement,
   InstitutionRating,
   MarketTemperature,
-  Position,
   RatingDistribution,
   TradeTick,
 } from './types.ts';

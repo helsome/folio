@@ -1,53 +1,27 @@
-import React, { useCallback, useEffect, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtom } from 'jotai';
-import { useFinagentClient, type SkillListItem, type SkillResourceItem } from '../../client';
-import {
-  getSkillReadiness,
-  loadSkillReadiness,
-  skillReadinessAtom,
-} from '../../atoms/skillReadinessAtoms';
-import { SkillReadinessBadge } from './SkillReadinessBadge';
+import { useFinagentClient, type SkillListItem } from '../../client';
+import { loadSkillReadiness, skillReadinessAtom } from '../../atoms/skillReadinessAtoms';
+import { filterSkills, SKILL_STATUS_FILTERS, type SkillStatusFilter } from './skillFilters';
+import { useSkillToggle } from './useSkillToggle';
+import { SkillList } from './SkillList';
+import { SkillDetailDrawer } from './SkillDetailDrawer';
 
-const Toggle: React.FC<{ checked: boolean; onChange: () => void; disabled?: boolean }> = ({
-  checked,
-  onChange,
-  disabled = false,
-}) => (
-  <button
-    type="button"
-    role="switch"
-    aria-checked={checked}
-    onClick={onChange}
-    disabled={disabled}
-    className={`relative h-5 w-9 shrink-0 rounded-full transition-smooth disabled:cursor-not-allowed disabled:opacity-50 ${
-      checked ? 'bg-[var(--mac-blue)]' : 'bg-foreground/18'
-    }`}
-  >
-    <span
-      className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-        checked ? 'translate-x-[18px]' : 'translate-x-0.5'
-      }`}
-    />
-  </button>
-);
-
-/** Skill registry: list, enable/disable, expand resources, read markdown. */
+/** Skills home: search + status chips + rows, with a detail drawer. */
 export const SkillsView: React.FC = () => {
   const client = useFinagentClient();
   const [skills, setSkills] = useState<SkillListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-
-  const [expandedId, setExpandedId] = useState<string | null>(null);
-  const [resources, setResources] = useState<SkillResourceItem[]>([]);
-  const [resourcesLoading, setResourcesLoading] = useState(false);
-  const [resourcesError, setResourcesError] = useState<string | null>(null);
   const [skillReadiness, setSkillReadiness] = useAtom(skillReadinessAtom);
 
-  const [activeResource, setActiveResource] = useState<{ skillId: string; path: string } | null>(null);
-  const [resourceContent, setResourceContent] = useState<string | null>(null);
-  const [contentLoading, setContentLoading] = useState(false);
-  const [contentError, setContentError] = useState<string | null>(null);
+  const [query, setQuery] = useState('');
+  const [status, setStatus] = useState<SkillStatusFilter>('all');
+
+  const [openSkillId, setOpenSkillId] = useState<string | null>(null);
+  const triggerRef = useRef<HTMLElement | null>(null);
+
+  const { togglingId, toggleError, toggle } = useSkillToggle(client, setSkills);
 
   const loadSkills = useCallback(async () => {
     setLoading(true);
@@ -60,6 +34,7 @@ export const SkillsView: React.FC = () => {
       setError(result.error.message);
     }
   }, [client]);
+
   useEffect(() => {
     void loadSkills();
   }, [loadSkills]);
@@ -68,171 +43,127 @@ export const SkillsView: React.FC = () => {
     void loadSkillReadiness().then(setSkillReadiness);
   }, [setSkillReadiness]);
 
-  const toggleEnabled = async (skill: SkillListItem) => {
-    const next = !skill.enabled;
-    const result = await client.skills.setEnabled(skill.id, next);
-    if (result.ok) {
-      setSkills((prev) => prev.map((s) => (s.id === skill.id ? { ...s, enabled: next } : s)));
-    }
-  };
+  const filtered = useMemo(
+    () => filterSkills(skills, skillReadiness, query, status),
+    [skills, skillReadiness, query, status]
+  );
 
-  const toggleExpand = async (skillId: string) => {
-    if (expandedId === skillId) {
-      setExpandedId(null);
-      setResources([]);
-      setActiveResource(null);
-      setResourceContent(null);
-      return;
-    }
-    setExpandedId(skillId);
-    setResourcesLoading(true);
-    setResourcesError(null);
-    setResources([]);
-    setActiveResource(null);
-    setResourceContent(null);
-    const result = await client.skills.listResources(skillId);
-    setResourcesLoading(false);
-    if (result.ok) {
-      setResources(result.data);
-    } else {
-      setResourcesError(result.error.message);
-    }
-  };
+  const openSkill = openSkillId ? skills.find((skill) => skill.id === openSkillId) : undefined;
 
-  const openResource = async (skillId: string, path: string) => {
-    setActiveResource({ skillId, path });
-    setContentLoading(true);
-    setContentError(null);
-    setResourceContent(null);
-    const result = await client.skills.readResource(skillId, path);
-    setContentLoading(false);
-    if (result.ok) {
-      setResourceContent(result.data);
-    } else {
-      setContentError(result.error.message);
-    }
-  };
+  const openDrawer = useCallback((skill: SkillListItem, trigger: HTMLElement) => {
+    triggerRef.current = trigger;
+    setOpenSkillId(skill.id);
+  }, []);
 
-  if (loading) {
-    return <div className="py-10 text-center text-[13px] text-foreground/48">Loading skills…</div>;
-  }
+  const closeDrawer = useCallback(() => {
+    setOpenSkillId(null);
+    triggerRef.current?.focus();
+    triggerRef.current = null;
+  }, []);
 
-  if (error) {
-    return (
-      <div className="py-10 text-center">
-        <div className="text-[13px] text-destructive">{error}</div>
-      </div>
-    );
-  }
-
-  if (skills.length === 0) {
-    return (
-      <div className="py-10 text-center text-[13px] text-foreground/48">
-        No skills installed
-      </div>
-    );
-  }
+  const handleToggle = useCallback(
+    (skill: SkillListItem) => {
+      void toggle(skill);
+    },
+    [toggle]
+  );
 
   return (
-    <div className="max-w-3xl space-y-2">
-      {skills.map((skill) => {
-        const isExpanded = expandedId === skill.id;
-        const mdResources = resources.filter((r) => r.path.toLowerCase().endsWith('.md'));
-        return (
-          <div key={skill.id} className="mac-stock-tile overflow-hidden rounded-[14px]">
-            <div
-              role="button"
-              tabIndex={0}
-              onClick={() => void toggleExpand(skill.id)}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter' || e.key === ' ') {
-                  e.preventDefault();
-                  void toggleExpand(skill.id);
-                }
-              }}
-              className="flex w-full cursor-pointer items-center gap-3 px-4 py-3 text-left transition-smooth hover:bg-[var(--mac-sidebar-hover)]"
+    <div className="max-w-3xl">
+      <div className="space-y-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <div className="relative min-w-0 flex-1">
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 16 16"
+              fill="none"
+              aria-hidden="true"
+              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/40"
             >
-              <svg
-                width="10"
-                height="10"
-                viewBox="0 0 10 10"
-                fill="none"
-                className={`shrink-0 text-foreground/42 transition-transform ${isExpanded ? 'rotate-90' : ''}`}
-                aria-hidden="true"
-              >
-                <path d="M4 2.5 6.5 5 4 7.5" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-[13px] font-semibold text-foreground">{skill.name}</div>
-                {skill.description && (
-                  <div className="truncate text-[12px] text-foreground/54">{skill.description}</div>
-                )}
-              </div>
-              <SkillReadinessBadge readiness={getSkillReadiness(skillReadiness, skill.id)} />
-              <span className="shrink-0 rounded-[6px] bg-foreground/[0.05] px-1.5 py-0.5 text-[11px] text-foreground/56">
-                {skill.keywords.length} keywords
-              </span>
-              {skill.riskLevel && (
-                <span className="shrink-0 rounded-[6px] border border-[var(--mac-border)] px-1.5 py-0.5 text-[11px] text-foreground/56">
-                  {skill.riskLevel}
-                </span>
-              )}
-              {skill.tier && (
-                <span className="shrink-0 rounded-[6px] border border-[var(--mac-border)] px-1.5 py-0.5 text-[11px] text-foreground/56">
-                  {skill.tier}
-                </span>
-              )}
-              <span onClick={(e) => e.stopPropagation()}>
-                <Toggle checked={skill.enabled} onChange={() => void toggleEnabled(skill)} />
-              </span>
-            </div>
-
-            {isExpanded && (
-              <div className="border-t mac-section-divider px-4 py-3">
-                {resourcesLoading && (
-                  <div className="text-[12px] text-foreground/48">Loading resources…</div>
-                )}
-                {resourcesError && <div className="text-[12px] text-destructive">{resourcesError}</div>}
-                {!resourcesLoading && !resourcesError && mdResources.length === 0 && (
-                  <div className="text-[12px] text-foreground/48">No markdown resources</div>
-                )}
-                {!resourcesLoading && !resourcesError && mdResources.length > 0 && (
-                  <div className="flex flex-wrap gap-1.5">
-                    {mdResources.map((resource) => (
-                      <button
-                        key={resource.path}
-                        type="button"
-                        onClick={() => void openResource(skill.id, resource.path)}
-                        className={`rounded-[8px] border px-2 py-1 font-mono text-[11px] transition-smooth ${
-                          activeResource?.path === resource.path
-                            ? 'border-[rgba(var(--accent-rgb),0.3)] bg-[var(--mac-blue-soft)] text-foreground'
-                            : 'border-[var(--mac-border)] text-foreground/64 hover:text-foreground'
-                        }`}
-                      >
-                        {resource.path}
-                      </button>
-                    ))}
-                  </div>
-                )}
-
-                {activeResource && activeResource.skillId === skill.id && (
-                  <div className="mt-3">
-                    {contentLoading && (
-                      <div className="text-[12px] text-foreground/48">Loading {activeResource.path}…</div>
-                    )}
-                    {contentError && <div className="text-[12px] text-destructive">{contentError}</div>}
-                    {resourceContent !== null && (
-                      <pre className="max-h-72 overflow-auto whitespace-pre-wrap rounded-[10px] border border-[var(--mac-border)] bg-background/60 p-3 font-mono text-[12px] leading-relaxed text-foreground/80">
-                        {resourceContent}
-                      </pre>
-                    )}
-                  </div>
-                )}
-              </div>
-            )}
+              <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4" />
+              <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+            </svg>
+            <input
+              type="search"
+              value={query}
+              onChange={(event) => setQuery(event.target.value)}
+              placeholder="Search skills…"
+              aria-label="Search skills"
+              data-testid="skills-search"
+              className="w-full rounded-[8px] border border-[var(--mac-border)] bg-background/60 py-1.5 pl-8 pr-3 text-[13px] text-foreground placeholder:text-foreground/40 transition-smooth hover:border-[var(--mac-border-strong)] focus:border-[var(--mac-blue)] focus:outline-none"
+            />
           </div>
-        );
-      })}
+        </div>
+
+        <div role="group" aria-label="Filter skills by status" className="flex flex-wrap gap-1.5">
+          {SKILL_STATUS_FILTERS.map((filter) => {
+            const active = status === filter.value;
+            return (
+              <button
+                key={filter.value}
+                type="button"
+                aria-pressed={active}
+                data-testid={`skills-filter-${filter.value}`}
+                onClick={() => setStatus(filter.value)}
+                className={`rounded-full border px-3 py-1 text-[12px] font-medium transition-smooth focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)] ${
+                  active
+                    ? 'border-transparent bg-[var(--mac-blue)] text-white'
+                    : 'border-[var(--mac-border)] text-foreground/64 hover:border-[var(--mac-border-strong)] hover:text-foreground active:scale-95'
+                }`}
+              >
+                {filter.label}
+              </button>
+            );
+          })}
+        </div>
+      </div>
+
+      <div className="mt-4">
+        {loading ? (
+          <div className="py-10 text-center text-[13px] text-foreground/48">Loading skills…</div>
+        ) : error ? (
+          <div className="py-10 text-center">
+            <div role="alert" className="text-[13px] text-destructive">
+              {error}
+            </div>
+            <button
+              type="button"
+              onClick={() => void loadSkills()}
+              className="mt-3 rounded-[8px] border border-[var(--mac-border)] px-3 py-1.5 text-[12px] font-medium text-foreground/72 transition-smooth hover:border-[var(--mac-border-strong)] hover:text-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)]"
+            >
+              Retry
+            </button>
+          </div>
+        ) : skills.length === 0 ? (
+          <div className="py-10 text-center text-[13px] text-foreground/48">No skills installed</div>
+        ) : filtered.length === 0 ? (
+          <div className="py-10 text-center text-[13px] text-foreground/48">
+            No skills match your search or filter
+          </div>
+        ) : (
+          <SkillList
+            skills={filtered}
+            readiness={skillReadiness}
+            togglingId={togglingId}
+            toggleError={toggleError}
+            onToggle={handleToggle}
+            onOpen={openDrawer}
+          />
+        )}
+      </div>
+
+      {openSkill && (
+        <SkillDetailDrawer
+          key={openSkill.id}
+          skill={openSkill}
+          readiness={skillReadiness.find((entry) => entry.skillId === openSkill.id)}
+          onClose={closeDrawer}
+          togglingId={togglingId}
+          toggleError={toggleError}
+          onToggle={handleToggle}
+        />
+      )}
     </div>
   );
 };

@@ -19,7 +19,7 @@ export default defineConfig({
     outDir: resolve(__dirname, 'dist'),
     emptyOutDir: true,
     rollupOptions: {
-      external: ['react', 'react-dom', 'react/jsx-runtime', 'jotai', 'jotai/utils', 'clsx', 'tailwind-merge', 'class-variance-authority'],
+      external: ['react', 'react-dom', 'react/jsx-runtime', 'jotai', 'jotai/utils', 'clsx', 'tailwind-merge', 'class-variance-authority', /^@finagent\//],
     },
   },
 });

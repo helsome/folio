@@ -51,6 +51,16 @@ function findAppBinary() {
   throw new Error(`No Folio.app binary found under ${distDir}/mac*.`);
 }
 
+async function waitForPage(context, timeoutMs) {
+  const deadline = Date.now() + timeoutMs;
+  while (Date.now() < deadline) {
+    const pages = context.pages();
+    if (pages.length > 0) return pages[pages.length - 1];
+    await new Promise((resolve) => setTimeout(resolve, 250));
+  }
+  throw new Error('No renderer page appeared in time');
+}
+
 async function waitForCdp(timeoutMs) {
   const deadline = Date.now() + timeoutMs;
   while (Date.now() < deadline) {
@@ -80,6 +90,7 @@ async function main() {
     env: {
       ...process.env,
       FINAGENT_AGENT_PROVIDER: 'local',
+    FINAGENT_E2E_HIDDEN: '1',
       FINAGENT_USER_DATA_DIR: userDataDir,
     },
   });
@@ -89,9 +100,7 @@ async function main() {
     await waitForCdp(60_000);
     browser = await chromium.connectOverCDP(CDP_URL, { timeout: 30_000 });
     const context = browser.contexts()[0];
-    await context.waitForEvent('page', { timeout: 30_000 }).catch(() => undefined);
-    const pages = context.pages();
-    const page = pages[pages.length - 1];
+    const page = await waitForPage(context, 30_000);
     await page.waitForLoadState('domcontentloaded');
 
     // A. Window renders + preload bridge is present.

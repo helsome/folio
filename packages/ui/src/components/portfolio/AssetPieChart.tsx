@@ -1,8 +1,9 @@
 import React from 'react';
-import type { Portfolio } from '@finagent/core';
+import type { PortfolioView } from '../../atoms/portfolioAtoms';
+import { formatMoney } from '../../lib/money';
 
 interface AssetPieChartProps {
-  portfolio: Portfolio;
+  view: PortfolioView;
 }
 
 const COLORS = [
@@ -16,25 +17,35 @@ const COLORS = [
   'bg-teal-500',
 ];
 
-export const AssetPieChart: React.FC<AssetPieChartProps> = ({ portfolio }) => {
-  const { positions, totalValue, cash } = portfolio;
+interface Slice {
+  name: string;
+  value: number;
+  currency?: string;
+  color: string;
+}
 
-  // Calculate percentages
-  const totalStockValue = positions.reduce((sum, p) => sum + p.marketValue, 0);
-  const items = [
-    { name: 'Cash', value: cash, color: 'bg-gray-400' },
-    ...positions.map((p, i) => ({
-      name: p.symbol,
-      value: p.marketValue,
+export const AssetPieChart: React.FC<AssetPieChartProps> = ({ view }) => {
+  const holdingsValue = view.holdings
+    .map((h) => h.marketValueBase ?? h.marketValue ?? 0)
+    .reduce((sum, v) => sum + (v > 0 ? v : 0), 0);
+  const cash = view.cash ?? 0;
+  const total = view.totalAssets ?? (holdingsValue + cash);
+
+  const items: Slice[] = [
+    { name: 'Cash', value: cash, currency: view.baseCurrency, color: 'bg-gray-400' },
+    ...view.holdings.map((h, i) => ({
+      name: h.symbol,
+      value: h.marketValueBase ?? h.marketValue ?? 0,
+      currency: h.currency,
       color: COLORS[i % COLORS.length],
     })),
-  ].filter(item => item.value > 0);
+  ].filter((item) => item.value > 0);
 
   const maxItems = 8;
   const displayItems = items.slice(0, maxItems);
   const otherValue = items.slice(maxItems).reduce((sum, item) => sum + item.value, 0);
 
-  if (totalValue === 0) {
+  if (total <= 0 || items.length === 0) {
     return (
       <div className="p-4 bg-[oklch(var(--bg-secondary))] rounded-lg text-center text-[oklch(var(--text-secondary))]">
         No holdings to display
@@ -48,26 +59,24 @@ export const AssetPieChart: React.FC<AssetPieChartProps> = ({ portfolio }) => {
         Asset Allocation
       </h3>
 
-      {/* Simple bar representation */}
       <div className="flex h-4 rounded-full overflow-hidden mb-4">
         {displayItems.map((item, i) => (
           <div
             key={i}
             className={`${item.color} transition-all`}
-            style={{ width: `${(item.value / totalValue) * 100}%` }}
-            title={`${item.name}: $${item.value.toFixed(2)} (${((item.value / totalValue) * 100).toFixed(1)}%)`}
+            style={{ width: `${(item.value / total) * 100}%` }}
+            title={`${item.name}: ${formatMoney(item.value, item.currency)} (${((item.value / total) * 100).toFixed(1)}%)`}
           />
         ))}
         {otherValue > 0 && (
           <div
             className="bg-gray-500"
-            style={{ width: `${(otherValue / totalValue) * 100}%` }}
-            title={`Other: $${otherValue.toFixed(2)}`}
+            style={{ width: `${(otherValue / total) * 100}%` }}
+            title={`Other: ${formatMoney(otherValue, view.baseCurrency)}`}
           />
         )}
       </div>
 
-      {/* Legend */}
       <div className="grid grid-cols-2 gap-2">
         {displayItems.map((item, i) => (
           <div key={i} className="flex items-center gap-2 text-sm">
@@ -76,7 +85,7 @@ export const AssetPieChart: React.FC<AssetPieChartProps> = ({ portfolio }) => {
               {item.name}:
             </span>
             <span className="text-[oklch(var(--text-primary))] font-medium">
-              {((item.value / totalValue) * 100).toFixed(1)}%
+              {((item.value / total) * 100).toFixed(1)}%
             </span>
           </div>
         ))}
@@ -85,7 +94,7 @@ export const AssetPieChart: React.FC<AssetPieChartProps> = ({ portfolio }) => {
             <div className="w-3 h-3 rounded-sm bg-gray-500" />
             <span className="text-[oklch(var(--text-secondary))]">Other:</span>
             <span className="text-[oklch(var(--text-primary))] font-medium">
-              {((otherValue / totalValue) * 100).toFixed(1)}%
+              {((otherValue / total) * 100).toFixed(1)}%
             </span>
           </div>
         )}

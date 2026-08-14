@@ -31,12 +31,20 @@ export type NavSection =
   // feature agents never race on this union.
   | 'research'
   | 'thesis'
-  | 'compare';
+  | 'compare'
+  // Folio V4 "Today" dashboard (spec §31–32) — mounted by the Lead.
+  | 'today';
 
 export const navSectionAtom = atom<NavSection>('sessions');
 
 /** Whether the Agent Panel is visible (collapse/expand in the shell). */
 export const agentPanelVisibleAtom = atom<boolean>(true);
+/** Active tab within the Settings section. */
+export type SettingsTab = 'general' | 'llm' | 'connections' | 'skills' | 'diagnostics';
+
+/** Which Settings tab is selected (drives SettingsView and the ErrorBoundary fallback). */
+export const settingsTabAtom = atom<SettingsTab>('general');
+
 
 /** Derived WorkspaceContext passed to agent runs and shared by all views. */
 export const workspaceContextAtom = atom<WorkspaceContext>((get) => {

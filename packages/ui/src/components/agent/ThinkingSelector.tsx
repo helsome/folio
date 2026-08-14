@@ -91,7 +91,7 @@ export const ThinkingSelector: React.FC<ThinkingSelectorProps> = ({ disabled = f
       {open && (
         <div
           role="listbox"
-          className="absolute left-0 top-full z-[--z-index-dropdown] mt-1.5 max-h-72 w-44 overflow-y-auto rounded-[12px] border border-[var(--mac-border)] bg-[var(--mac-surface-solid)] shadow-middle"
+          className="absolute left-0 top-full z-(--z-index-dropdown) mt-1.5 max-h-72 w-44 overflow-y-auto rounded-[12px] border border-[var(--mac-border)] bg-[var(--mac-surface-solid)] shadow-middle"
         >
           {levels.map((level) => {
             const isCurrent = level === state.thinkingLevel;

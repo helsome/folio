@@ -22,22 +22,7 @@ export const quoteSchema = z.object({
   prevClose: z.number(),
 });
 
-export const positionSchema = z.object({
-  symbol: symbolSchema,
-  name: z.string(),
-  quantity: z.number(),
-  avgCost: z.number(),
-  lastPrice: z.number(),
-  marketValue: z.number(),
-  unrealizedPnL: z.number(),
-  unrealizedPnLPercent: z.number(),
-});
 
-export const portfolioSchema = z.object({
-  totalValue: z.number(),
-  cash: z.number(),
-  positions: z.array(positionSchema),
-});
 
 export const sessionSchema = z.object({
   id: z.string(),
@@ -126,3 +111,5 @@ export * from './alerts/index.ts';
 export * from './portfolio-risk/index.ts';
 export * from './resources/index.ts';
 export { isRecord, toFiniteNumber } from './guards.ts';
+export * from './providers/index.ts';
+export * from './diagnostics/index.ts';

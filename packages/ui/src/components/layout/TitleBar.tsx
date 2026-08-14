@@ -1,11 +1,14 @@
 import React, { useState, useEffect } from 'react';
 import { useFinagentClient } from '../../client';
+import { Dialog } from '../primitives/Dialog';
+import { AboutView } from '../about/AboutView';
 
 const folioLogoUrl = new URL('../../assets/folio-logo.png', import.meta.url).href;
 
 export const TitleBar: React.FC = () => {
   const client = useFinagentClient();
   const [isMaximized, setIsMaximized] = useState(false);
+  const [aboutOpen, setAboutOpen] = useState(false);
 
   useEffect(() => {
     const checkMaximized = async () => {
@@ -65,7 +68,23 @@ export const TitleBar: React.FC = () => {
         </div>
       </div>
 
-      <div className="w-[4.8rem]" />
+      <div className="flex h-full w-[4.8rem] items-center justify-end pr-3">
+        <button
+          type="button"
+          onClick={() => setAboutOpen(true)}
+          aria-label="About Folio"
+          className="flex h-5 w-5 items-center justify-center rounded text-foreground/50 transition-smooth hover:bg-black/5 hover:text-foreground"
+        >
+          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
+            <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M8 7.2v3M8 5.4v.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+        </button>
+      </div>
+
+      <Dialog open={aboutOpen} onClose={() => setAboutOpen(false)} title="About Folio">
+        <AboutView />
+      </Dialog>
     </header>
   );
 };

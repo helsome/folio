@@ -1,21 +1,28 @@
 import { LongBridgeError } from './errors.ts';
 import type {
+  AccountAssets,
   CalcIndex,
+  CashFlowRecord,
+  Holding,
   IntradayData,
   Kline,
   MarketStatus,
   NewsItem,
-  Portfolio,
-  Position,
+  PortfolioSnapshot,
   Quote,
   StaticInfo,
 } from '@finagent/core';
+import {
+  normalizeAssets,
+  normalizeCashFlow,
+  normalizePortfolioSnapshot,
+  normalizePositions,
+} from './normalizer.ts';
+import type { RawPortfolioResponse } from './normalizer.ts';
 import type {
-  Assets,
   CalendarEvent,
   CapitalFlow,
   CapitalFlowSide,
-  CashFlowRecord,
   Depth,
   DepthLevel,
   DividendRecord,
@@ -26,10 +33,9 @@ import type {
   FinancialReportValue,
   InstitutionRating,
   MarketTemperature,
-  Position as AccountPosition,
   RatingDistribution,
   TradeTick,
-} from './types.ts';
+} from '@finagent/core/market-data';
 
 interface RawQuoteResponse {
   symbol: string;
@@ -43,23 +49,6 @@ interface RawQuoteResponse {
   low?: number | string;
   open?: number | string;
   prev_close?: number | string;
-}
-
-interface RawPositionResponse {
-  symbol: string;
-  name: string;
-  quantity: number;
-  avg_cost: number;
-  last_price: number;
-  market_value: number;
-  unrealized_pnl: number;
-  unrealized_pnl_ratio: number;
-}
-
-interface RawPortfolioResponse {
-  total_value: number;
-  cash: number;
-  positions: RawPositionResponse[];
 }
 
 interface RawKlineResponse {
@@ -107,29 +96,26 @@ export function parseQuoteResponse(output: string): Quote {
   }
 }
 
-export function parsePortfolioResponse(output: string): Portfolio {
+function parsePortfolioError(output: string): LongBridgeError {
+  const debug = output.length > 2000 ? `${output.slice(0, 2000)}…` : output;
+  return new LongBridgeError(
+    'Portfolio data could not be read in the expected format.',
+    'LONGBRIDGE_PARSE_FAILURE',
+    debug
+  );
+}
+
+export function parsePortfolioResponse(output: string): PortfolioSnapshot {
+  let data: unknown;
   try {
-    const data: RawPortfolioResponse = JSON.parse(output);
-    return {
-      totalValue: data.total_value,
-      cash: data.cash,
-      positions: data.positions.map((p): Position => ({
-        symbol: p.symbol,
-        name: p.name,
-        quantity: p.quantity,
-        avgCost: p.avg_cost,
-        lastPrice: p.last_price,
-        marketValue: p.market_value,
-        unrealizedPnL: p.unrealized_pnl,
-        unrealizedPnLPercent: p.unrealized_pnl_ratio * 100,
-      })),
-    };
-  } catch (e) {
-    throw new LongBridgeError(
-      `Failed to parse portfolio response: ${output}`,
-      'LONGBRIDGE_PARSE_FAILURE'
-    );
+    data = JSON.parse(output);
+  } catch {
+    throw parsePortfolioError(output);
   }
+  if (typeof data !== 'object' || data === null || Array.isArray(data)) {
+    throw parsePortfolioError(output);
+  }
+  return normalizePortfolioSnapshot(data as RawPortfolioResponse);
 }
 
 export function parseKlineResponse(output: string, fallbackSymbol = ''): Kline[] {
@@ -737,116 +723,43 @@ function counterIdToSymbol(counterId?: string, market?: string): string {
   return mkt ? `${code}.${mkt}` : code;
 }
 
-interface RawAccountPosition {
-  symbol: string;
-  name: string;
-  quantity: number | string;
-  available: number | string;
-  cost_price: number | string;
-  currency?: string;
-  market?: string;
-}
-
-export function parsePositionsResponse(output: string): AccountPosition[] {
+export function parsePositionsResponse(output: string): Holding[] {
+  let data: unknown;
   try {
-    const data: RawAccountPosition[] = JSON.parse(output);
-    if (!Array.isArray(data)) {
-      throw new Error('Positions response is not an array');
-    }
-    return data.map((p) => ({
-      symbol: p.symbol,
-      name: p.name,
-      quantity: toNumber(p.quantity, 'quantity'),
-      available: toNumber(p.available, 'available'),
-      costPrice: toNumber(p.cost_price, 'cost_price'),
-      currency: p.currency ?? '',
-      market: p.market ?? '',
-    }));
-  } catch (e) {
-    throw new LongBridgeError(`Failed to parse positions response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    data = JSON.parse(output);
+  } catch {
+    throw parsePortfolioError(output);
   }
+  if (!Array.isArray(data)) {
+    throw parsePortfolioError(output);
+  }
+  return normalizePositions(data);
 }
 
-interface RawCashInfo {
-  available_cash?: number | string;
-  currency?: string;
-  frozen_cash?: number | string;
-  settling_cash?: number | string;
-  withdraw_cash?: number | string;
-}
-
-interface RawAssetsResponse {
-  buy_power?: number | string;
-  cash_infos?: RawCashInfo[];
-  currency?: string;
-  init_margin?: number | string;
-  maintenance_margin?: number | string;
-  margin_call?: number | string;
-  max_finance_amount?: number | string;
-  net_assets?: number | string;
-  remaining_finance_amount?: number | string;
-  risk_level?: string;
-  total_cash?: number | string;
-}
-
-export function parseAssetsResponse(output: string): Assets[] {
+export function parseAssetsResponse(output: string): AccountAssets[] {
+  let data: unknown;
   try {
-    const data: RawAssetsResponse[] = JSON.parse(output);
-    if (!Array.isArray(data)) {
-      throw new Error('Assets response is not an array');
-    }
-    return data.map((a) => ({
-      currency: a.currency ?? '',
-      netAssets: toNumber(a.net_assets ?? 0, 'net_assets'),
-      totalCash: toNumber(a.total_cash ?? 0, 'total_cash'),
-      buyPower: toNumber(a.buy_power ?? 0, 'buy_power'),
-      maxFinanceAmount: toOptionalNumber(a.max_finance_amount),
-      remainingFinanceAmount: toOptionalNumber(a.remaining_finance_amount),
-      initMargin: toOptionalNumber(a.init_margin),
-      maintenanceMargin: toOptionalNumber(a.maintenance_margin),
-      marginCall: toOptionalNumber(a.margin_call),
-      riskLevel: a.risk_level,
-      cashInfos: (a.cash_infos ?? []).map((c) => ({
-        currency: c.currency ?? '',
-        availableCash: toNumber(c.available_cash ?? 0, 'available_cash'),
-        frozenCash: toNumber(c.frozen_cash ?? 0, 'frozen_cash'),
-        settlingCash: toNumber(c.settling_cash ?? 0, 'settling_cash'),
-        withdrawCash: toNumber(c.withdraw_cash ?? 0, 'withdraw_cash'),
-      })),
-    }));
-  } catch (e) {
-    throw new LongBridgeError(`Failed to parse assets response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    data = JSON.parse(output);
+  } catch {
+    throw parsePortfolioError(output);
   }
-}
-
-interface RawCashFlowRecord {
-  balance?: number | string;
-  business_type?: string;
-  currency?: string;
-  description?: string;
-  flow_name?: string;
-  symbol?: string;
-  time?: string;
+  if (!Array.isArray(data)) {
+    throw parsePortfolioError(output);
+  }
+  return normalizeAssets(data);
 }
 
 export function parseCashFlowResponse(output: string): CashFlowRecord[] {
+  let data: unknown;
   try {
-    const data: RawCashFlowRecord[] = JSON.parse(output);
-    if (!Array.isArray(data)) {
-      throw new Error('Cash flow response is not an array');
-    }
-    return data.map((r) => ({
-      timestamp: toEpochSeconds(r.time) ?? 0,
-      balance: toNumber(r.balance ?? 0, 'balance'),
-      businessType: r.business_type ?? '',
-      flowName: r.flow_name ?? '',
-      description: r.description ?? '',
-      symbol: r.symbol ?? '',
-      currency: r.currency ?? '',
-    }));
-  } catch (e) {
-    throw new LongBridgeError(`Failed to parse cash-flow response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+    data = JSON.parse(output);
+  } catch {
+    throw parsePortfolioError(output);
   }
+  if (!Array.isArray(data)) {
+    throw parsePortfolioError(output);
+  }
+  return normalizeCashFlow(data);
 }
 
 /**

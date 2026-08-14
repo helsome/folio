@@ -2,11 +2,11 @@ import type {
   AllocationItem,
   CapabilityRegistry,
   CapabilityRunRecord,
+  Holding,
   Kline,
   NewsItem,
-  Position,
-  Portfolio,
   PortfolioRiskReport,
+  PortfolioSnapshot,
   Quote,
   RiskSeverity,
   RiskSignal,
@@ -90,7 +90,7 @@ export class PortfolioRiskService {
     else runs.push(missingRun('portfolio.positions'));
 
     const summaryData = summaryOutcome?.result?.data;
-    const summaryPortfolio = isPortfolio(summaryData) ? summaryData : undefined;
+    const summaryPortfolio = isPortfolioSnapshot(summaryData) ? summaryData : undefined;
     const rawPositions = resolvePositions(summaryPortfolio, positionsOutcome);
     const hasPositions = rawPositions.length > 0;
 
@@ -195,20 +195,20 @@ export class PortfolioRiskService {
 // ── Allocation + concentration (pure) ──────────────────────────────────────
 
 function resolvePositions(
-  summary: Portfolio | undefined,
+  summary: PortfolioSnapshot | undefined,
   positionsOutcome: RunOutcome | undefined
-): Position[] {
-  if (summary && summary.positions.length > 0) {
-    return summary.positions.filter(isPosition);
+): Holding[] {
+  if (summary && summary.holdings.length > 0) {
+    return summary.holdings.filter(isHolding);
   }
   const positionsData = positionsOutcome?.result?.data;
-  return isPositionArray(positionsData) ? positionsData : [];
+  return isHoldingArray(positionsData) ? positionsData : [];
 }
 
 function buildAllocation(
-  rawPositions: Position[],
+  rawPositions: Holding[],
   quoteOutcomes: RunOutcome[],
-  summary: Portfolio | undefined
+  summary: PortfolioSnapshot | undefined
 ): AllocationItem[] {
   const resolved: Array<{ symbol: string; marketValue: number }> = [];
   rawPositions.forEach((position, index) => {
@@ -217,8 +217,8 @@ function buildAllocation(
   });
 
   const total =
-    summary && typeof summary.totalValue === 'number' && summary.totalValue > 0
-      ? summary.totalValue
+    summary && typeof summary.marketValue === 'number' && summary.marketValue > 0
+      ? summary.marketValue
       : resolved.reduce((sum, item) => sum + item.marketValue, 0);
 
   return resolved
@@ -227,11 +227,15 @@ function buildAllocation(
 }
 
 /**
- * Prefer the position's own marketValue; when raw positions lack it, derive
- * it from the quote (quantity × last price). Returns 0 when neither is
- * available so the caller excludes the position.
+ * Prefer the position's own market value (base-currency `marketValueBase` first,
+ * then `marketValue`); when both are absent, derive it from the quote
+ * (quantity × last price). Returns 0 when nothing is available so the caller
+ * excludes the position.
  */
-function resolveMarketValue(position: Position, quoteOutcome: RunOutcome | undefined): number {
+function resolveMarketValue(position: Holding, quoteOutcome: RunOutcome | undefined): number {
+  if (typeof position.marketValueBase === 'number' && position.marketValueBase > 0) {
+    return position.marketValueBase;
+  }
   if (typeof position.marketValue === 'number' && position.marketValue > 0) {
     return position.marketValue;
   }
@@ -476,18 +480,18 @@ interface CalendarEvent {
   date?: string | number;
 }
 
-function isPortfolio(value: unknown): value is Portfolio {
+function isPortfolioSnapshot(value: unknown): value is PortfolioSnapshot {
   if (typeof value !== 'object' || value === null) return false;
-  return 'positions' in value && Array.isArray(value.positions);
+  return 'holdings' in value && Array.isArray(value.holdings);
 }
 
-function isPosition(value: unknown): value is Position {
+function isHolding(value: unknown): value is Holding {
   if (typeof value !== 'object' || value === null) return false;
   return 'symbol' in value && typeof value.symbol === 'string';
 }
 
-function isPositionArray(value: unknown): value is Position[] {
-  return Array.isArray(value) && value.every(isPosition);
+function isHoldingArray(value: unknown): value is Holding[] {
+  return Array.isArray(value) && value.every(isHolding);
 }
 
 function isQuote(value: unknown): value is Quote {

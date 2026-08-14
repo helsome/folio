@@ -3,6 +3,7 @@ import { Allotment } from 'allotment';
 import 'allotment/dist/style.css';
 import { useAtomValue } from 'jotai';
 import { agentPanelVisibleAtom } from '../../atoms';
+import { ErrorBoundary } from '../primitives/ErrorBoundary';
 import { Sidebar } from './Sidebar';
 import { FinanceWorkspace } from '../workspace/FinanceWorkspace';
 import { AgentPanel } from '../agent/AgentPanel';
@@ -17,7 +18,9 @@ export const WorkbenchShell: React.FC = () => {
           <Sidebar />
         </Allotment.Pane>
         <Allotment.Pane minSize={500}>
-          <FinanceWorkspace />
+          <ErrorBoundary>
+            <FinanceWorkspace />
+          </ErrorBoundary>
         </Allotment.Pane>
         <Allotment.Pane
           minSize={320}
@@ -25,7 +28,9 @@ export const WorkbenchShell: React.FC = () => {
           snap
           visible={agentPanelVisible}
         >
-          <AgentPanel />
+          <ErrorBoundary>
+            <AgentPanel />
+          </ErrorBoundary>
         </Allotment.Pane>
       </Allotment>
     </div>

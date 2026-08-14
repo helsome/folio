@@ -18,8 +18,10 @@ import type {
   MarketStatus,
   Message,
   NewsItem,
-  Portfolio,
+  PortfolioSnapshot,
   PortfolioRiskReport,
+  ProviderCoverage,
+  ProviderHealth,
   ProviderStatus,
   Quote,
   ResearchReport,
@@ -33,6 +35,8 @@ import type {
   ToolDefinition,
   WorkspaceContext,
 } from '@finagent/core';
+import type { ConnectionsChannel, HealthChannel } from './client/connections';
+import type { DiagnosticsBundle } from './client/diagnostics';
 
 /** Renderer-safe capability metadata (schemas never cross IPC). */
 export interface CapabilityMetadata {
@@ -56,6 +60,12 @@ export interface KernelHydrate {
   sessions: SessionMeta[];
 }
 
+export interface AboutInfo {
+  version: string;
+  channel: string;
+  build: string;
+}
+
 export interface SkillListItem {
   id: string;
   name: string;
@@ -64,6 +74,10 @@ export interface SkillListItem {
   description: string;
   riskLevel?: string;
   tier?: string;
+  /** Parsed from SKILL.md frontmatter; absent until the main process maps it. */
+  version?: string;
+  /** Parsed from SKILL.md frontmatter; absent until the main process maps it. */
+  author?: string;
 }
 
 export interface SkillResourceItem {
@@ -95,7 +109,7 @@ export interface FinagentClient {
   market: {
     getQuote: (symbol: string) => Promise<ApiResult<Quote>>;
     getKline: (request: KlineRequest) => Promise<ApiResult<Kline[]>>;
-    getPortfolio: () => Promise<ApiResult<Portfolio>>;
+    getPortfolio: () => Promise<ApiResult<PortfolioSnapshot>>;
     getStaticInfo: (symbol: string) => Promise<ApiResult<StaticInfo>>;
     getCalcIndex: (symbol: string) => Promise<ApiResult<CalcIndex>>;
     getMarketStatus: () => Promise<ApiResult<MarketStatus[]>>;
@@ -103,6 +117,13 @@ export interface FinagentClient {
   };
   longbridge: {
     getStatus: () => Promise<ApiResult<LongBridgeStatus>>;
+  };
+  about?: {
+    get: () => Promise<ApiResult<AboutInfo>>;
+  };
+  onboarding?: {
+    getCompleted: () => Promise<ApiResult<boolean>>;
+    setCompleted: (completed: boolean) => Promise<ApiResult<void>>;
   };
   alerts?: {
     loadRules: () => Promise<ApiResult<AlertRule[]>>;
@@ -157,6 +178,13 @@ export interface FinagentClient {
     readResource: (skillId: string, relativePath: string) => Promise<ApiResult<string>>;
     readiness: () => Promise<ApiResult<SkillReadiness[]>>;
   };
+  diagnostics?: {
+    collect: () => Promise<ApiResult<DiagnosticsBundle>>;
+    export: () => Promise<ApiResult<{ canceled?: boolean; filePath?: string }>>;
+  };
+  connections?: ConnectionsChannel;
+  health?: HealthChannel;
+  openExternal?: (url: string) => Promise<ApiResult<void>>;
 }
 
 const missingClient = (operation: string) => async () =>
@@ -190,6 +218,9 @@ export const fallbackClient: FinagentClient = {
   },
   longbridge: {
     getStatus: missingClient('longbridge.getStatus'),
+  },
+  about: {
+    get: missingClient('about.get'),
   },
   alerts: {
     loadRules: missingClient('alerts.loadRules'),
@@ -243,6 +274,19 @@ export const fallbackClient: FinagentClient = {
     listResources: missingClient('skills.listResources'),
     readResource: missingClient('skills.readResource'),
     readiness: missingClient('skills.readiness'),
+  },
+  connections: {
+    list: missingClient('connections.list'),
+    connect: missingClient('connections.connect'),
+    cancelConnect: missingClient('connections.cancelConnect'),
+    disconnect: missingClient('connections.disconnect'),
+    test: missingClient('connections.test'),
+    setConfig: missingClient('connections.setConfig'),
+    coverage: missingClient('connections.coverage'),
+    onChanged: () => () => undefined,
+  },
+  health: {
+    check: missingClient('health.check'),
   },
 };
 

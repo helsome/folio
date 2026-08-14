@@ -20,6 +20,8 @@ packages/longbridge-tools/src/testing/fixtures/assets.json
 packages/longbridge-tools/src/testing/fixtures/assets.cmd.txt
 packages/longbridge-tools/src/testing/fixtures/cash-flow.json
 packages/longbridge-tools/src/testing/fixtures/cash-flow.cmd.txt
+packages/longbridge-tools/src/testing/fixtures/portfolio.json
+packages/longbridge-tools/src/testing/fixtures/portfolio.cmd.txt
 
 # Claude local session artifacts
 .claude/logs
@@ -31,3 +33,5 @@ packages/longbridge-tools/src/testing/fixtures/cash-flow.cmd.txt
 
 # E2E artifacts
 apps/electron/e2e/.user-data
+apps/electron/e2e/.user-data-interactions
+apps/electron/e2e/.user-data*

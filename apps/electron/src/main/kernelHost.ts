@@ -1,5 +1,6 @@
 import { join } from 'node:path';
-import { app, Notification, type BrowserWindow } from 'electron';
+import { spawn } from 'node:child_process';
+import { app, Notification, shell, type BrowserWindow } from 'electron';
 import type {
   AgentEvent,
   AlertRule,
@@ -9,12 +10,15 @@ import type {
   Comparison,
   CredentialInfo,
   CustomProviderConfig,
+  FinancialProviderStatus,
   InvestmentThesis,
   LlmModel,
   LlmRuntimeState,
   LlmTestResult,
   Message,
   PortfolioRiskReport,
+  ProviderCoverage,
+  ProviderHealth,
   ProviderStatus,
   ResearchReport,
   ResearchRunSummary,
@@ -40,24 +44,60 @@ import {
   createAgentSynthesizer,
   createFullRegistry,
   createLocalThesisEvaluator,
+  createRouterFetchers,
+  ConnectionStore,
   defaultPortfolioRiskSynthesizer,
   FinanceToolRegistry,
   JsonFileStore,
   LocalResearchSynthesizer,
   MarketDataService,
+  MassiveFinancialDataProvider,
   parseImpactJson,
   parseSynthesisJson,
   PortfolioRiskService,
+  ProviderRouter,
   ResearchReportRepository,
   ResearchService,
   ThesisImpactRepository,
   ThesisRepository,
   ThesisService,
+  type AnyProvider,
   type PortfolioRiskSynthesisInput,
 } from '@finagent/shared';
+import {
+  LongbridgeBrokerAccountProvider,
+  LongbridgeFinancialDataProvider,
+  logout as longbridgeLogout,
+  startLogin,
+  testConnection as longbridgeTestConnection,
+  type LongbridgeExec,
+  type SpawnFn,
+} from '@finagent/shared/providers/longbridge';
 import { SkillHub, skillCapabilityMap } from '@finagent/skill-hub';
-import { getPiCwd, getPiExtensionEntry, getSkillsDir } from '@finagent/shared/resources';
+import { getPiCwd, getPiExtensionEntry, getRuntimeRoot, getSkillsDir } from '@finagent/shared/resources';
+import {
+  collectDiagnostics,
+  ErrorLog,
+  type DiagnosticsBundle,
+  type FinancialProviderSummary,
+} from '@finagent/shared/diagnostics';
 import { CredentialStore, redactSecrets } from './credentialStore.ts';
+import { executeLongBridge } from '@finagent/longbridge-tools';
+
+/** Renderer-facing mirror of the Connections IPC contract (ui/client/connections.ts). */
+interface ConnectionEntry {
+  providerId: string;
+  kind: 'financial-data' | 'broker-account';
+  name: string;
+  status: FinancialProviderStatus;
+  health: ProviderHealth | null;
+  coverage: ProviderCoverage | null;
+  configurable: boolean;
+  configured: boolean;
+  hasAccount: boolean;
+  accountLabel: string | null;
+  error: { code: string; message: string } | null;
+}
 
 type IpcSuccess<T> = { ok: true; data: T };
 
@@ -107,7 +147,11 @@ export class AgentKernelHost {
   private readonly alertEventLog: AlertEventLog;
   private readonly alertEngine: AlertEngine;
   private readonly portfolioRisk: PortfolioRiskService;
+  private readonly connectionStore: ConnectionStore;
+  private readonly providerRouter: ProviderRouter;
+  private activeLogin: { cancel: () => void } | null = null;
   private unsubscribe: (() => void) | null = null;
+  private connectionsUnsubscribe: (() => void) | null = null;
   private window: BrowserWindow | null = null;
 
   constructor() {
@@ -126,7 +170,23 @@ export class AgentKernelHost {
     const provider = readAgentProvider();
     const userData = app.getPath('userData');
 
-    this.registry = createFullRegistry();
+    // V4 provider platform: the capability registry is built on top of the
+    // provider router, which owns the Longbridge (primary) and Massive
+    // (fallback) adapters. Business layers see only the neutral capability
+    // surface — vendor specifics stay inside the adapters.
+    this.connectionStore = new ConnectionStore(new JsonFileStore(userData));
+    this.providerRouter = new ProviderRouter();
+    const longbridgeData = new LongbridgeFinancialDataProvider();
+    const longbridgeBroker = new LongbridgeBrokerAccountProvider();
+    const massive = new MassiveFinancialDataProvider({
+      getApiKey: async () => (await this.connectionStore.getConfig('massive'))?.apiKey,
+    });
+    this.providerRouter.register(longbridgeData);
+    this.providerRouter.register(longbridgeBroker);
+    this.providerRouter.register(massive);
+    this.providerRouter.setRouting({ primary: 'longbridge', fallback: 'massive' });
+
+    this.registry = createFullRegistry(createRouterFetchers(this.providerRouter));
     this.executor = new CapabilityExecutor();
 
     this.researchService = new ResearchService({
@@ -190,6 +250,10 @@ export class AgentKernelHost {
       if (!window.isDestroyed()) {
         window.webContents.send('agent:event', event);
       }
+    });
+    this.connectionsUnsubscribe?.();
+    this.connectionsUnsubscribe = this.connectionStore.subscribe(() => {
+      void this.pushConnections();
     });
   }
 
@@ -708,21 +772,343 @@ export class AgentKernelHost {
       requireString(request.modelId, 'modelId')
     );
   }
+  // -------------------------------------------------------------------------
+  // Diagnostics (spec §35–36)
+  // -------------------------------------------------------------------------
+
+  async collectDiagnostics(): Promise<DiagnosticsBundle> {
+    let llmState: LlmRuntimeState | null = null;
+    try {
+      llmState = await this.requireLlm().getState();
+    } catch {
+      // Local provider (no Pi runtime) — llm fields stay null.
+    }
+    let providerSummaries: FinancialProviderSummary[] = [];
+    try {
+      providerSummaries = this.listFinancialProviders();
+    } catch {
+      // Provider wiring lands with the connector slice; empty until then.
+    }
+    return collectDiagnostics({
+      version: app.getVersion(),
+      os: process.platform,
+      arch: process.arch,
+      electronVersion: process.versions.electron ?? null,
+      agentProviderId: readAgentProvider(),
+      agentState: llmState?.runtimeProvider ?? null,
+      llmProviderId: llmState?.model?.provider ?? null,
+      llmModel: llmState?.model?.id ?? null,
+      financialProviders: providerSummaries,
+      brokerConnected: providerSummaries.some((p) => p.id === 'longbridge-broker'),
+      brokerAccountCount: providerSummaries.some((p) => p.id === 'longbridge-broker') ? 1 : 0,
+      skillsLoadedCount: this.skillHub.listSkills().length,
+      capabilities: this.registry,
+      resources: { dev: !app.isPackaged, root: getRuntimeRoot() },
+      errors: mainErrorLog.recent(20),
+    });
+  }
+
+  // -------------------------------------------------------------------------
+  // Environment health check (onboarding step 4, spec §30)
+  // -------------------------------------------------------------------------
+
+  async checkHealth(): Promise<{
+    ai: { ok: boolean; detail: string | null; error: { code: string; message: string } | null };
+    marketData: { ok: boolean; detail: string | null; error: { code: string; message: string } | null };
+    skills: { ok: boolean; detail: string | null; error: { code: string; message: string } | null };
+    agentRuntime: { ok: boolean; detail: string | null; error: { code: string; message: string } | null };
+  }> {
+    const item = (ok: boolean, detail: string | null, error: { code: string; message: string } | null = null) => ({
+      ok,
+      detail,
+      error,
+    });
+
+    let ai = item(false, null, { code: 'LLM_UNAVAILABLE', message: 'LLM control plane unavailable' });
+    try {
+      const state = await this.requireLlm().getState();
+      if (state.runtimeProvider === 'local') {
+        ai = item(true, 'Local agent runtime (no LLM configured)');
+      } else if (state.model) {
+        ai = item(true, `${state.model.provider} · ${state.model.id}`);
+      } else {
+        ai = item(false, null, { code: 'LLM_NO_MODEL', message: 'No model selected' });
+      }
+    } catch {
+      // ai stays failed.
+    }
+
+    let marketData = item(false, null, { code: 'MARKET_DATA_UNAVAILABLE', message: 'Market data check failed' });
+    try {
+      const quoteCapability = this.registry.get('market.quote');
+      if (!quoteCapability) {
+        marketData = item(false, null, { code: 'CAPABILITY_MISSING', message: 'market.quote capability missing' });
+      } else {
+        const outcome = await this.executor.run(quoteCapability, { symbol: 'AAPL.US' }, { timeoutMs: 20_000 });
+        marketData =
+          outcome.record.status === 'success'
+            ? item(true, 'Quote check passed (AAPL.US)')
+            : item(false, null, { code: 'QUOTE_FAILED', message: outcome.record.error ?? 'Quote check failed' });
+      }
+    } catch (error) {
+      marketData = item(false, null, {
+        code: 'QUOTE_FAILED',
+        message: error instanceof Error ? error.message : 'Quote check failed',
+      });
+    }
+
+    const skillsCount = this.skillHub.listSkills().length;
+    const skills = item(
+      skillsCount > 0,
+      skillsCount > 0 ? `${skillsCount} skills loaded` : null,
+      skillsCount > 0 ? null : { code: 'NO_SKILLS', message: 'No skills loaded' }
+    );
+
+    const agentRuntime = item(true, 'Agent kernel running', null);
+
+    return { ai, marketData, skills, agentRuntime };
+  }
+
+  // -------------------------------------------------------------------------
+  // Provider connections (spec §8–11)
+  // -------------------------------------------------------------------------
+
+  private async providerHealth(provider: AnyProvider): Promise<ProviderHealth | null> {
+    try {
+      return await provider.status();
+    } catch {
+      return null;
+    }
+  }
+
+  /** Renderer-facing mirror of the Connections IPC contract (ui/client/connections.ts). */
+  private async entryFor(provider: AnyProvider): Promise<ConnectionEntry> {
+    const state = await this.connectionStore.get(provider.id);
+    const health = await this.providerHealth(provider);
+    const coverage =
+      this.providerRouter.coverage().find((c) => c.providerId === provider.id) ?? null;
+    const config = await this.connectionStore.getConfig(provider.id);
+    let hasAccount = false;
+    let accountLabel: string | null = null;
+    if (provider.kind === 'broker-account') {
+      try {
+        const accounts = await provider.accounts();
+        if (accounts.ok) {
+          hasAccount = accounts.data.length > 0;
+          accountLabel = accounts.data[0]?.name ?? null;
+        }
+      } catch {
+        // No account info — entry still renders with hasAccount=false.
+      }
+    }
+    return {
+      providerId: provider.id,
+      kind: provider.kind,
+      name: provider.name,
+      status: health?.status ?? state?.status ?? 'not-connected',
+      health,
+      coverage,
+      configurable: provider.id === 'massive',
+      configured: Boolean(config?.apiKey),
+      hasAccount,
+      accountLabel,
+      error: state?.error ?? null,
+    };
+  }
+
+  async listConnections(): Promise<ConnectionEntry[]> {
+    return Promise.all(this.providerRouter.list().map((provider) => this.entryFor(provider)));
+  }
+
+  async connectProvider(input: unknown): Promise<{ status: 'connecting' | 'connected'; verificationUrl?: string }> {
+    const request = requireObject(input);
+    const providerId = requireString(request.providerId, 'providerId');
+    if (providerId !== 'longbridge') {
+      throw createCodeError('CONFIG_UNSUPPORTED', 'Connect is only supported for the Longbridge CLI.');
+    }
+    if (this.activeLogin) {
+      throw createCodeError('LOGIN_IN_PROGRESS', 'A Longbridge login is already in progress.');
+    }
+    await this.connectionStore.update({ providerId, status: 'connecting', lastCheck: Date.now() });
+
+    const controller = new AbortController();
+    let resolveUrl: (uri: string | undefined) => void;
+    const urlPromise = new Promise<string | undefined>((resolve) => {
+      resolveUrl = resolve;
+    });
+    const urlTimer = setTimeout(() => resolveUrl(undefined), 30_000);
+
+    const outcomePromise = startLogin({
+      exec: executeLongBridgeCli,
+      spawn: spawnLongbridge,
+      openUrl: (uri) => shell.openExternal(uri),
+      onVerificationUri: (uri) => {
+        clearTimeout(urlTimer);
+        resolveUrl(uri);
+      },
+      signal: controller.signal,
+    });
+    this.activeLogin = {
+      cancel: () => controller.abort(),
+    };
+
+    const verificationUrl = await urlPromise;
+    if (!verificationUrl) {
+      controller.abort();
+      this.activeLogin = null;
+      throw createCodeError('LOGIN_START_FAILED', 'Could not start the Longbridge authorization flow.');
+    }
+
+    // The device flow continues in the background; completion updates the
+    // connection store and pushes `connections:changed` to the renderer.
+    void outcomePromise
+      .then(async (outcome) => {
+        if (outcome.status === 'connected') {
+          await this.connectionStore.update({
+            providerId,
+            status: 'connected',
+            lastCheck: Date.now(),
+            connectedAt: Date.now(),
+          });
+        } else if (outcome.status === 'cancelled') {
+          await this.connectionStore.update({ providerId, status: 'not-connected', lastCheck: Date.now() });
+        } else {
+          await this.connectionStore.update({
+            providerId,
+            status: 'error',
+            lastCheck: Date.now(),
+            error: { code: 'LOGIN_TIMEOUT', message: 'Authorization timed out. Try again.' },
+          });
+        }
+        this.activeLogin = null;
+        void this.pushConnections();
+      })
+      .catch(() => {
+        this.activeLogin = null;
+        void this.pushConnections();
+      });
+
+    return { status: 'connecting', verificationUrl };
+  }
+
+  async cancelConnectProvider(input: unknown): Promise<void> {
+    requireObject(input);
+    this.activeLogin?.cancel();
+  }
+
+  async disconnectProvider(input: unknown): Promise<ConnectionEntry | null> {
+    const request = requireObject(input);
+    const providerId = requireString(request.providerId, 'providerId');
+    const provider = this.providerRouter.get(providerId);
+    if (!provider) return null;
+    if (providerId === 'longbridge') {
+      await longbridgeLogout({ exec: executeLongBridgeCli });
+    }
+    await this.connectionStore.update({ providerId, status: 'not-connected', lastCheck: Date.now() });
+    return this.entryFor(provider);
+  }
+
+  async testProviderConnection(input: unknown): Promise<ProviderHealth> {
+    const request = requireObject(input);
+    const providerId = requireString(request.providerId, 'providerId');
+    if (providerId === 'longbridge') {
+      return longbridgeTestConnection({ exec: executeLongBridgeCli });
+    }
+    const provider = this.providerRouter.get(providerId);
+    if (!provider) throw createCodeError('UNKNOWN_PROVIDER', 'Unknown provider.');
+    return (await this.providerHealth(provider)) ?? {
+      status: 'error',
+      lastCheck: Date.now(),
+      message: 'Provider did not answer a health probe.',
+    };
+  }
+
+  async setProviderConfig(input: unknown): Promise<ConnectionEntry> {
+    const request = requireObject(input);
+    const providerId = requireString(request.providerId, 'providerId');
+    const config = requireObject(request.config);
+    if (providerId !== 'massive') {
+      throw createCodeError('CONFIG_UNSUPPORTED', 'Only API-key providers accept config.');
+    }
+    const apiKey = typeof config.apiKey === 'string' ? config.apiKey.trim() : '';
+    if (!apiKey) {
+      throw createCodeError('INVALID_ARGUMENT', 'An API key is required.');
+    }
+    await this.connectionStore.setConfig(providerId, { apiKey });
+    const massive = this.providerRouter.get('massive');
+    if (massive instanceof MassiveFinancialDataProvider) {
+      massive.clearCache();
+    }
+    return this.entryFor(this.providerRouter.get(providerId)!);
+  }
+
+  async coverageMatrix(): Promise<ProviderCoverage[]> {
+    return this.providerRouter.coverage();
+  }
+
+  // -------------------------------------------------------------------------
+  // Onboarding persistence (spec §27–30, §42) — main-side so the flag
+  // survives restarts regardless of web-storage behavior in packaged builds.
+  // -------------------------------------------------------------------------
+
+  async getOnboardingCompleted(): Promise<boolean> {
+    const store = new JsonFileStore(app.getPath('userData'));
+    const file = await store.read<{ completed?: boolean }>('onboarding.json', {});
+    return file.completed === true;
+  }
+
+  async setOnboardingCompleted(input: unknown): Promise<void> {
+    const request = requireObject(input);
+    const completed = request.completed === true;
+    const store = new JsonFileStore(app.getPath('userData'));
+    await store.write('onboarding.json', { completed });
+  }
+
+  private async pushConnections(): Promise<void> {
+    try {
+      const entries = await this.listConnections();
+      if (this.window && !this.window.isDestroyed()) {
+        this.window.webContents.send('connections:changed', entries);
+      }
+    } catch {
+      // Push is best-effort; the UI can re-list on demand.
+    }
+  }
+
+  private listFinancialProviders(): FinancialProviderSummary[] {
+    return this.providerRouter.list().map((provider) => {
+      const coverage = this.providerRouter.coverage().find((c) => c.providerId === provider.id);
+      return {
+        id: provider.id,
+        status: provider.kind,
+        coverage: {
+          capabilities: coverage?.capabilities ?? [],
+          markets: (coverage?.markets ?? []).map((m) => m.id),
+        },
+      };
+    });
+  }
 
   // -------------------------------------------------------------------------
   // Skills
   // -------------------------------------------------------------------------
 
   async listSkills() {
-    return this.skillHub.listSkills().map((skill) => ({
-      id: skill.id,
-      name: skill.name,
-      keywords: skill.trigger.keywords,
-      enabled: skill.metadata.enabled,
-      description: this.skillHub.listSkillMetadata().find((m) => m.id === skill.id)?.description ?? '',
-      riskLevel: this.skillHub.listSkillMetadata().find((m) => m.id === skill.id)?.riskLevel,
-      tier: this.skillHub.listSkillMetadata().find((m) => m.id === skill.id)?.tier,
-    }));
+    const metadataById = new Map(this.skillHub.listSkillMetadata().map((m) => [m.id, m]));
+    return this.skillHub.listSkills().map((skill) => {
+      const meta = metadataById.get(skill.id);
+      return {
+        id: skill.id,
+        name: skill.name,
+        keywords: skill.trigger.keywords,
+        enabled: skill.metadata.enabled,
+        description: meta?.description ?? '',
+        riskLevel: meta?.riskLevel,
+        tier: meta?.tier,
+        version: meta?.version,
+        author: meta?.author,
+      };
+    });
   }
 
   async setSkillEnabled(input: unknown): Promise<void> {
@@ -816,12 +1202,26 @@ export function toIpcError(error: unknown): IpcFailure['error'] {
   };
 }
 
+/**
+ * Main-process error ring buffer (spec §43). IPC failures and service errors
+ * are pushed here already redacted; the diagnostics collector ships the last
+ * 20 entries. Renderer-side errors stay renderer-side.
+ */
+export const mainErrorLog = new ErrorLog();
+
 export async function toIpcResult<T>(operation: () => Promise<T> | T): Promise<IpcResult<T>> {
   try {
     const data = await operation();
     return { ok: true, data };
   } catch (error) {
-    return { ok: false, error: toIpcError(error) };
+    const ipcError = toIpcError(error);
+    mainErrorLog.push({
+      at: Date.now(),
+      source: 'main',
+      message: ipcError.message,
+      stack: error instanceof Error ? (error.stack ?? null) : null,
+    });
+    return { ok: false, error: ipcError };
   }
 }
 
@@ -829,6 +1229,18 @@ function readAgentProvider() {
   const value = process.env.FINAGENT_AGENT_PROVIDER;
   return value === 'local' ? 'local' : 'pi-runtime';
 }
+
+/** Real CLI exec for the Longbridge providers (main process only). */
+const executeLongBridgeCli: LongbridgeExec = (args, options) =>
+  executeLongBridge(args, { timeout: options?.timeout });
+
+/** Spawn the Longbridge CLI; stdout chunks stream to the login flow. */
+const spawnLongbridge: SpawnFn = (args, onStdout) => {
+  const child = spawn('longbridge', args, { stdio: ['ignore', 'pipe', 'pipe'] });
+  child.stdout.on('data', (chunk: Buffer) => onStdout(chunk.toString()));
+  child.stderr.resume();
+  return { kill: () => child.kill() };
+};
 
 function readRequiredLlmEnvKeys() {
   return process.env.FINAGENT_LLM_ENV_KEYS?.split(',')

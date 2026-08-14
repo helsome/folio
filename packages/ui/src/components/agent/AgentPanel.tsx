@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import type { Portfolio, Quote, ToolCall } from '@finagent/core';
+import type { PortfolioSnapshot, Quote, ToolCall } from '@finagent/core';
 import {
   activeMessagesAtom,
   activeSessionIdAtom,
@@ -46,10 +46,10 @@ function isQuote(value: unknown): value is Quote {
   return typeof v.lastPrice === 'number' && (typeof v.symbol === 'string' || typeof v.change === 'number');
 }
 
-function isPortfolio(value: unknown): value is Portfolio {
+function isPortfolio(value: unknown): value is PortfolioSnapshot {
   if (!value || typeof value !== 'object') return false;
   const v = value as Record<string, unknown>;
-  return typeof v.totalValue === 'number' && Array.isArray(v.positions);
+  return Array.isArray(v.holdings);
 }
 
 function extractQuote(toolCalls: ToolCall[]): Quote | null {
@@ -63,7 +63,7 @@ function extractQuote(toolCalls: ToolCall[]): Quote | null {
   return { ...data, symbol: symbol || '—' };
 }
 
-function extractPortfolio(toolCalls: ToolCall[]): Portfolio | null {
+function extractPortfolio(toolCalls: ToolCall[]): PortfolioSnapshot | null {
   const call = toolCalls.find((tc) => tc.toolName === 'get_portfolio' && tc.status === 'success');
   if (!call) return null;
   const data = unwrapStructuredResult(call.result);

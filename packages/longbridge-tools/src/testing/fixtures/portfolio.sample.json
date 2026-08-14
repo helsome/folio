@@ -1,0 +1,51 @@
+{
+  "overview": {
+    "total_asset": "50000.00",
+    "market_cap": "42000.00",
+    "total_cash": "8000.00",
+    "total_pl": "1250.50",
+    "total_today_pl": "-320.10",
+    "margin_call": "0",
+    "risk_level": 0,
+    "credit_limit": "90000.00",
+    "leverage_ratio": "0",
+    "fund_market_value": "0",
+    "currency": "USD"
+  },
+  "market_accounts": {
+    "US": {
+      "market": "US",
+      "currency": "USD",
+      "net_assets": "35000.00",
+      "market_value": "30000.00",
+      "pl": "1000.00",
+      "today_pl": "-200.00",
+      "balance": "5000.00",
+      "frozen_cash": "0",
+      "withdraw_cash": "5000.00",
+      "max_buy_limit": "0"
+    },
+    "HK": {
+      "market": "HK",
+      "currency": "HKD",
+      "net_assets": "15000.00",
+      "market_value": "12000.00",
+      "pl": "250.50",
+      "today_pl": "-120.10",
+      "balance": "3000.00",
+      "frozen_cash": "0",
+      "withdraw_cash": "3000.00",
+      "max_buy_limit": "0"
+    }
+  },
+  "cash_balances": [
+    { "currency": "USD", "total_amount": "5000.00", "balance": "5000.00", "frozen_cash": "0", "withdraw_cash": "5000.00" },
+    { "currency": "HKD", "total_amount": "3000.00", "balance": "3000.00", "frozen_cash": "0", "withdraw_cash": "3000.00" }
+  ],
+  "holdings": [
+    { "symbol": "0700.HK", "name": "腾讯控股", "currency": "HKD", "quantity": "100", "available_quantity": "100", "cost_price": "400.00", "market_value": "38000.00", "market_value_usd": "4850.00", "market_price": "380.00", "prev_close": "385.00" },
+    { "symbol": "AAPL.US", "name": "Apple", "currency": "USD", "quantity": "10", "available_quantity": "10", "cost_price": "180.00", "market_value": "2000.00", "market_value_usd": "2000.00", "market_price": "200.00", "prev_close": "195.00" },
+    { "symbol": "BABA.US", "name": "Alibaba", "currency": "USD", "quantity": "20", "available_quantity": "20", "cost_price": "120.00", "market_value": "2000.00", "market_value_usd": "2000.00", "market_price": "100.00", "prev_close": null },
+    { "symbol": "DELISTED.US", "name": "Delisted Co", "currency": "USD", "quantity": "5", "available_quantity": "5", "cost_price": "10.00", "market_value": "0", "market_value_usd": "0", "market_price": null, "prev_close": null }
+  ]
+}

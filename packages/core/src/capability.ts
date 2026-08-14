@@ -29,12 +29,16 @@ export type CapabilityId = string;
  * optional short human/agent-readable condensation.
  */
 export interface CapabilityProvenance {
-  /** Provider name, e.g. `longbridge`. */
+  /** Provider id, e.g. `longbridge`. */
   provider: string;
+  /** Provider id of the ACTUAL answering adapter (fallback-aware). */
+  providerId?: string;
   /** Epoch ms at which the data was fetched. */
   fetchedAt: number;
   /** Epoch ms of the data's own market timestamp, when known. */
   marketTime?: number;
+  /** True when the market was closed / data is delayed relative to live. */
+  delayed?: boolean;
   /** True when the data may be outdated relative to the market. */
   stale: boolean;
 }

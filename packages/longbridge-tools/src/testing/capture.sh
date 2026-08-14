@@ -45,6 +45,7 @@ run forecast-eps forecast-eps "$SYM"
 run finance-calendar finance-calendar financial
 run trading trading session
 run positions positions
+run portfolio portfolio
 run assets assets
 run cash-flow cash-flow
 run valuation valuation "$SYM"

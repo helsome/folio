@@ -1,0 +1,2 @@
+longbridge portfolio --format json
+# Hand-annotated sample (sanitized values) committed for CI; the real capture is portfolio.json (gitignored).

@@ -18,6 +18,7 @@
     "outDir": "./dist",
     "paths": {
       "@finagent/core": ["./packages/core/src"],
+      "@finagent/core/*": ["./packages/core/src/*"],
       "@finagent/shared": ["./packages/shared/src"],
       "@finagent/ui": ["./packages/ui/src"],
       "@finagent/pi-extension": ["./packages/pi-extension/src"],

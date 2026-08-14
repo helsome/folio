@@ -1,6 +1,6 @@
 {
   "name": "finagent",
-  "version": "0.1.0",
+  "version": "0.4.0-beta.1",
   "private": true,
   "workspaces": [
     "apps/*",
@@ -13,7 +13,9 @@
     "build:packages": "bun run --filter './packages/*' build",
     "build:electron": "cd apps/electron && bun run build",
     "typecheck": "bun run --filter './**' typecheck",
-    "lint": "bun run --filter './**' lint"
+    "lint": "bun run --filter './**' lint",
+    "release:check": "bun run scripts/release-check.mjs",
+    "release:package": "bun run scripts/release-package.mjs"
   },
   "devDependencies": {
     "typescript": "^5.6.0",

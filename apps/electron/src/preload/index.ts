@@ -89,6 +89,31 @@ export interface ElectronAPI {
     readResource: (skillId: string, relativePath: string) => Promise<unknown>;
     readiness: () => Promise<unknown>;
   };
+  about: {
+    get: () => Promise<unknown>;
+  };
+  diagnostics: {
+    collect: () => Promise<unknown>;
+    export: () => Promise<unknown>;
+  };
+  health: {
+    check: () => Promise<unknown>;
+  };
+  openExternal: (url: string) => Promise<unknown>;
+  connections: {
+    list: () => Promise<unknown>;
+    connect: (input: { providerId: string }) => Promise<unknown>;
+    cancelConnect: (input: { providerId: string }) => Promise<unknown>;
+    disconnect: (input: { providerId: string }) => Promise<unknown>;
+    test: (input: { providerId: string }) => Promise<unknown>;
+    setConfig: (input: { providerId: string; config: { apiKey?: string } }) => Promise<unknown>;
+    coverage: () => Promise<unknown>;
+    onChanged: (callback: (entries: unknown) => void) => () => void;
+  };
+  onboarding: {
+    getCompleted: () => Promise<unknown>;
+    setCompleted: (input: { completed: boolean }) => Promise<unknown>;
+  };
 }
 
 const electronAPI: ElectronAPI = {
@@ -199,6 +224,38 @@ const electronAPI: ElectronAPI = {
     readResource: (skillId: string, relativePath: string) =>
       ipcRenderer.invoke('skills:readResource', skillId, relativePath),
     readiness: () => ipcRenderer.invoke('skills:readiness'),
+  },
+  about: {
+    get: () => ipcRenderer.invoke('app:about'),
+  },
+  diagnostics: {
+    collect: () => ipcRenderer.invoke('diagnostics:collect'),
+    export: () => ipcRenderer.invoke('diagnostics:export'),
+  },
+  health: {
+    check: () => ipcRenderer.invoke('health:check'),
+  },
+  openExternal: (url: string) => ipcRenderer.invoke('openExternal', url),
+  connections: {
+    list: () => ipcRenderer.invoke('connections:list'),
+    connect: (input: { providerId: string }) => ipcRenderer.invoke('connections:connect', input),
+    cancelConnect: (input: { providerId: string }) => ipcRenderer.invoke('connections:cancelConnect', input),
+    disconnect: (input: { providerId: string }) => ipcRenderer.invoke('connections:disconnect', input),
+    test: (input: { providerId: string }) => ipcRenderer.invoke('connections:test', input),
+    setConfig: (input: { providerId: string; config: { apiKey?: string } }) =>
+      ipcRenderer.invoke('connections:setConfig', input),
+    coverage: () => ipcRenderer.invoke('connections:coverage'),
+    onChanged: (callback: (entries: unknown) => void) => {
+      const listener = (_event: unknown, entries: unknown) => callback(entries);
+      ipcRenderer.on('connections:changed', listener);
+      return () => {
+        ipcRenderer.removeListener('connections:changed', listener);
+      };
+    },
+  },
+  onboarding: {
+    getCompleted: () => ipcRenderer.invoke('onboarding:getCompleted'),
+    setCompleted: (input: { completed: boolean }) => ipcRenderer.invoke('onboarding:setCompleted', input),
   },
 };
 

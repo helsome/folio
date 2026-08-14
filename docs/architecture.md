@@ -245,6 +245,12 @@ finagent/
 │   │                          #   readiness/compare/portfolio-risk contracts +
 │   │                          #   kernel types (Session, Run, AgentEvent, …)
 │   ├── shared/
+│   │   ├── providers/          # V4 provider platform: ProviderRouter (primary
+│   │   │                      #   + fallback), registry, ConnectionStore,
+│   │   │                      #   Longbridge financial-data + broker adapters,
+│   │   │                      #   Massive (Polygon.io) fallback adapter, health
+│   │   ├── diagnostics/        # Collector, redaction, support-bundle export,
+│   │   │                      #   error ring buffer
 │   │   ├── capabilities/      # Finance Capability Registry (single source of
 │   │   │                      #   truth): manifests (phase-one + phase-two),
 │   │   │                      #   registry, executor (concurrency/timeout/abort),
@@ -283,12 +289,17 @@ finagent/
     └── e2e/                   # Golden-path A–H (run.mjs) + packaged smoke
 ```
 
-## 11.1 Capability Layer (V3)
+## 11.1 Capability Layer (V4)
 
 ```
-Longbridge CLI ─► longbridge-tools fetchers ─► capability manifests
-                                                    │
-                                          Capability Registry (20 caps)
+Longbridge CLI / Massive API ─► provider adapters (FinancialDataProvider,
+                                   BrokerAccountProvider — neutral domains)
+                                              │
+                                    ProviderRouter (primary + fallback)
+                                              │
+                          ProviderResult { data, provenance{providerId, …} }
+                                              │
+                          Capability Registry (20 caps, router-backed fetchers)
                        ┌────────────────────┴──────────────────────┐
                        │                    │                       │
              Pi tools (generated)   UI availability +       Product workflows:
@@ -304,6 +315,11 @@ summary }`. `defineCapability` wraps execute with input validation. The
 failure isolation — research, re-evaluation, alerts, compare, and risk all
 execute through it. All capabilities are read-only (`riskLevel: 'read'`); no
 order/trading capability exists.
+
+Business layers (research/agent/UI/portfolio/compare) never import a vendor
+package: they consume capability results whose provenance names the actual
+answering provider. Longbridge and Massive (Polygon.io, fallback) are the two
+adapters in V4; the router is the only bridge (spec §4).
 
 ## 12. Data Flow — Workspace Query
 

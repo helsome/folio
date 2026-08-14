@@ -1,34 +1,37 @@
 import React from 'react';
-import type { Portfolio, Position } from '@finagent/core';
+import type { Holding, PortfolioSnapshot } from '@finagent/core';
 import { MetricGrid } from './MetricGrid';
+import { formatMoney } from '../../../lib/money';
 
 type RiskLevel = 'HIGH' | 'MED' | 'LOW';
-
-const fmtMoney = (n: number | null | undefined): string =>
-  n == null || Number.isNaN(n) ? '—' : `$${n.toFixed(2)}`;
 
 const fmtPct = (n: number | null | undefined): string =>
   n == null || Number.isNaN(n) ? '—' : `${n.toFixed(1)}%`;
 
 interface PortfolioRiskCardProps {
-  portfolio: Portfolio;
+  portfolio: PortfolioSnapshot;
 }
 
 /** Renders concentration risk derived from a get_portfolio tool result. */
 export const PortfolioRiskCard: React.FC<PortfolioRiskCardProps> = ({ portfolio }) => {
-  const totalValue = portfolio.totalValue;
+  const totalValue = portfolio.totalAssets;
   const cash = portfolio.cash;
-  const positions: Position[] = Array.isArray(portfolio.positions) ? portfolio.positions : [];
+  const currency = portfolio.baseCurrency;
+  const positions: Holding[] = Array.isArray(portfolio.holdings) ? portfolio.holdings : [];
 
-  const largest = positions.reduce<Position | null>(
-    (acc, position) =>
-      !acc || (position.marketValue ?? 0) > (acc.marketValue ?? 0) ? position : acc,
-    null
-  );
+  const largest = positions.reduce<Holding | null>((acc, position) => {
+    const value = position.marketValueBase ?? position.marketValue ?? 0;
+    const accValue = acc ? (acc.marketValueBase ?? acc.marketValue ?? 0) : 0;
+    return !acc || value > accValue ? position : acc;
+  }, null);
 
-  const largestWeightPct =
-    largest && totalValue > 0 ? ((largest.marketValue ?? 0) / totalValue) * 100 : null;
-  const cashPct = totalValue > 0 ? (cash / totalValue) * 100 : null;
+  const largestValue = largest ? (largest.marketValueBase ?? largest.marketValue ?? 0) : 0;
+  const largestWeightPct = largest && totalValue !== undefined && totalValue > 0
+    ? (largestValue / totalValue) * 100
+    : null;
+  const cashPct = totalValue !== undefined && totalValue > 0 && cash !== undefined
+    ? (cash / totalValue) * 100
+    : null;
 
   const risk: RiskLevel | null =
     largestWeightPct == null
@@ -58,8 +61,8 @@ export const PortfolioRiskCard: React.FC<PortfolioRiskCardProps> = ({ portfolio 
         <MetricGrid
           columns={2}
           items={[
-            { label: 'Total value', value: fmtMoney(totalValue) },
-            { label: 'Cash', value: fmtMoney(cash) },
+            { label: 'Total value', value: formatMoney(totalValue, currency) },
+            { label: 'Cash', value: formatMoney(cash, currency) },
             { label: 'Cash %', value: fmtPct(cashPct) },
             { label: 'Largest position', value: largest?.symbol ?? '—' },
             { label: 'Largest weight', value: fmtPct(largestWeightPct) },

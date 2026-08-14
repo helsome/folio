@@ -41,6 +41,7 @@ export interface SkillMetadata {
   requiresMcp?: boolean;
   tier?: string;
   version?: string;
+  author?: string;
   location?: string;
 }
 
@@ -406,6 +407,7 @@ function toMetadata(frontmatter: Record<string, unknown>): SkillMetadata {
     requiresMcp: nested.requires_mcp === undefined ? undefined : Boolean(nested.requires_mcp),
     tier: nested.tier === undefined ? undefined : String(nested.tier),
     version: nested.version === undefined ? undefined : String(nested.version),
+    author: nested.author === undefined ? undefined : String(nested.author),
   };
 }
 

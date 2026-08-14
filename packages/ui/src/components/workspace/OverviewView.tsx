@@ -5,10 +5,11 @@ import type {
   Kline,
   CalcIndex,
   StaticInfo,
-  Portfolio,
-  Position,
+  Holding,
+  PortfolioSnapshot,
 } from '@finagent/core';
 import { activeSymbolAtom } from '../../atoms';
+import { formatMoney, formatPercent, formatQuantity, formatSignedMoney } from '../../lib/money';
 import { useFinagentClient } from '../../client';
 
 const DASH = '\u2014';
@@ -62,7 +63,7 @@ export const OverviewView: React.FC = () => {
   const [quote, setQuote] = useState<Quote | null>(null);
   const [calcIndex, setCalcIndex] = useState<CalcIndex | null>(null);
   const [staticInfo, setStaticInfo] = useState<StaticInfo | null>(null);
-  const [portfolio, setPortfolio] = useState<Portfolio | null>(null);
+  const [portfolio, setPortfolio] = useState<PortfolioSnapshot | null>(null);
   const [yearHigh, setYearHigh] = useState<number | null>(null);
   const [yearLow, setYearLow] = useState<number | null>(null);
   const [rangeLoading, setRangeLoading] = useState(false);
@@ -118,12 +119,14 @@ export const OverviewView: React.FC = () => {
 
   if (!symbol) return null;
 
-  const position: Position | undefined = portfolio?.positions.find(
-    (p) => p.symbol === symbol
+  const holding: Holding | undefined = portfolio?.holdings.find(
+    (h) => h.symbol === symbol
   );
+  const holdingValue = holding ? (holding.marketValueBase ?? holding.marketValue ?? 0) : 0;
+  const totalAssets = portfolio?.totalAssets ?? 0;
   const portfolioWeight =
-    position && portfolio && portfolio.totalValue > 0
-      ? (position.marketValue / portfolio.totalValue) * 100
+    holding && totalAssets > 0
+      ? (holdingValue / totalAssets) * 100
       : null;
 
   return (
@@ -224,15 +227,15 @@ export const OverviewView: React.FC = () => {
 
       {/* Position */}
       <Block title="Position">
-        {position ? (
+        {holding ? (
           <>
-            <Metric label="Quantity" value={fmtNumber(position.quantity)} />
-            <Metric label="Avg Cost" value={fmtPrice(position.avgCost)} />
-            <Metric label="Market Value" value={fmtPrice(position.marketValue)} />
+            <Metric label="Quantity" value={formatQuantity(holding.quantity)} />
+            <Metric label="Avg Cost" value={formatMoney(holding.costPrice, holding.currency)} />
+            <Metric label="Market Value" value={formatMoney(holding.marketValue, holding.currency)} />
             <Metric
               label="Unrealized PnL"
-              value={`${fmtSigned(position.unrealizedPnL)} (${position.unrealizedPnLPercent >= 0 ? '+' : ''}${fmtPercent(position.unrealizedPnLPercent)})`}
-              color={signColor(position.unrealizedPnL)}
+              value={`${formatSignedMoney(holding.unrealizedPnL, holding.currency)} (${formatPercent(holding.unrealizedPnLPercent)})`}
+              color={signColor(holding.unrealizedPnL ?? 0)}
             />
             <Metric
               label="Portfolio Weight"

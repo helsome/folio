@@ -1,7 +1,9 @@
-import { app, BrowserWindow, ipcMain } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { AgentKernelHost, toIpcResult } from './kernelHost.ts';
+import { registerAboutIpc } from './about.ts';
+import { writeSupportBundle } from '@finagent/shared/diagnostics';
 import { loadFinagentEnv } from './loadEnv.ts';
 import { getRuntimeRoot } from '@finagent/shared/resources';
 let mainWindow: BrowserWindow | null = null;
@@ -20,15 +22,24 @@ loadFinagentEnv({
   roots: [runtimeRoot, appRoot],
 });
 const agentKernelHost = new AgentKernelHost();
+registerAboutIpc();
 const isDev = !app.isPackaged;
 
 function createWindow() {
+  // Test-harness window policy (see docs/release-gates.md §Test tiers):
+  //   - default (real user): window is visible
+  //   - FINAGENT_E2E_HIDDEN=1 (all e2e harnesses): window never appears on
+  //     screen — CDP/renderer keep working, nothing flashes on the desktop
+  //   - FINAGENT_E2E_VISIBLE=1 (manual debugging): force visible
+  const windowVisible =
+    process.env.FINAGENT_E2E_VISIBLE === '1' || process.env.FINAGENT_E2E_HIDDEN !== '1';
   mainWindow = new BrowserWindow({
     width: 1200,
     height: 800,
     minWidth: 900,
     minHeight: 600,
     titleBarStyle: 'hiddenInset',
+    show: windowVisible,
     webPreferences: {
       preload: join(__dirname, '../preload/index.cjs'),
       contextIsolation: true,
@@ -294,4 +305,75 @@ ipcMain.handle('skills:listResources', async (_event, skillId: unknown) =>
 
 ipcMain.handle('skills:readResource', async (_event, skillId: unknown, relativePath: unknown) =>
   toIpcResult(() => agentKernelHost.readSkillResource(skillId, relativePath))
+);
+
+// Diagnostics (spec §35–36)
+ipcMain.handle('diagnostics:collect', async () =>
+  toIpcResult(() => agentKernelHost.collectDiagnostics())
+);
+
+ipcMain.handle('diagnostics:export', async () =>
+  toIpcResult(async () => {
+    const bundle = await agentKernelHost.collectDiagnostics();
+    const result = await dialog.showSaveDialog({
+      title: 'Export Folio diagnostics',
+      defaultPath: join(app.getPath('documents'), `folio-diagnostics-${Date.now()}.json`),
+      filters: [{ name: 'JSON', extensions: ['json'] }],
+    });
+    if (result.canceled || !result.filePath) return { canceled: true };
+    await writeSupportBundle(bundle, result.filePath);
+    return { canceled: false, filePath: result.filePath };
+  })
+);
+
+// Environment health check (onboarding, spec §30)
+ipcMain.handle('health:check', async () =>
+  toIpcResult(() => agentKernelHost.checkHealth())
+);
+
+// Provider connections (spec §8–11)
+ipcMain.handle('connections:list', async () =>
+  toIpcResult(() => agentKernelHost.listConnections())
+);
+
+ipcMain.handle('connections:connect', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.connectProvider(input))
+);
+
+ipcMain.handle('connections:cancelConnect', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.cancelConnectProvider(input))
+);
+
+ipcMain.handle('connections:disconnect', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.disconnectProvider(input))
+);
+
+ipcMain.handle('connections:test', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.testProviderConnection(input))
+);
+
+ipcMain.handle('connections:setConfig', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.setProviderConfig(input))
+);
+
+ipcMain.handle('connections:coverage', async () =>
+  toIpcResult(() => agentKernelHost.coverageMatrix())
+);
+
+ipcMain.handle('onboarding:getCompleted', async () =>
+  toIpcResult(() => agentKernelHost.getOnboardingCompleted())
+);
+
+ipcMain.handle('onboarding:setCompleted', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.setOnboardingCompleted(input))
+);
+
+// Controlled external open (spec §10): http/https only, never a shell.
+ipcMain.handle('openExternal', async (_event, url: unknown) =>
+  toIpcResult(async () => {
+    if (typeof url !== 'string' || !/^https?:\/\//i.test(url)) {
+      throw new Error('Only http(s) URLs may be opened');
+    }
+    await shell.openExternal(url);
+  })
 );

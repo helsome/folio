@@ -10,7 +10,10 @@
     "./resources": "./src/resources/index.ts",
     "./thesis": "./src/thesis/index.ts",
     "./compare": "./src/compare/index.ts",
-    "./portfolio-risk": "./src/portfolio-risk/index.ts"
+    "./portfolio-risk": "./src/portfolio-risk/index.ts",
+    "./diagnostics": "./src/diagnostics/index.ts",
+    "./providers/longbridge": "./src/providers/longbridge/index.ts",
+    "./providers/massive": "./src/providers/massive/index.ts"
   },
   "dependencies": {
     "@finagent/core": "workspace:*",

@@ -9,11 +9,14 @@ export type ErrorCode =
 
 export class LongBridgeError extends Error {
   code: ErrorCode;
+  /** Raw vendor output for diagnostics. NEVER rendered to users or sent over IPC. */
+  debug?: string;
 
-  constructor(message: string, code: ErrorCode) {
+  constructor(message: string, code: ErrorCode, debug?: string) {
     super(message);
     this.name = 'LongBridgeError';
     this.code = code;
+    if (debug !== undefined) this.debug = debug;
   }
 }
 

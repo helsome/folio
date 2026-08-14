@@ -2,6 +2,8 @@ import React, { useEffect, useState } from 'react';
 import { TitleBar } from './TitleBar';
 import { KernelBridge } from '../kernel/KernelBridge';
 import { WorkbenchShell } from './WorkbenchShell';
+import { OnboardingOverlay } from '../onboarding/OnboardingOverlay';
+import { CommandPalette } from '../command/CommandPalette';
 import {
   FinagentClientProvider,
   fallbackClient,
@@ -23,6 +25,8 @@ export const AppShell: React.FC<AppShellProps> = ({ client = fallbackClient }) =
         <LongBridgeBanner />
         <WorkbenchShell />
       </div>
+      <OnboardingOverlay />
+      <CommandPalette />
     </FinagentClientProvider>
   );
 };

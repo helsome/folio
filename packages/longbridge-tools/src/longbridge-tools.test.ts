@@ -54,20 +54,44 @@ const longBridgeQuoteArrayJson = JSON.stringify([
 ]);
 
 const portfolioJson = JSON.stringify({
-  total_value: 10000,
-  cash: 1500,
-  positions: [
+  overview: {
+    total_asset: '23353.35',
+    market_cap: '16309.36',
+    total_cash: '7043.99',
+    total_pl: '3871.06',
+    total_today_pl: '255.33',
+    risk_level: 0,
+    currency: 'USD',
+  },
+  market_accounts: {
+    US: {
+      market: 'US',
+      currency: 'USD',
+      net_assets: '0',
+      market_value: '12273.410',
+      pl: '3826.715',
+      today_pl: '0',
+      balance: '0',
+      frozen_cash: '0',
+      withdraw_cash: '0',
+      max_buy_limit: '0',
+    },
+  },
+  holdings: [
     {
-      symbol: 'AAPL.US',
-      name: 'Apple',
-      quantity: 10,
-      avg_cost: 180,
-      last_price: 195.5,
-      market_value: 1955,
-      unrealized_pnl: 155,
-      unrealized_pnl_ratio: 0.0861,
+      symbol: 'TSLA.US',
+      name: 'Tesla',
+      currency: 'USD',
+      quantity: '1',
+      available_quantity: '1',
+      cost_price: '-52.920',
+      market_value: '341.510',
+      market_value_usd: '341.510',
+      market_price: '341.510',
+      prev_close: '327.510',
     },
   ],
+  cash_balances: [],
 });
 
 const klineJson = JSON.stringify([
