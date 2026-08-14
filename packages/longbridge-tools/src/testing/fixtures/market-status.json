@@ -1,0 +1,18 @@
+[
+  {
+    "market": "US",
+    "status": "Pre-Market"
+  },
+  {
+    "market": "HK",
+    "status": "Closed"
+  },
+  {
+    "market": "CN",
+    "status": "Closed"
+  },
+  {
+    "market": "SG",
+    "status": "Trading"
+  }
+]

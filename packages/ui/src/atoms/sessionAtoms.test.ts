@@ -66,8 +66,10 @@ function makeClient(): FinagentClient {
       getStatus: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
     },
     alerts: {
-      load: async () => ({ ok: true as const, data: [] }),
-      save: async () => ({ ok: true as const, data: undefined }),
+      loadRules: async () => ({ ok: true as const, data: [] }),
+      saveRules: async () => ({ ok: true as const, data: undefined }),
+      listEvents: async () => ({ ok: true as const, data: [] }),
+      onTriggered: () => () => undefined,
     },
     llm: {
       getState: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
@@ -88,6 +90,7 @@ function makeClient(): FinagentClient {
       setEnabled: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
       listResources: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
       readResource: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      readiness: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
     },
   };
 }

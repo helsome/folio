@@ -4,10 +4,22 @@ node_modules
 dist
 apps/*/dist
 packages/*/dist
+apps/electron/build
+apps/electron/src/main/index.js
 
 # Local environment
 .env
 .env.*
+
+# Longbridge account fixtures — captured from a real authenticated account;
+# never commit balances/positions. Regenerate with
+# packages/longbridge-tools/src/testing/capture.sh.
+packages/longbridge-tools/src/testing/fixtures/positions.json
+packages/longbridge-tools/src/testing/fixtures/positions.cmd.txt
+packages/longbridge-tools/src/testing/fixtures/assets.json
+packages/longbridge-tools/src/testing/fixtures/assets.cmd.txt
+packages/longbridge-tools/src/testing/fixtures/cash-flow.json
+packages/longbridge-tools/src/testing/fixtures/cash-flow.cmd.txt
 
 # Claude local session artifacts
 .claude/logs

@@ -1,7 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import { useAtom, useSetAtom } from 'jotai';
+import type { AlertRuleDraft } from '../../atoms';
 import {
   alertStateAtom,
+  buildAlertRule,
   loadAlertsAtom,
   toggleAlertAtom,
   removeAlertAtom,
@@ -12,7 +14,6 @@ import { AlertCard } from './AlertCard';
 import { AlertForm } from './AlertForm';
 import { Button } from '../primitives/Button';
 import { Dialog } from '../primitives/Dialog';
-import type { Alert } from '@finagent/core';
 
 export const AlertList: React.FC = () => {
   const client = useFinagentClient();
@@ -28,26 +29,17 @@ export const AlertList: React.FC = () => {
     loadAlerts(client);
   }, [client, loadAlerts]);
 
-  const handleCreateAlert = (alertData: Omit<Alert, 'id' | 'createdAt' | 'triggered'>) => {
-    const alert: Alert = {
-      ...alertData,
-      id: crypto.randomUUID(),
-      createdAt: Date.now(),
-      triggered: false,
-    };
-    addAlert({ client, alert });
+  const handleCreateAlert = (draft: AlertRuleDraft) => {
+    addAlert({ client, rule: buildAlertRule(draft) });
     setShowForm(false);
   };
-
-  const activeAlerts = state.alerts.filter((a) => !a.triggered);
-  const triggeredAlerts = state.alerts.filter((a) => a.triggered);
 
   return (
     <div className="flex flex-col h-full">
       <div className="p-3 border-b border-[oklch(var(--bg-primary))]">
         <div className="flex justify-between items-center">
           <div className="text-xs font-semibold text-[oklch(var(--text-secondary))] uppercase tracking-wide">
-            Alerts ({state.alerts.length})
+            Alerts ({state.rules.length})
           </div>
           <Button size="sm" onClick={() => setShowForm(true)}>
             + New
@@ -57,66 +49,48 @@ export const AlertList: React.FC = () => {
 
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {state.loading && (
-          <div className="text-center py-8 text-[oklch(var(--text-secondary))]">
-            Loading alerts...
-          </div>
+          <div className="text-center py-8 text-[oklch(var(--text-secondary))]">Loading alerts...</div>
         )}
 
-        {!state.loading && state.alerts.length === 0 && (
+        {!state.loading && state.rules.length === 0 && state.events.length === 0 && (
           <div className="text-center py-8 text-[oklch(var(--text-secondary))]">
             <p>No alerts configured</p>
-            <Button
-              size="sm"
-              variant="ghost"
-              onClick={() => setShowForm(true)}
-              className="mt-2"
-            >
+            <Button size="sm" variant="ghost" onClick={() => setShowForm(true)} className="mt-2">
               Create your first alert
             </Button>
           </div>
         )}
 
-        {/* Active Alerts */}
-        {activeAlerts.length > 0 && (
-          <>
-            <div className="text-xs text-[oklch(var(--text-secondary))] px-2 py-1">
-              Active
-            </div>
-            {activeAlerts.map((alert) => (
-              <AlertCard
-                key={alert.id}
-                alert={alert}
-                onToggle={() => toggleAlert({ client, alertId: alert.id })}
-                onRemove={() => removeAlert({ client, alertId: alert.id })}
-              />
-            ))}
-          </>
-        )}
+        {state.rules.map((rule) => (
+          <AlertCard
+            key={rule.id}
+            rule={rule}
+            onToggle={() => toggleAlert({ client, ruleId: rule.id })}
+            onRemove={() => removeAlert({ client, ruleId: rule.id })}
+          />
+        ))}
 
-        {/* Triggered Alerts */}
-        {triggeredAlerts.length > 0 && (
+        {state.events.length > 0 && (
           <>
-            <div className="text-xs text-[oklch(var(--text-secondary))] px-2 py-1 mt-4">
-              Triggered
-            </div>
-            {triggeredAlerts.map((alert) => (
-              <AlertCard
-                key={alert.id}
-                alert={alert}
-                onToggle={() => toggleAlert({ client, alertId: alert.id })}
-                onRemove={() => removeAlert({ client, alertId: alert.id })}
-              />
+            <div className="text-xs text-[oklch(var(--text-secondary))] px-2 py-1 mt-4">Recent triggers</div>
+            {state.events.slice(0, 10).map((event) => (
+              <div
+                key={event.id}
+                className="p-2 rounded-lg bg-[oklch(var(--bg-secondary))]/50 text-xs text-[oklch(var(--text-secondary))]"
+              >
+                <span className="font-medium text-[oklch(var(--text-primary))]">{event.title}</span>
+                <span className="ml-2">{event.message}</span>
+                <div className="mt-0.5 opacity-60">
+                  {new Date(event.triggeredAt).toLocaleString()}
+                </div>
+              </div>
             ))}
           </>
         )}
       </div>
 
-      {/* Create Alert Dialog */}
       <Dialog open={showForm} onClose={() => setShowForm(false)}>
-        <AlertForm
-          onSubmit={handleCreateAlert}
-          onCancel={() => setShowForm(false)}
-        />
+        <AlertForm onSubmit={handleCreateAlert} onCancel={() => setShowForm(false)} />
       </Dialog>
     </div>
   );

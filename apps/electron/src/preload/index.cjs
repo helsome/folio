@@ -66,8 +66,48 @@ var electronAPI = {
     getStatus: () => import_electron.ipcRenderer.invoke("longbridge:getStatus")
   },
   alerts: {
-    load: () => import_electron.ipcRenderer.invoke("alerts:load"),
-    save: (alerts) => import_electron.ipcRenderer.invoke("alerts:save", alerts)
+    loadRules: () => import_electron.ipcRenderer.invoke("alerts:loadRules"),
+    saveRules: (rules) => import_electron.ipcRenderer.invoke("alerts:saveRules", rules),
+    listEvents: () => import_electron.ipcRenderer.invoke("alerts:listEvents"),
+    onTriggered: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      import_electron.ipcRenderer.on("alerts:triggered", listener);
+      return () => {
+        import_electron.ipcRenderer.removeListener("alerts:triggered", listener);
+      };
+    }
+  },
+  capabilities: {
+    list: () => import_electron.ipcRenderer.invoke("capabilities:list")
+  },
+  research: {
+    start: (input) => import_electron.ipcRenderer.invoke("research:start", input),
+    cancel: (input) => import_electron.ipcRenderer.invoke("research:cancel", input),
+    listRuns: () => import_electron.ipcRenderer.invoke("research:listRuns"),
+    getRun: (input) => import_electron.ipcRenderer.invoke("research:getRun", input),
+    listReports: (input) => import_electron.ipcRenderer.invoke("research:listReports", input),
+    getReport: (input) => import_electron.ipcRenderer.invoke("research:getReport", input)
+  },
+  thesis: {
+    list: (symbol) => import_electron.ipcRenderer.invoke("thesis:list", symbol),
+    getReport: (symbol) => import_electron.ipcRenderer.invoke("thesis:getReport", symbol),
+    saveFromReport: (symbol) => import_electron.ipcRenderer.invoke("thesis:saveFromReport", symbol),
+    reEvaluate: (symbol) => import_electron.ipcRenderer.invoke("thesis:reEvaluate", symbol),
+    update: (thesis) => import_electron.ipcRenderer.invoke("thesis:update", thesis),
+    listImpacts: (symbol) => import_electron.ipcRenderer.invoke("thesis:listImpacts", symbol),
+    onImpact: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      import_electron.ipcRenderer.on("thesis:impact", listener);
+      return () => {
+        import_electron.ipcRenderer.removeListener("thesis:impact", listener);
+      };
+    }
+  },
+  compare: {
+    build: (symbols) => import_electron.ipcRenderer.invoke("compare:build", symbols)
+  },
+  portfolioRisk: {
+    analyze: () => import_electron.ipcRenderer.invoke("portfolioRisk:analyze")
   },
   llm: {
     getState: () => import_electron.ipcRenderer.invoke("llm:getState"),
@@ -87,7 +127,8 @@ var electronAPI = {
     list: () => import_electron.ipcRenderer.invoke("skills:list"),
     setEnabled: (input) => import_electron.ipcRenderer.invoke("skills:setEnabled", input),
     listResources: (skillId) => import_electron.ipcRenderer.invoke("skills:listResources", skillId),
-    readResource: (skillId, relativePath) => import_electron.ipcRenderer.invoke("skills:readResource", skillId, relativePath)
+    readResource: (skillId, relativePath) => import_electron.ipcRenderer.invoke("skills:readResource", skillId, relativePath),
+    readiness: () => import_electron.ipcRenderer.invoke("skills:readiness")
   }
 };
 import_electron.contextBridge.exposeInMainWorld("electronAPI", electronAPI);

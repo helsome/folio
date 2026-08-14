@@ -63,6 +63,10 @@ async function main() {
   }
   execSync('bunx vite build', { cwd: appRoot, stdio: 'pipe' });
 
+  // Deterministic golden path: always start from a fresh userData dir.
+  const userDataDir = join(appRoot, 'e2e/.user-data');
+  execSync(`rm -rf "${userDataDir}"`);
+  execSync(`mkdir -p "${userDataDir}"`);
   const electronProcess = spawn(
     electronBinary,
     [electronMain, `--remote-debugging-port=${CDP_PORT}`, '--no-sandbox'],
@@ -95,7 +99,7 @@ async function main() {
       await page.locator('[data-testid="agent-panel"]').waitFor({ timeout: 15_000 });
       // Fresh isolated userData has no sessions — create one so the copilot
       // input renders.
-      await page.getByRole('button', { name: 'Create New Session' }).click();
+      await page.getByRole('button', { name: 'New Session', exact: true }).click();
       await page.waitForTimeout(2500);
       const inp = page.locator('[data-testid="agent-input"]');
       console.log('INPUT count:', await inp.count());
@@ -195,6 +199,77 @@ async function main() {
       pass('D: agent run streams an answer for the workspace symbol');
     } catch (error) {
       fail('D: agent run streams an answer for the workspace symbol', error);
+    }
+    // E. Deep Research (local provider: deterministic synthesis, real
+    // Longbridge capability fetches) → evidence-backed report in the UI.
+    try {
+      await page.locator('[data-testid="watchlist-row-NVDA.US"]').first().click();
+      await page.locator('[data-testid="deep-research-button"]').first().click();
+      // SecurityHeader navigates to the research section.
+      await page.locator('[data-testid="research-panel"]').waitFor({ timeout: 15_000 });
+      await page
+        .getByRole('button', { name: /^Deep Research$/i })
+        .first()
+        .click();
+      // Capability fetches + synthesis take a while against the real CLI.
+      await page.locator('[data-testid="research-report"]').waitFor({ timeout: 180_000 });
+      const reportText = await page.locator('[data-testid="research-report"]').first().textContent();
+      if (!/POSITIVE|NEGATIVE|NEUTRAL/.test(reportText ?? '')) {
+        throw new Error('report stance missing');
+      }
+      if (!/Evidence/i.test(reportText ?? '')) {
+        throw new Error('evidence section missing');
+      }
+      pass('E: Deep Research produces an evidence-backed report');
+    } catch (error) {
+      fail('E: Deep Research produces an evidence-backed report', error);
+    }
+
+    // F. Save as Thesis (uses the report from E for NVDA.US)
+    try {
+      await page.getByRole('button', { name: /^Thesis$/i }).first().click();
+      await page.locator('[data-testid="thesis-panel"]').waitFor({ timeout: 15_000 });
+      await page.getByRole('button', { name: /Save as Thesis/i }).first().click();
+      await page.locator('[data-testid="thesis-card"]').waitFor({ timeout: 30_000 });
+      const thesisText = await page.locator('[data-testid="thesis-card"]').first().textContent();
+      if (!/Bullish|Bearish|Neutral/.test(thesisText ?? '')) {
+        throw new Error('thesis stance missing');
+      }
+      pass('F: research report saves as an investment thesis');
+    } catch (error) {
+      fail('F: research report saves as an investment thesis', error);
+    }
+
+    // G. Compare NVDA / AMD with structured data
+    try {
+      await page.locator('[data-testid="compare-workspace"]').waitFor({ timeout: 15_000 });
+      // Two symbols trigger the automatic build (workspace contract).
+      await page.locator('[data-testid="compare-symbol-input"]').first().fill('NVDA.US');
+      await page.locator('[data-testid="compare-add"]').first().click();
+      await page.locator('[data-testid="compare-symbol-input"]').first().fill('AMD.US');
+      await page.locator('[data-testid="compare-add"]').first().click();
+      await page.locator('[data-testid="compare-table"]').waitFor({ timeout: 120_000 });
+      const compareText = await page.locator('[data-testid="compare-table"]').first().textContent();
+      if (!/Market Cap/.test(compareText ?? '') || !/NVDA/.test(compareText ?? '')) {
+        throw new Error('comparison rows missing');
+      }
+      pass('G: compare workspace builds a structured comparison');
+    } catch (error) {
+      fail('G: compare workspace builds a structured comparison', error);
+    }
+
+    // H. Portfolio risk center
+    try {
+      await page.getByRole('button', { name: /^Portfolio$/i }).first().click();
+      await page.getByRole('button', { name: /Analyze Portfolio/i }).first().click();
+      await page.locator('[data-testid="portfolio-risk-panel"]').waitFor({ timeout: 120_000 });
+      const riskText = await page.locator('[data-testid="portfolio-risk-panel"]').first().textContent();
+      if (!/Concentration|Signals|Allocation/i.test(riskText ?? '')) {
+        throw new Error('risk sections missing');
+      }
+      pass('H: portfolio risk center analyzes the portfolio');
+    } catch (error) {
+      fail('H: portfolio risk center analyzes the portfolio', error);
     }
   } catch (error) {
     fail('harness setup', error);

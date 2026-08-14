@@ -7,10 +7,13 @@ import {
   selectedPositionAtom,
   activeSymbolAtom,
 } from '../../atoms';
+import { portfolioRiskCacheAtom, analyzePortfolioRiskAtom } from '../../atoms/portfolioRiskAtoms';
 import { useFinagentClient } from '../../client';
 import { PortfolioCard } from '../portfolio/PortfolioCard';
 import { HoldingRow } from '../portfolio/HoldingRow';
 import { AssetPieChart } from '../portfolio/AssetPieChart';
+import { PortfolioRiskPanel } from '../portfolio/PortfolioRiskPanel';
+import { Button } from '../primitives/Button';
 
 export const PortfolioSection: React.FC = () => {
   const client = useFinagentClient();
@@ -18,6 +21,8 @@ export const PortfolioSection: React.FC = () => {
   const fetchPortfolio = useSetAtom(fetchPortfolioAtom);
   const setSelectedPosition = useSetAtom(selectedPositionAtom);
   const setActiveSymbol = useSetAtom(activeSymbolAtom);
+  const riskCache = useAtomValue(portfolioRiskCacheAtom);
+  const analyzeRisk = useSetAtom(analyzePortfolioRiskAtom);
 
   useEffect(() => {
     fetchPortfolio(client).catch(() => {
@@ -80,6 +85,26 @@ export const PortfolioSection: React.FC = () => {
             </div>
           )}
         </div>
+      </div>
+      <div className="border-t border-[var(--mac-border)] pt-3">
+        <Button
+          variant="secondary"
+          size="sm"
+          onClick={() => void analyzeRisk().catch(() => {})}
+          disabled={riskCache.loading}
+        >
+          {riskCache.loading ? 'Analyzing…' : 'Analyze Portfolio'}
+        </Button>
+
+        {riskCache.loading && (
+          <div className="mt-3 h-24 animate-pulse rounded-[12px] bg-foreground/6" />
+        )}
+        {riskCache.error && (
+          <div className="mt-3 text-[12px] text-foreground/54">
+            Risk analysis failed: {riskCache.error}
+          </div>
+        )}
+        {riskCache.report && <PortfolioRiskPanel report={riskCache.report} />}
       </div>
     </div>
   );

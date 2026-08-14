@@ -13,6 +13,7 @@ import type {
 import { FinanceToolRegistry, type FinanceToolName } from './finance-tool-registry.ts';
 import { routeFinanceIntent, unsupportedFinanceMessage } from './intent-router.ts';
 import { MarketDataService } from './market-data-service.ts';
+import { createPhaseOneRegistry } from '../capabilities/index.ts';
 import { composeToolResponse } from './response-composer.ts';
 import { toApiError } from './errors.ts';
 
@@ -30,7 +31,10 @@ export class LocalFinanceAgentBackend implements AgentBackend {
   constructor(options: LocalFinanceAgentBackendOptions = {}) {
     this.now = options.now ?? Date.now;
     const marketData = options.marketData ?? new MarketDataService();
-    this.registry = options.registry ?? new FinanceToolRegistry(marketData, { now: this.now });
+    this.registry = options.registry ?? new FinanceToolRegistry(
+      createPhaseOneRegistry(marketData),
+      { now: this.now }
+    );
   }
 
   async getTools(): Promise<ApiResult<ToolDefinition[]>> {

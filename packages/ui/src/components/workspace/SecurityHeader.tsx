@@ -1,9 +1,8 @@
 import React, { useEffect, useState } from 'react';
-import { useAtomValue } from 'jotai';
+import { useAtomValue, useSetAtom } from 'jotai';
 import type { Quote, StaticInfo, MarketStatus } from '@finagent/core';
-import { activeSymbolAtom } from '../../atoms';
+import { activeSymbolAtom, navSectionAtom } from '../../atoms';
 import { useFinagentClient } from '../../client';
-
 const DASH = '\u2014';
 
 const formatPrice = (value: number): string => `$${value.toFixed(2)}`;
@@ -30,7 +29,7 @@ const StatCell: React.FC<StatCellProps> = ({ label, value }) => (
 export const SecurityHeader: React.FC = () => {
   const client = useFinagentClient();
   const symbol = useAtomValue(activeSymbolAtom);
-
+  const setNavSection = useSetAtom(navSectionAtom);
   const [quote, setQuote] = useState<Quote | null>(null);
   const [info, setInfo] = useState<StaticInfo | null>(null);
   const [marketStatus, setMarketStatus] = useState<string | null>(null);
@@ -172,8 +171,16 @@ export const SecurityHeader: React.FC = () => {
             {formatSigned(quote.change)} ({formatPercent(quote.changePercent)})
           </div>
         </div>
+        <div className="flex items-center gap-2">
+          <button
+            onClick={() => setNavSection('research')}
+            className="mac-primary-button rounded-[8px] px-3 py-1.5 text-[12px] font-semibold"
+            data-testid="deep-research-button"
+          >
+            Deep Research
+          </button>
+        </div>
       </div>
-
       <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 border-t mac-section-divider pt-3">
         {stats.map((stat) => (
           <StatCell key={stat.label} label={stat.label} value={stat.value} />

@@ -1,3 +1,4 @@
+import { compareSymbolsAtom } from './compareAtoms';
 import { atom } from 'jotai';
 import type { WorkspaceContext, WorkspaceView } from '@finagent/core';
 
@@ -19,7 +20,18 @@ export const activeViewAtom = atom<WorkspaceView>('overview');
 export const selectedPositionAtom = atom<string | null>(null);
 
 /** Sidebar navigation section (app-level views). */
-export type NavSection = 'sessions' | 'watchlist' | 'portfolio' | 'alerts' | 'skills' | 'settings';
+export type NavSection =
+  | 'sessions'
+  | 'watchlist'
+  | 'portfolio'
+  | 'alerts'
+  | 'skills'
+  | 'settings'
+  // Folio V3 sections — wired by the Lead at integration; reserved here so
+  // feature agents never race on this union.
+  | 'research'
+  | 'thesis'
+  | 'compare';
 
 export const navSectionAtom = atom<NavSection>('sessions');
 
@@ -31,9 +43,11 @@ export const workspaceContextAtom = atom<WorkspaceContext>((get) => {
   const activeSymbol = get(activeSymbolAtom);
   const activeView = get(activeViewAtom);
   const selectedPosition = get(selectedPositionAtom);
+  const comparisonSymbols = get(compareSymbolsAtom);
   return {
     ...(activeSymbol ? { activeSymbol } : {}),
     ...(activeView ? { activeView } : {}),
     ...(selectedPosition ? { selectedPosition } : {}),
+    ...(comparisonSymbols.length > 0 ? { comparisonSymbols } : {}),
   };
 });

@@ -22,7 +22,6 @@
         "@finagent/shared": "workspace:*",
         "@finagent/skill-hub": "workspace:*",
         "@finagent/ui": "workspace:*",
-        "electron": "^39.0.0",
         "react": "^18.3.0",
         "react-dom": "^18.3.0",
       },
@@ -32,6 +31,7 @@
         "@types/react": "^18.3.0",
         "@types/react-dom": "^18.3.0",
         "@vitejs/plugin-react": "4.3.0",
+        "electron": "^39.0.0",
         "electron-builder": "^26.0.0",
         "playwright-core": "^1.62.1",
         "tailwindcss": "^4.2.4",
@@ -42,6 +42,9 @@
     "packages/core": {
       "name": "@finagent/core",
       "version": "0.1.0",
+      "dependencies": {
+        "@sinclair/typebox": "^0.34.0",
+      },
       "devDependencies": {
         "typescript": "^5.6.0",
       },
@@ -60,7 +63,7 @@
       "name": "@finagent/pi-extension",
       "version": "0.1.0",
       "dependencies": {
-        "@finagent/longbridge-tools": "workspace:*",
+        "@finagent/shared": "workspace:*",
         "@sinclair/typebox": "^0.34.0",
       },
       "devDependencies": {
@@ -73,7 +76,7 @@
       "dependencies": {
         "@finagent/core": "workspace:*",
         "@finagent/longbridge-tools": "workspace:*",
-        "@finagent/pi-extension": "workspace:*",
+        "@sinclair/typebox": "^0.34.0",
         "zod": "^3.23.0",
       },
       "devDependencies": {

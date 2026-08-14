@@ -438,3 +438,8 @@ function extractTriggerKeywords(description: unknown): string[] {
 export function basenameWithoutExtension(path: string): string {
   return resolve(path).split(/[\\/]/).pop() ?? path;
 }
+
+// Skill readiness: per-skill capability requirement map (see capability-map.ts).
+export { skillCapabilityMap } from './capability-map.ts';
+export type { CapabilityId, SkillCapabilityRequirements } from '@finagent/core';
+export type { SkillReadiness, SkillReadinessStatus } from '@finagent/core';

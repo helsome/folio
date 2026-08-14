@@ -8,16 +8,44 @@ import type {
   Quote,
   StaticInfo,
 } from '@finagent/core';
+import type {
+  Assets,
+  CalendarEvent,
+  CapitalFlow,
+  CashFlowRecord,
+  Depth,
+  DividendRecord,
+  EpsForecast,
+  FinancialReport,
+  InstitutionRating,
+  MarketTemperature,
+  Position,
+  TradeTick,
+} from '@finagent/longbridge-tools';
 import {
+  getAccountPositions,
+  getAssets,
   getCalcIndex,
+  getCalendarEvents,
+  getCapitalFlow,
+  getCashFlow,
+  getDepth,
+  getDividends,
+  getEpsForecasts,
+  getFinancialReport,
+  getInstitutionRating,
   getIntraday,
   getKline,
   getLongBridgeStatus,
   getMarketStatus,
+  getMarketTemperature,
   getNews,
   getPortfolio,
   getQuote,
   getStaticInfo,
+  getTrades,
+  type GetCalendarEventsOptions,
+  type GetCashFlowOptions,
   type GetKlineOptions,
   type LongBridgeStatus,
 } from '@finagent/longbridge-tools';
@@ -42,6 +70,22 @@ export interface MarketDataFetchers {
   getCalcIndex: (symbol: string) => Promise<CalcIndex>;
   getMarketStatus: () => Promise<MarketStatus[]>;
   getNews: (symbol: string) => Promise<NewsItem[]>;
+  getDepth: (symbol: string) => Promise<Depth>;
+  getTrades: (symbol: string, count?: number) => Promise<TradeTick[]>;
+  getCapitalFlow: (symbol: string) => Promise<CapitalFlow>;
+  getMarketTemperature: (market?: string) => Promise<MarketTemperature>;
+  getFinancialReport: (
+    symbol: string,
+    kind?: 'IS' | 'BS' | 'CF' | 'ALL',
+    report?: string
+  ) => Promise<FinancialReport>;
+  getInstitutionRating: (symbol: string) => Promise<InstitutionRating>;
+  getDividends: (symbol: string) => Promise<DividendRecord[]>;
+  getEpsForecasts: (symbol: string) => Promise<EpsForecast[]>;
+  getCalendarEvents: (options: GetCalendarEventsOptions) => Promise<CalendarEvent[]>;
+  getAccountPositions: () => Promise<Position[]>;
+  getAssets: (currency?: string) => Promise<Assets[]>;
+  getCashFlow: (options?: GetCashFlowOptions) => Promise<CashFlowRecord[]>;
 }
 
 interface CacheEntry<T> {
@@ -59,6 +103,18 @@ const defaultFetchers: MarketDataFetchers = {
   getCalcIndex,
   getMarketStatus,
   getNews,
+  getDepth,
+  getTrades,
+  getCapitalFlow,
+  getMarketTemperature,
+  getFinancialReport,
+  getInstitutionRating,
+  getDividends,
+  getEpsForecasts,
+  getCalendarEvents,
+  getAccountPositions,
+  getAssets,
+  getCashFlow,
 };
 
 export class MarketDataService {
@@ -117,6 +173,73 @@ export class MarketDataService {
 
   getNews(symbol: string) {
     return this.cached(`news:${symbol}`, this.quoteTTL, () => this.fetchers.getNews(symbol));
+  }
+
+  getDepth(symbol: string) {
+    return this.cached(`depth:${symbol}`, this.quoteTTL, () => this.fetchers.getDepth(symbol));
+  }
+
+  getTrades(symbol: string, count = 20) {
+    return this.cached(`trades:${symbol}:${count}`, this.quoteTTL, () =>
+      this.fetchers.getTrades(symbol, count)
+    );
+  }
+
+  getCapitalFlow(symbol: string) {
+    return this.cached(`capital-flow:${symbol}`, this.quoteTTL, () =>
+      this.fetchers.getCapitalFlow(symbol)
+    );
+  }
+
+  getMarketTemperature(market = 'US') {
+    return this.cached(`market-temp:${market}`, this.statusTTL, () =>
+      this.fetchers.getMarketTemperature(market)
+    );
+  }
+
+  getFinancialReport(symbol: string, kind: 'IS' | 'BS' | 'CF' | 'ALL' = 'ALL', report?: string) {
+    const key = `financial-report:${symbol}:${kind}:${report ?? ''}`;
+    return this.cached(key, this.referenceTTL, () =>
+      this.fetchers.getFinancialReport(symbol, kind, report)
+    );
+  }
+
+  getInstitutionRating(symbol: string) {
+    return this.cached(`institution-rating:${symbol}`, this.referenceTTL, () =>
+      this.fetchers.getInstitutionRating(symbol)
+    );
+  }
+
+  getDividends(symbol: string) {
+    return this.cached(`dividend:${symbol}`, this.referenceTTL, () =>
+      this.fetchers.getDividends(symbol)
+    );
+  }
+
+  getEpsForecasts(symbol: string) {
+    return this.cached(`forecast-eps:${symbol}`, this.referenceTTL, () =>
+      this.fetchers.getEpsForecasts(symbol)
+    );
+  }
+
+  getCalendarEvents(options: GetCalendarEventsOptions) {
+    const key = `calendar:${options.eventType}:${(options.symbols ?? []).join(',')}:${options.start ?? ''}:${options.end ?? ''}:${options.count ?? 100}`;
+    return this.cached(key, this.referenceTTL, () => this.fetchers.getCalendarEvents(options));
+  }
+
+  getAccountPositions() {
+    return this.cached('positions', this.portfolioTTL, () => this.fetchers.getAccountPositions());
+  }
+
+  getAssets(currency?: string) {
+    return this.cached(`assets:${currency ?? ''}`, this.portfolioTTL, () =>
+      this.fetchers.getAssets(currency)
+    );
+  }
+
+  getCashFlow(options: GetCashFlowOptions = {}) {
+    const key = `cash-flow:${options.start ?? ''}:${options.end ?? ''}`;
+    return this.cached(key, this.portfolioTTL, () => this.fetchers.getCashFlow(options));
   }
 
   clear() {

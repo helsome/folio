@@ -1,0 +1,665 @@
+{
+  "list": [
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.25 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2026.06.04",
+      "id": "625397",
+      "payment_date": "2026.06.26",
+      "record_date": "2026.06.04"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.01 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2026.03.11",
+      "id": "614517",
+      "payment_date": "2026.04.01",
+      "record_date": "2026.03.11"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.01 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2025.12.04",
+      "id": "597107",
+      "payment_date": "2025.12.26",
+      "record_date": "2025.12.04"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.01 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2025.09.11",
+      "id": "586265",
+      "payment_date": "2025.10.02",
+      "record_date": "2025.09.11"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.01 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2025.06.11",
+      "id": "571498",
+      "payment_date": "2025.07.03",
+      "record_date": "2025.06.11"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.01 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2025.03.12",
+      "id": "556887",
+      "payment_date": "2025.04.02",
+      "record_date": "2025.03.12"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.01 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2024.12.05",
+      "id": "545285",
+      "payment_date": "2024.12.27",
+      "record_date": "2024.12.05"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.01 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2024.09.12",
+      "id": "536573",
+      "payment_date": "2024.10.03",
+      "record_date": "2024.09.12"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.01 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2024.06.11",
+      "id": "103371",
+      "payment_date": "2024.06.28",
+      "record_date": "2024.06.11"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.04 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2024.03.05",
+      "id": "110721",
+      "payment_date": "2024.03.27",
+      "record_date": "2024.03.06"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.04 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2023.12.05",
+      "id": "118156",
+      "payment_date": "2023.12.28",
+      "record_date": "2023.12.06"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.04 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2023.09.06",
+      "id": "124679",
+      "payment_date": "2023.09.28",
+      "record_date": "2023.09.07"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.04 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2023.06.07",
+      "id": "131231",
+      "payment_date": "2023.06.30",
+      "record_date": "2023.06.08"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.04 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2023.03.07",
+      "id": "137627",
+      "payment_date": "2023.03.29",
+      "record_date": "2023.03.08"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.04 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2022.11.30",
+      "id": "144744",
+      "payment_date": "2022.12.22",
+      "record_date": "2022.12.01"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.04 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2022.09.07",
+      "id": "150033",
+      "payment_date": "2022.09.29",
+      "record_date": "2022.09.08"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.04 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2022.06.08",
+      "id": "155934",
+      "payment_date": "2022.07.01",
+      "record_date": "2022.06.09"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.04 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2022.03.02",
+      "id": "161787",
+      "payment_date": "2022.03.24",
+      "record_date": "2022.03.03"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.04 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2021.12.01",
+      "id": "167979",
+      "payment_date": "2021.12.23",
+      "record_date": "2021.12.02"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.04 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2021.08.31",
+      "id": "173354",
+      "payment_date": "2021.09.23",
+      "record_date": "2021.09.01"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.16 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2021.06.09",
+      "id": "178149",
+      "payment_date": "2021.07.01",
+      "record_date": "2021.06.10"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.16 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2021.03.09",
+      "id": "183134",
+      "payment_date": "2021.03.31",
+      "record_date": "2021.03.10"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.16 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2020.12.03",
+      "id": "188451",
+      "payment_date": "2020.12.29",
+      "record_date": "2020.12.04"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.16 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2020.09.01",
+      "id": "193354",
+      "payment_date": "2020.09.24",
+      "record_date": "2020.09.02"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.16 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2020.06.04",
+      "id": "197932",
+      "payment_date": "2020.06.26",
+      "record_date": "2020.06.05"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.16 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2020.02.27",
+      "id": "203046",
+      "payment_date": "2020.03.20",
+      "record_date": "2020.02.28"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.16 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2019.11.27",
+      "id": "208249",
+      "payment_date": "2019.12.20",
+      "record_date": "2019.11.29"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.16 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2019.08.28",
+      "id": "213097",
+      "payment_date": "2019.09.20",
+      "record_date": "2019.08.29"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.16 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2019.05.30",
+      "id": "217833",
+      "payment_date": "2019.06.21",
+      "record_date": "2019.05.31"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.16 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2019.02.28",
+      "id": "222399",
+      "payment_date": "2019.03.22",
+      "record_date": "2019.03.01"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.16 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2018.11.29",
+      "id": "227571",
+      "payment_date": "2018.12.21",
+      "record_date": "2018.11.30"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.15 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2018.08.29",
+      "id": "232027",
+      "payment_date": "2018.09.21",
+      "record_date": "2018.08.30"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.15 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2018.05.23",
+      "id": "236676",
+      "payment_date": "2018.06.15",
+      "record_date": "2018.05.24"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.15 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2018.02.22",
+      "id": "240936",
+      "payment_date": "2018.03.16",
+      "record_date": "2018.02.23"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.15 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2017.11.22",
+      "id": "245637",
+      "payment_date": "2017.12.15",
+      "record_date": "2017.11.24"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.14 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2017.08.22",
+      "id": "249740",
+      "payment_date": "2017.09.18",
+      "record_date": "2017.08.24"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.14 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2017.05.19",
+      "id": "253882",
+      "payment_date": "2017.06.14",
+      "record_date": "2017.05.23"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.14 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2017.02.22",
+      "id": "257695",
+      "payment_date": "2017.03.17",
+      "record_date": "2017.02.24"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.14 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2016.11.23",
+      "id": "261825",
+      "payment_date": "2016.12.19",
+      "record_date": "2016.11.28"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.115 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2016.08.23",
+      "id": "265598",
+      "payment_date": "2016.09.16",
+      "record_date": "2016.08.25"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.115 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2016.05.24",
+      "id": "269456",
+      "payment_date": "2016.06.20",
+      "record_date": "2016.05.26"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.115 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2016.02.29",
+      "id": "272926",
+      "payment_date": "2016.03.23",
+      "record_date": "2016.03.02"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.115 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2015.11.18",
+      "id": "277226",
+      "payment_date": "2015.12.14",
+      "record_date": "2015.11.20"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.0975 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2015.08.18",
+      "id": "280778",
+      "payment_date": "2015.09.11",
+      "record_date": "2015.08.20"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.0975 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2015.05.19",
+      "id": "284403",
+      "payment_date": "2015.06.12",
+      "record_date": "2015.05.21"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.085 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2015.02.24",
+      "id": "287716",
+      "payment_date": "2015.03.19",
+      "record_date": "2015.02.26"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.085 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2014.11.19",
+      "id": "291523",
+      "payment_date": "2014.12.15",
+      "record_date": "2014.11.21"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.085 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2014.08.19",
+      "id": "294957",
+      "payment_date": "2014.09.12",
+      "record_date": "2014.08.21"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.085 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2014.05.20",
+      "id": "298421",
+      "payment_date": "2014.06.13",
+      "record_date": "2014.05.22"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.085 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2014.02.25",
+      "id": "301543",
+      "payment_date": "2014.03.20",
+      "record_date": "2014.02.27"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.085 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2013.11.19",
+      "id": "305190",
+      "payment_date": "2013.12.13",
+      "record_date": "2013.11.21"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.075 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2013.08.20",
+      "id": "308312",
+      "payment_date": "2013.09.13",
+      "record_date": "2013.08.22"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.075 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2013.05.21",
+      "id": "311440",
+      "payment_date": "2013.06.14",
+      "record_date": "2013.05.23"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.075 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2013.02.26",
+      "id": "314311",
+      "payment_date": "2013.03.21",
+      "record_date": "2013.02.28"
+    },
+    {
+      "counter_id": "ST/US/NVDA",
+      "desc": "每股派息 0.075 USD",
+      "dividend_summary": {
+        "desc": "",
+        "title": ""
+      },
+      "ex_date": "2012.11.20",
+      "id": "317727",
+      "payment_date": "2012.12.14",
+      "record_date": "2012.11.23"
+    }
+  ],
+  "total": "55"
+}

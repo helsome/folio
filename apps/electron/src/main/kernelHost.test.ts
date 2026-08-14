@@ -1,4 +1,4 @@
-import { beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import type { AgentEvent } from '@finagent/core';
 
 let lastKernelOptions: Record<string, unknown> | null = null;
@@ -78,7 +78,16 @@ mock.module('electron', () => ({
   safeStorage: {
     isEncryptionAvailable: () => true,
   },
+  Notification: {
+    isSupported: () => false,
+  },
 }));
+
+const noopStore = class {
+  read = async (_file: string, fallback: unknown) => fallback;
+  write = async () => undefined;
+  remove = async () => undefined;
+};
 
 mock.module('@finagent/shared', () => ({
   AgentKernel: FakeAgentKernel,
@@ -88,6 +97,53 @@ mock.module('@finagent/shared', () => ({
       lastMarketData = this;
     }
   },
+  FinanceToolRegistry: class {
+    constructor() {
+      // Capability-backed tool registry under test elsewhere.
+    }
+  },
+  JsonFileStore: noopStore,
+  createFullRegistry: () => ({ list: () => [] }),
+  CapabilityExecutor: class {},
+  ResearchService: class {
+    start = async () => undefined;
+    cancel = async () => undefined;
+    listRuns = async () => [];
+    getRun = async () => undefined;
+    listReports = async () => [];
+    getReport = async () => undefined;
+  },
+  ResearchReportRepository: class extends noopStore {},
+  LocalResearchSynthesizer: class {},
+  createAgentSynthesizer: (runner: unknown) => runner,
+  createAgentEvaluator: (runner: unknown) => runner,
+  createLocalThesisEvaluator: () => ({}),
+  ThesisService: class {},
+  ThesisRepository: class {
+    list = async () => [];
+    getBySymbol = async () => [];
+  },
+  ThesisImpactRepository: class extends noopStore {},
+  AlertEngine: class {
+    start = () => undefined;
+    stop = () => undefined;
+  },
+  AlertRuleRepository: class {
+    list = async () => [];
+    save = async () => undefined;
+    remove = async () => undefined;
+  },
+  AlertEventLog: class {
+    list = async () => [];
+  },
+  PortfolioRiskService: class {
+    analyze = async () => undefined;
+  },
+  defaultPortfolioRiskSynthesizer: async () => '',
+  buildComparison: async () => undefined,
+  computeSkillReadiness: () => undefined,
+  parseSynthesisJson: (text: string) => JSON.parse(text),
+  parseImpactJson: (text: string) => JSON.parse(text),
 }));
 
 mock.module('@finagent/skill-hub', () => ({
@@ -99,14 +155,27 @@ mock.module('@finagent/skill-hub', () => ({
     listSkillResources = async () => [];
     readSkillResource = async () => '';
   },
+  skillCapabilityMap: {},
 }));
 
 const { AgentKernelHost } = await import('./kernelHost.ts');
+
+// The constructor sets FINAGENT_PI_EXTENSION as a process-wide side effect;
+// restore it so sibling test files (shared process) see the default args.
+const originalPiExtension = process.env.FINAGENT_PI_EXTENSION;
 
 beforeEach(() => {
   lastKernelOptions = null;
   lastMarketData = null;
   forwardedEvents = [];
+});
+
+afterEach(() => {
+  if (originalPiExtension === undefined) {
+    delete process.env.FINAGENT_PI_EXTENSION;
+  } else {
+    process.env.FINAGENT_PI_EXTENSION = originalPiExtension;
+  }
 });
 
 describe('AgentKernelHost', () => {

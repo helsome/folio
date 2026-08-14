@@ -1,11 +1,14 @@
 import React, { createContext, useContext } from 'react';
 import type {
   AgentEvent,
-  Alert,
+  AlertRule,
+  AlertTriggerEvent,
   ApiResult,
   CalcIndex,
+  Comparison,
   CredentialInfo,
   CustomProviderConfig,
+  InvestmentThesis,
   Kline,
   KlineRequest,
   LlmModel,
@@ -16,15 +19,31 @@ import type {
   Message,
   NewsItem,
   Portfolio,
+  PortfolioRiskReport,
   ProviderStatus,
   Quote,
+  ResearchReport,
+  ResearchRunSummary,
   Run,
   SessionMeta,
   Skill,
+  SkillReadiness,
   StaticInfo,
+  ThesisImpact,
   ToolDefinition,
   WorkspaceContext,
 } from '@finagent/core';
+
+/** Renderer-safe capability metadata (schemas never cross IPC). */
+export interface CapabilityMetadata {
+  id: string;
+  name: string;
+  description: string;
+  category: string;
+  riskLevel: string;
+  auth: string;
+  toolName: string;
+}
 
 export interface WindowControlsClient {
   minimize: () => Promise<void>;
@@ -85,9 +104,37 @@ export interface FinagentClient {
   longbridge: {
     getStatus: () => Promise<ApiResult<LongBridgeStatus>>;
   };
-  alerts: {
-    load: () => Promise<ApiResult<Alert[]>>;
-    save: (alerts: Alert[]) => Promise<ApiResult<void>>;
+  alerts?: {
+    loadRules: () => Promise<ApiResult<AlertRule[]>>;
+    saveRules: (rules: AlertRule[]) => Promise<ApiResult<void>>;
+    listEvents: () => Promise<ApiResult<AlertTriggerEvent[]>>;
+    onTriggered: (callback: (event: AlertTriggerEvent) => void) => () => void;
+  };
+  capabilities?: {
+    list: () => Promise<ApiResult<CapabilityMetadata[]>>;
+  };
+  research?: {
+    start: (input: { symbol: string }) => Promise<ApiResult<ResearchRunSummary>>;
+    cancel: (input: { runId: string }) => Promise<ApiResult<void>>;
+    listRuns: () => Promise<ApiResult<ResearchRunSummary[]>>;
+    getRun: (input: { runId: string }) => Promise<ApiResult<ResearchRunSummary | undefined>>;
+    listReports: (input: { symbol?: string }) => Promise<ApiResult<ResearchReport[]>>;
+    getReport: (input: { reportId: string }) => Promise<ApiResult<ResearchReport | undefined>>;
+  };
+  thesis?: {
+    list: (symbol?: string) => Promise<ApiResult<InvestmentThesis[]>>;
+    getReport: (symbol: string) => Promise<ApiResult<ResearchReport | null>>;
+    saveFromReport: (symbol: string) => Promise<ApiResult<InvestmentThesis>>;
+    reEvaluate: (symbol: string) => Promise<ApiResult<ThesisImpact>>;
+    update: (thesis: InvestmentThesis) => Promise<ApiResult<InvestmentThesis>>;
+    listImpacts: (symbol: string) => Promise<ApiResult<ThesisImpact[]>>;
+    onImpact: (callback: (impact: ThesisImpact) => void) => () => void;
+  };
+  compare?: {
+    build: (symbols: string[]) => Promise<ApiResult<Comparison>>;
+  };
+  portfolioRisk?: {
+    analyze: () => Promise<ApiResult<PortfolioRiskReport>>;
   };
   llm: {
     getState: () => Promise<ApiResult<LlmRuntimeState>>;
@@ -108,6 +155,7 @@ export interface FinagentClient {
     setEnabled: (skillId: string, enabled: boolean) => Promise<ApiResult<void>>;
     listResources: (skillId: string) => Promise<ApiResult<SkillResourceItem[]>>;
     readResource: (skillId: string, relativePath: string) => Promise<ApiResult<string>>;
+    readiness: () => Promise<ApiResult<SkillReadiness[]>>;
   };
 }
 
@@ -144,8 +192,36 @@ export const fallbackClient: FinagentClient = {
     getStatus: missingClient('longbridge.getStatus'),
   },
   alerts: {
-    load: missingClient('alerts.load'),
-    save: missingClient('alerts.save'),
+    loadRules: missingClient('alerts.loadRules'),
+    saveRules: missingClient('alerts.saveRules'),
+    listEvents: missingClient('alerts.listEvents'),
+    onTriggered: () => () => undefined,
+  },
+  capabilities: {
+    list: missingClient('capabilities.list'),
+  },
+  research: {
+    start: missingClient('research.start'),
+    cancel: missingClient('research.cancel'),
+    listRuns: missingClient('research.listRuns'),
+    getRun: missingClient('research.getRun'),
+    listReports: missingClient('research.listReports'),
+    getReport: missingClient('research.getReport'),
+  },
+  thesis: {
+    list: missingClient('thesis.list'),
+    getReport: missingClient('thesis.getReport'),
+    saveFromReport: missingClient('thesis.saveFromReport'),
+    reEvaluate: missingClient('thesis.reEvaluate'),
+    update: missingClient('thesis.update'),
+    listImpacts: missingClient('thesis.listImpacts'),
+    onImpact: () => () => undefined,
+  },
+  compare: {
+    build: missingClient('compare.build'),
+  },
+  portfolioRisk: {
+    analyze: missingClient('portfolioRisk.analyze'),
   },
   llm: {
     getState: missingClient('llm.getState'),
@@ -166,6 +242,7 @@ export const fallbackClient: FinagentClient = {
     setEnabled: missingClient('skills.setEnabled'),
     listResources: missingClient('skills.listResources'),
     readResource: missingClient('skills.readResource'),
+    readiness: missingClient('skills.readiness'),
   },
 };
 

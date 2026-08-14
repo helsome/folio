@@ -1,0 +1,1 @@
+longbridge capital NVDA.US --flow --format json

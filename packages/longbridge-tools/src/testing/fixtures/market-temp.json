@@ -1,0 +1,22 @@
+[
+  {
+    "field": "Market",
+    "value": "US"
+  },
+  {
+    "field": "Temperature",
+    "value": "62"
+  },
+  {
+    "field": "Description",
+    "value": "Temp Comfortable & Staying Stable"
+  },
+  {
+    "field": "Valuation",
+    "value": "78"
+  },
+  {
+    "field": "Sentiment",
+    "value": "46"
+  }
+]

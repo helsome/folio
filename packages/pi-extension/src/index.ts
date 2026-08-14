@@ -36,26 +36,23 @@ interface AgentApi {
   registerProvider?: (name: string, config: ProviderConfig) => void;
 }
 
-import { getQuoteTool } from './tools/getQuote.ts';
-import { getPortfolioTool } from './tools/getPortfolio.ts';
-import { getKlineTool, getIntradayTool } from './tools/getKline.ts';
+import { createCapabilityTools as buildCapabilityTools, fullCapabilities } from '@finagent/shared/capabilities';
 import { listSkillResourcesTool, readSkillResourceTool } from './tools/skillResources.ts';
+
+/** Finance tools generated from the shared capability registry manifests. */
+export function createCapabilityTools(): Tool[] {
+  return buildCapabilityTools(fullCapabilities);
+}
 
 // Tool registry
 export const tools: Tool[] = [
-  getQuoteTool,
-  getPortfolioTool,
-  getKlineTool,
-  getIntradayTool,
+  ...createCapabilityTools(),
   listSkillResourcesTool,
   readSkillResourceTool,
 ];
 
-// Export individual tools
-export { getQuoteTool } from './tools/getQuote.ts';
-export { getPortfolioTool } from './tools/getPortfolio.ts';
-export { getKlineTool, getIntradayTool } from './tools/getKline.ts';
-export { listSkillResourcesTool, readSkillResourceTool } from './tools/skillResources.ts';
+// Export the two hand-written skill-resource tools.
+export { listSkillResourcesTool, readSkillResourceTool };
 
 // Register all tools with Pi Agent
 export function registerTools(agent: AgentApi) {

@@ -6,6 +6,7 @@ import { RunRepository } from '../storage/run-repository.ts';
 import { SessionRepository } from '../storage/session-repository.ts';
 import { LocalRuntimeAdapter } from '../agent/local-runtime-adapter.ts';
 import { PiRuntimeAdapter, type LlmRuntimeApi } from '../agent/pi-runtime-adapter.ts';
+import { FinanceToolRegistry } from '../agent/finance-tool-registry.ts';
 import { MarketDataService } from '../agent/market-data-service.ts';
 import { createCodeError } from '../agent/errors.ts';
 import type { PiRpcClientOptions } from '../agent/pi-rpc-client.ts';
@@ -23,6 +24,11 @@ export interface AgentKernelOptions {
   /** Explicit runtime override (tests). */
   runtime?: AgentRuntime;
   marketData?: MarketDataService;
+  /**
+   * Capability-backed tool registry shared by the local and Pi adapters.
+   * Defaults to the phase-1 registry when omitted.
+   */
+  registry?: FinanceToolRegistry;
   rpc?: PiRpcClientOptions;
   /** Skill hub used for progressive skill loading in the runtime prompt. */
   skillHub?: SkillHub;
@@ -104,10 +110,11 @@ function createDefaultRuntime(
   now: () => number
 ): AgentRuntime {
   if (options.provider === 'local') {
-    return new LocalRuntimeAdapter({ marketData, now });
+    return new LocalRuntimeAdapter({ marketData, registry: options.registry, now });
   }
   return new PiRuntimeAdapter({
     marketData,
+    registry: options.registry,
     sessionDir: options.piSessionDir,
     rpc: options.rpc,
     skillHub: options.skillHub,

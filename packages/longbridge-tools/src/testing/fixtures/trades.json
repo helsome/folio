@@ -1,0 +1,142 @@
+[
+  {
+    "direction": "Down",
+    "price": "224.120",
+    "time": "2026-08-13 08:32:27",
+    "type": "I",
+    "volume": "1"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.140",
+    "time": "2026-08-13 08:32:28",
+    "type": "I",
+    "volume": "3"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.094",
+    "time": "2026-08-13 08:32:28",
+    "type": "I",
+    "volume": "50"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.097",
+    "time": "2026-08-13 08:32:29",
+    "type": "I",
+    "volume": "30"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.073",
+    "time": "2026-08-13 08:32:31",
+    "type": "I",
+    "volume": "1"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.150",
+    "time": "2026-08-13 08:32:33",
+    "type": "I",
+    "volume": "1"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.073",
+    "time": "2026-08-13 08:32:35",
+    "type": "I",
+    "volume": "1"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.073",
+    "time": "2026-08-13 08:32:38",
+    "type": "I",
+    "volume": "1"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.120",
+    "time": "2026-08-13 08:32:38",
+    "type": "I",
+    "volume": "22"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.110",
+    "time": "2026-08-13 08:32:39",
+    "type": "I",
+    "volume": "5"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.110",
+    "time": "2026-08-13 08:32:39",
+    "type": "I",
+    "volume": "2"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.110",
+    "time": "2026-08-13 08:32:44",
+    "type": "I",
+    "volume": "1"
+  },
+  {
+    "direction": "Down",
+    "price": "224.070",
+    "time": "2026-08-13 08:33:04",
+    "type": "",
+    "volume": "860"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.080",
+    "time": "2026-08-13 08:33:04",
+    "type": "I",
+    "volume": "38"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.108",
+    "time": "2026-08-13 08:33:04",
+    "type": "I",
+    "volume": "1"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.098",
+    "time": "2026-08-13 08:33:06",
+    "type": "I",
+    "volume": "1"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.127",
+    "time": "2026-08-13 08:33:07",
+    "type": "I",
+    "volume": "1"
+  },
+  {
+    "direction": "Neutral",
+    "price": "224.120",
+    "time": "2026-08-13 08:33:07",
+    "type": "I",
+    "volume": "90"
+  },
+  {
+    "direction": "Up",
+    "price": "224.130",
+    "time": "2026-08-13 08:33:07",
+    "type": "",
+    "volume": "183"
+  },
+  {
+    "direction": "Up",
+    "price": "224.130",
+    "time": "2026-08-13 08:33:07",
+    "type": "I",
+    "volume": "40"
+  }
+]

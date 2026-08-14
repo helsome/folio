@@ -1,5 +1,12 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useAtom } from 'jotai';
 import { useFinagentClient, type SkillListItem, type SkillResourceItem } from '../../client';
+import {
+  getSkillReadiness,
+  loadSkillReadiness,
+  skillReadinessAtom,
+} from '../../atoms/skillReadinessAtoms';
+import { SkillReadinessBadge } from './SkillReadinessBadge';
 
 const Toggle: React.FC<{ checked: boolean; onChange: () => void; disabled?: boolean }> = ({
   checked,
@@ -35,6 +42,7 @@ export const SkillsView: React.FC = () => {
   const [resources, setResources] = useState<SkillResourceItem[]>([]);
   const [resourcesLoading, setResourcesLoading] = useState(false);
   const [resourcesError, setResourcesError] = useState<string | null>(null);
+  const [skillReadiness, setSkillReadiness] = useAtom(skillReadinessAtom);
 
   const [activeResource, setActiveResource] = useState<{ skillId: string; path: string } | null>(null);
   const [resourceContent, setResourceContent] = useState<string | null>(null);
@@ -52,10 +60,13 @@ export const SkillsView: React.FC = () => {
       setError(result.error.message);
     }
   }, [client]);
-
   useEffect(() => {
     void loadSkills();
   }, [loadSkills]);
+
+  useEffect(() => {
+    void loadSkillReadiness().then(setSkillReadiness);
+  }, [setSkillReadiness]);
 
   const toggleEnabled = async (skill: SkillListItem) => {
     const next = !skill.enabled;
@@ -157,6 +168,7 @@ export const SkillsView: React.FC = () => {
                   <div className="truncate text-[12px] text-foreground/54">{skill.description}</div>
                 )}
               </div>
+              <SkillReadinessBadge readiness={getSkillReadiness(skillReadiness, skill.id)} />
               <span className="shrink-0 rounded-[6px] bg-foreground/[0.05] px-1.5 py-0.5 text-[11px] text-foreground/56">
                 {skill.keywords.length} keywords
               </span>

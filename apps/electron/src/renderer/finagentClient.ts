@@ -1,7 +1,9 @@
 import type {
   AgentEvent,
+  AlertTriggerEvent,
   ApiResult,
   CustomProviderConfig,
+  ThesisImpact,
   WorkspaceContext,
 } from '@finagent/core';
 import { fallbackClient, type FinagentClient } from '@finagent/ui';
@@ -51,8 +53,38 @@ function createElectronClient(): FinagentClient {
       getStatus: () => ipcResult(window.electronAPI.longbridge.getStatus()),
     },
     alerts: {
-      load: () => ipcResult(window.electronAPI.alerts.load()),
-      save: (alerts) => ipcResult(window.electronAPI.alerts.save(alerts)),
+      loadRules: () => ipcResult(window.electronAPI.alerts.loadRules()),
+      saveRules: (rules) => ipcResult(window.electronAPI.alerts.saveRules(rules)),
+      listEvents: () => ipcResult(window.electronAPI.alerts.listEvents()),
+      onTriggered: (callback) =>
+        window.electronAPI.alerts.onTriggered((event) => callback(event as AlertTriggerEvent)),
+    },
+    capabilities: {
+      list: () => ipcResult(window.electronAPI.capabilities.list()),
+    },
+    research: {
+      start: (input) => ipcResult(window.electronAPI.research.start(input)),
+      cancel: (input) => ipcResult(window.electronAPI.research.cancel(input)),
+      listRuns: () => ipcResult(window.electronAPI.research.listRuns()),
+      getRun: (input) => ipcResult(window.electronAPI.research.getRun(input)),
+      listReports: (input) => ipcResult(window.electronAPI.research.listReports(input)),
+      getReport: (input) => ipcResult(window.electronAPI.research.getReport(input)),
+    },
+    thesis: {
+      list: (symbol?) => ipcResult(window.electronAPI.thesis.list(symbol)),
+      getReport: (symbol) => ipcResult(window.electronAPI.thesis.getReport(symbol)),
+      saveFromReport: (symbol) => ipcResult(window.electronAPI.thesis.saveFromReport(symbol)),
+      reEvaluate: (symbol) => ipcResult(window.electronAPI.thesis.reEvaluate(symbol)),
+      update: (thesis) => ipcResult(window.electronAPI.thesis.update(thesis)),
+      listImpacts: (symbol) => ipcResult(window.electronAPI.thesis.listImpacts(symbol)),
+      onImpact: (callback) =>
+        window.electronAPI.thesis.onImpact((impact) => callback(impact as ThesisImpact)),
+    },
+    compare: {
+      build: (symbols) => ipcResult(window.electronAPI.compare.build(symbols)),
+    },
+    portfolioRisk: {
+      analyze: () => ipcResult(window.electronAPI.portfolioRisk.analyze()),
     },
     llm: {
       getState: () => ipcResult(window.electronAPI.llm.getState()),
@@ -74,6 +106,7 @@ function createElectronClient(): FinagentClient {
       listResources: (skillId) => ipcResult(window.electronAPI.skills.listResources(skillId)),
       readResource: (skillId, relativePath) =>
         ipcResult(window.electronAPI.skills.readResource(skillId, relativePath)),
+      readiness: () => ipcResult(window.electronAPI.skills.readiness()),
     },
   };
 }

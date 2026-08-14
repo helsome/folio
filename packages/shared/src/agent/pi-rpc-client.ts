@@ -708,7 +708,7 @@ function readDefaultPiArgs() {
     args.push('--model', model);
   }
 
-  args.push('--extension', '.pi/extensions/finagent/index.ts');
+  args.push('--extension', process.env.FINAGENT_PI_EXTENSION ?? '.pi/extensions/finagent/index.ts');
   return args;
 }
 

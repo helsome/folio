@@ -3,15 +3,18 @@
   "version": "0.1.0",
   "private": true,
   "type": "module",
-  "main": "./src/main/index.ts",
+  "main": "./src/main/index.js",
   "scripts": {
     "dev": "vite",
-    "build": "vite build && bun run build:preload",
+    "build": "vite build && bun run build:preload && bun run build:main",
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "test:e2e": "node e2e/run.mjs",
+    "test:package-smoke": "node e2e/package-smoke.mjs",
     "build:preload": "bun build src/preload/index.ts --outfile src/preload/index.cjs --target node --format cjs --external electron",
-    "package": "bun run build && electron-builder"
+    "build:main": "bun build src/main/index.ts --outfile src/main/index.js --bundle --target node --format esm --external electron",
+    "build:extension": "bun build ../../.pi/extensions/finagent/index.ts --outfile build/extensions/finagent/index.js --bundle --target node --format esm",
+    "package": "bun run build && bun run build:extension && electron-builder"
   },
   "dependencies": {
     "@finagent/core": "workspace:*",
@@ -42,13 +45,25 @@
     "directories": {
       "output": "../../dist/electron"
     },
+    "electronDist": "node_modules/electron/dist",
     "files": [
       "src/**/*",
       "dist/renderer/**/*"
     ],
+    "extraResources": [
+      {
+        "from": "../../skills",
+        "to": "skills"
+      },
+      {
+        "from": "build/extensions",
+        "to": "extensions"
+      }
+    ],
     "mac": {
-      "target": "dmg",
-      "icon": "assets/icon.icns"
+      "target": "dir",
+      "icon": "assets/icon.icns",
+      "identity": null
     }
   }
 }

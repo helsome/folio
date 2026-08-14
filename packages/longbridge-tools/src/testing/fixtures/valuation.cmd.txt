@@ -1,0 +1,1 @@
+longbridge valuation NVDA.US --format json

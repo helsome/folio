@@ -8,6 +8,7 @@ import {
   navSectionAtom,
   agentPanelVisibleAtom,
 } from './workspaceAtoms';
+import { compareSymbolsAtom } from './compareAtoms';
 
 describe('workspace atoms', () => {
   it('derives WorkspaceContext from active symbol and view', () => {
@@ -31,6 +32,17 @@ describe('workspace atoms', () => {
     expect(store.get(workspaceContextAtom)).toEqual({
       activeView: 'overview',
       selectedPosition: 'pos-1',
+    });
+  });
+
+  it('includes comparisonSymbols from the compare workspace when set', () => {
+    const store = createStore();
+    expect(store.get(workspaceContextAtom)).toEqual({ activeView: 'overview' });
+
+    store.set(compareSymbolsAtom, ['AAPL.US', 'MSFT.US']);
+    expect(store.get(workspaceContextAtom)).toEqual({
+      activeView: 'overview',
+      comparisonSymbols: ['AAPL.US', 'MSFT.US'],
     });
   });
 

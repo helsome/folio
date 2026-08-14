@@ -1,24 +1,62 @@
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
-import { fileURLToPath } from 'node:url';
-import { app, type BrowserWindow } from 'electron';
+import { join } from 'node:path';
+import { app, Notification, type BrowserWindow } from 'electron';
 import type {
   AgentEvent,
+  AlertRule,
+  AlertTriggerEvent,
   ApiResult,
+  CapabilityRegistry,
+  Comparison,
   CredentialInfo,
   CustomProviderConfig,
+  InvestmentThesis,
   LlmModel,
   LlmRuntimeState,
   LlmTestResult,
   Message,
+  PortfolioRiskReport,
   ProviderStatus,
+  ResearchReport,
+  ResearchRunSummary,
+  ResearchSynthesis,
+  ResearchSynthesisInput,
   Run,
   SessionMeta,
+  SkillReadiness,
+  ThesisImpact,
+  ThesisImpactInput,
   ToolDefinition,
   WorkspaceContext,
 } from '@finagent/core';
-import { AgentKernel, MarketDataService } from '@finagent/shared';
-import { SkillHub } from '@finagent/skill-hub';
+import {
+  AgentKernel,
+  AlertEngine,
+  AlertEventLog,
+  AlertRuleRepository,
+  buildComparison,
+  CapabilityExecutor,
+  computeSkillReadiness,
+  createAgentEvaluator,
+  createAgentSynthesizer,
+  createFullRegistry,
+  createLocalThesisEvaluator,
+  defaultPortfolioRiskSynthesizer,
+  FinanceToolRegistry,
+  JsonFileStore,
+  LocalResearchSynthesizer,
+  MarketDataService,
+  parseImpactJson,
+  parseSynthesisJson,
+  PortfolioRiskService,
+  ResearchReportRepository,
+  ResearchService,
+  ThesisImpactRepository,
+  ThesisRepository,
+  ThesisService,
+  type PortfolioRiskSynthesisInput,
+} from '@finagent/shared';
+import { SkillHub, skillCapabilityMap } from '@finagent/skill-hub';
+import { getPiCwd, getPiExtensionEntry, getSkillsDir } from '@finagent/shared/resources';
 import { CredentialStore, redactSecrets } from './credentialStore.ts';
 
 type IpcSuccess<T> = { ok: true; data: T };
@@ -59,39 +97,94 @@ export class AgentKernelHost {
   private readonly kernel: AgentKernel;
   private readonly credentials: CredentialStore;
   private readonly skillHub: SkillHub;
-  private readonly workspaceRoot: string;
+  /** Full Folio V3 capability registry: agent tools + UI + product workflows. */
+  private readonly registry: CapabilityRegistry;
+  private readonly executor: CapabilityExecutor;
+  private readonly researchService: ResearchService;
+  private readonly thesisRepository: ThesisRepository;
+  private readonly thesisService: ThesisService;
+  private readonly alertRepository: AlertRuleRepository;
+  private readonly alertEventLog: AlertEventLog;
+  private readonly alertEngine: AlertEngine;
+  private readonly portfolioRisk: PortfolioRiskService;
   private unsubscribe: (() => void) | null = null;
+  private window: BrowserWindow | null = null;
 
   constructor() {
-    // The Pi runtime resolves its extension path (`.pi/extensions/...`)
-    // relative to the spawned process cwd, so spawn it from the workspace
-    // root rather than the Electron app directory.
-    this.workspaceRoot = join(
-      dirname(fileURLToPath(import.meta.url)),
-      '../../../../'
-    );
+    // Resource paths come from ResourceLocator: the repo root in dev, the app
+    // Resources dir when packaged. The Pi runtime resolves its extension path
+    // relative to the spawn cwd (getPiCwd), so both are wired through it.
+    // FINAGENT_PI_EXTENSION lets readDefaultPiArgs() supply the correct
+    // --extension without duplicating the default arg list.
+    process.env.FINAGENT_PI_EXTENSION = getPiExtensionEntry();
     this.credentials = new CredentialStore(join(app.getPath('userData'), 'credentials.json'));
     this.skillHub = new SkillHub({
-      skillsDirectory: join(this.workspaceRoot, 'skills'),
+      skillsDirectory: getSkillsDir(),
       stateFile: join(app.getPath('userData'), 'skills-state.json'),
     });
+
+    const provider = readAgentProvider();
+    const userData = app.getPath('userData');
+
+    this.registry = createFullRegistry();
+    this.executor = new CapabilityExecutor();
+
+    this.researchService = new ResearchService({
+      registry: this.registry,
+      synthesizer:
+        provider === 'local'
+          ? new LocalResearchSynthesizer()
+          : createAgentSynthesizer(this.runResearchSynthesis),
+      repository: new ResearchReportRepository(new JsonFileStore(join(userData, 'store'))),
+    });
+
+    this.thesisRepository = new ThesisRepository({ storageDir: join(userData, 'thesis') });
+    this.thesisService = new ThesisService({
+      registry: this.registry,
+      repository: this.thesisRepository,
+      impactRepository: new ThesisImpactRepository({ storageDir: join(userData, 'thesis') }),
+      evaluator:
+        provider === 'local'
+          ? createLocalThesisEvaluator()
+          : createAgentEvaluator(this.runThesisImpact),
+    });
+
+    const alertsStore = new JsonFileStore(userData);
+    this.alertRepository = new AlertRuleRepository(alertsStore);
+    this.alertEventLog = new AlertEventLog(alertsStore);
+    this.alertEngine = new AlertEngine({
+      registry: this.registry,
+      repository: this.alertRepository,
+      eventLog: this.alertEventLog,
+      onTrigger: (event) => void this.handleAlertTrigger(event),
+    });
+
+    this.portfolioRisk = new PortfolioRiskService({
+      registry: this.registry,
+      executor: this.executor,
+      synthesizer: provider === 'local' ? defaultPortfolioRiskSynthesizer : this.runRiskSummary,
+    });
+
     this.kernel = new AgentKernel({
-      storageDir: join(app.getPath('userData'), 'store'),
-      piSessionDir: join(app.getPath('userData'), 'pi-sessions'),
-      provider: readAgentProvider(),
+      storageDir: join(userData, 'store'),
+      piSessionDir: join(userData, 'pi-sessions'),
+      provider,
       marketData: this.marketData,
+      registry: new FinanceToolRegistry(this.registry),
       skillHub: this.skillHub,
       rpc: {
-        cwd: this.workspaceRoot,
+        cwd: getPiCwd(),
         requiredEnvKeys: readRequiredLlmEnvKeys(),
         env: () => this.buildRuntimeEnv(),
       },
     });
     void this.skillHub.loadSkills();
+    this.alertEngine.start();
   }
 
   /** Forward kernel events to the window's renderer. */
   attach(window: BrowserWindow): void {
+    this.window = window;
     this.unsubscribe?.();
     this.unsubscribe = this.kernel.runs.subscribe((event: AgentEvent) => {
       if (!window.isDestroyed()) {
@@ -140,6 +233,14 @@ export class AgentKernelHost {
       }
       if (typeof context.selectedPosition === 'string') {
         workspaceContext.selectedPosition = context.selectedPosition;
+      }
+      if (
+        Array.isArray(context.comparisonSymbols) &&
+        context.comparisonSymbols.every((entry) => typeof entry === 'string')
+      ) {
+        workspaceContext.comparisonSymbols = context.comparisonSymbols.map((entry) =>
+          entry.toUpperCase()
+        );
       }
     }
     return this.kernel.runs.startRun(
@@ -224,22 +325,242 @@ export class AgentKernelHost {
     };
   }
 
-  async loadAlerts() {
-    try {
-      const contents = await readFile(getAlertsPath(), 'utf8');
-      return JSON.parse(contents) as unknown;
-    } catch (error) {
-      if (isNodeError(error) && error.code === 'ENOENT') {
-        return [];
+  // -------------------------------------------------------------------------
+  // Folio V3: capabilities, research, thesis, compare, alerts, portfolio risk
+  // -------------------------------------------------------------------------
+
+  /** Capability metadata for UI availability (schemas never cross IPC). */
+  listCapabilities() {
+    return this.registry.list().map((cap) => ({
+      id: cap.id,
+      name: cap.name,
+      description: cap.description,
+      category: cap.category,
+      riskLevel: cap.riskLevel,
+      auth: cap.auth,
+      toolName: cap.toolName,
+    }));
+  }
+
+  /** Skill readiness: capability requirements × registry coverage. */
+  listSkillReadiness(): SkillReadiness[] {
+    const readiness: SkillReadiness[] = [];
+    for (const skillId of Object.keys(skillCapabilityMap)) {
+      const requirements = skillCapabilityMap[skillId];
+      if (!requirements) continue;
+      readiness.push(computeSkillReadiness(skillId, requirements, this.registry));
+    }
+    return readiness;
+  }
+
+  // -- Deep Research ---------------------------------------------------------
+
+  async researchStart(input: unknown): Promise<ResearchRunSummary> {
+    const request = requireObject(input);
+    return this.researchService.start(requireString(request.symbol, 'symbol').toUpperCase());
+  }
+
+  async researchCancel(input: unknown): Promise<void> {
+    const request = requireObject(input);
+    await this.researchService.cancel(requireString(request.runId, 'runId'));
+  }
+
+  async researchListRuns(): Promise<ResearchRunSummary[]> {
+    return this.researchService.listRuns();
+  }
+
+  async researchGetRun(input: unknown): Promise<ResearchRunSummary | undefined> {
+    const request = requireObject(input);
+    return this.researchService.getRun(requireString(request.runId, 'runId'));
+  }
+
+  async researchListReports(input: unknown): Promise<ResearchReport[]> {
+    const request = requireObject(input);
+    const symbol =
+      typeof request.symbol === 'string' && request.symbol.length > 0
+        ? request.symbol.toUpperCase()
+        : undefined;
+    return this.researchService.listReports(symbol);
+  }
+
+  async researchGetReport(input: unknown): Promise<ResearchReport | undefined> {
+    const request = requireObject(input);
+    return this.researchService.getReport(requireString(request.reportId, 'reportId'));
+  }
+
+  // -- Investment Thesis -----------------------------------------------------
+
+  async thesisList(symbol?: unknown): Promise<InvestmentThesis[]> {
+    if (typeof symbol === 'string' && symbol.length > 0) {
+      return this.thesisRepository.getBySymbol(symbol.toUpperCase());
+    }
+    return this.thesisRepository.list();
+  }
+
+  /** Latest research report for a symbol (used by "Save as Thesis"). */
+  async thesisGetReport(symbol: unknown): Promise<ResearchReport | null> {
+    const reports = await this.researchService.listReports(
+      requireString(symbol, 'symbol').toUpperCase()
+    );
+    return reports[0] ?? null;
+  }
+
+  async thesisSaveFromReport(symbol: unknown): Promise<InvestmentThesis> {
+    const report = await this.thesisGetReport(symbol);
+    if (!report) {
+      throw createCodeError(
+        'REPORT_NOT_FOUND',
+        'No research report for this symbol. Run Deep Research first.'
+      );
+    }
+    return this.thesisService.saveFromReport(report);
+  }
+
+  async thesisReEvaluate(symbol: unknown): Promise<ThesisImpact> {
+    return this.thesisService.reEvaluate(requireString(symbol, 'symbol').toUpperCase());
+  }
+
+  async thesisUpdate(input: unknown): Promise<InvestmentThesis> {
+    const request = requireObject(input);
+    return this.thesisService.updateThesis(request as unknown as InvestmentThesis);
+  }
+
+  async thesisListImpacts(symbol: unknown): Promise<ThesisImpact[]> {
+    return this.thesisService.listImpacts(requireString(symbol, 'symbol').toUpperCase());
+  }
+
+  // -- Compare ---------------------------------------------------------------
+
+  async compareBuild(input: unknown): Promise<Comparison> {
+    const request = requireObject(input);
+    if (!Array.isArray(request.symbols) || request.symbols.length < 2) {
+      throw createCodeError('INVALID_ARGUMENT', 'Compare needs at least two symbols.');
+    }
+    const symbols = request.symbols.map((entry) =>
+      requireString(entry, 'symbols[]').toUpperCase()
+    );
+    return buildComparison(symbols, this.registry, { executor: this.executor });
+  }
+
+  // -- Portfolio risk --------------------------------------------------------
+
+  async portfolioRiskAnalyze(): Promise<PortfolioRiskReport> {
+    return this.portfolioRisk.analyze();
+  }
+
+  // -- Alerts (v2 engine) ----------------------------------------------------
+
+  async loadAlertRules(): Promise<AlertRule[]> {
+    return this.alertRepository.list();
+  }
+
+  async saveAlertRules(input: unknown): Promise<void> {
+    if (!Array.isArray(input)) {
+      throw createCodeError('INVALID_ARGUMENT', 'Expected an array of alert rules.');
+    }
+    const incoming = input as AlertRule[];
+    const existing = await this.alertRepository.list();
+    const incomingIds = new Set(incoming.map((rule) => rule.id));
+    for (const rule of incoming) {
+      await this.alertRepository.save(rule);
+    }
+    for (const stale of existing) {
+      if (!incomingIds.has(stale.id)) {
+        await this.alertRepository.remove(stale.id);
       }
-      throw error;
     }
   }
 
-  async saveAlerts(alerts: unknown) {
-    await mkdir(dirname(getAlertsPath()), { recursive: true });
-    await writeFile(getAlertsPath(), JSON.stringify(alerts, null, 2), 'utf8');
-    return alerts;
+  async listAlertEvents(): Promise<AlertTriggerEvent[]> {
+    return this.alertEventLog.list();
+  }
+
+  // -- Agent-backed V3 runners ----------------------------------------------
+
+  /**
+   * Run one prompt through the agent kernel and resolve the final answer.
+   * Creates a throwaway session; the run settles via the event stream.
+   */
+  private async runAgentPrompt(content: string, signal?: AbortSignal): Promise<string> {
+    const session = await this.kernel.sessions.createSession('Research');
+    try {
+      const answer = new Promise<string>((resolve, reject) => {
+        const timer = setTimeout(
+          () => reject(createCodeError('SYNTHESIS_TIMEOUT', 'Agent synthesis timed out.')),
+          240_000
+        );
+        const abort = () => reject(createCodeError('SYNTHESIS_CANCELLED', 'Synthesis cancelled.'));
+        signal?.addEventListener('abort', abort, { once: true });
+        const unsubscribe = this.kernel.runs.subscribe((event: AgentEvent) => {
+          if (event.sessionId !== session.id) return;
+          if (event.type === 'run_completed') {
+            cleanup();
+            resolve(event.payload.answer);
+          } else if (event.type === 'run_failed') {
+            cleanup();
+            reject(createCodeError(event.payload.error.code, event.payload.error.message));
+          }
+        });
+        const cleanup = () => {
+          clearTimeout(timer);
+          signal?.removeEventListener('abort', abort);
+          unsubscribe();
+        };
+      });
+      await this.kernel.runs.startRun(session.id, content);
+      return await answer;
+    } finally {
+      await this.kernel.deleteSession(session.id).catch(() => undefined);
+    }
+  }
+
+  private runResearchSynthesis = async (
+    input: ResearchSynthesisInput,
+    signal?: AbortSignal
+  ): Promise<ResearchSynthesis> => {
+    const answer = await this.runAgentPrompt(buildSynthesisPrompt(input), signal);
+    return parseSynthesisJson(answer);
+  };
+
+  private runThesisImpact = async (
+    input: ThesisImpactInput,
+    signal?: AbortSignal
+  ): Promise<{ kind: ThesisImpact['kind']; summary: string; updatedThesis: InvestmentThesis }> => {
+    const answer = await this.runAgentPrompt(buildImpactPrompt(input), signal);
+    return parseImpactJson(answer);
+  };
+
+  private runRiskSummary = async (
+    input: PortfolioRiskSynthesisInput,
+    signal?: AbortSignal
+  ): Promise<string> => {
+    const answer = await this.runAgentPrompt(buildRiskSummaryPrompt(input), signal);
+    return answer.trim();
+  };
+
+  /** OS notification + renderer push + thesis-impact hook for alert triggers. */
+  private async handleAlertTrigger(event: AlertTriggerEvent): Promise<void> {
+    this.window?.webContents.send('alerts:triggered', event);
+    if (Notification.isSupported()) {
+      new Notification({
+        title: `Folio — ${event.title}`,
+        body: event.message,
+      }).show();
+    }
+    if (!event.symbol) return;
+    const theses = await this.thesisRepository.getBySymbol(event.symbol);
+    if (theses.length === 0) return;
+    try {
+      const impact = await this.thesisService.reEvaluate(event.symbol, {
+        ruleId: event.ruleId,
+        ruleType: event.ruleType,
+        eventId: event.id,
+      });
+      this.window?.webContents.send('thesis:impact', impact);
+    } catch (error) {
+      // An alert must never crash the engine tick; the trigger is already logged.
+      console.error('thesis impact evaluation failed:', error);
+    }
   }
 
   // -------------------------------------------------------------------------
@@ -448,14 +769,16 @@ export class AgentKernelHost {
       overrides.push({ provider: info.provider, apiKey });
     }
     return {
-      FINAGENT_SKILLS_DIR: join(this.workspaceRoot, 'skills'),
+      FINAGENT_SKILLS_DIR: getSkillsDir(),
       FINAGENT_PROVIDER_OVERRIDES: overrides.length > 0 ? JSON.stringify(overrides) : '',
     };
   }
 
   async dispose() {
+    this.alertEngine.stop();
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.window = null;
     await this.kernel.dispose();
   }
 }
@@ -535,10 +858,6 @@ function requireObject(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function getAlertsPath() {
-  return join(app.getPath('userData'), 'alerts.json');
-}
-
 function createCodeError(code: string, message: string, action?: string) {
   const error = new Error(message) as Error & { code: string; action?: string };
   error.code = code;
@@ -552,6 +871,77 @@ function isCodeError(error: unknown): error is Error & { code: string; action?: 
 
 function isNodeError(error: unknown): error is NodeJS.ErrnoException {
   return error instanceof Error && typeof (error as NodeJS.ErrnoException).code === 'string';
+}
+
+// -- V3 prompt builders ------------------------------------------------------
+
+function buildSynthesisPrompt(input: ResearchSynthesisInput): string {
+  return [
+    'You are the Folio research synthesizer. Analyze the structured market data below',
+    `for ${input.symbol} and produce a JSON research synthesis.`,
+    '',
+    'Planned capabilities: ' + input.plannedCapabilities.join(', '),
+    '',
+    'Capability outcomes:',
+    ...input.runs.map(
+      (run) =>
+        `- ${run.capabilityId}: ${run.status}${run.error ? ` (error: ${run.error})` : ''}${run.summary ? ` — ${run.summary}` : ''}`
+    ),
+    '',
+    'Structured data bundle (facts; never invent values not present here):',
+    '```json',
+    input.dataBundle,
+    '```',
+    '',
+    'Respond with ONLY a JSON object matching this shape (no prose outside it):',
+    '{"summary": string, "stance": "bullish"|"bearish"|"neutral", "confidence": 0..1,',
+    ' "sections": [{"key": string, "title": string, "verdict": "positive"|"negative"|"neutral"|"unavailable", "summary": string}],',
+    ' "bullCase": string[], "bearCase": string[], "catalysts": string[], "risks": string[]}',
+    '',
+    'Sections must cover every planned capability; a capability that failed or has no data',
+    'gets verdict "unavailable" with an explicit note. Do not fabricate numbers or events.',
+  ].join('\n');
+}
+
+function buildImpactPrompt(input: ThesisImpactInput): string {
+  return [
+    'You are the Folio thesis evaluator. Compare the existing investment thesis',
+    `for ${input.thesis.symbol} against the fresh data below and decide how the new facts`,
+    'affect the thesis.',
+    '',
+    'Existing thesis (JSON):',
+    '```json',
+    JSON.stringify(input.thesis, null, 2),
+    '```',
+    '',
+    'Fresh data bundle:',
+    '```json',
+    input.dataBundle,
+    '```',
+    '',
+    'Respond with ONLY a JSON object matching this shape:',
+    '{"kind": "unchanged"|"strengthened"|"weakened"|"invalidated",',
+    ' "summary": "one clear sentence explaining why",',
+    ' "updatedThesis": <the full InvestmentThesis JSON with updatedAt/lastReviewedAt set to now and',
+    '   any stance/cases/risks adjusted to reflect the new facts>}',
+    '',
+    'updatedThesis must keep every field of the original thesis; only adjust what the new facts',
+    'actually change. Never invent data.',
+  ].join('\n');
+}
+
+function buildRiskSummaryPrompt(input: PortfolioRiskSynthesisInput): string {
+  return [
+    'You are the Folio portfolio risk analyst. Summarize the top risk findings from the',
+    'structured portfolio data below in 2-4 sentences of plain prose (no JSON, no markdown).',
+    '',
+    'Allocation: ' + JSON.stringify(input.allocation),
+    'Concentration: ' + JSON.stringify(input.concentration),
+    'Signals: ' + JSON.stringify(input.signals),
+    '',
+    'Mention only what the data supports; if there are no signals, say the portfolio looks',
+    'balanced and note any missing data explicitly.',
+  ].join('\n');
 }
 
 export { isApiResult };

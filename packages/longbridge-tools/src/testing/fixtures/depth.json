@@ -1,0 +1,19 @@
+{
+  "asks": [
+    {
+      "order_num": 0,
+      "position": 1,
+      "price": "224.200",
+      "volume": 76
+    }
+  ],
+  "bids": [
+    {
+      "order_num": 0,
+      "position": 1,
+      "price": "224.070",
+      "volume": 40
+    }
+  ],
+  "symbol": "NVDA.US"
+}

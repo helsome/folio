@@ -1,72 +1,63 @@
 import React from 'react';
-import type { Alert } from '@finagent/core';
+import type { AlertRule, AlertRuleType } from '@finagent/core';
+import { ALERT_TYPE_LABELS, ruleSummary } from '../../atoms';
 
 interface AlertCardProps {
-  alert: Alert;
+  rule: AlertRule;
   onToggle?: () => void;
   onRemove?: () => void;
 }
 
-const ALERT_TYPE_LABELS: Record<Alert['type'], string> = {
-  price_above: 'Price Above',
-  price_below: 'Price Below',
-  news: 'News Alert',
-  rating_change: 'Rating Change',
-};
-
-const ALERT_TYPE_ICONS: Record<Alert['type'], string> = {
+const ALERT_TYPE_ICONS: Record<AlertRuleType, string> = {
   price_above: '📈',
   price_below: '📉',
-  news: '📰',
+  new_news: '📰',
+  earnings: '📅',
   rating_change: '⭐',
+  dividend: '💰',
+  position_weight: '⚖️',
+  portfolio_drawdown: '🛡️',
 };
 
-export const AlertCard: React.FC<AlertCardProps> = ({ alert, onToggle, onRemove }) => {
-  const isEnabled = alert.enabled && !alert.triggered;
+export const AlertCard: React.FC<AlertCardProps> = ({ rule, onToggle, onRemove }) => {
+  const displaySymbol = rule.type === 'portfolio_drawdown' ? 'Portfolio' : rule.symbol;
 
   return (
     <div
       className={`p-3 rounded-lg border transition-all ${
-        alert.triggered
-          ? 'bg-yellow-500/10 border-yellow-500/30'
-          : isEnabled
+        rule.enabled
           ? 'bg-[oklch(var(--bg-secondary))] border-[oklch(var(--bg-primary))]'
           : 'bg-[oklch(var(--bg-secondary))]/50 border-[oklch(var(--bg-primary))] opacity-60'
       }`}
     >
       <div className="flex items-start justify-between">
         <div className="flex items-center gap-2">
-          <span className="text-lg">{ALERT_TYPE_ICONS[alert.type]}</span>
+          <span className="text-lg">{ALERT_TYPE_ICONS[rule.type]}</span>
           <div>
-            <div className="font-semibold text-[oklch(var(--text-primary))]">
-              {alert.symbol}
-            </div>
+            <div className="font-semibold text-[oklch(var(--text-primary))]">{displaySymbol}</div>
             <div className="text-sm text-[oklch(var(--text-secondary))]">
-              {ALERT_TYPE_LABELS[alert.type]}: ${alert.value.toFixed(2)}
+              {ALERT_TYPE_LABELS[rule.type]}: {ruleSummary(rule)}
             </div>
           </div>
         </div>
 
         <div className="flex items-center gap-2">
-          {alert.triggered && (
-            <span className="px-2 py-1 bg-yellow-500/20 text-yellow-500 text-xs rounded-full">
-              Triggered
-            </span>
-          )}
           <button
             onClick={onToggle}
+            aria-label={rule.enabled ? 'Disable alert' : 'Enable alert'}
             className={`w-10 h-5 rounded-full transition-colors ${
-              isEnabled ? 'bg-[oklch(var(--accent-primary))]' : 'bg-gray-600'
+              rule.enabled ? 'bg-[oklch(var(--accent-primary))]' : 'bg-gray-600'
             }`}
           >
             <div
               className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                isEnabled ? 'translate-x-5' : 'translate-x-0.5'
+                rule.enabled ? 'translate-x-5' : 'translate-x-0.5'
               }`}
             />
           </button>
           <button
             onClick={onRemove}
+            aria-label="Remove alert"
             className="text-[oklch(var(--text-secondary))] hover:text-red-500 transition-colors"
           >
             ×
@@ -75,10 +66,10 @@ export const AlertCard: React.FC<AlertCardProps> = ({ alert, onToggle, onRemove 
       </div>
 
       <div className="mt-2 text-xs text-[oklch(var(--text-secondary))]">
-        Created: {new Date(alert.createdAt).toLocaleDateString()}
-        {alert.triggeredAt && (
+        Created: {new Date(rule.createdAt).toLocaleDateString()}
+        {rule.lastTriggeredAt && (
           <span className="ml-2">
-            Triggered: {new Date(alert.triggeredAt).toLocaleString()}
+            Last triggered: {new Date(rule.lastTriggeredAt).toLocaleString()}
           </span>
         )}
       </div>

@@ -3,17 +3,21 @@ import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { AgentKernelHost, toIpcResult } from './kernelHost.ts';
 import { loadFinagentEnv } from './loadEnv.ts';
-
+import { getRuntimeRoot } from '@finagent/shared/resources';
 let mainWindow: BrowserWindow | null = null;
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(__dirname, '../..');
-const workspaceRoot = join(__dirname, '../../../..');
+if (app.isPackaged) {
+  process.env.FINAGENT_PACKAGED = '1';
+}
+const runtimeRoot = getRuntimeRoot();
+
 if (process.env.FINAGENT_USER_DATA_DIR) {
   app.setPath('userData', process.env.FINAGENT_USER_DATA_DIR);
 }
 
 loadFinagentEnv({
-  roots: [workspaceRoot, appRoot],
+  roots: [runtimeRoot, appRoot],
 });
 const agentKernelHost = new AgentKernelHost();
 const isDev = !app.isPackaged;
@@ -149,12 +153,81 @@ ipcMain.handle('longbridge:getStatus', async () =>
   toIpcResult(() => agentKernelHost.getLongBridgeStatus())
 );
 
-ipcMain.handle('alerts:load', async () =>
-  toIpcResult(() => agentKernelHost.loadAlerts())
+// Folio V3: capabilities, skill readiness, research, thesis, compare, alerts, risk
+ipcMain.handle('capabilities:list', async () =>
+  toIpcResult(() => agentKernelHost.listCapabilities())
 );
 
-ipcMain.handle('alerts:save', async (_event, alerts: unknown) =>
-  toIpcResult(() => agentKernelHost.saveAlerts(alerts))
+ipcMain.handle('skills:readiness', async () =>
+  toIpcResult(() => agentKernelHost.listSkillReadiness())
+);
+
+ipcMain.handle('research:start', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.researchStart(input))
+);
+
+ipcMain.handle('research:cancel', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.researchCancel(input))
+);
+
+ipcMain.handle('research:listRuns', async () =>
+  toIpcResult(() => agentKernelHost.researchListRuns())
+);
+
+ipcMain.handle('research:getRun', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.researchGetRun(input))
+);
+
+ipcMain.handle('research:listReports', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.researchListReports(input))
+);
+
+ipcMain.handle('research:getReport', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.researchGetReport(input))
+);
+
+ipcMain.handle('thesis:list', async (_event, symbol?: unknown) =>
+  toIpcResult(() => agentKernelHost.thesisList(symbol))
+);
+
+ipcMain.handle('thesis:getReport', async (_event, symbol: unknown) =>
+  toIpcResult(() => agentKernelHost.thesisGetReport(symbol))
+);
+
+ipcMain.handle('thesis:saveFromReport', async (_event, symbol: unknown) =>
+  toIpcResult(() => agentKernelHost.thesisSaveFromReport(symbol))
+);
+
+ipcMain.handle('thesis:reEvaluate', async (_event, symbol: unknown) =>
+  toIpcResult(() => agentKernelHost.thesisReEvaluate(symbol))
+);
+
+ipcMain.handle('thesis:update', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.thesisUpdate(input))
+);
+
+ipcMain.handle('thesis:listImpacts', async (_event, symbol: unknown) =>
+  toIpcResult(() => agentKernelHost.thesisListImpacts(symbol))
+);
+
+ipcMain.handle('compare:build', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.compareBuild(input))
+);
+
+ipcMain.handle('portfolioRisk:analyze', async () =>
+  toIpcResult(() => agentKernelHost.portfolioRiskAnalyze())
+);
+
+ipcMain.handle('alerts:loadRules', async () =>
+  toIpcResult(() => agentKernelHost.loadAlertRules())
+);
+
+ipcMain.handle('alerts:saveRules', async (_event, rules: unknown) =>
+  toIpcResult(() => agentKernelHost.saveAlertRules(rules))
+);
+
+ipcMain.handle('alerts:listEvents', async () =>
+  toIpcResult(() => agentKernelHost.listAlertEvents())
 );
 
 // LLM control plane

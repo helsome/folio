@@ -18,6 +18,18 @@ export {
   parseCalcIndexResponse,
   parseMarketStatusResponse,
   parseNewsResponse,
+  parseDepthResponse,
+  parseTradesResponse,
+  parseCapitalFlowResponse,
+  parseMarketTemperatureResponse,
+  parseFinancialReportResponse,
+  parseInstitutionRatingResponse,
+  parseDividendResponse,
+  parseEpsForecastResponse,
+  parseCalendarResponse,
+  parsePositionsResponse,
+  parseAssetsResponse,
+  parseCashFlowResponse,
 } from './parser.ts';
 
 export { getStaticInfo, getCalcIndex, getMarketStatus, getNews } from './tools/reference.ts';
@@ -28,7 +40,57 @@ export type { GetQuoteOptions } from './tools/quote.ts';
 
 export { getKline, getIntraday } from './tools/kline.ts';
 export type { GetKlineOptions, GetIntradayOptions } from './tools/kline.ts';
-
 export { getPortfolio, getPositions, getCash } from './tools/portfolio.ts';
 
-export type { Quote, Portfolio, Position, Kline, IntradayData } from '@finagent/core';
+export { getDepth } from './tools/depth.ts';
+
+export { getTrades } from './tools/trades.ts';
+
+export { getCapitalFlow } from './tools/capital.ts';
+
+export { getMarketTemperature } from './tools/market-temp.ts';
+
+export { getFinancialReport } from './tools/financial-report.ts';
+export type { FinancialReportKind } from './tools/financial-report.ts';
+
+export { getInstitutionRating } from './tools/institution-rating.ts';
+
+export { getDividends } from './tools/dividend.ts';
+
+export { getEpsForecasts } from './tools/forecast-eps.ts';
+
+export { getCalendarEvents } from './tools/calendar.ts';
+export type { CalendarEventType, GetCalendarEventsOptions } from './tools/calendar.ts';
+
+export { getAccountPositions } from './tools/positions.ts';
+
+export { getAssets } from './tools/assets.ts';
+
+export { getCashFlow } from './tools/cash-flow.ts';
+export type { GetCashFlowOptions } from './tools/cash-flow.ts';
+
+export type { Quote, Portfolio, Kline, IntradayData } from '@finagent/core';
+
+export type {
+  Assets,
+  CalendarEvent,
+  CalendarEventData,
+  CapitalFlow,
+  CapitalFlowSide,
+  CashFlowRecord,
+  CashInfo,
+  Depth,
+  DepthLevel,
+  DividendRecord,
+  EpsForecast,
+  FinancialReport,
+  FinancialReportAccount,
+  FinancialReportIndicator,
+  FinancialReportValue,
+  FinancialStatement,
+  InstitutionRating,
+  MarketTemperature,
+  Position,
+  RatingDistribution,
+  TradeTick,
+} from './types.ts';

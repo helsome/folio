@@ -37,8 +37,36 @@ export interface ElectronAPI {
     getStatus: () => Promise<unknown>;
   };
   alerts: {
-    load: () => Promise<unknown>;
-    save: (alerts: unknown) => Promise<unknown>;
+    loadRules: () => Promise<unknown>;
+    saveRules: (rules: unknown) => Promise<unknown>;
+    listEvents: () => Promise<unknown>;
+    onTriggered: (callback: (event: unknown) => void) => () => void;
+  };
+  capabilities: {
+    list: () => Promise<unknown>;
+  };
+  research: {
+    start: (input: { symbol: string }) => Promise<unknown>;
+    cancel: (input: { runId: string }) => Promise<unknown>;
+    listRuns: () => Promise<unknown>;
+    getRun: (input: { runId: string }) => Promise<unknown>;
+    listReports: (input: { symbol?: string }) => Promise<unknown>;
+    getReport: (input: { reportId: string }) => Promise<unknown>;
+  };
+  thesis: {
+    list: (symbol?: string) => Promise<unknown>;
+    getReport: (symbol: string) => Promise<unknown>;
+    saveFromReport: (symbol: string) => Promise<unknown>;
+    reEvaluate: (symbol: string) => Promise<unknown>;
+    update: (thesis: unknown) => Promise<unknown>;
+    listImpacts: (symbol: string) => Promise<unknown>;
+    onImpact: (callback: (impact: unknown) => void) => () => void;
+  };
+  compare: {
+    build: (symbols: string[]) => Promise<unknown>;
+  };
+  portfolioRisk: {
+    analyze: () => Promise<unknown>;
   };
   llm: {
     getState: () => Promise<unknown>;
@@ -59,6 +87,7 @@ export interface ElectronAPI {
     setEnabled: (input: { skillId: string; enabled: boolean }) => Promise<unknown>;
     listResources: (skillId: string) => Promise<unknown>;
     readResource: (skillId: string, relativePath: string) => Promise<unknown>;
+    readiness: () => Promise<unknown>;
   };
 }
 
@@ -106,8 +135,48 @@ const electronAPI: ElectronAPI = {
     getStatus: () => ipcRenderer.invoke('longbridge:getStatus'),
   },
   alerts: {
-    load: () => ipcRenderer.invoke('alerts:load'),
-    save: (alerts: unknown) => ipcRenderer.invoke('alerts:save', alerts),
+    loadRules: () => ipcRenderer.invoke('alerts:loadRules'),
+    saveRules: (rules: unknown) => ipcRenderer.invoke('alerts:saveRules', rules),
+    listEvents: () => ipcRenderer.invoke('alerts:listEvents'),
+    onTriggered: (callback: (event: unknown) => void) => {
+      const listener = (_event: unknown, payload: unknown) => callback(payload);
+      ipcRenderer.on('alerts:triggered', listener);
+      return () => {
+        ipcRenderer.removeListener('alerts:triggered', listener);
+      };
+    },
+  },
+  capabilities: {
+    list: () => ipcRenderer.invoke('capabilities:list'),
+  },
+  research: {
+    start: (input: { symbol: string }) => ipcRenderer.invoke('research:start', input),
+    cancel: (input: { runId: string }) => ipcRenderer.invoke('research:cancel', input),
+    listRuns: () => ipcRenderer.invoke('research:listRuns'),
+    getRun: (input: { runId: string }) => ipcRenderer.invoke('research:getRun', input),
+    listReports: (input: { symbol?: string }) => ipcRenderer.invoke('research:listReports', input),
+    getReport: (input: { reportId: string }) => ipcRenderer.invoke('research:getReport', input),
+  },
+  thesis: {
+    list: (symbol?: string) => ipcRenderer.invoke('thesis:list', symbol),
+    getReport: (symbol: string) => ipcRenderer.invoke('thesis:getReport', symbol),
+    saveFromReport: (symbol: string) => ipcRenderer.invoke('thesis:saveFromReport', symbol),
+    reEvaluate: (symbol: string) => ipcRenderer.invoke('thesis:reEvaluate', symbol),
+    update: (thesis: unknown) => ipcRenderer.invoke('thesis:update', thesis),
+    listImpacts: (symbol: string) => ipcRenderer.invoke('thesis:listImpacts', symbol),
+    onImpact: (callback: (impact: unknown) => void) => {
+      const listener = (_event: unknown, payload: unknown) => callback(payload);
+      ipcRenderer.on('thesis:impact', listener);
+      return () => {
+        ipcRenderer.removeListener('thesis:impact', listener);
+      };
+    },
+  },
+  compare: {
+    build: (symbols: string[]) => ipcRenderer.invoke('compare:build', symbols),
+  },
+  portfolioRisk: {
+    analyze: () => ipcRenderer.invoke('portfolioRisk:analyze'),
   },
   llm: {
     getState: () => ipcRenderer.invoke('llm:getState'),
@@ -129,6 +198,7 @@ const electronAPI: ElectronAPI = {
     listResources: (skillId: string) => ipcRenderer.invoke('skills:listResources', skillId),
     readResource: (skillId: string, relativePath: string) =>
       ipcRenderer.invoke('skills:readResource', skillId, relativePath),
+    readiness: () => ipcRenderer.invoke('skills:readiness'),
   },
 };
 

@@ -1,0 +1,80 @@
+{
+  "date": "2026-05-15",
+  "list": [
+    {
+      "count": 1,
+      "date": "2026-05-20",
+      "infos": [
+        {
+          "activity_type": "",
+          "chart_uid": "",
+          "content": "2027 财年第 1 季度业绩披露",
+          "counter_id": "ST/US/NVDA",
+          "counter_name": "英伟达",
+          "currency": "USD",
+          "data_kv": [
+            {
+              "key": "",
+              "type": "estimate_eps",
+              "value": "1.7413",
+              "value_raw": "1.741340"
+            },
+            {
+              "key": "",
+              "type": "estimate_revenue",
+              "value": "791 亿",
+              "value_raw": "79115709670.000000"
+            },
+            {
+              "key": "",
+              "type": "actual_eps",
+              "value": "2.39",
+              "value_raw": "2.390000"
+            },
+            {
+              "key": "",
+              "type": "actual_revenue",
+              "value": "816 亿",
+              "value_raw": "81615000000.000000"
+            }
+          ],
+          "date": "2026.05.20 (美东)",
+          "date_type": "盘后",
+          "datetime": "1779235200",
+          "ext": {
+            "date_zone": "(美东)",
+            "financial_report": {
+              "fiscal_year": "2027",
+              "market_time": "after",
+              "period": "1",
+              "period_type": "qf"
+            },
+            "industry": "半导体厂商",
+            "local_date": "2026-05-20"
+          },
+          "financial_market_time": "",
+          "icon": "https://assets.lbkrs.com/ticker/ST/US/NVDA.png",
+          "id": "761790",
+          "live": {
+            "booked": false,
+            "counter_ids": [
+              "ST/US/NVDA"
+            ],
+            "icon": "https://assets.lbctrl.com/uploads/fe952da9-f735-483b-a216-85aed558f783/tg_replay@3x.png",
+            "id": "345960",
+            "name": "英伟达公司 (NVDA.US) 2027 财年第一季度业绩电话会",
+            "started_at": "1779310800",
+            "status": 4
+          },
+          "market": "US",
+          "source_type": 0,
+          "star": 0,
+          "type": "financial",
+          "widget_short_display_date": "05/20"
+        }
+      ]
+    }
+  ],
+  "next_date": "",
+  "result": {}
+}

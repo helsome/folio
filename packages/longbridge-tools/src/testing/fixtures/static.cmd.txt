@@ -1,0 +1,1 @@
+longbridge static NVDA.US --format json

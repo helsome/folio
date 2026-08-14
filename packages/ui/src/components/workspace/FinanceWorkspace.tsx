@@ -11,6 +11,9 @@ import { PortfolioSection } from './PortfolioSection';
 import { AlertsSection } from './AlertsSection';
 import { SkillsView } from '../settings/SkillsView';
 import { SettingsView } from '../settings/SettingsView';
+import { ResearchPanel } from '../research/ResearchPanel';
+import { ThesisPanel } from '../thesis/ThesisPanel';
+import { CompareWorkspace } from '../compare/CompareWorkspace';
 
 const WORKSPACE_TABS: { value: WorkspaceView; label: string }[] = [
   { value: 'overview', label: 'Overview' },
@@ -35,6 +38,15 @@ export const FinanceWorkspace: React.FC = () => {
       break;
     case 'settings':
       content = <SettingsView />;
+      break;
+    case 'research':
+      content = <ResearchPanel />;
+      break;
+    case 'thesis':
+      content = <ThesisPanel />;
+      break;
+    case 'compare':
+      content = <CompareWorkspace />;
       break;
     case 'sessions':
     case 'watchlist':

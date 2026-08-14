@@ -39,17 +39,6 @@ export const portfolioSchema = z.object({
   positions: z.array(positionSchema),
 });
 
-export const alertSchema = z.object({
-  id: z.string(),
-  symbol: symbolSchema,
-  type: z.enum(['price_above', 'price_below', 'news', 'rating_change']),
-  value: z.number(),
-  enabled: z.boolean(),
-  triggered: z.boolean(),
-  createdAt: z.number(),
-  triggeredAt: z.number().optional(),
-});
-
 export const sessionSchema = z.object({
   id: z.string(),
   title: z.string(),
@@ -103,7 +92,6 @@ export function getStoragePath(filename: string): string {
 }
 
 // Re-export storage utilities
-export { loadAlerts, saveAlerts, addAlert, removeAlert, updateAlert } from './storage/alerts.ts';
 export {
   JsonFileStore,
   SessionRepository,
@@ -128,3 +116,13 @@ export {
   routeFinanceIntent,
 } from './agent/index.ts';
 export type { PiPromptStream, PiPromptResult, PiState, PiStreamEvent } from './agent/pi-rpc-client.ts';
+
+// ── Folio V3 modules ───────────────────────────────────────────────────────
+export * from './capabilities/index.ts';
+export * from './research/index.ts';
+export * from './thesis/index.ts';
+export * from './compare/index.ts';
+export * from './alerts/index.ts';
+export * from './portfolio-risk/index.ts';
+export * from './resources/index.ts';
+export { isRecord, toFiniteNumber } from './guards.ts';

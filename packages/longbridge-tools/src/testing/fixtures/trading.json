@@ -1,0 +1,67 @@
+[
+  {
+    "market": "US",
+    "sessions": [
+      {
+        "close": "9:30:00.0",
+        "open": "4:00:00.0",
+        "session": "Pre"
+      },
+      {
+        "close": "16:00:00.0",
+        "open": "9:30:00.0",
+        "session": "Intraday"
+      },
+      {
+        "close": "20:00:00.0",
+        "open": "16:00:00.0",
+        "session": "Post"
+      }
+    ]
+  },
+  {
+    "market": "HK",
+    "sessions": [
+      {
+        "close": "12:00:00.0",
+        "open": "9:30:00.0",
+        "session": "Intraday"
+      },
+      {
+        "close": "16:00:00.0",
+        "open": "13:00:00.0",
+        "session": "Intraday"
+      }
+    ]
+  },
+  {
+    "market": "CN",
+    "sessions": [
+      {
+        "close": "11:30:00.0",
+        "open": "9:30:00.0",
+        "session": "Intraday"
+      },
+      {
+        "close": "14:57:00.0",
+        "open": "13:00:00.0",
+        "session": "Intraday"
+      }
+    ]
+  },
+  {
+    "market": "SG",
+    "sessions": [
+      {
+        "close": "12:00:00.0",
+        "open": "9:00:00.0",
+        "session": "Intraday"
+      },
+      {
+        "close": "17:00:00.0",
+        "open": "13:00:00.0",
+        "session": "Intraday"
+      }
+    ]
+  }
+]

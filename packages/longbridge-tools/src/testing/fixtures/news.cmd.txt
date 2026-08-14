@@ -1,0 +1,1 @@
+longbridge news NVDA.US --count 20 --format json

@@ -10,12 +10,14 @@ import type {
   LlmRuntimeState,
   LlmTestResult,
   RuntimeSession,
+  SkillReadiness,
   ToolCall,
   ToolDefinition,
   WorkspaceContext,
 } from '@finagent/core';
 import type { SkillHub } from '@finagent/skill-hub';
 import { FinanceToolRegistry } from './finance-tool-registry.ts';
+import { createPhaseOneRegistry } from '../capabilities/index.ts';
 import { MarketDataService } from './market-data-service.ts';
 import { PiRpcClient, type PiRpcClientOptions, type PiState } from './pi-rpc-client.ts';
 import { PiEventAdapter } from './pi-event-adapter.ts';
@@ -30,6 +32,13 @@ export interface PiRuntimeAdapterOptions {
   sessionDir?: string;
   /** Skill hub used to build the progressive skill index in the system prompt. */
   skillHub?: SkillHub;
+  /**
+   * Optional per-skill readiness resolver used to annotate each skill in the
+   * index with its readiness status. Returns undefined when readiness is
+   * unknown (e.g. the capability registry is unavailable), which omits the
+   * readiness line. Defaults to undefined (annotation disabled).
+   */
+  readinessProvider?: (skillId: string) => SkillReadiness | undefined;
   now?: () => number;
 }
 
@@ -66,6 +75,7 @@ export class PiRuntimeAdapter implements AgentRuntime {
   private readonly rpcClient: PiRpcClient;
   private readonly sessionDir: string;
   private readonly skillHub?: SkillHub;
+  private readonly readinessProvider?: (skillId: string) => SkillReadiness | undefined;
   private readonly now: () => number;
   private readonly sessions = new Map<string, RuntimeSessionState>();
   /** Session file currently loaded in the Pi runtime. */
@@ -75,10 +85,11 @@ export class PiRuntimeAdapter implements AgentRuntime {
 
   constructor(options: PiRuntimeAdapterOptions = {}) {
     const marketData = options.marketData ?? new MarketDataService();
-    this.registry = options.registry ?? new FinanceToolRegistry(marketData);
+    this.registry = options.registry ?? new FinanceToolRegistry(createPhaseOneRegistry(marketData));
     this.rpcClient = options.rpcClient ?? new PiRpcClient(options.rpc);
     this.sessionDir = options.sessionDir ?? join(homedir(), '.finagent', 'pi-sessions');
     this.skillHub = options.skillHub;
+    this.readinessProvider = options.readinessProvider;
     this.now = options.now ?? Date.now;
   }
 
@@ -123,7 +134,7 @@ export class PiRuntimeAdapter implements AgentRuntime {
 
     const adapter = new PiEventAdapter({ sessionId: input.sessionId, runId: input.runId, now: this.now });
     const stream = this.rpcClient.promptStreaming(
-      buildPrompt(input.content, state, input.workspaceContext, this.skillHub)
+      buildPrompt(input.content, state, input.workspaceContext, this.skillHub, this.readinessProvider)
     );
     let aborted = false;
 
@@ -322,7 +333,8 @@ function buildPrompt(
   content: string,
   state: RuntimeSessionState,
   workspaceContext?: WorkspaceContext,
-  skillHub?: SkillHub
+  skillHub?: SkillHub,
+  readinessProvider?: (skillId: string) => SkillReadiness | undefined
 ): string {
   const recentSymbols = state.recentSymbols.length > 0
     ? `\nRecent symbols: ${state.recentSymbols.join(', ')}`
@@ -342,7 +354,7 @@ function buildPrompt(
     ? `\nWorkspace context:\n${workspaceLines.join('\n')}\nWhen the user refers to "this", "the stock", or asks follow-up questions about a symbol without naming it, use the active symbol above.`
     : '';
 
-  const skillSection = buildSkillIndexSection(skillHub);
+  const skillSection = buildSkillIndexSection(skillHub, readinessProvider);
 
   return [
     'You are Finagent, a finance agent backend.',
@@ -359,7 +371,10 @@ function buildPrompt(
   ].join('\n');
 }
 
-function buildSkillIndexSection(skillHub?: SkillHub): string {
+function buildSkillIndexSection(
+  skillHub?: SkillHub,
+  readinessProvider?: (skillId: string) => SkillReadiness | undefined
+): string {
   if (!skillHub) return '';
   const metadata = skillHub.listSkillMetadata();
   if (metadata.length === 0) return '';
@@ -367,7 +382,13 @@ function buildSkillIndexSection(skillHub?: SkillHub): string {
     const description = entry.description.length > 160
       ? `${entry.description.slice(0, 160)}…`
       : entry.description;
-    return `- ${entry.id}: ${description}`;
+    const readiness = readinessProvider?.(entry.id);
+    const readinessLine = readiness
+      ? `  readiness: ${readiness.status} (${readiness.summary}${
+          readiness.missing.length > 0 ? `; missing: ${readiness.missing.join(', ')}` : ''
+        })`
+      : '';
+    return `- ${entry.id}: ${description}${readinessLine ? `\n${readinessLine}` : ''}`;
   });
   return `\nAvailable skills (load them with read_skill_resource when relevant):\n${lines.join('\n')}`;
 }

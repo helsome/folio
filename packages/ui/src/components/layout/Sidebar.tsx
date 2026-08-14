@@ -24,14 +24,24 @@ const NAV_ITEMS: Array<{ key: NavSection; label: string; path: string }> = [
     path: 'M8 2.5a3 3 0 0 0-3 3v2L3.6 9a.6.6 0 0 0 .4 1h8a.6.6 0 0 0 .4-1L11 7.5v-2a3 3 0 0 0-3-3zM7.5 11.5h1',
   },
   {
+    key: 'research',
+    label: 'Research',
+    path: 'M3 3.5h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H3zM5 8h3M8 6.5V9.5M6 11.5h4',
+  },
+  {
+    key: 'thesis',
+    label: 'Thesis',
+    path: 'M4.5 2.5h7M4.5 6h7M4.5 9.5h7M3 13h10a1 1 0 0 1 0 2H3z',
+  },
+  {
+    key: 'compare',
+    label: 'Compare',
+    path: 'M3.5 6.5h4v5h-4zM8.5 6.5h4v5h-4z',
+  },
+  {
     key: 'skills',
     label: 'Skills',
     path: 'M9 2 4.5 9H7.5L7 14l4.5-7H8.5z',
-  },
-  {
-    key: 'settings',
-    label: 'Settings',
-    path: 'M3 5h10M11 3v4M13 11H3M5 9v4',
   },
 ];
 

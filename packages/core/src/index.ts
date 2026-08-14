@@ -47,18 +47,8 @@ export interface IntradayData {
   volume: number;
 }
 
-export type AlertType = 'price_above' | 'price_below' | 'news' | 'rating_change';
-
-export interface Alert {
-  id: string;
-  symbol: string;
-  type: AlertType;
-  value: number;
-  enabled: boolean;
-  triggered: boolean;
-  createdAt: number;
-  triggeredAt?: number;
-}
+// (Legacy flat Alert removed in V3 — the discriminated AlertRule union in
+// alert-rules.ts replaces it.)
 
 export interface NewsItem {
   id: string;
@@ -355,6 +345,8 @@ export interface WorkspaceContext {
   activeSymbol?: string;
   activeView?: WorkspaceView;
   selectedPosition?: string;
+  /** Set when the Compare workspace is focused; feeds the compare agent context. */
+  comparisonSymbols?: string[];
 }
 
 export interface AgentRunInput {
@@ -499,3 +491,12 @@ export interface Skill {
     updatedAt: number;
   };
 }
+
+// ── Folio V3 domains ───────────────────────────────────────────────────────
+export * from './capability.ts';
+export * from './research.ts';
+export * from './thesis.ts';
+export * from './alert-rules.ts';
+export * from './readiness.ts';
+export * from './compare.ts';
+export * from './portfolio-risk.ts';

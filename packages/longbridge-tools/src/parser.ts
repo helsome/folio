@@ -10,6 +10,26 @@ import type {
   Quote,
   StaticInfo,
 } from '@finagent/core';
+import type {
+  Assets,
+  CalendarEvent,
+  CapitalFlow,
+  CapitalFlowSide,
+  CashFlowRecord,
+  Depth,
+  DepthLevel,
+  DividendRecord,
+  EpsForecast,
+  FinancialReport,
+  FinancialReportAccount,
+  FinancialReportIndicator,
+  FinancialReportValue,
+  InstitutionRating,
+  MarketTemperature,
+  Position as AccountPosition,
+  RatingDistribution,
+  TradeTick,
+} from './types.ts';
 
 interface RawQuoteResponse {
   symbol: string;
@@ -290,4 +310,577 @@ function toTimestamp(value: unknown): number {
     }
   }
   return Math.floor(Date.now() / 1000);
+}
+
+// ── Phase-2 parsers ────────────────────────────────────────────────────────
+
+interface RawDepthLevel {
+  position: number | string;
+  price: number | string;
+  volume: number | string;
+  order_num?: number | string;
+}
+
+interface RawDepthResponse {
+  symbol: string;
+  bids?: RawDepthLevel[];
+  asks?: RawDepthLevel[];
+}
+
+export function parseDepthResponse(output: string): Depth {
+  try {
+    const data: RawDepthResponse = JSON.parse(output);
+    if (!data || typeof data !== 'object') {
+      throw new Error('Depth response is empty');
+    }
+    const level = (l: RawDepthLevel): DepthLevel => ({
+      position: toNumber(l.position, 'position'),
+      price: toNumber(l.price, 'price'),
+      volume: toNumber(l.volume, 'volume'),
+      orderNum: toNumber(l.order_num ?? 0, 'order_num'),
+    });
+    return {
+      symbol: data.symbol,
+      bids: (data.bids ?? []).map(level),
+      asks: (data.asks ?? []).map(level),
+    };
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse depth response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawTradeTick {
+  time: string;
+  price: number | string;
+  volume: number | string;
+  direction?: string;
+  type?: string;
+}
+
+export function parseTradesResponse(output: string): TradeTick[] {
+  try {
+    const data: RawTradeTick[] = JSON.parse(output);
+    if (!Array.isArray(data)) {
+      throw new Error('Trades response is not an array');
+    }
+    return data.map((t) => ({
+      timestamp: toEpochSeconds(t.time) ?? 0,
+      price: toNumber(t.price, 'price'),
+      volume: toNumber(t.volume, 'volume'),
+      direction: t.direction ?? '',
+      type: t.type ?? '',
+    }));
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse trades response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawCapitalFlowSide {
+  large?: number | string;
+  medium?: number | string;
+  small?: number | string;
+}
+
+interface RawCapitalFlowResponse {
+  symbol: string;
+  timestamp?: number | string;
+  capital_in?: RawCapitalFlowSide;
+  capital_out?: RawCapitalFlowSide;
+}
+
+export function parseCapitalFlowResponse(output: string): CapitalFlow {
+  try {
+    const data: RawCapitalFlowResponse = JSON.parse(output);
+    if (!data || typeof data !== 'object') {
+      throw new Error('Capital flow response is empty');
+    }
+    const side = (s?: RawCapitalFlowSide): CapitalFlowSide => ({
+      large: toNumber(s?.large ?? 0, 'large'),
+      medium: toNumber(s?.medium ?? 0, 'medium'),
+      small: toNumber(s?.small ?? 0, 'small'),
+    });
+    return {
+      symbol: data.symbol,
+      timestamp: toEpochSeconds(data.timestamp) ?? 0,
+      capitalIn: side(data.capital_in),
+      capitalOut: side(data.capital_out),
+    };
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse capital flow response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawMarketTemperatureItem {
+  field: string;
+  value: string;
+}
+
+export function parseMarketTemperatureResponse(output: string): MarketTemperature {
+  try {
+    const items: RawMarketTemperatureItem[] = JSON.parse(output);
+    if (!Array.isArray(items)) {
+      throw new Error('Market temperature response is not an array');
+    }
+    const field = (name: string) => items.find((i) => i.field === name)?.value ?? '';
+    return {
+      market: field('Market') || 'US',
+      temperature: toNumber(field('Temperature'), 'temperature'),
+      description: field('Description'),
+      valuation: toNumber(field('Valuation'), 'valuation'),
+      sentiment: toNumber(field('Sentiment'), 'sentiment'),
+    };
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse market-temp response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawFinancialReportValue {
+  fp_end?: number | string;
+  period?: string;
+  ratio?: string;
+  value?: number | string;
+  year?: number;
+  yoy?: string;
+}
+
+interface RawFinancialReportAccount {
+  field?: string;
+  industry_ranking?: string;
+  name?: string;
+  percent?: boolean;
+  ranking_code?: string;
+  tip?: string;
+  values?: RawFinancialReportValue[];
+}
+
+interface RawFinancialReportIndicator {
+  accounts?: RawFinancialReportAccount[];
+  currency?: string;
+  has_yoy?: boolean;
+  periods?: string[];
+  short_title?: string;
+  title?: string;
+}
+
+interface RawFinancialReportResponse {
+  symbol: string;
+  report: string;
+  list?: Record<string, { indicators?: RawFinancialReportIndicator[] }>;
+}
+
+export function parseFinancialReportResponse(output: string, fallbackSymbol = ''): FinancialReport {
+  try {
+    const data: RawFinancialReportResponse = JSON.parse(output);
+    const statements: FinancialReport['statements'] = {};
+    for (const [key, stmt] of Object.entries(data.list ?? {})) {
+      if (!stmt || !Array.isArray(stmt.indicators)) continue;
+      const indicators: FinancialReportIndicator[] = stmt.indicators.map((ind) => ({
+        title: ind.title ?? '',
+        hasYoy: ind.has_yoy,
+        periods: ind.periods,
+        accounts: (ind.accounts ?? []).map((acc): FinancialReportAccount => ({
+          field: acc.field ?? '',
+          name: acc.name ?? '',
+          rankingCode: acc.ranking_code,
+          industryRanking: acc.industry_ranking,
+          percent: acc.percent,
+          tip: acc.tip,
+          values: (acc.values ?? []).map((v): FinancialReportValue => ({
+            fpEnd: toEpochSeconds(v.fp_end) ?? 0,
+            period: v.period ?? '',
+            year: toNumber(v.year ?? 0, 'year'),
+            value: toNumber(v.value ?? 0, 'value'),
+            ratio: v.ratio,
+            yoy: v.yoy,
+          })),
+        })),
+      }));
+      const upper = key.toUpperCase();
+      if (upper === 'IS') statements.IS = { indicators };
+      else if (upper === 'BS') statements.BS = { indicators };
+      else if (upper === 'CF') statements.CF = { indicators };
+    }
+    return { symbol: data.symbol || fallbackSymbol, report: data.report, statements };
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse financial-report response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawRatingDistribution {
+  buy?: number | string;
+  hold?: number | string;
+  sell?: number | string;
+  strong_buy?: number | string;
+  no_opinion?: number | string;
+  over?: number | string;
+  under?: number | string;
+  total?: number | string;
+}
+
+interface RawInstitutionRatingResponse {
+  analyst?: {
+    evaluate?: RawRatingDistribution;
+    industry_mean?: number;
+    industry_median?: number;
+    industry_name?: string;
+    industry_rank?: number;
+    industry_total?: number;
+    target?: {
+      highest_price?: number | string;
+      lowest_price?: number | string;
+      prev_close?: number | string;
+      start_date?: number | string;
+      end_date?: number | string;
+    };
+  };
+  instratings?: {
+    ccy_symbol?: string;
+    change?: number | string;
+    evaluate?: RawRatingDistribution;
+    recommend?: string;
+    target?: number | string;
+    updated_at?: string;
+  };
+}
+
+export function parseInstitutionRatingResponse(output: string, symbol = ''): InstitutionRating {
+  try {
+    const data: RawInstitutionRatingResponse = JSON.parse(output);
+    const { analyst, instratings } = data;
+    const dist = (d?: RawRatingDistribution): RatingDistribution => ({
+      buy: toNumber(d?.buy ?? 0, 'buy'),
+      hold: toNumber(d?.hold ?? 0, 'hold'),
+      sell: toNumber(d?.sell ?? 0, 'sell'),
+      strongBuy: toOptionalNumber(d?.strong_buy),
+      noOpinion: toOptionalNumber(d?.no_opinion),
+      over: toOptionalNumber(d?.over),
+      under: toOptionalNumber(d?.under),
+      total: toNumber(d?.total ?? 0, 'total'),
+    });
+    return {
+      symbol,
+      recommend: instratings?.recommend ?? '',
+      target: toOptionalNumber(instratings?.target),
+      updatedAt: toEpochSeconds(instratings?.updated_at),
+      analyst: analyst
+        ? {
+            distribution: dist(analyst.evaluate),
+            industryName: analyst.industry_name,
+            industryRank: analyst.industry_rank,
+            industryMean: analyst.industry_mean,
+            industryMedian: analyst.industry_median,
+            industryTotal: analyst.industry_total,
+            highestTarget: toOptionalNumber(analyst.target?.highest_price),
+            lowestTarget: toOptionalNumber(analyst.target?.lowest_price),
+            prevClose: toOptionalNumber(analyst.target?.prev_close),
+          }
+        : undefined,
+      institutional: instratings
+        ? {
+            distribution: dist(instratings.evaluate),
+            currency: instratings.ccy_symbol,
+            change: toOptionalNumber(instratings.change),
+          }
+        : undefined,
+    };
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse institution-rating response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawDividendRecord {
+  counter_id?: string;
+  desc?: string;
+  ex_date?: string;
+  id?: string;
+  payment_date?: string;
+  record_date?: string;
+}
+
+interface RawDividendResponse {
+  total?: number | string;
+  list?: RawDividendRecord[];
+}
+
+export function parseDividendResponse(output: string): DividendRecord[] {
+  try {
+    const data: RawDividendResponse = JSON.parse(output);
+    const list = Array.isArray(data) ? (data as unknown as RawDividendRecord[]) : data.list ?? [];
+    if (!Array.isArray(list)) {
+      throw new Error('Dividend response is not an array');
+    }
+    return list.map((d): DividendRecord => ({
+      id: String(d.id ?? ''),
+      description: d.desc ?? '',
+      exDate: toEpochSeconds(d.ex_date) ?? 0,
+      paymentDate: toEpochSeconds(d.payment_date),
+      recordDate: toEpochSeconds(d.record_date),
+      counterId: d.counter_id,
+    }));
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse dividend response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawEpsForecastItem {
+  forecast_end_date?: number | string;
+  forecast_eps_highest?: number | string;
+  forecast_eps_lowest?: number | string;
+  forecast_eps_mean?: number | string;
+  forecast_eps_median?: number | string;
+  forecast_start_date?: number | string;
+  institution_down?: number;
+  institution_total?: number;
+  institution_up?: number;
+}
+
+interface RawEpsForecastResponse {
+  items?: RawEpsForecastItem[];
+}
+
+export function parseEpsForecastResponse(output: string): EpsForecast[] {
+  try {
+    const data: RawEpsForecastResponse = JSON.parse(output);
+    const items = data.items ?? [];
+    if (!Array.isArray(items)) {
+      throw new Error('Forecast EPS response is not an array');
+    }
+    return items.map((f): EpsForecast => ({
+      endDate: toEpochSeconds(f.forecast_end_date) ?? 0,
+      startDate: toEpochSeconds(f.forecast_start_date) ?? 0,
+      epsMean: toNumber(f.forecast_eps_mean ?? 0, 'forecast_eps_mean'),
+      epsMedian: toOptionalNumber(f.forecast_eps_median),
+      epsHighest: toOptionalNumber(f.forecast_eps_highest),
+      epsLowest: toOptionalNumber(f.forecast_eps_lowest),
+      institutionUp: f.institution_up,
+      institutionDown: f.institution_down,
+      institutionTotal: f.institution_total,
+    }));
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse forecast-eps response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawCalendarEventData {
+  key?: string;
+  type?: string;
+  value?: string;
+  value_raw?: string;
+}
+
+interface RawCalendarEventInfo {
+  activity_type?: string;
+  content?: string;
+  counter_id?: string;
+  counter_name?: string;
+  currency?: string;
+  data_kv?: RawCalendarEventData[];
+  datetime?: number | string;
+  ext?: { local_date?: string };
+  id?: string;
+  market?: string;
+  type?: string;
+}
+
+interface RawCalendarEventGroup {
+  count?: number;
+  date?: string;
+  infos?: RawCalendarEventInfo[];
+}
+
+interface RawCalendarResponse {
+  date?: string;
+  list?: RawCalendarEventGroup[];
+  next_date?: string;
+  result?: unknown;
+}
+
+export function parseCalendarResponse(output: string): CalendarEvent[] {
+  try {
+    const data: RawCalendarResponse = JSON.parse(output);
+    const events: CalendarEvent[] = [];
+    for (const group of data.list ?? []) {
+      for (const info of group.infos ?? []) {
+        events.push({
+          id: String(info.id ?? ''),
+          date: toEpochSeconds(info.datetime) ?? 0,
+          type: info.type ?? '',
+          activityType: info.activity_type,
+          symbol: counterIdToSymbol(info.counter_id, info.market),
+          counterId: info.counter_id,
+          name: info.counter_name,
+          market: info.market,
+          currency: info.currency,
+          content: info.content,
+          localDate: info.ext?.local_date,
+          data: (info.data_kv ?? []).map((kv) => ({
+            type: kv.type ?? '',
+            value: kv.value ?? '',
+            valueRaw: kv.value_raw,
+          })),
+        });
+      }
+    }
+    return events;
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse finance-calendar response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+/** `ST/US/NVDA` → `NVDA.US` (best effort; empty when not derivable). */
+function counterIdToSymbol(counterId?: string, market?: string): string {
+  if (!counterId) return '';
+  const parts = counterId.split('/');
+  const code = parts[parts.length - 1] ?? '';
+  if (!code) return '';
+  const mkt = market ?? (parts.length >= 2 ? parts[1] : '');
+  return mkt ? `${code}.${mkt}` : code;
+}
+
+interface RawAccountPosition {
+  symbol: string;
+  name: string;
+  quantity: number | string;
+  available: number | string;
+  cost_price: number | string;
+  currency?: string;
+  market?: string;
+}
+
+export function parsePositionsResponse(output: string): AccountPosition[] {
+  try {
+    const data: RawAccountPosition[] = JSON.parse(output);
+    if (!Array.isArray(data)) {
+      throw new Error('Positions response is not an array');
+    }
+    return data.map((p) => ({
+      symbol: p.symbol,
+      name: p.name,
+      quantity: toNumber(p.quantity, 'quantity'),
+      available: toNumber(p.available, 'available'),
+      costPrice: toNumber(p.cost_price, 'cost_price'),
+      currency: p.currency ?? '',
+      market: p.market ?? '',
+    }));
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse positions response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawCashInfo {
+  available_cash?: number | string;
+  currency?: string;
+  frozen_cash?: number | string;
+  settling_cash?: number | string;
+  withdraw_cash?: number | string;
+}
+
+interface RawAssetsResponse {
+  buy_power?: number | string;
+  cash_infos?: RawCashInfo[];
+  currency?: string;
+  init_margin?: number | string;
+  maintenance_margin?: number | string;
+  margin_call?: number | string;
+  max_finance_amount?: number | string;
+  net_assets?: number | string;
+  remaining_finance_amount?: number | string;
+  risk_level?: string;
+  total_cash?: number | string;
+}
+
+export function parseAssetsResponse(output: string): Assets[] {
+  try {
+    const data: RawAssetsResponse[] = JSON.parse(output);
+    if (!Array.isArray(data)) {
+      throw new Error('Assets response is not an array');
+    }
+    return data.map((a) => ({
+      currency: a.currency ?? '',
+      netAssets: toNumber(a.net_assets ?? 0, 'net_assets'),
+      totalCash: toNumber(a.total_cash ?? 0, 'total_cash'),
+      buyPower: toNumber(a.buy_power ?? 0, 'buy_power'),
+      maxFinanceAmount: toOptionalNumber(a.max_finance_amount),
+      remainingFinanceAmount: toOptionalNumber(a.remaining_finance_amount),
+      initMargin: toOptionalNumber(a.init_margin),
+      maintenanceMargin: toOptionalNumber(a.maintenance_margin),
+      marginCall: toOptionalNumber(a.margin_call),
+      riskLevel: a.risk_level,
+      cashInfos: (a.cash_infos ?? []).map((c) => ({
+        currency: c.currency ?? '',
+        availableCash: toNumber(c.available_cash ?? 0, 'available_cash'),
+        frozenCash: toNumber(c.frozen_cash ?? 0, 'frozen_cash'),
+        settlingCash: toNumber(c.settling_cash ?? 0, 'settling_cash'),
+        withdrawCash: toNumber(c.withdraw_cash ?? 0, 'withdraw_cash'),
+      })),
+    }));
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse assets response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+interface RawCashFlowRecord {
+  balance?: number | string;
+  business_type?: string;
+  currency?: string;
+  description?: string;
+  flow_name?: string;
+  symbol?: string;
+  time?: string;
+}
+
+export function parseCashFlowResponse(output: string): CashFlowRecord[] {
+  try {
+    const data: RawCashFlowRecord[] = JSON.parse(output);
+    if (!Array.isArray(data)) {
+      throw new Error('Cash flow response is not an array');
+    }
+    return data.map((r) => ({
+      timestamp: toEpochSeconds(r.time) ?? 0,
+      balance: toNumber(r.balance ?? 0, 'balance'),
+      businessType: r.business_type ?? '',
+      flowName: r.flow_name ?? '',
+      description: r.description ?? '',
+      symbol: r.symbol ?? '',
+      currency: r.currency ?? '',
+    }));
+  } catch (e) {
+    throw new LongBridgeError(`Failed to parse cash-flow response: ${output}`, 'LONGBRIDGE_PARSE_FAILURE');
+  }
+}
+
+/**
+ * Normalize a timestamp-like value to epoch seconds. Handles numbers (assumed
+ * epoch seconds), numeric strings (`"1772064000"`), `YYYY.MM.DD`, `YYYY 年 M 月
+ * D 日`, and ISO date strings. Returns `undefined` when unparseable.
+ */
+function toEpochSeconds(value: unknown): number | undefined {
+  if (typeof value === 'number' && Number.isFinite(value)) {
+    return value;
+  }
+  if (typeof value === 'string') {
+    const trimmed = value.trim();
+    if (trimmed === '' || trimmed === '0') return undefined;
+    if (/^\d+$/.test(trimmed)) {
+      const n = Number(trimmed);
+      return Number.isFinite(n) ? n : undefined;
+    }
+    const dotMatch = /(\d{4})\.(\d{1,2})\.(\d{1,2})/.exec(trimmed);
+    if (dotMatch) {
+      return Math.floor(
+        Date.UTC(Number(dotMatch[1]), Number(dotMatch[2]) - 1, Number(dotMatch[3])) / 1000
+      );
+    }
+    const zhMatch = /(\d{4})\s*年\s*(\d{1,2})\s*月\s*(\d{1,2})\s*日/.exec(trimmed);
+    if (zhMatch) {
+      return Math.floor(
+        Date.UTC(Number(zhMatch[1]), Number(zhMatch[2]) - 1, Number(zhMatch[3])) / 1000
+      );
+    }
+    const parsed = Date.parse(trimmed);
+    if (Number.isFinite(parsed)) {
+      return Math.floor(parsed / 1000);
+    }
+  }
+  return undefined;
 }

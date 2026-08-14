@@ -1,0 +1,1 @@
+longbridge financial-report NVDA.US --format json

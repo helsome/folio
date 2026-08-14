@@ -1,0 +1,43 @@
+{
+  "analyst": {
+    "evaluate": {
+      "buy": 48,
+      "end_date": "0",
+      "hold": 2,
+      "no_opinion": 1,
+      "over": 10,
+      "sell": 1,
+      "start_date": "1786492800",
+      "total": 62,
+      "under": 0
+    },
+    "industry_id": 87081,
+    "industry_mean": 14,
+    "industry_median": 9,
+    "industry_name": "半导体厂商",
+    "industry_rank": 1,
+    "industry_total": 76,
+    "target": {
+      "end_date": "0",
+      "highest_price": "500.000",
+      "lowest_price": "180.000",
+      "prev_close": "224.09",
+      "start_date": "1786492800"
+    }
+  },
+  "instratings": {
+    "ccy_symbol": "$",
+    "change": "35.13659244053728",
+    "evaluate": {
+      "buy": 10,
+      "date": "",
+      "hold": 2,
+      "sell": 1,
+      "strong_buy": 48,
+      "under": 0
+    },
+    "recommend": "strong_buy",
+    "target": "302.82759",
+    "updated_at": "2026 年 8 月 12 日"
+  }
+}

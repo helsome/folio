@@ -1,0 +1,1367 @@
+{
+  "history": {
+    "metrics": {
+      "pe": {
+        "desc": "当前市盈率 <strong>34.12</strong>，<strong>低于</strong>合理区间，比近 <strong>5</strong> 年 <strong>94.63%</strong> 的时间便宜，行业排名 <strong>17/90</strong>，行业中位数 <strong>18.26</strong>。",
+        "high": "80.30",
+        "list": [
+          {
+            "timestamp": "1630468800",
+            "value": "79.88"
+          },
+          {
+            "timestamp": "1633060800",
+            "value": "73.03"
+          },
+          {
+            "timestamp": "1635739200",
+            "value": "78.56"
+          },
+          {
+            "timestamp": "1638334800",
+            "value": "95.62"
+          },
+          {
+            "timestamp": "1641013200",
+            "value": "89.46"
+          },
+          {
+            "timestamp": "1643691600",
+            "value": "63.16"
+          },
+          {
+            "timestamp": "1646110800",
+            "value": "60.19"
+          },
+          {
+            "timestamp": "1648785600",
+            "value": "68.48"
+          },
+          {
+            "timestamp": "1651377600",
+            "value": "49.10"
+          },
+          {
+            "timestamp": "1654056000",
+            "value": "48.50"
+          },
+          {
+            "timestamp": "1656648000",
+            "value": "38.45"
+          },
+          {
+            "timestamp": "1659326400",
+            "value": "58.17"
+          },
+          {
+            "timestamp": "1662004800",
+            "value": "45.08"
+          },
+          {
+            "timestamp": "1664596800",
+            "value": "39.27"
+          },
+          {
+            "timestamp": "1667275200",
+            "value": "56.59"
+          },
+          {
+            "timestamp": "1669870800",
+            "value": "71.59"
+          },
+          {
+            "timestamp": "1672549200",
+            "value": "61.06"
+          },
+          {
+            "timestamp": "1675227600",
+            "value": "110.07"
+          },
+          {
+            "timestamp": "1677646800",
+            "value": "130.80"
+          },
+          {
+            "timestamp": "1680321600",
+            "value": "156.50"
+          },
+          {
+            "timestamp": "1682913600",
+            "value": "148.75"
+          },
+          {
+            "timestamp": "1685592000",
+            "value": "204.63"
+          },
+          {
+            "timestamp": "1688184000",
+            "value": "217.66"
+          },
+          {
+            "timestamp": "1690862400",
+            "value": "111.39"
+          },
+          {
+            "timestamp": "1693540800",
+            "value": "116.18"
+          },
+          {
+            "timestamp": "1696132800",
+            "value": "104.18"
+          },
+          {
+            "timestamp": "1698811200",
+            "value": "55.35"
+          },
+          {
+            "timestamp": "1701406800",
+            "value": "61.15"
+          },
+          {
+            "timestamp": "1704085200",
+            "value": "64.76"
+          },
+          {
+            "timestamp": "1706763600",
+            "value": "52.31"
+          },
+          {
+            "timestamp": "1709269200",
+            "value": "68.29"
+          },
+          {
+            "timestamp": "1711944000",
+            "value": "75.00"
+          },
+          {
+            "timestamp": "1714536000",
+            "value": "68.68"
+          },
+          {
+            "timestamp": "1717214400",
+            "value": "63.25"
+          },
+          {
+            "timestamp": "1719806400",
+            "value": "71.71"
+          },
+          {
+            "timestamp": "1722484800",
+            "value": "63.00"
+          },
+          {
+            "timestamp": "1725163200",
+            "value": "55.24"
+          },
+          {
+            "timestamp": "1727755200",
+            "value": "54.14"
+          },
+          {
+            "timestamp": "1730433600",
+            "value": "62.66"
+          },
+          {
+            "timestamp": "1733029200",
+            "value": "53.68"
+          },
+          {
+            "timestamp": "1735707600",
+            "value": "52.14"
+          },
+          {
+            "timestamp": "1738386000",
+            "value": "46.62"
+          },
+          {
+            "timestamp": "1740805200",
+            "value": "41.82"
+          },
+          {
+            "timestamp": "1743480000",
+            "value": "36.88"
+          },
+          {
+            "timestamp": "1746072000",
+            "value": "37.37"
+          },
+          {
+            "timestamp": "1748750400",
+            "value": "42.95"
+          },
+          {
+            "timestamp": "1751342400",
+            "value": "48.72"
+          },
+          {
+            "timestamp": "1754020800",
+            "value": "55.21"
+          },
+          {
+            "timestamp": "1756699200",
+            "value": "48.88"
+          },
+          {
+            "timestamp": "1759291200",
+            "value": "52.54"
+          },
+          {
+            "timestamp": "1761969600",
+            "value": "56.82"
+          },
+          {
+            "timestamp": "1764565200",
+            "value": "44.07"
+          },
+          {
+            "timestamp": "1767243600",
+            "value": "45.68"
+          },
+          {
+            "timestamp": "1769922000",
+            "value": "46.82"
+          },
+          {
+            "timestamp": "1772341200",
+            "value": "35.86"
+          },
+          {
+            "timestamp": "1775016000",
+            "value": "35.57"
+          },
+          {
+            "timestamp": "1777608000",
+            "value": "40.16"
+          },
+          {
+            "timestamp": "1780286400",
+            "value": "34.16"
+          },
+          {
+            "timestamp": "1782878400",
+            "value": "30.08"
+          },
+          {
+            "timestamp": "1785556800",
+            "value": "30.56"
+          }
+        ],
+        "low": "44.32",
+        "median": "59.50"
+      }
+    },
+    "range": 5
+  },
+  "layouts": {
+    "pe": {
+      "groups": [
+        {
+          "list": [
+            {
+              "counter_id": "ST/US/INTC",
+              "growth": "-3734.96666666666667",
+              "name": "",
+              "ticker": "",
+              "value": "-44.658012"
+            },
+            {
+              "counter_id": "ST/US/CBRS",
+              "growth": "-338.99710144927536",
+              "name": "",
+              "ticker": "",
+              "value": "-85.161484"
+            },
+            {
+              "counter_id": "ST/US/IONQ",
+              "growth": "-179.55769230769231",
+              "name": "",
+              "ticker": "",
+              "value": "-12.628645"
+            },
+            {
+              "counter_id": "ST/US/SMTC",
+              "growth": "439.75217391304348",
+              "name": "",
+              "ticker": "",
+              "value": "-393.303683"
+            },
+            {
+              "counter_id": "ST/US/SLAB",
+              "growth": "39.14141414141414",
+              "name": "",
+              "ticker": "",
+              "value": "-184.546072"
+            },
+            {
+              "counter_id": "ST/US/MXL",
+              "growth": "93.38924050632911",
+              "name": "",
+              "ticker": "",
+              "value": "-64.970026"
+            },
+            {
+              "counter_id": "ST/US/RGTI",
+              "growth": "63.81",
+              "name": "",
+              "ticker": "",
+              "value": "-25.759286"
+            },
+            {
+              "counter_id": "ST/US/PI",
+              "growth": "-21.91081081081081",
+              "name": "",
+              "ticker": "",
+              "value": "-202.661646"
+            },
+            {
+              "counter_id": "ST/US/SYNA",
+              "growth": "88.03486529318542",
+              "name": "",
+              "ticker": "",
+              "value": "-8.758062"
+            },
+            {
+              "counter_id": "ST/US/AMBA",
+              "growth": "23.40842696629213",
+              "name": "",
+              "ticker": "",
+              "value": "-52.625442"
+            },
+            {
+              "counter_id": "ST/US/NVTS",
+              "growth": "-121.05263157894737",
+              "name": "",
+              "ticker": "",
+              "value": "-11.617981"
+            },
+            {
+              "counter_id": "ST/US/AMBQ",
+              "growth": "67.12691466083151",
+              "name": "",
+              "ticker": "",
+              "value": "-42.840893"
+            },
+            {
+              "counter_id": "ST/US/TE",
+              "growth": "82.95296803652968",
+              "name": "",
+              "ticker": "",
+              "value": "-3.553735"
+            },
+            {
+              "counter_id": "ST/US/POET",
+              "growth": "58.82352941176471",
+              "name": "",
+              "ticker": "",
+              "value": "-18.750063"
+            },
+            {
+              "counter_id": "ST/US/WOLF",
+              "growth": "98.81942756741195",
+              "name": "",
+              "ticker": "",
+              "value": "-2.949997"
+            },
+            {
+              "counter_id": "ST/US/CSIQ",
+              "growth": "39.4292",
+              "name": "",
+              "ticker": "",
+              "value": "-10.426403"
+            },
+            {
+              "counter_id": "ST/US/AOSL",
+              "growth": "1.77304964539007",
+              "name": "",
+              "ticker": "",
+              "value": "-25.691354"
+            },
+            {
+              "counter_id": "ST/US/JKS",
+              "growth": "77.129019109502",
+              "name": "",
+              "ticker": "",
+              "value": "-1.687990"
+            },
+            {
+              "counter_id": "ST/US/INDI",
+              "growth": "12.86164383561644",
+              "name": "",
+              "ticker": "",
+              "value": "-6.068006"
+            },
+            {
+              "counter_id": "ST/US/CEVA",
+              "growth": "51.97727272727273",
+              "name": "",
+              "ticker": "",
+              "value": "-77.263046"
+            },
+            {
+              "counter_id": "ST/US/LAES",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "-13.916948"
+            },
+            {
+              "counter_id": "ST/US/MRAM",
+              "growth": "-416.66666666666667",
+              "name": "",
+              "ticker": "",
+              "value": "-157.651292"
+            },
+            {
+              "counter_id": "ST/US/DVLT",
+              "growth": "96.15384615384615",
+              "name": "",
+              "ticker": "",
+              "value": "-2.164000"
+            },
+            {
+              "counter_id": "ST/US/QUIK",
+              "growth": "71.42857142857143",
+              "name": "",
+              "ticker": "",
+              "value": "-18.269502"
+            },
+            {
+              "counter_id": "ST/US/GSIT",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "-16.104580"
+            },
+            {
+              "counter_id": "ST/US/VLN",
+              "growth": "16.12903225806452",
+              "name": "",
+              "ticker": "",
+              "value": "-6.242703"
+            },
+            {
+              "counter_id": "ST/US/GCTS",
+              "growth": "29.26829268292683",
+              "name": "",
+              "ticker": "",
+              "value": "-3.394714"
+            },
+            {
+              "counter_id": "ST/US/BZAI",
+              "growth": "69.94949494949495",
+              "name": "",
+              "ticker": "",
+              "value": "-1.999607"
+            },
+            {
+              "counter_id": "ST/US/MX",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "-4.553185"
+            },
+            {
+              "counter_id": "ST/US/WKEY",
+              "growth": "233.57431048716551",
+              "name": "",
+              "ticker": "",
+              "value": "-12.820959"
+            },
+            {
+              "counter_id": "ST/US/IPWR",
+              "growth": "0.86206896551724",
+              "name": "",
+              "ticker": "",
+              "value": "-6.093324"
+            },
+            {
+              "counter_id": "ST/US/ICG",
+              "growth": "36.66666666666667",
+              "name": "",
+              "ticker": "",
+              "value": "-8.019202"
+            },
+            {
+              "counter_id": "ST/US/SQNS",
+              "growth": "56.68924640135478",
+              "name": "",
+              "ticker": "",
+              "value": "-0.259089"
+            },
+            {
+              "counter_id": "ST/US/GUER",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "-9.632193"
+            },
+            {
+              "counter_id": "ST/US/ASTI",
+              "growth": "76.05177993527508",
+              "name": "",
+              "ticker": "",
+              "value": "-3.924370"
+            },
+            {
+              "counter_id": "ST/US/LEDS",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "-19.624903"
+            },
+            {
+              "counter_id": "ST/US/MOBX",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "-0.387037"
+            },
+            {
+              "counter_id": "ST/US/PRSO",
+              "growth": "65.67164179104478",
+              "name": "",
+              "ticker": "",
+              "value": "-1.492093"
+            },
+            {
+              "counter_id": "ST/US/SMTK",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "-0.101186"
+            },
+            {
+              "counter_id": "ST/US/MAXNQ",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "-0.001385"
+            },
+            {
+              "counter_id": "ST/US/SELXF",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "-0.010825"
+            },
+            {
+              "counter_id": "ST/US/MMATQ",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": ""
+            },
+            {
+              "counter_id": "ST/US/SPIEQ",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": ""
+            },
+            {
+              "counter_id": "ST/US/SIVEF",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": ""
+            },
+            {
+              "counter_id": "ST/US/QNC",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": ""
+            }
+          ]
+        },
+        {
+          "list": [
+            {
+              "counter_id": "ST/US/QCOM",
+              "growth": "149.16506986027944",
+              "name": "",
+              "ticker": "",
+              "value": "18.790031"
+            },
+            {
+              "counter_id": "ST/US/NXPI",
+              "growth": "85.33647798742138",
+              "name": "",
+              "ticker": "",
+              "value": "19.784081"
+            },
+            {
+              "counter_id": "ST/US/UMC",
+              "growth": "61.45488721804511",
+              "name": "",
+              "ticker": "",
+              "value": "18.262590"
+            },
+            {
+              "counter_id": "ST/US/FSLR",
+              "growth": "22.89120337790289",
+              "name": "",
+              "ticker": "",
+              "value": "13.958035"
+            },
+            {
+              "counter_id": "ST/US/CRUS",
+              "growth": "-13.56687898089172",
+              "name": "",
+              "ticker": "",
+              "value": "14.188037"
+            },
+            {
+              "counter_id": "ST/US/TOYO",
+              "growth": "103.09734513274336",
+              "name": "",
+              "ticker": "",
+              "value": "3.707327"
+            },
+            {
+              "counter_id": "ST/US/NA",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "2.212893"
+            }
+          ]
+        },
+        {
+          "list": [
+            {
+              "counter_id": "ST/US/NVDA",
+              "growth": "92.99775510204082",
+              "name": "",
+              "ticker": "",
+              "value": "34.116187"
+            },
+            {
+              "counter_id": "ST/US/TSM",
+              "growth": "59.90619718309859",
+              "name": "",
+              "ticker": "",
+              "value": "31.550838"
+            },
+            {
+              "counter_id": "ST/US/SKHY",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "22.550078"
+            },
+            {
+              "counter_id": "ST/US/MU",
+              "growth": "856.46903820816864",
+              "name": "",
+              "ticker": "",
+              "value": "20.392809"
+            },
+            {
+              "counter_id": "ST/US/KXIAY",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "20.237829"
+            },
+            {
+              "counter_id": "ST/US/SWKS",
+              "growth": "-51.62012987012987",
+              "name": "",
+              "ticker": "",
+              "value": "36.126465"
+            },
+            {
+              "counter_id": "ST/US/QRVO",
+              "growth": "28.21408839779006",
+              "name": "",
+              "ticker": "",
+              "value": "21.710818"
+            },
+            {
+              "counter_id": "ST/US/SIMO",
+              "growth": "243.23516483516484",
+              "name": "",
+              "ticker": "",
+              "value": "28.237027"
+            },
+            {
+              "counter_id": "ST/US/OLED",
+              "growth": "-17.43720472440945",
+              "name": "",
+              "ticker": "",
+              "value": "21.617990"
+            },
+            {
+              "counter_id": "ST/US/PENG",
+              "growth": "535.71428571428571",
+              "name": "",
+              "ticker": "",
+              "value": "39.643329"
+            },
+            {
+              "counter_id": "ST/US/IMOS",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "27.801170"
+            },
+            {
+              "counter_id": "ST/US/NVEC",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "32.812332"
+            }
+          ]
+        },
+        {
+          "list": [
+            {
+              "counter_id": "ST/US/TXN",
+              "growth": "55.96385321100917",
+              "name": "",
+              "ticker": "",
+              "value": "41.980252"
+            },
+            {
+              "counter_id": "ST/US/ADI",
+              "growth": "108.13179824561404",
+              "name": "",
+              "ticker": "",
+              "value": "56.512664"
+            },
+            {
+              "counter_id": "ST/US/ASX",
+              "growth": "96.11733800350263",
+              "name": "",
+              "ticker": "",
+              "value": "45.221843"
+            },
+            {
+              "counter_id": "ST/US/ON",
+              "growth": "648.75862068965517",
+              "name": "",
+              "ticker": "",
+              "value": "52.002590"
+            },
+            {
+              "counter_id": "ST/US/GFS",
+              "growth": "-17.96163522012579",
+              "name": "",
+              "ticker": "",
+              "value": "40.757797"
+            },
+            {
+              "counter_id": "ST/US/RMBS",
+              "growth": "18.56255924170616",
+              "name": "",
+              "ticker": "",
+              "value": "45.709723"
+            },
+            {
+              "counter_id": "ST/US/DIOD",
+              "growth": "135.66433566433566",
+              "name": "",
+              "ticker": "",
+              "value": "57.202259"
+            }
+          ]
+        },
+        {
+          "list": [
+            {
+              "counter_id": "ST/US/AVGO",
+              "growth": "88.79014675052411",
+              "name": "",
+              "ticker": "",
+              "value": "67.516841"
+            },
+            {
+              "counter_id": "ST/US/MRVL",
+              "growth": "-39.74951140065147",
+              "name": "",
+              "ticker": "",
+              "value": "75.114990"
+            },
+            {
+              "counter_id": "ST/US/IFNNY",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "68.202986"
+            },
+            {
+              "counter_id": "ST/US/HIMX",
+              "growth": "72.61904761904762",
+              "name": "",
+              "ticker": "",
+              "value": "74.618332"
+            }
+          ]
+        },
+        {
+          "list": [
+            {
+              "counter_id": "ST/US/MPWR",
+              "growth": "76.96360784313725",
+              "name": "",
+              "ticker": "",
+              "value": "87.324167"
+            },
+            {
+              "counter_id": "ST/US/MTSI",
+              "growth": "663.00958904109589",
+              "name": "",
+              "ticker": "",
+              "value": "98.504382"
+            }
+          ]
+        },
+        {
+          "list": [
+            {
+              "counter_id": "ST/US/STMEF",
+              "growth": "",
+              "name": "",
+              "ticker": "",
+              "value": "105.182899"
+            },
+            {
+              "counter_id": "ST/US/STM",
+              "growth": "574.22777777777778",
+              "name": "",
+              "ticker": "",
+              "value": "103.333602"
+            },
+            {
+              "counter_id": "ST/US/CRDO",
+              "growth": "99.16334661354582",
+              "name": "",
+              "ticker": "",
+              "value": "105.882144"
+            },
+            {
+              "counter_id": "ST/US/MCHP",
+              "growth": "868.48181818181818",
+              "name": "",
+              "ticker": "",
+              "value": "117.474429"
+            },
+            {
+              "counter_id": "ST/US/TSEM",
+              "growth": "79.39536082474227",
+              "name": "",
+              "ticker": "",
+              "value": "101.343383"
+            },
+            {
+              "counter_id": "ST/US/KOPN",
+              "growth": "-333.3",
+              "name": "",
+              "ticker": "",
+              "value": "115.558194"
+            }
+          ]
+        },
+        {
+          "list": [
+            {
+              "counter_id": "ST/US/AMD",
+              "growth": "115.79433962264151",
+              "name": "",
+              "ticker": "",
+              "value": "122.532044"
+            }
+          ]
+        },
+        {
+          "list": [
+            {
+              "counter_id": "ST/US/ALAB",
+              "growth": "167.71229508196721",
+              "name": "",
+              "ticker": "",
+              "value": "149.683219"
+            },
+            {
+              "counter_id": "ST/US/POWI",
+              "growth": "85.25641025641026",
+              "name": "",
+              "ticker": "",
+              "value": "142.296699"
+            }
+          ]
+        },
+        {
+          "list": []
+        },
+        {
+          "list": []
+        },
+        {
+          "list": [
+            {
+              "counter_id": "ST/US/ARM",
+              "growth": "48.45411764705882",
+              "name": "",
+              "ticker": "",
+              "value": "278.140395"
+            },
+            {
+              "counter_id": "ST/US/LSCC",
+              "growth": "3788.9",
+              "name": "",
+              "ticker": "",
+              "value": "505.443999"
+            },
+            {
+              "counter_id": "ST/US/SITM",
+              "growth": "323.14593023255814",
+              "name": "",
+              "ticker": "",
+              "value": "1274.735268"
+            },
+            {
+              "counter_id": "ST/US/ALGM",
+              "growth": "745.3375",
+              "name": "",
+              "ticker": "",
+              "value": "557.460383"
+            }
+          ]
+        }
+      ],
+      "industry_median": "18.26",
+      "step": "20"
+    }
+  },
+  "overview": {
+    "ai_summary": "当前市盈率 <strong>34.12</strong>，<strong>低于</strong>合理区间，比近 <strong>5</strong> 年 <strong>94.63%</strong> 的时间便宜，行业排名 <strong>17/90</strong>，行业中位数 <strong>18.26</strong>。",
+    "aichat_data": {
+      "agent_id": "chatbot",
+      "handoff_agent_id": "fkl5safices4",
+      "symbol": "NVDA.US",
+      "text": "估值分析",
+      "type": "newChat",
+      "workflow_type": "valuation"
+    },
+    "ccy_symbol": "$",
+    "date": "2026 年 8 月 12 日",
+    "indicator": "pe",
+    "metrics": {
+      "pe": {
+        "circle": "224.0900",
+        "desc": "当前市盈率 <strong>34.12</strong>，<strong>低于</strong>合理区间，比近 <strong>5</strong> 年 <strong>94.63%</strong> 的时间便宜，行业排名 <strong>17/90</strong>，行业中位数 <strong>18.26</strong>。",
+        "industry_median": "18.26",
+        "metric": "34.12x",
+        "part": "6.5684"
+      }
+    },
+    "range": 5
+  },
+  "peers": {
+    "pe": {
+      "industry_median": "18.26",
+      "list": [
+        {
+          "counter_id": "ST/US/AVGO",
+          "growth": "",
+          "name": "博通",
+          "ticker": "",
+          "value": "67.5168"
+        },
+        {
+          "counter_id": "ST/US/NVDA",
+          "growth": "",
+          "name": "英伟达",
+          "ticker": "",
+          "value": "34.1162"
+        },
+        {
+          "counter_id": "ST/US/TSM",
+          "growth": "",
+          "name": "台积电",
+          "ticker": "",
+          "value": "31.5508"
+        },
+        {
+          "counter_id": "ST/US/SKHY",
+          "growth": "",
+          "name": "SK海力士",
+          "ticker": "",
+          "value": "22.5501"
+        },
+        {
+          "counter_id": "ST/US/MU",
+          "growth": "",
+          "name": "美光科技",
+          "ticker": "",
+          "value": "20.3928"
+        }
+      ]
+    }
+  },
+  "stocks": {
+    "ST/US/ADI": {
+      "market_cap": "187250870787.2000",
+      "name": "亚德诺"
+    },
+    "ST/US/ALAB": {
+      "market_cap": "55307051155.2000",
+      "name": "Astera Labs"
+    },
+    "ST/US/ALGM": {
+      "market_cap": "7916494893.6200",
+      "name": "Allegro Microsystems"
+    },
+    "ST/US/AMBA": {
+      "market_cap": "3664309493.0500",
+      "name": "安霸"
+    },
+    "ST/US/AMBQ": {
+      "market_cap": "1583699278.4200",
+      "name": "Ambiq Micro"
+    },
+    "ST/US/AMD": {
+      "market_cap": "788371172033.0600",
+      "name": "AMD"
+    },
+    "ST/US/AOSL": {
+      "market_cap": "1085845089.8400",
+      "name": "阿尔法和欧米伽半导体"
+    },
+    "ST/US/ARM": {
+      "market_cap": "290378572481.2000",
+      "name": "Arm"
+    },
+    "ST/US/ASTI": {
+      "market_cap": "31791940.3200",
+      "name": "Ascent Solar Tech"
+    },
+    "ST/US/ASX": {
+      "market_cap": "87472584510.4800",
+      "name": "日月光半导体"
+    },
+    "ST/US/AVGO": {
+      "market_cap": "1979391241377.9000",
+      "name": "博通"
+    },
+    "ST/US/BZAI": {
+      "market_cap": "163559829.8500",
+      "name": "Blaize"
+    },
+    "ST/US/CBRS": {
+      "market_cap": "56402791454.4600",
+      "name": "Cerebras"
+    },
+    "ST/US/CEVA": {
+      "market_cap": "848039192.3600",
+      "name": "CEVA公司"
+    },
+    "ST/US/CRDO": {
+      "market_cap": "50005913127.6800",
+      "name": "Credo Tech"
+    },
+    "ST/US/CRUS": {
+      "market_cap": "6108829510.2900",
+      "name": "凌云半导体"
+    },
+    "ST/US/CSIQ": {
+      "market_cap": "1066078901.2800",
+      "name": "阿特斯太阳能"
+    },
+    "ST/US/DIOD": {
+      "market_cap": "4924542503.5200",
+      "name": "Diodes"
+    },
+    "ST/US/DVLT": {
+      "market_cap": "265224218.4500",
+      "name": "Datavault AI"
+    },
+    "ST/US/FSLR": {
+      "market_cap": "24370923824.7600",
+      "name": "第一太阳能"
+    },
+    "ST/US/GCTS": {
+      "market_cap": "180286475.2500",
+      "name": "GCT Semiconductor"
+    },
+    "ST/US/GFS": {
+      "market_cap": "29182582540.7600",
+      "name": "格芯"
+    },
+    "ST/US/GSIT": {
+      "market_cap": "254790564.7200",
+      "name": "广船国际技术"
+    },
+    "ST/US/GUER": {
+      "market_cap": "39337440.9120",
+      "name": "Guerrilla RF, Inc."
+    },
+    "ST/US/HIMX": {
+      "market_cap": "2632087042.2600",
+      "name": "奇景光电"
+    },
+    "ST/US/ICG": {
+      "market_cap": "53426495.7600",
+      "name": "聪链集团"
+    },
+    "ST/US/IFNNY": {
+      "market_cap": "94772510130.8700",
+      "name": "英飞凌(ADR)"
+    },
+    "ST/US/IMOS": {
+      "market_cap": "1989221029.3200",
+      "name": "南茂科技"
+    },
+    "ST/US/INDI": {
+      "market_cap": "908677881.6300",
+      "name": "indie Semiconductor"
+    },
+    "ST/US/INTC": {
+      "market_cap": "504144300000.0000",
+      "name": "英特尔"
+    },
+    "ST/US/IONQ": {
+      "market_cap": "17221304592.8000",
+      "name": "IonQ"
+    },
+    "ST/US/IPWR": {
+      "market_cap": "70115276.5200",
+      "name": "Ideal Power"
+    },
+    "ST/US/JKS": {
+      "market_cap": "859918486.9600",
+      "name": "晶科能源"
+    },
+    "ST/US/KOPN": {
+      "market_cap": "920484343.3000",
+      "name": "高平电子"
+    },
+    "ST/US/KXIAY": {
+      "market_cap": "178214360277.6000",
+      "name": "KIOXIA HOLDINGS CORPORATION UNSPON ADR EACH REP 0.1 COM"
+    },
+    "ST/US/LAES": {
+      "market_cap": "475876120.0200",
+      "name": "SEALSQ"
+    },
+    "ST/US/LEDS": {
+      "market_cap": "19938901.2300",
+      "name": "旭明光电"
+    },
+    "ST/US/LSCC": {
+      "market_cap": "18360253261.4400",
+      "name": "莱迪思半导体"
+    },
+    "ST/US/MAXNQ": {
+      "market_cap": "846638.0000",
+      "name": "MAXEON SOLAR TECHNOLOGIES LTD"
+    },
+    "ST/US/MCHP": {
+      "market_cap": "43136610413.0400",
+      "name": "微芯科技"
+    },
+    "ST/US/MMATQ": {
+      "market_cap": "667.7000",
+      "name": "META MATERIALS INC"
+    },
+    "ST/US/MOBX": {
+      "market_cap": "15473367.0000",
+      "name": "Mobix Labs"
+    },
+    "ST/US/MPWR": {
+      "market_cap": "70029266430.0000",
+      "name": "芯源系统"
+    },
+    "ST/US/MRAM": {
+      "market_cap": "415411153.5400",
+      "name": "Everspin科技"
+    },
+    "ST/US/MRVL": {
+      "market_cap": "189793044000.0000",
+      "name": "迈威尔科技"
+    },
+    "ST/US/MTSI": {
+      "market_cap": "23732266808.2500",
+      "name": "MACOM科技解决方案控股"
+    },
+    "ST/US/MU": {
+      "market_cap": "1029204684574.7900",
+      "name": "美光科技"
+    },
+    "ST/US/MX": {
+      "market_cap": "139468624.0200",
+      "name": "MagnaChip半导体"
+    },
+    "ST/US/MXL": {
+      "market_cap": "6741224887.0300",
+      "name": "MaxLinear"
+    },
+    "ST/US/NA": {
+      "market_cap": "42017502.9000",
+      "name": "Nano Labs"
+    },
+    "ST/US/NVDA": {
+      "market_cap": "5445387000000.0000",
+      "name": "英伟达"
+    },
+    "ST/US/NVEC": {
+      "market_cap": "591198428.5200",
+      "name": "NVE"
+    },
+    "ST/US/NVTS": {
+      "market_cap": "3637032287.8400",
+      "name": "Navitas Semiconductor"
+    },
+    "ST/US/NXPI": {
+      "market_cap": "58857639853.3400",
+      "name": "恩智浦"
+    },
+    "ST/US/OLED": {
+      "market_cap": "4229408488.3500",
+      "name": "Universal Display"
+    },
+    "ST/US/ON": {
+      "market_cap": "32772032135.7600",
+      "name": "安森美半导体"
+    },
+    "ST/US/PENG": {
+      "market_cap": "3009483712.2700",
+      "name": "Penguin Solutions"
+    },
+    "ST/US/PI": {
+      "market_cap": "5469837815.2200",
+      "name": "Impinj"
+    },
+    "ST/US/POET": {
+      "market_cap": "1530921251.2200",
+      "name": "POET Tech"
+    },
+    "ST/US/POWI": {
+      "market_cap": "3566951344.3200",
+      "name": "帕沃英蒂格盛"
+    },
+    "ST/US/PRSO": {
+      "market_cap": "10114900.6044",
+      "name": "Peraso"
+    },
+    "ST/US/QCOM": {
+      "market_cap": "173995690000.0000",
+      "name": "高通"
+    },
+    "ST/US/QNC": {
+      "market_cap": "",
+      "name": "Quantum Emotion"
+    },
+    "ST/US/QRVO": {
+      "market_cap": "8666893225.9200",
+      "name": "QORVO"
+    },
+    "ST/US/QUIK": {
+      "market_cap": "238380462.4800",
+      "name": "快辑半导体"
+    },
+    "ST/US/RGTI": {
+      "market_cap": "6148020319.7400",
+      "name": "Rigetti Computing"
+    },
+    "ST/US/RMBS": {
+      "market_cap": "10955706519.0300",
+      "name": "Rambus"
+    },
+    "ST/US/SELXF": {
+      "market_cap": "47690.1513",
+      "name": "SEMILUX INTERNATIONAL LTD"
+    },
+    "ST/US/SIMO": {
+      "market_cap": "8182299663.8500",
+      "name": "慧荣科技"
+    },
+    "ST/US/SITM": {
+      "market_cap": "17963569390.5600",
+      "name": "SiTime"
+    },
+    "ST/US/SIVEF": {
+      "market_cap": "",
+      "name": "SIVERS SEMICONDUCTORS AB"
+    },
+    "ST/US/SKHY": {
+      "market_cap": "1125441218550.0000",
+      "name": "SK海力士"
+    },
+    "ST/US/SLAB": {
+      "market_cap": "7217412327.0900",
+      "name": "芯科实验室"
+    },
+    "ST/US/SMTC": {
+      "market_cap": "13041163520.0000",
+      "name": "先科电子"
+    },
+    "ST/US/SMTK": {
+      "market_cap": "2807309.2817",
+      "name": "SmartKem"
+    },
+    "ST/US/SPIEQ": {
+      "market_cap": "31.6031",
+      "name": "SPI ENERGY CO LTD"
+    },
+    "ST/US/SQNS": {
+      "market_cap": "46388101.3000",
+      "name": "Sequans通信"
+    },
+    "ST/US/STM": {
+      "market_cap": "48153458475.3600",
+      "name": "意法半导体"
+    },
+    "ST/US/STMEF": {
+      "market_cap": "49015231035.9300",
+      "name": "意法半导体"
+    },
+    "ST/US/SWKS": {
+      "market_cap": "10480287501.8400",
+      "name": "思佳讯"
+    },
+    "ST/US/SYNA": {
+      "market_cap": "4298456867.0400",
+      "name": "Synaptics"
+    },
+    "ST/US/TE": {
+      "market_cap": "1368429762.0000",
+      "name": "T1 Energy"
+    },
+    "ST/US/TOYO": {
+      "market_cap": "240934866.7200",
+      "name": "Toyo"
+    },
+    "ST/US/TSEM": {
+      "market_cap": "29346814202.6400",
+      "name": "Tower半导体"
+    },
+    "ST/US/TSM": {
+      "market_cap": "2225775317100.0000",
+      "name": "台积电"
+    },
+    "ST/US/TXN": {
+      "market_cap": "252595177470.7400",
+      "name": "德州仪器"
+    },
+    "ST/US/UMC": {
+      "market_cap": "48509486736.8000",
+      "name": "联电"
+    },
+    "ST/US/VLN": {
+      "market_cap": "202469586.2200",
+      "name": "Valens Semiconductor"
+    },
+    "ST/US/WKEY": {
+      "market_cap": "77848865.1200",
+      "name": "Wisekey"
+    },
+    "ST/US/WOLF": {
+      "market_cap": "1532818306.1100",
+      "name": "Wolfspeed"
+    }
+  }
+}
