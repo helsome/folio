@@ -3,6 +3,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import {
   watchlistAtom,
   quoteCacheAtomFamily,
+  watchlistLatestTimestampAtom,
   fetchQuoteAtom,
   addToWatchlistAtom,
   removeFromWatchlistAtom,
@@ -12,6 +13,7 @@ import {
 import { useFinagentClient } from '../../client';
 import { Input } from '../primitives/Input';
 import { Button } from '../primitives/Button';
+import { DataFreshness } from '../primitives/DataFreshness';
 
 const SYMBOL_REGEX = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
 const DASH = '\u2014';
@@ -28,6 +30,7 @@ export const Watchlist: React.FC = () => {
   const setActiveSymbol = useSetAtom(activeSymbolAtom);
   const setActiveView = useSetAtom(activeViewAtom);
   const activeSymbol = useAtomValue(activeSymbolAtom);
+  const latestTimestamp = useAtomValue(watchlistLatestTimestampAtom);
 
   const [newSymbol, setNewSymbol] = React.useState('');
   const [error, setError] = React.useState('');
@@ -89,8 +92,16 @@ export const Watchlist: React.FC = () => {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b mac-section-divider px-3 py-3">
-        <div className="mb-2 px-0.5 text-[11px] font-semibold uppercase text-foreground/42">
-          Watchlist
+        <div className="mb-2 flex items-center justify-between px-0.5">
+          <span className="text-[11px] font-semibold uppercase text-foreground/42">
+            Watchlist
+          </span>
+          <DataFreshness
+            providerName="Longbridge"
+            updatedAtMs={
+              latestTimestamp ? latestTimestamp * 1000 : undefined
+            }
+          />
         </div>
         <div className="flex gap-1.5">
           <Input

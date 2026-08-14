@@ -3,6 +3,7 @@ import { useAtomValue } from 'jotai';
 import { activeSymbolAtom } from '../../atoms';
 import { useFinagentClient } from '../../client';
 import { Button } from '../primitives/Button';
+import { DataFreshness } from '../primitives/DataFreshness';
 import { FinancialKLineChart } from '../chart/FinancialKLineChart';
 import { normalizeKlines, type FinancialBar } from '../chart/klineAdapter';
 
@@ -122,6 +123,14 @@ export function ChartView() {
             {value}
           </button>
         ))}
+        <div className="ml-auto">
+          <DataFreshness
+            providerName="Longbridge"
+            updatedAtMs={
+              bars.length > 0 ? bars[bars.length - 1]!.timestamp * 1000 : undefined
+            }
+          />
+        </div>
       </div>
       <div className="min-h-0 flex-1">{body}</div>
     </div>

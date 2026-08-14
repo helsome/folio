@@ -25,6 +25,18 @@ export const quoteCacheAtomFamily = atomFamily((symbol: string) =>
 // Watchlist atoms
 export const watchlistAtom = atom<string[]>(['AAPL.US', 'TSLA.US', 'NVDA.US']);
 
+/** Newest quote timestamp (epoch seconds) across the watchlist, for the §34 freshness line. */
+export const watchlistLatestTimestampAtom = atom<number | undefined>((get) => {
+  const watchlist = get(watchlistAtom);
+  let latest: number | undefined;
+  for (const symbol of watchlist) {
+    const cache = get(quoteCacheAtomFamily(symbol));
+    const ts = cache.data?.timestamp;
+    if (ts && (!latest || ts > latest)) latest = ts;
+  }
+  return latest;
+});
+
 // Add symbol to watchlist
 export const addToWatchlistAtom = atom(
   null,

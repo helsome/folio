@@ -3,6 +3,7 @@ import { useAtom } from 'jotai';
 import { compareSymbolsAtom, comparisonStateAtom, withComparisonSymbols } from '../../atoms/compareAtoms';
 import { loadComparison } from '../../client/compare';
 import { Button } from '../primitives/Button';
+import { DataFreshness } from '../primitives/DataFreshness';
 import { CompareTable } from './CompareTable';
 
 /** Symbol picker (2–4) + comparison table + agent-context note. */
@@ -45,6 +46,10 @@ export const CompareWorkspace: React.FC = () => {
         <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
           Compare symbols (2–4)
         </h3>
+        <DataFreshness
+          providerName="Longbridge"
+          updatedAtMs={state.data?.generatedAt}
+        />
       </div>
 
       <div className="flex items-center gap-2">

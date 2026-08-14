@@ -37,6 +37,7 @@ AI-native investment research workbench. A desktop app that combines a professio
 - **Onboarding & Connections Center** — first-run wizard (welcome/disclaimers → Connect AI → financial data → optional broker → environment health check), one-time disclaimers (re-accessible in Settings/About), completion persisted in the main process; Connections tab with status cards, capability matrix, and BYOK key entry.
 - **Today + ⌘K** — lightweight home (portfolio snapshot, watchlist movers, triggered alerts, upcoming events, recent research, theses needing review, quick actions) and a command palette for symbols/navigation/actions.
 - **Diagnostics & recovery** — Settings → Diagnostics (version, platform, runtimes, providers, skills, capabilities, resource location, last errors), redacted support-bundle export (keys/tokens/credentials never included), workspace-level React error boundaries with Retry / Open Diagnostics.
+- **Data freshness (spec §34)** — quote header, chart (last bar), watchlist, compare, and portfolio all show a `Longbridge · Updated HH:MM:SS` line from the data's own timestamp; nothing is ever presented as fresher than it is.
 - **Release pipeline** — `bun run release:check` (unit, typecheck, build, E2E, package, packaged smoke), `release:package` (DMG + SHA256SUMS), CI `release.yml` on `v*` tags with signing/notarization behind secrets, About view (version/channel/build), semver + channel metadata.
 
 ## Architecture

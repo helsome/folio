@@ -3,6 +3,7 @@ import { useAtomValue, useSetAtom } from 'jotai';
 import type { Quote, StaticInfo, MarketStatus } from '@finagent/core';
 import { activeSymbolAtom, navSectionAtom } from '../../atoms';
 import { useFinagentClient } from '../../client';
+import { DataFreshness } from '../primitives/DataFreshness';
 const DASH = '\u2014';
 
 const formatPrice = (value: number): string => `$${value.toFixed(2)}`;
@@ -170,6 +171,11 @@ export const SecurityHeader: React.FC = () => {
           >
             {formatSigned(quote.change)} ({formatPercent(quote.changePercent)})
           </div>
+          <DataFreshness
+            providerName="Longbridge"
+            updatedAtMs={quote.timestamp ? quote.timestamp * 1000 : undefined}
+            className="mt-1.5"
+          />
         </div>
         <div className="flex items-center gap-2">
           <button
