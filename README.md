@@ -5,6 +5,10 @@
 </p>
 
 <p align="center">
+  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
+</p>
+
+<p align="center">
   <strong>Local-first AI-native investment research workbench</strong><br />
   Research the market, understand your exposure, and keep an evidence-backed view of what changed.
 </p>
@@ -177,7 +181,7 @@ Folio is in beta. The current repository includes the V5 research, discovery, mo
 - Electron E2E and packaged smoke gates: available through the release scripts
 - Current package channel: `0.4.0-beta.1`
 
-Known limitations and release decisions are documented in [`docs/release-gates.md`](docs/release-gates.md) and [`docs/provider-b-decision.md`](docs/provider-b-decision.md).
+Known limitations and release decisions are documented in [`docs/release-gates.md`](docs/release-gates.md) ([简体中文](docs/release-gates.zh-CN.md)) and [`docs/provider-b-decision.md`](docs/provider-b-decision.md) ([简体中文](docs/provider-b-decision.zh-CN.md)).
 
 ## Roadmap
 
@@ -196,12 +200,12 @@ Known limitations and release decisions are documented in [`docs/release-gates.m
 
 ## Documentation
 
-- [`docs/architecture.md`](docs/architecture.md) — system architecture and runtime boundaries
-- [`docs/PRD.md`](docs/PRD.md) — product requirements and invariants
-- [`docs/UI-SYSTEM.md`](docs/UI-SYSTEM.md) — visual system and component rules
-- [`docs/longbridge-auth.md`](docs/longbridge-auth.md) — Longbridge authentication
-- [`docs/longbridge-skill-setup.md`](docs/longbridge-skill-setup.md) — skill setup and capability coverage
-- [`docs/release-gates.md`](docs/release-gates.md) — release validation checklist
+- [`docs/architecture.md`](docs/architecture.md) — system architecture and runtime boundaries · [简体中文](docs/architecture.zh-CN.md)
+- [`docs/PRD.md`](docs/PRD.md) — product requirements and invariants (document is in Chinese)
+- [`docs/UI-SYSTEM.md`](docs/UI-SYSTEM.md) — visual system and component rules · [简体中文](docs/UI-SYSTEM.zh-CN.md)
+- [`docs/longbridge-auth.md`](docs/longbridge-auth.md) — Longbridge authentication · [简体中文](docs/longbridge-auth.zh-CN.md)
+- [`docs/longbridge-skill-setup.md`](docs/longbridge-skill-setup.md) — skill setup and capability coverage · [简体中文](docs/longbridge-skill-setup.zh-CN.md)
+- [`docs/release-gates.md`](docs/release-gates.md) — release validation checklist · [简体中文](docs/release-gates.zh-CN.md)
 
 ## Contributing
 
