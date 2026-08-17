@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { ArrowUp, ChevronLeft, Square } from 'lucide-react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { PortfolioSnapshot, Quote, ToolCall } from '@finagent/core';
 import {
@@ -12,6 +13,7 @@ import {
 } from '../../atoms';
 import { useFinagentClient } from '../../client';
 import { MessageList } from '../chat/MessageList';
+import { MarkdownContent } from '../chat/MarkdownContent';
 import { ModelSelector } from './ModelSelector';
 import { ThinkingSelector } from './ThinkingSelector';
 import { ToolActivity } from './ToolActivity';
@@ -167,9 +169,7 @@ export const AgentPanel: React.FC = () => {
           aria-label="Collapse agent panel"
           title="Collapse panel"
         >
-          <svg width="14" height="14" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-            <path d="M9.5 2.5 4 7l5.5 4.5" stroke="currentColor" strokeWidth="1.6" strokeLinecap="round" strokeLinejoin="round" />
-          </svg>
+          <ChevronLeft className="h-4 w-4" strokeWidth={1.8} />
         </button>
       </div>
 
@@ -191,7 +191,7 @@ export const AgentPanel: React.FC = () => {
       </div>
 
       {/* Input / send / stop */}
-      <div className="border-t mac-section-divider bg-background/64 px-3 py-3 backdrop-blur-2xl">
+      <div className="border-t mac-section-divider bg-surface px-3 py-3">
         <textarea
           data-testid="agent-input"
           value={input}
@@ -210,9 +210,7 @@ export const AgentPanel: React.FC = () => {
               onClick={() => void handleStop()}
               className="flex items-center gap-1.5 rounded-full border border-destructive/30 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-smooth hover:bg-destructive/10"
             >
-              <svg width="9" height="9" viewBox="0 0 10 10" fill="currentColor" aria-hidden="true">
-                <rect x="1" y="1" width="8" height="8" rx="1.5" />
-              </svg>
+              <Square className="h-3 w-3 fill-current" />
               Stop
             </button>
           ) : (
@@ -223,9 +221,7 @@ export const AgentPanel: React.FC = () => {
               className="mac-primary-button flex h-9 w-9 items-center justify-center rounded-full transition-smooth active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-45"
               aria-label="Send message"
             >
-              <svg width="15" height="15" viewBox="0 0 17 17" fill="none" aria-hidden="true">
-                <path d="M8.5 13.5v-10M8.5 3.5 4.2 7.8M8.5 3.5l4.3 4.3" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round" />
-              </svg>
+              <ArrowUp className="h-4 w-4" strokeWidth={1.8} />
             </button>
           )}
         </div>
@@ -243,7 +239,7 @@ const StreamingBlock: React.FC<{ answer: string }> = ({ answer }) => {
         Agent running
       </div>
       {answer.length > 0 ? (
-        <div className="whitespace-pre-wrap text-[13px] leading-relaxed text-foreground/72">{answer}</div>
+        <MarkdownContent content={answer} className="text-[13px] text-foreground/72" />
       ) : (
         <div className="text-[13px] italic text-foreground/40">Thinking…</div>
       )}

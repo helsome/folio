@@ -1,70 +1,80 @@
 import React from 'react';
 import { useAtom, useSetAtom } from 'jotai';
 import {
+  Activity,
+  Bell,
+  BookOpen,
+  BriefcaseBusiness,
+  ChartNoAxesCombined,
+  ChevronRight,
+  CirclePlus,
+  Compass,
+  FileText,
+  Gauge,
+  GitCompareArrows,
+  LayoutDashboard,
+  PanelRight,
+  Settings,
+  Trash2,
+  Zap,
+} from 'lucide-react';
+import type { LucideIcon } from 'lucide-react';
+import {
   sessionsAtom,
   activeSessionIdAtom,
   createSessionAtom,
   deleteSessionAtom,
   navSectionAtom,
   agentPanelVisibleAtom,
+  settingsTabAtom,
   type NavSection,
+  type SettingsTab,
 } from '../../atoms';
 import { useFinagentClient } from '../../client';
 import { Watchlist } from '../stock/Watchlist';
+import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 
-const NAV_ITEMS: Array<{ key: NavSection; label: string; path: string }> = [
-  {
-    key: 'today',
-    label: 'Today',
-    path: 'M2.5 8.5h11a3 3 0 0 1-3 3h-5a3 3 0 0 1-3-3zM2.5 8.5a3 3 0 0 1 3-3h5a3 3 0 0 1 3 3M8 3.5V2M5 3.5V2M11 3.5V2',
-  },
-  {
-    key: 'discover',
-    label: 'Discover',
-    path: 'M8 2.5a5.5 5.5 0 1 0 0 11 5.5 5.5 0 0 0 0-11zm0 2v3.5l2.3 1.4',
-  },
-  {
-    key: 'portfolio',
-    label: 'Portfolio',
-    path: 'M2.5 5.5h11v8h-11zM6 5.5V4a1.5 1.5 0 0 1 1.5-1.5h1A1.5 1.5 0 0 1 10 4v1.5',
-  },
-  {
-    key: 'alerts',
-    label: 'Alerts',
-    path: 'M8 2.5a3 3 0 0 0-3 3v2L3.6 9a.6.6 0 0 0 .4 1h8a.6.6 0 0 0 .4-1L11 7.5v-2a3 3 0 0 0-3-3zM7.5 11.5h1',
-  },
-  {
-    key: 'research',
-    label: 'Research',
-    path: 'M3 3.5h10a1 1 0 0 1 1 1v7a1 1 0 0 1-1 1H3zM5 8h3M8 6.5V9.5M6 11.5h4',
-  },
-  {
-    key: 'thesis',
-    label: 'Thesis',
-    path: 'M4.5 2.5h7M4.5 6h7M4.5 9.5h7M3 13h10a1 1 0 0 1 0 2H3z',
-  },
-  {
-    key: 'compare',
-    label: 'Compare',
-    path: 'M3.5 6.5h4v5h-4zM8.5 6.5h4v5h-4z',
-  },
-  {
-    key: 'skills',
-    label: 'Skills',
-    path: 'M9 2 4.5 9H7.5L7 14l4.5-7H8.5z',
-  },
-  {
-    key: 'settings',
-    label: 'Settings',
-    path: 'M8 1.8 9.4 3l2-.7 1.2 1.7 2.1.2.3 2.1 1.7 1.2-.2 2.1-2.1.3-1.2 1.7-2-.7-1.4-1.2-2 .7-1.2-1.7-2.1-.2-.3-2.1-1.7-1.2.2-2.1-2.1-.3L4.6 3l2 .7L8 1.8zm0 3.7a2.5 2.5 0 1 0 0 5 2.5 2.5 0 0 0 0-5z',
-  },
+type IconType = LucideIcon;
+const folioLogoUrl = new URL('../../assets/folio-logo.png', import.meta.url).href;
+
+const RAIL_ITEMS: Array<{ key: NavSection; label: string; icon: IconType }> = [
+  { key: 'today', label: 'Today', icon: LayoutDashboard },
+  { key: 'discover', label: 'Discover', icon: Compass },
+  { key: 'watchlist', label: 'Workspace', icon: ChartNoAxesCombined },
+  { key: 'portfolio', label: 'Portfolio', icon: BriefcaseBusiness },
+  { key: 'compare', label: 'Compare', icon: GitCompareArrows },
+  { key: 'alerts', label: 'Alerts', icon: Bell },
+  { key: 'research', label: 'Research', icon: BookOpen },
+  { key: 'thesis', label: 'Thesis', icon: FileText },
+  { key: 'skills', label: 'Skills', icon: Zap },
 ];
 
-const NavIcon: React.FC<{ path: string }> = ({ path }) => (
-  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-    <path d={path} stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-  </svg>
-);
+const IconRailButton: React.FC<{
+  item: { key: NavSection; label: string; icon: IconType };
+  active: boolean;
+  onClick: () => void;
+}> = ({ item, active, onClick }) => {
+  const Icon = item.icon;
+  return (
+    <Tooltip>
+      <TooltipTrigger asChild>
+        <button
+          type="button"
+          aria-label={item.label}
+          aria-pressed={active}
+          onClick={onClick}
+          className={`relative flex h-9 w-9 items-center justify-center rounded-[9px] transition-colors ${
+            active ? 'bg-accent/12 text-accent' : 'text-foreground/48 hover:bg-surface-hover hover:text-foreground'
+          }`}
+        >
+          {active && <span className="absolute -left-2 h-4 w-0.5 rounded-full bg-accent" aria-hidden="true" />}
+          <Icon className="h-[17px] w-[17px]" strokeWidth={active ? 2.1 : 1.7} />
+        </button>
+      </TooltipTrigger>
+      <TooltipContent side="right">{item.label}</TooltipContent>
+    </Tooltip>
+  );
+};
 
 export const Sidebar: React.FC = () => {
   const client = useFinagentClient();
@@ -76,123 +86,91 @@ export const Sidebar: React.FC = () => {
   const [agentPanelVisible, setAgentPanelVisible] = useAtom(agentPanelVisibleAtom);
 
   return (
-    <aside className="flex h-full flex-col bg-surface">
-      {/* Sessions section */}
-      <section className="flex min-h-0 flex-1 flex-col border-b mac-section-divider">
-        <button
-          onClick={() => setNavSection('sessions')}
-          className={`flex w-full items-center justify-between px-3 pb-1 pt-2.5 text-[10.5px] font-semibold uppercase tracking-wider transition-smooth ${
-            navSection === 'sessions' ? 'text-accent' : 'text-text-muted hover:text-foreground'
-          }`}
-        >
-          <span>Sessions</span>
-          <span className="tnum text-[10px] font-normal opacity-70">{sessions.length}</span>
+    <aside className="flex h-full min-w-0 bg-surface-muted">
+      <nav aria-label="Global navigation" className="flex w-16 shrink-0 flex-col items-center border-r border-border bg-surface-muted px-2 py-2">
+        <button type="button" aria-label="Folio home" onClick={() => setNavSection('today')} className="mb-5 flex h-9 w-9 items-center justify-center overflow-hidden rounded-[10px] bg-surface shadow-sm">
+          <img src={folioLogoUrl} alt="" className="h-full w-full object-cover" draggable={false} />
         </button>
-        <div className="px-2 pb-1.5">
-          <button
-            onClick={() => void createSession(client)}
-            className="mac-primary-button flex h-7 w-full items-center justify-center gap-1.5 rounded-[8px] px-3 text-[12.5px] font-semibold transition-smooth active:scale-[0.985]"
-          >
-            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" aria-hidden="true">
-              <path d="M7 2.5v9M2.5 7h9" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-            </svg>
-            <span>New Session</span>
-          </button>
+        <div className="flex flex-col items-center gap-1">
+          {RAIL_ITEMS.map((item) => <IconRailButton key={item.key} item={item} active={navSection === item.key} onClick={() => setNavSection(item.key)} />)}
         </div>
-        <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
-          {sessions.map((session) => (
-            <div key={session.id} className="group relative">
-              <button
-                onClick={() => setActiveSessionId(session.id)}
-                className={`mac-list-row flex w-full items-center gap-2 rounded-[8px] py-1.5 pl-2 pr-7 text-left ${
-                  session.id === activeSessionId
-                    ? 'mac-list-row-active'
-                    : 'text-foreground/72 hover:text-foreground active:scale-[0.99]'
-                }`}
-              >
-                <div className="min-w-0 flex-1">
-                  <div className="truncate text-[12.5px] font-semibold leading-tight">{session.title}</div>
-                  <div className="tnum mt-0.5 text-[10.5px] leading-none text-text-muted">
-                    {session.messageCount} msgs
-                  </div>
-                </div>
+        <div className="my-3 h-px w-7 bg-border" />
+        <div className="flex flex-col items-center gap-1">
+          <IconRailButton item={{ key: 'settings', label: 'Settings', icon: Settings }} active={navSection === 'settings'} onClick={() => setNavSection('settings')} />
+        </div>
+        <div className="mt-auto flex flex-col items-center gap-1">
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" aria-label="Agent Panel" aria-pressed={agentPanelVisible} onClick={() => setAgentPanelVisible(!agentPanelVisible)} className={`flex h-9 w-9 items-center justify-center rounded-[9px] transition-colors ${agentPanelVisible ? 'bg-accent/10 text-accent' : 'text-foreground/42 hover:bg-surface-hover hover:text-foreground'}`}>
+                <PanelRight className="h-[17px] w-[17px]" strokeWidth={1.8} />
               </button>
-              <button
-                onClick={(e) => {
-                  e.stopPropagation();
-                  void deleteSession(client, session.id);
-                }}
-                aria-label={`Delete ${session.title}`}
-                className="absolute right-1.5 top-1/2 flex h-5 w-5 -translate-y-1/2 items-center justify-center rounded text-text-muted opacity-0 transition-smooth hover:text-negative group-hover:opacity-100"
-              >
-                <svg width="12" height="12" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-                  <path
-                    d="M3 4.5h10M6.5 4.5V3h3v1.5M5 4.5l.5 9h5l.5-9"
-                    stroke="currentColor"
-                    strokeWidth="1.4"
-                    strokeLinecap="round"
-                    strokeLinejoin="round"
-                  />
-                </svg>
-              </button>
-            </div>
-          ))}
-          {sessions.length === 0 && (
-            <div className="py-8 text-center text-[12px] text-text-muted">No sessions yet</div>
-          )}
+            </TooltipTrigger>
+            <TooltipContent side="right">Agent Panel</TooltipContent>
+          </Tooltip>
         </div>
-      </section>
-
-      {/* Watchlist section */}
-      <section className="flex min-h-0 flex-1 flex-col overflow-hidden border-b mac-section-divider">
-        <button
-          onClick={() => setNavSection('watchlist')}
-          className={`flex w-full items-center justify-between px-3 pb-1 pt-2.5 text-[10.5px] font-semibold uppercase tracking-wider transition-smooth ${
-            navSection === 'watchlist' ? 'text-accent' : 'text-text-muted hover:text-foreground'
-          }`}
-        >
-          <span>Watchlist</span>
-        </button>
-        <div className="min-h-0 flex-1 overflow-hidden">
-          <Watchlist />
-        </div>
-      </section>
-
-      {/* App navigation */}
-      <nav className="flex flex-col px-2 py-1.5">
-        {NAV_ITEMS.map((item) => (
-          <button
-            key={item.key}
-            onClick={() => setNavSection(item.key)}
-            className={`flex h-7 w-full items-center gap-2 rounded-[8px] px-2 text-left text-[12.5px] font-medium transition-smooth ${
-              navSection === item.key
-                ? 'bg-[var(--mac-blue-soft)] text-foreground'
-                : 'text-text-muted hover:bg-[var(--mac-sidebar-hover)] hover:text-foreground'
-            }`}
-          >
-            <NavIcon path={item.path} />
-            <span>{item.label}</span>
-          </button>
-        ))}
       </nav>
 
-      {/* Agent panel toggle */}
-      <button
-        onClick={() => setAgentPanelVisible(!agentPanelVisible)}
-        aria-pressed={agentPanelVisible}
-        className="flex h-8 w-full items-center gap-2 border-t mac-section-divider px-3 text-[12px] font-medium text-text-muted transition-smooth hover:bg-[var(--mac-sidebar-hover)] hover:text-foreground"
-      >
-        <svg width="14" height="14" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-          <rect x="2.5" y="2.5" width="11" height="11" rx="2" stroke="currentColor" strokeWidth="1.4" />
-          <path d="M9.5 2.5v11" stroke="currentColor" strokeWidth="1.4" />
-        </svg>
-        <span>Agent Panel</span>
-        <span
-          className={`ml-auto h-2 w-2 rounded-full transition-smooth ${
-            agentPanelVisible ? 'bg-[var(--mac-green)]' : 'bg-foreground/25'
-          }`}
-        />
-      </button>
+      <div className="flex min-w-0 flex-1 flex-col">
+        <div className="flex h-12 shrink-0 items-center justify-between border-b border-border px-3">
+          <div className="min-w-0">
+            <p className="truncate text-[12px] font-semibold text-foreground">{navSection === 'watchlist' || navSection === 'sessions' ? 'Workspace' : navSection[0]?.toUpperCase() + navSection.slice(1)}</p>
+            <p className="mt-0.5 text-[10px] text-foreground/42">Folio Financial Workbench</p>
+          </div>
+          {navSection !== 'settings' && <Activity className="h-3.5 w-3.5 text-foreground/28" />}
+        </div>
+
+        {(navSection === 'sessions' || navSection === 'watchlist') && (
+          <>
+            <section className="flex min-h-0 flex-[0.9] flex-col border-b border-border">
+              <div className="flex items-center justify-between px-3 pb-1 pt-3">
+                <span className="text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/42">Sessions</span>
+                <span className="tnum text-[10px] text-foreground/36">{sessions.length}</span>
+              </div>
+              <div className="px-2 pb-2">
+                <button type="button" onClick={() => void createSession(client)} className="flex h-8 w-full items-center justify-center gap-1.5 rounded-[8px] bg-primary px-3 text-[12px] font-semibold text-primary-foreground transition-colors hover:bg-primary/88">
+                  <CirclePlus className="h-3.5 w-3.5" /> New Session
+                </button>
+              </div>
+              <div className="min-h-0 flex-1 overflow-y-auto px-2 pb-2">
+                {sessions.map((session) => (
+                  <div key={session.id} className="group relative">
+                    <button type="button" onClick={() => setActiveSessionId(session.id)} className={`flex w-full items-center rounded-[8px] py-1.5 pl-2 pr-7 text-left transition-colors ${session.id === activeSessionId ? 'bg-accent/10 text-foreground' : 'text-foreground/62 hover:bg-surface-hover hover:text-foreground'}`}>
+                      <div className="min-w-0"><div className="truncate text-[12px] font-medium">{session.title}</div><div className="tnum mt-0.5 text-[10px] text-foreground/36">{session.messageCount} msgs</div></div>
+                    </button>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); void deleteSession(client, session.id); }} aria-label={`Delete ${session.title}`} className="absolute right-1 top-1/2 flex h-6 w-6 -translate-y-1/2 items-center justify-center rounded-[6px] text-foreground/32 opacity-0 transition-opacity hover:bg-negative/10 hover:text-negative group-hover:opacity-100"><Trash2 className="h-3.5 w-3.5" /></button>
+                  </div>
+                ))}
+                {sessions.length === 0 && <div className="py-6 text-center text-[11px] text-foreground/38">No sessions yet</div>}
+              </div>
+            </section>
+            <section className="flex min-h-0 flex-[1.25] flex-col overflow-hidden">
+              <button type="button" onClick={() => setNavSection('watchlist')} className="flex items-center justify-between px-3 pb-1 pt-3 text-left"><span className="text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/42">Watchlist</span><ChevronRight className="h-3.5 w-3.5 text-foreground/28" /></button>
+              <div className="min-h-0 flex-1 overflow-hidden"><Watchlist showHeader={false} /></div>
+            </section>
+          </>
+        )}
+
+        {navSection !== 'sessions' && navSection !== 'watchlist' && navSection !== 'settings' && (
+          <div className="border-b border-border px-2 py-3">
+            <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/42">Workspace shortcut</p>
+            <button type="button" onClick={() => setNavSection('watchlist')} className="flex w-full items-center gap-2 rounded-[8px] px-2 py-2 text-left text-[12px] text-foreground/58 hover:bg-surface-hover hover:text-foreground"><ChartNoAxesCombined className="h-3.5 w-3.5" />Watchlist</button>
+          </div>
+        )}
+
+        {navSection === 'settings' && (
+          <div className="border-b border-border px-2 py-3">
+            <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/42">Settings</p>
+            {['general', 'llm', 'connections', 'skills', 'performance', 'diagnostics'].map((tab) => <SettingsNavButton key={tab} tab={tab} />)}
+          </div>
+        )}
+
+        {(navSection === 'sessions' || navSection === 'watchlist') && <div className="mt-auto border-t border-border px-3 py-2 text-[10px] text-foreground/34">⌘K to search symbols and actions</div>}
+      </div>
     </aside>
   );
+};
+
+const SettingsNavButton: React.FC<{ tab: string }> = ({ tab }) => {
+  const [settingsTab, setSettingsTab] = useAtom(settingsTabAtom);
+  return <button type="button" onClick={() => setSettingsTab(tab as SettingsTab)} className={`w-full rounded-[8px] px-2 py-1.5 text-left text-[12px] capitalize transition-colors ${settingsTab === tab ? 'bg-accent/10 font-medium text-foreground' : 'text-foreground/56 hover:bg-surface-hover hover:text-foreground'}`}>{tab === 'llm' ? 'Models' : tab}</button>;
 };

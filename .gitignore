@@ -35,3 +35,4 @@ packages/longbridge-tools/src/testing/fixtures/portfolio.cmd.txt
 apps/electron/e2e/.user-data
 apps/electron/e2e/.user-data-interactions
 apps/electron/e2e/.user-data*
+apps/electron/e2e/artifacts/

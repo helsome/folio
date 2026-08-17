@@ -1,4 +1,5 @@
 import React, { useEffect, useReducer, useRef } from 'react';
+import { CirclePlus, X } from 'lucide-react';
 import { useAtomValue, useSetAtom } from 'jotai';
 import {
   watchlistAtom,
@@ -22,7 +23,7 @@ const formatPrice = (value: number): string => `$${value.toFixed(2)}`;
 const formatPercent = (value: number): string =>
   `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 
-export const Watchlist: React.FC = () => {
+export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = true }) => {
   const client = useFinagentClient();
   const watchlist = useAtomValue(watchlistAtom);
   const addSymbol = useSetAtom(addToWatchlistAtom);
@@ -92,17 +93,20 @@ export const Watchlist: React.FC = () => {
   return (
     <div className="flex h-full flex-col">
       <div className="border-b mac-section-divider px-3 py-3">
-        <div className="mb-2 flex items-center justify-between px-0.5">
-          <span className="text-[11px] font-semibold uppercase text-foreground/42">
-            Watchlist
-          </span>
-          <DataFreshness
-            providerName="Longbridge"
-            updatedAtMs={
-              latestTimestamp ? latestTimestamp * 1000 : undefined
-            }
-          />
-        </div>
+        {showHeader && (
+          <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 px-0.5">
+            <span className="text-[11px] font-semibold uppercase text-foreground/42">
+              Watchlist
+            </span>
+            <DataFreshness
+              providerName="Longbridge"
+              updatedAtMs={
+                latestTimestamp ? latestTimestamp * 1000 : undefined
+              }
+              className="min-w-0 text-right leading-tight"
+            />
+          </div>
+        )}
         <div className="flex gap-1.5">
           <Input
             value={newSymbol}
@@ -116,9 +120,7 @@ export const Watchlist: React.FC = () => {
             className="h-8 flex-1 text-[12px]"
           />
           <Button size="icon" onClick={handleAddSymbol} aria-label="Add symbol">
-            <svg width="13" height="13" viewBox="0 0 13 13" fill="none" aria-hidden="true">
-              <path d="M6.5 2.25v8.5M2.25 6.5h8.5" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
-            </svg>
+            <CirclePlus className="h-4 w-4" strokeWidth={1.8} />
           </Button>
         </div>
       </div>
@@ -234,9 +236,7 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({
         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-foreground/38 opacity-0 transition-smooth hover:bg-foreground/8 hover:text-[var(--negative)] group-hover:opacity-100"
         aria-label={`Remove ${symbol}`}
       >
-        <svg width="10" height="10" viewBox="0 0 11 11" fill="none" aria-hidden="true">
-          <path d="M2.4 2.4l6.2 6.2M8.6 2.4 2.4 8.6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-        </svg>
+        <X className="h-3 w-3" strokeWidth={1.8} />
       </button>
     </div>
   );

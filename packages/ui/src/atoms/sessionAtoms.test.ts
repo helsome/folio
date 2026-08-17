@@ -113,6 +113,17 @@ describe('session atoms', () => {
     expect(store.get(sessionsAtom)[0]).toMatchObject({ title: 'Session A', messageCount: 0 });
   });
 
+  it('hides internal research sessions while preserving user sessions', async () => {
+    const store = createStore();
+    savedSessions = [makeSession('Research'), makeSession('__folio_internal_research__'), makeSession('Session A')];
+
+    await store.set(hydrateSessionsAtom, makeClient());
+
+    expect(store.get(sessionsAtom)).toHaveLength(1);
+    expect(store.get(sessionsAtom)[0].title).toBe('Session A');
+    expect(store.get(activeSessionIdAtom)).toBe('s3');
+  });
+
   it('creates a session through the kernel and activates it', async () => {
     const store = createStore();
     const client = makeClient();

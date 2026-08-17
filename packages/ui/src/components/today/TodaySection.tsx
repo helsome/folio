@@ -4,7 +4,7 @@ import React from 'react'
  * Presentational shell for a "Today" dashboard section (spec §31). Each
  * section renders its own loading/error/empty content via `<SectionState>`;
  * the shell only owns the title, the optional right-aligned action, and the
- * consistent tile chrome shared with the rest of the app.
+ * quiet section chrome shared with the rest of the app.
  */
 
 interface TodaySectionProps {
@@ -14,7 +14,7 @@ interface TodaySectionProps {
 }
 
 export const TodaySection: React.FC<TodaySectionProps> = ({ title, action, children }) => (
-  <section className="mac-stock-tile rounded-[14px] p-4">
+  <section className="border-t border-border px-1 py-4 first:border-t-0">
     <header className="mb-3 flex items-center justify-between gap-3">
       <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/48">{title}</h3>
       {action}

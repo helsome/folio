@@ -16,6 +16,7 @@ import { ThesisPanel } from '../thesis/ThesisPanel';
 import { CompareWorkspace } from '../compare/CompareWorkspace';
 import { TodayView } from '../today/TodayView';
 import { DiscoverView } from '../discover/DiscoverView';
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 const WORKSPACE_TABS: { value: WorkspaceView; label: string }[] = [
   { value: 'overview', label: 'Overview' },
   { value: 'chart', label: 'Chart' },
@@ -91,20 +92,12 @@ const SecurityWorkspace: React.FC = () => {
   return (
     <div className="flex h-full flex-col">
       <SecurityHeader />
-      <div className="flex items-center gap-1 border-b mac-section-divider px-2 py-1.5">
-        {WORKSPACE_TABS.map((tab) => (
-          <button
-            key={tab.value}
-            onClick={() => setActiveView(tab.value)}
-            className={`rounded-[8px] px-3 py-1.5 text-[12px] font-semibold transition-smooth ${
-              activeView === tab.value
-                ? 'bg-[var(--mac-blue-soft)] text-[var(--mac-blue)]'
-                : 'text-foreground/60 hover:bg-[var(--mac-sidebar-hover)] hover:text-foreground'
-            }`}
-          >
-            {tab.label}
-          </button>
-        ))}
+      <div className="border-b mac-section-divider px-3">
+        <Tabs value={activeView} onValueChange={(value) => setActiveView(value as WorkspaceView)}>
+          <TabsList className="border-0">
+            {WORKSPACE_TABS.map((tab) => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
+          </TabsList>
+        </Tabs>
       </div>
       <div className="flex-1 overflow-y-auto">
         <ActiveView view={activeView} />

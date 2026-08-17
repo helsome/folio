@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Message } from '@finagent/core';
+import { MarkdownContent } from './MarkdownContent';
 
 interface TurnCardProps {
   message: Message;
@@ -15,12 +16,12 @@ export const TurnCard: React.FC<TurnCardProps> = ({ message }) => {
       className={`flex ${isUser ? 'justify-end' : 'justify-start'}`}
     >
       <div
-        className={`max-w-[76%] rounded-[20px] px-4 py-3 ${
+        className={`max-w-[88%] rounded-[10px] px-3.5 py-3 ${
           isUser
-            ? 'mac-message-user rounded-br-[6px]'
+            ? 'mac-message-user rounded-br-[4px]'
             : isTool
             ? 'mac-message-assistant rounded-bl-[6px] text-foreground'
-            : 'mac-message-assistant rounded-bl-[6px] text-foreground'
+            : 'mac-message-assistant rounded-bl-[4px] text-foreground'
         }`}
       >
         {isTool && message.toolName && (
@@ -28,9 +29,11 @@ export const TurnCard: React.FC<TurnCardProps> = ({ message }) => {
             Tool: {message.toolName}
           </div>
         )}
-        <div className="max-w-none whitespace-pre-wrap text-[14px] leading-relaxed">
-          {message.content}
-        </div>
+        {isUser ? (
+          <div className="max-w-none whitespace-pre-wrap text-[14px] leading-relaxed">{message.content}</div>
+        ) : (
+          <MarkdownContent content={message.content} />
+        )}
         {!isUser && toolCalls.length > 0 && (
           <div className="mt-3 border-t mac-section-divider pt-3">
             <div className="mb-2 text-[11px] font-semibold uppercase text-foreground/42">

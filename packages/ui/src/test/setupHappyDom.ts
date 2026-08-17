@@ -26,6 +26,10 @@ const GLOBAL_KEYS = [
   'Node',
   'Element',
   'HTMLElement',
+  'HTMLInputElement',
+  'HTMLTextAreaElement',
+  'HTMLButtonElement',
+  'HTMLFormElement',
   'SVGElement',
   'Document',
   'DocumentFragment',
@@ -42,6 +46,7 @@ const GLOBAL_KEYS = [
   'WheelEvent',
   'CustomEvent',
   'MutationObserver',
+  'NodeFilter',
 ] as const;
 
 const BOUND_METHODS = ['getComputedStyle', 'requestAnimationFrame', 'cancelAnimationFrame'] as const;

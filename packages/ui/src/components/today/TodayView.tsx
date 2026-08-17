@@ -1,4 +1,6 @@
 import React, { useEffect, useState } from 'react'
+import { ArrowUpRight, BriefcaseBusiness, GitCompareArrows, Search, Sparkles } from 'lucide-react'
+import type { LucideIcon } from 'lucide-react'
 import { useAtomValue, useSetAtom } from 'jotai'
 import type { AlertTriggerEvent, ApiResult, CalendarEvent, InvestmentThesis, ResearchReport } from '@finagent/core'
 import {
@@ -85,6 +87,7 @@ export const TodayView: React.FC = () => {
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(true)
   const [automationOpen, setAutomationOpen] = useState(false)
+  const [searchQuery, setSearchQuery] = useState('')
 
   useEffect(() => {
     let cancelled = false
@@ -129,6 +132,16 @@ export const TodayView: React.FC = () => {
 
   const handleCompare = (): void => {
     setNavSection('compare')
+  }
+
+  const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
+    if (event.key !== 'Enter') return
+    const value = searchQuery.trim().toUpperCase()
+    if (/^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/.test(value)) {
+      setActiveSymbol(value)
+      setNavSection('watchlist')
+      setSearchQuery('')
+    }
   }
 
   // ── Section content ────────────────────────────────────────────────────
@@ -282,13 +295,18 @@ export const TodayView: React.FC = () => {
   })()
 
   return (
-    <div className="h-full overflow-y-auto p-4" data-testid="today-view">
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <h1 className="mr-2 text-[20px] font-semibold tracking-tight text-foreground">Today</h1>
-        <Button variant="outline" size="sm" onClick={handleResearchStock}>Research a stock</Button>
-        <Button variant="outline" size="sm" onClick={handleAnalyzePortfolio}>Analyze Portfolio</Button>
-        <Button variant="outline" size="sm" onClick={handleCompare}>Compare</Button>
-      </div>
+    <div className="h-full overflow-y-auto px-5 py-6" data-testid="today-view">
+      <section data-testid="today-hero" className="mb-5 rounded-[12px] border border-border bg-surface p-5">
+        <div className="flex flex-wrap items-start justify-between gap-5">
+          <div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.14em] text-accent"><Sparkles className="h-3.5 w-3.5" />Quiet workspace</div><h1 className="mt-2 text-[24px] font-semibold tracking-[-.02em] text-foreground">Good morning</h1><p className="mt-1 text-[13px] text-foreground/52">What do you want to understand about your portfolio today?</p></div>
+          <div className="flex min-w-[280px] flex-1 justify-end"><label className="relative block w-full max-w-md"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/34" /><input data-testid="today-search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={handleSearchKeyDown} placeholder="Search a security, e.g. NVDA.US" aria-label="Search a security" className="h-10 w-full rounded-[9px] border border-input bg-background pl-9 pr-3 text-[13px] text-foreground placeholder:text-foreground/38 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring" /></label></div>
+        </div>
+        <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+          <QuickAction icon={Search} label="Deep Research" hint="Evidence-backed report" onClick={handleResearchStock} tone="blue" />
+          <QuickAction icon={BriefcaseBusiness} label="Review Portfolio" hint="See risk and attention" onClick={handleAnalyzePortfolio} tone="green" />
+          <QuickAction icon={GitCompareArrows} label="Compare Stocks" hint="Line up a decision" onClick={handleCompare} tone="violet" />
+        </div>
+      </section>
 
       <div className="mb-3">
         <DailyBriefSection onManage={() => setAutomationOpen(true)} />
@@ -312,3 +330,17 @@ export const TodayView: React.FC = () => {
     </div>
   )
 }
+
+const QuickAction: React.FC<{
+  icon: LucideIcon
+  label: string
+  hint: string
+  tone: 'blue' | 'green' | 'violet'
+  onClick: () => void
+}> = ({ icon: Icon, label, hint, tone, onClick }) => (
+  <button type="button" onClick={onClick} className={`group flex items-center gap-3 rounded-[9px] border border-border px-3 py-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-hover ${tone === 'blue' ? 'bg-accent/5' : tone === 'green' ? 'bg-positive/5' : 'bg-info/5'}`}>
+    <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] ${tone === 'blue' ? 'bg-accent/10 text-accent' : tone === 'green' ? 'bg-positive/10 text-positive' : 'bg-info/10 text-info'}`}><Icon className="h-4 w-4" strokeWidth={1.8} /></span>
+    <span className="min-w-0 flex-1"><span className="block text-[12px] font-semibold text-foreground">{label}</span><span className="mt-0.5 block truncate text-[11px] text-foreground/44">{hint}</span></span>
+    <ArrowUpRight className="h-3.5 w-3.5 text-foreground/28 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+  </button>
+)

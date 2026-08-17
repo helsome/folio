@@ -207,7 +207,7 @@ async function main() {
         .filter({ hasText: 'NVDA.US' })
         .waitFor({ timeout: 15_000 });
       // Chart tab renders the K-line canvas for the active symbol.
-      await page.getByRole('button', { name: /^Chart$/i }).click();
+      await page.getByRole('tab', { name: /^Chart$/i }).click();
       await page.locator('[data-testid="chart-canvas"]').waitFor({ timeout: 15_000 });
       await page.locator('[data-testid="chart-canvas"] canvas').first().waitFor({ timeout: 20_000 });
       pass('B: NVDA.US switches header, agent context, and chart');

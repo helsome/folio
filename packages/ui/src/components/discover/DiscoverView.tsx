@@ -191,10 +191,9 @@ export const DiscoverView: React.FC = () => {
               No candidates matched this task in the current universe.
             </div>
           ) : (
-            <div className="space-y-2">
-              {results.map((candidate) => (
-                <CandidateCard key={candidate.symbol} candidate={candidate} onAction={handleAction} />
-              ))}
+            <div className="overflow-hidden rounded-[10px] border border-border bg-surface">
+              <div className="grid grid-cols-[minmax(0,1.8fr)_minmax(110px,1fr)_auto] gap-3 border-b border-border bg-surface-muted px-3 py-2 text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/38"><span>Candidate</span><span className="text-right">Metrics</span><span className="sr-only">Actions</span></div>
+              {results.map((candidate) => <CandidateCard key={candidate.symbol} candidate={candidate} onAction={handleAction} />)}
             </div>
           )}
         </section>

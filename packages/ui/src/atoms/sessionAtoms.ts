@@ -27,14 +27,20 @@ export const activeMessagesAtom = atom((get) => {
 
 export const loadedSessionIdsAtom = atom<Set<string>>(new Set<string>());
 
+/** Internal synthesis sessions are implementation details, not user chats. */
+function isInternalSession(title: string): boolean {
+  return title === 'Research' || title.startsWith('__folio_internal_');
+}
+
 export const hydrateSessionsAtom = atom(
   null,
   async (_get, set, client: FinagentClient) => {
     const result = await client.kernel.hydrate();
     if (!result.ok) return;
-    set(sessionsAtom, result.data.sessions);
-    if (!_get(activeSessionIdAtom) && result.data.sessions.length > 0) {
-      set(activeSessionIdAtom, result.data.sessions[0].id);
+    const visibleSessions = result.data.sessions.filter((session) => !isInternalSession(session.title));
+    set(sessionsAtom, visibleSessions);
+    if (!_get(activeSessionIdAtom) && visibleSessions.length > 0) {
+      set(activeSessionIdAtom, visibleSessions[0].id);
     }
   }
 );

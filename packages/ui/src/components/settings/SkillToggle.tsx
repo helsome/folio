@@ -1,4 +1,5 @@
 import React from 'react';
+import { Switch } from '../ui/switch';
 
 export interface SkillToggleProps {
   checked: boolean;
@@ -24,30 +25,17 @@ export const SkillToggle: React.FC<SkillToggleProps> = ({
   const blocked = disabled || loading;
 
   return (
-    <button
-      type="button"
-      role="switch"
-      aria-checked={checked}
+    <Switch
+      checked={checked}
+      onCheckedChange={() => onChange()}
       aria-label={label}
       aria-busy={loading}
       disabled={blocked}
-      onClick={onChange}
-      className={`relative h-5 w-9 shrink-0 rounded-full transition-smooth focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)] ${
+      className={`h-6 w-10 ${
         checked
-          ? 'bg-[var(--mac-blue)] hover:bg-[var(--mac-blue-hover)]'
-          : 'bg-foreground/18 hover:bg-foreground/28'
-      } ${
-        blocked
-          ? 'cursor-not-allowed opacity-60'
-          : 'cursor-pointer active:scale-95'
+          ? 'data-[state=checked]:bg-primary'
+          : 'data-[state=unchecked]:bg-foreground/18 data-[state=unchecked]:hover:bg-foreground/28'
       } ${loading ? 'animate-pulse' : ''}`}
-    >
-      <span
-        aria-hidden="true"
-        className={`absolute top-0.5 h-4 w-4 rounded-full bg-white shadow-sm transition-transform ${
-          checked ? 'translate-x-[18px]' : 'translate-x-0.5'
-        }`}
-      />
-    </button>
+    />
   );
 };

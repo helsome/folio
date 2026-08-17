@@ -4,6 +4,9 @@ import { KernelBridge } from '../kernel/KernelBridge';
 import { WorkbenchShell } from './WorkbenchShell';
 import { OnboardingOverlay } from '../onboarding/OnboardingOverlay';
 import { CommandPalette } from '../command/CommandPalette';
+import { ThemeProvider } from './ThemeProvider';
+import { TooltipProvider } from '../ui/tooltip';
+import { Toaster } from 'sonner';
 import {
   FinagentClientProvider,
   fallbackClient,
@@ -19,14 +22,19 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({ client = fallbackClient }) => {
   return (
     <FinagentClientProvider client={client}>
-      <KernelBridge client={client} />
-      <div className="mac-app-window flex h-screen flex-col overflow-hidden bg-background text-foreground">
-        <TitleBar />
-        <LongBridgeBanner />
-        <WorkbenchShell />
-      </div>
-      <OnboardingOverlay />
-      <CommandPalette />
+      <ThemeProvider>
+        <TooltipProvider delayDuration={450} skipDelayDuration={100}>
+          <KernelBridge client={client} />
+          <div className="mac-app-window flex h-screen flex-col overflow-hidden bg-background text-foreground">
+            <TitleBar />
+            <LongBridgeBanner />
+            <WorkbenchShell />
+          </div>
+          <OnboardingOverlay />
+          <CommandPalette />
+          <Toaster closeButton richColors={false} />
+        </TooltipProvider>
+      </ThemeProvider>
     </FinagentClientProvider>
   );
 };
