@@ -8,6 +8,7 @@ import { ConnectionsCenter } from './ConnectionsCenter';
 import { SkillsView } from './SkillsView';
 import { DiagnosticsTab } from './DiagnosticsTab';
 import { PerformanceView } from '../performance/PerformanceView';
+import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 
 const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'general', label: 'General' },
@@ -25,23 +26,15 @@ export const SettingsView: React.FC = () => {
   return (
     <main className="mac-main-surface flex h-full flex-1 flex-col">
       <header className="border-b mac-section-divider px-6 pt-5">
-        <h1 className="text-[20px] font-semibold tracking-tight text-foreground">Settings</h1>
-        <nav className="mt-3 flex gap-1">
-          {TABS.map((t) => (
-            <button
-              key={t.id}
-              type="button"
-              onClick={() => setTab(t.id)}
-              className={`rounded-t-[10px] border-b-2 px-4 py-2 text-[13px] font-medium transition-smooth ${
-                tab === t.id
-                  ? 'border-accent text-foreground'
-                  : 'border-transparent text-foreground/52 hover:text-foreground'
-              }`}
-            >
-              {t.label}
-            </button>
-          ))}
-        </nav>
+        <div className="flex items-start justify-between gap-4">
+          <div><p className="text-[10px] font-semibold uppercase tracking-[.14em] text-foreground/38">Preferences</p><h1 className="mt-1 text-[20px] font-semibold tracking-tight text-foreground">Settings</h1></div>
+          <p className="max-w-xs text-right text-[11px] leading-relaxed text-foreground/42">Configure Folio without leaving your finance workspace.</p>
+        </div>
+        <Tabs value={tab} onValueChange={(value) => setTab(value as SettingsTab)} className="mt-3">
+          <TabsList>
+            {TABS.map((t) => <TabsTrigger key={t.id} value={t.id}>{t.label}</TabsTrigger>)}
+          </TabsList>
+        </Tabs>
       </header>
       <div className="flex-1 overflow-y-auto p-6">
         {tab === 'general' && <GeneralTab />}

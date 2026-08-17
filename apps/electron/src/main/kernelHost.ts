@@ -652,7 +652,9 @@ export class AgentKernelHost {
    * Creates a throwaway session; the run settles via the event stream.
    */
   private async runAgentPrompt(content: string, signal?: AbortSignal): Promise<string> {
-    const session = await this.kernel.sessions.createSession('Research');
+    // Keep synthesis runs out of the user's copilot history. The run still
+    // uses the normal kernel/runtime contract, but its session is internal.
+    const session = await this.kernel.sessions.createSession('__folio_internal_research__');
     try {
       const answer = new Promise<string>((resolve, reject) => {
         const timer = setTimeout(

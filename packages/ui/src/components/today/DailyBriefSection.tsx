@@ -88,7 +88,7 @@ interface BriefRowProps {
 }
 
 const BriefRow: React.FC<BriefRowProps> = ({ item, expanded, onToggle }) => (
-  <li className="rounded-[10px] border border-[oklch(var(--foreground)/0.06)] px-3 py-2">
+  <li className="rounded-[9px] border border-border bg-surface/60 px-3 py-2">
     <div className="flex items-start justify-between gap-3">
       <div className="min-w-0">
         <div className="flex items-center gap-2">

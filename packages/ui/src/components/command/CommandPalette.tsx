@@ -1,4 +1,6 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
+import { Command as CommandPrimitive } from 'cmdk'
+import { Search } from 'lucide-react'
 import { getDefaultStore, useAtomValue, useSetAtom } from 'jotai'
 import {
   activeSymbolAtom,
@@ -52,13 +54,6 @@ export function useCommandPaletteHotkey(): void {
     }
   }, [])
 }
-
-const SearchIcon: React.FC = () => (
-  <svg width="15" height="15" viewBox="0 0 16 16" fill="none" aria-hidden="true" className="shrink-0 text-foreground/38">
-    <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.5" />
-    <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
-  </svg>
-)
 
 export const CommandPalette: React.FC = () => {
   const open = useAtomValue(commandPaletteOpenAtom)
@@ -144,13 +139,13 @@ export const CommandPalette: React.FC = () => {
   return (
     <div className="fixed inset-0 z-(--z-index-modal) flex items-start justify-center pt-[16vh]">
       <div className="absolute inset-0 bg-black/50 backdrop-blur-sm" onClick={close} />
-      <div className="relative w-full max-w-xl overflow-hidden rounded-[14px] border border-[var(--mac-border)] bg-background shadow-middle">
-        <div className="flex items-center gap-2 border-b border-[var(--mac-border)] px-4">
-          <SearchIcon />
-          <input
+      <CommandPrimitive shouldFilter={false} loop className="relative w-full max-w-xl overflow-hidden rounded-[12px] border border-border bg-surface text-foreground shadow-[0_20px_60px_rgba(0,0,0,.18)]">
+        <div className="flex items-center gap-2 border-b border-border px-4">
+          <Search className="h-4 w-4 shrink-0 text-foreground/38" />
+          <CommandPrimitive.Input
             ref={inputRef}
             value={query}
-            onChange={(event) => setQuery(event.target.value)}
+            onValueChange={setQuery}
             onKeyDown={handleKeyDown}
             placeholder="Search symbols, sections, actions…"
             className="h-12 w-full bg-transparent text-[14px] text-foreground placeholder:text-foreground/38 focus:outline-none"
@@ -162,32 +157,27 @@ export const CommandPalette: React.FC = () => {
             Esc
           </kbd>
         </div>
-        <ul className="max-h-[50vh] overflow-y-auto py-2" role="listbox" aria-label="Command results">
+        <CommandPrimitive.List className="max-h-[50vh] overflow-y-auto py-2" role="listbox" aria-label="Command results">
           {commands.length === 0 ? (
-            <li className="px-4 py-3 text-[13px] text-foreground/42">No matches for “{query}”.</li>
+            <CommandPrimitive.Empty className="px-4 py-3 text-[13px] text-foreground/42">No matches for “{query}”.</CommandPrimitive.Empty>
           ) : (
             commands.map((command, index) => (
-              <li key={command.id}>
-                <button
-                  type="button"
-                  role="option"
-                  aria-selected={index === selected}
-                  onMouseEnter={() => setSelected(index)}
-                  onClick={() => execute(command)}
-                  className={`flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-[13px] ${
-                    index === selected ? 'bg-[var(--mac-sidebar-hover)] text-foreground' : 'text-foreground/78'
-                  }`}
-                >
-                  <span className="truncate">{command.label}</span>
-                  {command.hint && (
-                    <span className="shrink-0 text-[11px] text-foreground/38">{command.hint}</span>
-                  )}
-                </button>
-              </li>
+              <CommandPrimitive.Item
+                key={command.id}
+                value={command.id}
+                onSelect={() => execute(command)}
+                onMouseEnter={() => setSelected(index)}
+                aria-selected={index === selected}
+                role="option"
+                className={`flex w-full items-center justify-between gap-3 px-4 py-2 text-left text-[13px] outline-none ${index === selected ? 'bg-surface-hover text-foreground' : 'text-foreground/78'}`}
+              >
+                <span className="truncate">{command.label}</span>
+                {command.hint && <span className="shrink-0 text-[11px] text-foreground/38">{command.hint}</span>}
+              </CommandPrimitive.Item>
             ))
           )}
-        </ul>
-      </div>
+        </CommandPrimitive.List>
+      </CommandPrimitive>
     </div>
   )
 }

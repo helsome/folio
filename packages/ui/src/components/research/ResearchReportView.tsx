@@ -6,6 +6,7 @@ import { loadResearchReport } from '../../atoms/researchAtoms';
 import { EvidenceList } from './EvidenceList';
 import { ExportMenu } from './ExportMenu';
 import { WhatChangedSection } from './WhatChangedSection';
+import { MarkdownContent } from '../chat/MarkdownContent';
 
 const STANCE_TONE: Record<ResearchReport['stance'], string> = {
   bullish: 'text-positive',
@@ -84,7 +85,7 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
             <ExportMenu report={report} />
           </div>
         </div>
-        <p className="mt-3 text-[13px] leading-relaxed text-foreground/85">{report.summary}</p>
+        <MarkdownContent content={report.summary} className="mt-3 text-[13px] text-foreground/85" />
         <div className="mt-2 text-[11px] text-text-muted">
           {report.runStatus === 'partial'
             ? 'Partial run — unavailable data is marked explicitly.'
@@ -137,7 +138,7 @@ const SectionCard: React.FC<{ section: ResearchSection }> = ({ section }) => (
         {VERDICT_LABEL[section.verdict]}
       </span>
     </div>
-    <p className="mt-1.5 text-[12px] leading-relaxed text-foreground/75">{section.summary}</p>
+    <MarkdownContent content={section.summary} className="mt-1.5 text-[12px] text-foreground/75" />
     {section.evidence.length > 0 && (
       <div className="mt-1.5 text-[10.5px] text-text-muted">
         {section.evidence.length} evidence source{section.evidence.length === 1 ? '' : 's'}
@@ -157,7 +158,7 @@ const CaseColumn: React.FC<{ title: string; points: string[] }> = ({ title, poin
         {points.map((point, index) => (
           <li key={index} className="text-[12.5px] leading-relaxed text-foreground/80">
             <span className="mr-1.5 text-text-muted">•</span>
-            {point}
+            <MarkdownContent content={point} className="inline text-[12.5px] text-foreground/80" />
           </li>
         ))}
       </ul>

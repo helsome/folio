@@ -270,13 +270,13 @@ async function main() {
         page,
         `Workspace tab > ${tab}`,
         workspaceScope,
-        () => page.getByRole('button', { name: tab, exact: true }).first().click(),
+        () => page.getByRole('tab', { name: tab, exact: true }).first().click(),
         { expect: 'content' }
       );
     }
 
     // --- Chart periods -------------------------------------------------------
-    await page.getByRole('button', { name: 'Chart', exact: true }).first().click();
+    await page.getByRole('tab', { name: 'Chart', exact: true }).first().click();
     await page.locator('[data-testid="chart-canvas"]').waitFor({ timeout: 15_000 });
     await probe(
       page,
@@ -504,7 +504,7 @@ async function main() {
     await page.keyboard.press('Escape');
 
     // --- LLM selector --------------------------------------------------------
-    const modelButton = page.locator('button[aria-haspopup="listbox"]').first();
+    const modelButton = page.locator('button[aria-haspopup="menu"]').first();
     await modelButton.waitFor({ timeout: 15_000 });
     await probe(
       page,
@@ -525,6 +525,7 @@ async function main() {
     } else {
       console.log('SKIP  LLM selector > choose model (no options in local runtime)');
     }
+    await page.keyboard.press('Escape');
 
     // --- Agent run -----------------------------------------------------------
     await probe(

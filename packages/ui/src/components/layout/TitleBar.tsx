@@ -1,57 +1,18 @@
-import React, { useState, useEffect } from 'react';
-import { useFinagentClient } from '../../client';
+import React, { useState } from 'react';
+import { Info } from 'lucide-react';
 import { Dialog } from '../primitives/Dialog';
 import { AboutView } from '../about/AboutView';
 
 const folioLogoUrl = new URL('../../assets/folio-logo.png', import.meta.url).href;
 
 export const TitleBar: React.FC = () => {
-  const client = useFinagentClient();
-  const [isMaximized, setIsMaximized] = useState(false);
   const [aboutOpen, setAboutOpen] = useState(false);
-
-  useEffect(() => {
-    const checkMaximized = async () => {
-      if (client.window) {
-        const maximized = await client.window.isMaximized();
-        setIsMaximized(maximized);
-      }
-    };
-    checkMaximized();
-  }, [client]);
-
-  const handleMinimize = () => client.window?.minimize();
-  const handleMaximize = async () => {
-    await client.window?.maximize();
-    setIsMaximized(!isMaximized);
-  };
-  const handleClose = () => client.window?.close();
 
   return (
     <header className="mac-titlebar z-titlebar flex items-center justify-between">
-      <div className="flex h-full items-center gap-2 px-3">
-        <button
-          onClick={handleClose}
-          className="group flex h-5 w-5 items-center justify-center rounded-full transition-smooth hover:bg-black/5"
-          aria-label="Close"
-        >
-          <span className="mac-traffic-light mac-traffic-light-close" />
-        </button>
-        <button
-          onClick={handleMinimize}
-          className="group flex h-5 w-5 items-center justify-center rounded-full transition-smooth hover:bg-black/5"
-          aria-label="Minimize"
-        >
-          <span className="mac-traffic-light mac-traffic-light-minimize" />
-        </button>
-        <button
-          onClick={handleMaximize}
-          className="group flex h-5 w-5 items-center justify-center rounded-full transition-smooth hover:bg-black/5"
-          aria-label={isMaximized ? 'Restore' : 'Maximize'}
-        >
-          <span className="mac-traffic-light mac-traffic-light-maximize" />
-        </button>
-      </div>
+      {/* BrowserWindow owns the native macOS traffic lights. Reserve their area
+          instead of drawing a second set inside the renderer. */}
+      <div className="h-full w-20 shrink-0" aria-hidden="true" />
 
       <div
         data-tauri-drag-region
@@ -75,10 +36,7 @@ export const TitleBar: React.FC = () => {
           aria-label="About Folio"
           className="flex h-5 w-5 items-center justify-center rounded text-foreground/50 transition-smooth hover:bg-black/5 hover:text-foreground"
         >
-          <svg width="13" height="13" viewBox="0 0 16 16" fill="none" aria-hidden="true">
-            <circle cx="8" cy="8" r="5.5" stroke="currentColor" strokeWidth="1.4" />
-            <path d="M8 7.2v3M8 5.4v.1" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-          </svg>
+          <Info className="h-3.5 w-3.5" strokeWidth={1.7} />
         </button>
       </div>
 

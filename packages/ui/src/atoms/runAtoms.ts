@@ -23,6 +23,12 @@ export const applyAgentEventAtom = atom(
   null,
   (get, set, event: AgentEvent) => {
     const sessionId = event.sessionId;
+
+    // Research/thesis/portfolio synthesis uses the same kernel event bus as
+    // the visible copilot. Only project events for the active conversation
+    // into the chat UI; internal throwaway sessions must stay silent.
+    if (get(activeSessionIdAtom) !== sessionId) return;
+
     const messages = messagesAtomFamily(sessionId);
 
     if (event.type === 'run_started') {

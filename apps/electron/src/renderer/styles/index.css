@@ -2,316 +2,172 @@
 @source "../../../../../packages/ui/src";
 @source "../";
 
-/* CRAFT AGENT THEME - 6 Color System */
+/* Folio UI V2 — Quiet Financial Workspace.
+   Keep the palette intentionally restrained: surfaces and spacing carry the
+   hierarchy; blue is reserved for interaction and focus. */
 :root {
-  /* === 6 BASE COLORS === */
-  --background: oklch(0.98 0.003 265);
-  --background-elevated: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
-  --foreground: oklch(0.185 0.01 270);
-  --foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
-  --foreground-rgb: 38, 36, 42;
-  --accent: oklch(0.62 0.19 253);
-  --accent-rgb: 10, 132, 255;
-  --info: oklch(0.75 0.16 70);
-  --info-rgb: 180, 120, 40;
-  --success: oklch(0.55 0.17 145);
-  --success-rgb: 34, 120, 60;
-  --destructive: oklch(0.58 0.24 28);
-  --destructive-rgb: 180, 60, 50;
+  --background: oklch(0.975 0.004 260);
+  --surface: oklch(0.995 0.002 260);
+  --surface-muted: oklch(0.955 0.006 260);
+  --surface-hover: oklch(0.94 0.008 260);
+  --foreground: oklch(0.19 0.012 260);
+  --foreground-muted: oklch(0.48 0.012 260);
+  --foreground-subtle: oklch(0.62 0.01 260);
+  --primary: oklch(0.42 0.12 255);
+  --primary-foreground: oklch(0.99 0.002 260);
+  --accent: oklch(0.56 0.16 252);
+  --accent-foreground: oklch(0.99 0.002 260);
+  --positive: oklch(0.52 0.14 145);
+  --negative: oklch(0.56 0.19 28);
+  --warning: oklch(0.66 0.14 75);
+  --info: oklch(0.55 0.13 245);
+  --border: oklch(0.19 0.012 260 / 0.11);
+  --border-strong: oklch(0.19 0.012 260 / 0.18);
+  --input: oklch(0.19 0.012 260 / 0.14);
+  --ring: oklch(0.56 0.16 252 / 0.45);
+  --radius: 10px;
+  --foreground-rgb: 32, 32, 38;
+  --accent-rgb: 57, 108, 204;
+  --positive-rgb: 42, 130, 72;
+  --negative-rgb: 190, 64, 54;
+  --warning-rgb: 190, 128, 38;
 
-  /* === SHADOW OPACITY (light mode = subtle) === */
-  --shadow-border-opacity: 0.08;
-  --shadow-blur-opacity: 0.06;
+  /* Compatibility aliases for feature slices that still use the old names. */
+  --mac-window: var(--background);
+  --mac-titlebar: var(--surface);
+  --mac-sidebar: var(--surface-muted);
+  --mac-sidebar-hover: color-mix(in srgb, var(--foreground) 6%, transparent);
+  --mac-border: var(--border);
+  --mac-border-strong: var(--border-strong);
+  --mac-control: var(--surface);
+  --mac-control-hover: var(--surface-hover);
+  --mac-surface: var(--surface);
+  --mac-surface-solid: var(--surface);
+  --mac-blue: var(--accent);
+  --mac-blue-hover: color-mix(in srgb, var(--accent) 88%, black);
+  --mac-blue-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --mac-green: var(--positive);
+  --mac-red: var(--negative);
+  --mac-yellow: var(--warning);
 
-  /* === SHADOW VALUES === */
-  --shadow-minimal:
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
-    rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 1px 1px -0.5px,
-    rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 3px 3px -1.5px;
-
-  --shadow-middle:
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(0, 0, 0, 0) 0px 0px 0px 0px,
-    rgba(var(--foreground-rgb), 0.06) 0px 0px 0px 1px,
-    rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 1px 1px -0.5px,
-    rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 3px 3px -1.5px,
-    rgba(0, 0, 0, var(--shadow-blur-opacity)) 0px 6px 6px -3px;
-
-  --mac-window: oklch(0.985 0.002 260);
-  --mac-titlebar: color-mix(in srgb, white 78%, var(--background));
-  --mac-sidebar: color-mix(in srgb, white 66%, var(--background));
-  --mac-sidebar-hover: color-mix(in srgb, var(--foreground) 4%, transparent);
-  --mac-border: color-mix(in srgb, var(--foreground) 8%, transparent);
-  --mac-border-strong: color-mix(in srgb, var(--foreground) 13%, transparent);
-  --mac-control: color-mix(in srgb, var(--foreground) 3.8%, white);
-  --mac-control-hover: color-mix(in srgb, var(--foreground) 6%, white);
-  --mac-surface: rgba(255, 255, 255, 0.78);
-  --mac-surface-solid: oklch(1 0 0);
-  --mac-blue: #0a84ff;
-  --mac-blue-hover: #0071e3;
-  --mac-blue-soft: rgba(10, 132, 255, 0.12);
-  --mac-green: #30d158;
-  --mac-red: #ff453a;
-  --mac-yellow: #ffd60a;
-
-  /* === LEGACY TOKENS (mapped for compatibility) === */
-  --bg-primary: 0.98 0.003 265;
-  --bg-secondary: 0.96 0.003 265;
-  --accent-primary: 0.62 0.19 253;
-  --text-primary: 0.185 0.01 270;
-  --text-secondary: 0.45 0.01 270;
+  /* Legacy scalar tokens used by a few existing charts/import views. */
+  --bg-primary: 0.975 0.004 260;
+  --bg-secondary: 0.955 0.006 260;
+  --accent-primary: 0.56 0.16 252;
+  --text-primary: 0.19 0.012 260;
+  --text-secondary: 0.48 0.012 260;
 }
 
 .dark {
-  --background: oklch(0.145 0.015 270);
-  --background-elevated: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
-  --foreground: oklch(0.95 0.01 270);
-  --foreground-dimmed: color-mix(in srgb, var(--foreground) 80%, var(--background));
-  --foreground-rgb: 237, 236, 240;
-  --accent: oklch(0.68 0.18 253);
-  --accent-rgb: 64, 156, 255;
-  --info: oklch(0.78 0.14 70);
-  --info-rgb: 210, 155, 55;
-  --success: oklch(0.60 0.17 145);
-  --success-rgb: 50, 140, 80;
-  --destructive: oklch(0.65 0.22 28);
-  --destructive-rgb: 200, 70, 60;
+  --background: oklch(0.16 0.012 260);
+  --surface: oklch(0.195 0.014 260);
+  --surface-muted: oklch(0.135 0.012 260);
+  --surface-hover: oklch(0.24 0.018 260);
+  --foreground: oklch(0.93 0.008 260);
+  --foreground-muted: oklch(0.68 0.01 260);
+  --foreground-subtle: oklch(0.52 0.01 260);
+  --primary: oklch(0.78 0.09 250);
+  --primary-foreground: oklch(0.17 0.012 260);
+  --accent: oklch(0.72 0.14 250);
+  --accent-foreground: oklch(0.16 0.012 260);
+  --positive: oklch(0.7 0.14 145);
+  --negative: oklch(0.72 0.16 28);
+  --warning: oklch(0.78 0.13 78);
+  --info: oklch(0.72 0.12 245);
+  --border: oklch(0.93 0.008 260 / 0.13);
+  --border-strong: oklch(0.93 0.008 260 / 0.22);
+  --input: oklch(0.93 0.008 260 / 0.18);
+  --ring: oklch(0.72 0.14 250 / 0.58);
+  --foreground-rgb: 236, 236, 240;
+  --accent-rgb: 121, 162, 231;
+  --positive-rgb: 92, 182, 110;
+  --negative-rgb: 229, 116, 102;
+  --warning-rgb: 229, 178, 78;
 
-  --mac-window: oklch(0.155 0.014 260);
-  --mac-titlebar: color-mix(in srgb, var(--background) 84%, white);
-  --mac-sidebar: color-mix(in srgb, var(--background) 88%, white);
-  --mac-sidebar-hover: color-mix(in srgb, var(--foreground) 7%, transparent);
-  --mac-border: color-mix(in srgb, var(--foreground) 12%, transparent);
-  --mac-border-strong: color-mix(in srgb, var(--foreground) 20%, transparent);
-  --mac-control: color-mix(in srgb, var(--foreground) 7%, var(--background));
-  --mac-control-hover: color-mix(in srgb, var(--foreground) 11%, var(--background));
-  --mac-surface: rgba(35, 37, 44, 0.74);
-  --mac-surface-solid: oklch(0.205 0.014 260);
-  --mac-blue: #409cff;
-  --mac-blue-hover: #64adff;
-  --mac-blue-soft: rgba(64, 156, 255, 0.18);
-  --mac-green: #32d74b;
-  --mac-red: #ff6961;
-  --mac-yellow: #ffd60a;
-
-  /* === SHADOW OPACITY (stronger in dark mode) === */
-  --shadow-border-opacity: 0.15;
-  --shadow-blur-opacity: 0.12;
-
-  /* === LEGACY TOKENS === */
-  --bg-primary: 0.145 0.015 270;
-  --bg-secondary: 0.20 0.015 270;
-  --accent-primary: 0.68 0.18 253;
-  --text-primary: 0.95 0.01 270;
-  --text-secondary: 0.70 0.01 270;
+  --bg-primary: 0.16 0.012 260;
+  --bg-secondary: 0.135 0.012 260;
+  --accent-primary: 0.72 0.14 250;
+  --text-primary: 0.93 0.008 260;
+  --text-secondary: 0.68 0.01 260;
 }
 
-/* Z-Index Scale */
-:root {
-  --z-index-base: 0;
-  --z-index-local: 10;
-  --z-index-sticky: 20;
+@theme inline {
+  --color-background: var(--background);
+  --color-surface: var(--surface);
+  --color-surface-muted: var(--surface-muted);
+  --color-surface-hover: var(--surface-hover);
+  --color-foreground: var(--foreground);
+  --color-text-muted: var(--foreground-muted);
+  --color-text-subtle: var(--foreground-subtle);
+  --color-primary: var(--primary);
+  --color-primary-foreground: var(--primary-foreground);
+  --color-accent: var(--accent);
+  --color-accent-foreground: var(--accent-foreground);
+  --color-positive: var(--positive);
+  --color-negative: var(--negative);
+  --color-warning: var(--warning);
+  --color-info: var(--info);
+  --color-border: var(--border);
+  --color-border-strong: var(--border-strong);
+  --color-input: var(--input);
+  --color-ring: var(--ring);
+  --color-card: var(--surface);
+  --color-card-foreground: var(--foreground);
+  --color-popover: var(--surface);
+  --color-popover-foreground: var(--foreground);
+  --color-muted: var(--surface-muted);
+  --color-muted-foreground: var(--foreground-muted);
+  --color-destructive: var(--negative);
+  --color-destructive-foreground: var(--primary-foreground);
+  --font-sans: ui-sans-serif, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-mono: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
   --z-index-titlebar: 40;
   --z-index-panel: 50;
   --z-index-dropdown: 100;
   --z-index-tooltip: 150;
   --z-index-modal: 200;
-  --z-index-overlay: 300;
 }
 
-/* Theme integration via @theme inline */
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --color-accent: var(--accent);
-  --color-info: var(--info);
-  --color-success: var(--success);
-  --color-destructive: var(--destructive);
-}
-
+* { box-sizing: border-box; }
+html, body, #root { width: 100%; height: 100%; }
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: var(--font-sans);
   -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
-  background-color: oklch(var(--background));
-  color: oklch(var(--foreground));
-  text-rendering: geometricPrecision;
-}
-
-button,
-textarea,
-input {
-  font: inherit;
-}
-
-/* Apple-style frosted glass panels */
-.glass-panel {
-  background: var(--mac-surface);
-  backdrop-filter: saturate(180%) blur(24px);
-  -webkit-backdrop-filter: saturate(180%) blur(24px);
-  border: 1px solid var(--mac-border);
-}
-
-/* Apple-style elevated surface */
-.elevated-surface {
-  background: var(--mac-surface);
-  box-shadow: var(--shadow-middle);
-  border-radius: 12px;
-}
-
-/* Smooth transitions for interactive elements */
-.transition-smooth {
-  transition:
-    background-color 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
-    border-color 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
-    box-shadow 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
-    color 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
-    opacity 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
-    transform 0.18s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-
-/* Title bar drag region */
-[data-tauri-drag-region] {
-  -webkit-app-region: drag;
-}
-
-[data-tauri-drag-region] button {
-  -webkit-app-region: no-drag;
-}
-
-/* Scrollbar styling */
-::-webkit-scrollbar {
-  width: 4px;
-  height: 4px;
-}
-
-::-webkit-scrollbar-track {
-  background: transparent;
-}
-
-::-webkit-scrollbar-thumb {
-  background: oklch(var(--foreground) / 0.2);
-  border-radius: 4px;
-}
-
-::-webkit-scrollbar-thumb:hover {
-  background: oklch(var(--foreground) / 0.3);
-}
-
-.mac-app-window {
-  background:
-    radial-gradient(circle at 24% 0%, rgba(var(--accent-rgb), 0.055), transparent 28rem),
-    linear-gradient(180deg, color-mix(in srgb, var(--mac-window) 96%, white), var(--mac-window));
-}
-
-.mac-titlebar {
-  height: 2.25rem;
-  background: var(--mac-titlebar);
-  border-bottom: 1px solid var(--mac-border);
-  backdrop-filter: saturate(180%) blur(22px);
-  -webkit-backdrop-filter: saturate(180%) blur(22px);
-}
-
-.mac-traffic-light {
-  height: 0.78rem;
-  width: 0.78rem;
-  border-radius: 999px;
-  box-shadow:
-    inset 0 0 0 0.5px rgba(0, 0, 0, 0.16),
-    0 0.5px 1px rgba(0, 0, 0, 0.10);
-}
-
-.mac-traffic-light-close {
-  background: #ff5f57;
-}
-
-.mac-traffic-light-minimize {
-  background: #febc2e;
-}
-
-.mac-traffic-light-maximize {
-  background: #28c840;
-}
-
-.mac-sidebar {
-  background: var(--mac-sidebar);
-  border-right: 1px solid var(--mac-border);
-  backdrop-filter: saturate(180%) blur(26px);
-  -webkit-backdrop-filter: saturate(180%) blur(26px);
-}
-
-.mac-main-surface {
-  background:
-    linear-gradient(180deg, rgba(255, 255, 255, 0.52), rgba(255, 255, 255, 0) 16rem),
-    var(--background);
-}
-
-.mac-section-divider {
-  border-color: var(--mac-border);
-}
-
-.mac-primary-button {
-  background: var(--mac-blue);
-  color: white;
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
-    0 8px 18px rgba(var(--accent-rgb), 0.22);
-}
-
-.mac-primary-button:hover {
-  background: var(--mac-blue-hover);
-  box-shadow:
-    inset 0 0 0 1px rgba(255, 255, 255, 0.18),
-    0 10px 22px rgba(var(--accent-rgb), 0.25);
-}
-
-.mac-secondary-button,
-.mac-input {
-  background: var(--mac-control);
-  border: 1px solid var(--mac-border);
-  box-shadow: inset 0 0.5px 0 rgba(255, 255, 255, 0.48);
-}
-
-.mac-secondary-button:hover,
-.mac-input:hover {
-  background: var(--mac-control-hover);
-}
-
-.mac-message-assistant {
-  background: var(--mac-surface);
-  border: 1px solid var(--mac-border);
-  box-shadow: var(--shadow-minimal);
-}
-
-.mac-message-user {
-  background: var(--mac-blue);
-  color: white;
-  box-shadow: 0 8px 18px rgba(var(--accent-rgb), 0.18);
-}
-
-.mac-list-row {
-  border: 1px solid transparent;
-  transition:
-    background-color 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
-    border-color 0.18s cubic-bezier(0.25, 0.1, 0.25, 1),
-    transform 0.18s cubic-bezier(0.25, 0.1, 0.25, 1);
-}
-
-.mac-list-row:hover {
-  background: var(--mac-sidebar-hover);
-}
-
-.mac-list-row-active {
-  background: var(--mac-blue-soft);
-  border-color: rgba(var(--accent-rgb), 0.18);
+  background: var(--background);
   color: var(--foreground);
+  text-rendering: optimizeLegibility;
 }
+button, input, textarea, select { font: inherit; }
+button { cursor: pointer; }
+button:disabled { cursor: not-allowed; }
+:focus-visible { outline: 2px solid var(--ring); outline-offset: 2px; }
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: color-mix(in srgb, var(--foreground) 18%, transparent); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: color-mix(in srgb, var(--foreground) 28%, transparent); }
 
-.mac-stock-tile {
-  background: color-mix(in srgb, white 72%, var(--background));
-  border: 1px solid var(--mac-border);
-  box-shadow: var(--shadow-minimal);
-}
+.mac-app-window { background: var(--background); }
+.mac-titlebar { height: 2.25rem; flex: 0 0 2.25rem; background: var(--surface); border-bottom: 1px solid var(--border); }
+.mac-sidebar { background: var(--surface-muted); border-right: 1px solid var(--border); }
+.mac-main-surface { background: var(--background); }
+.mac-section-divider { border-color: var(--border); }
+.mac-list-row { transition: background-color .16s ease, color .16s ease; }
+.mac-list-row:hover { background: var(--mac-sidebar-hover); }
+.mac-list-row-active { background: var(--mac-blue-soft); color: var(--foreground); }
+.mac-stock-tile { background: var(--surface); border: 1px solid var(--border); }
+.glass-panel, .elevated-surface { background: var(--surface); border: 1px solid var(--border); box-shadow: none; }
+.elevated-surface { border-radius: var(--radius); }
+.mac-primary-button { background: var(--primary); color: var(--primary-foreground); }
+.mac-primary-button:hover { background: color-mix(in srgb, var(--primary) 88%, black); }
+.mac-secondary-button, .mac-input { background: var(--surface); border: 1px solid var(--border); }
+.mac-secondary-button:hover, .mac-input:hover { background: var(--surface-hover); border-color: var(--border-strong); }
+.mac-message-assistant { background: transparent; border: 0; }
+.mac-message-user { background: var(--mac-blue-soft); color: var(--foreground); border: 1px solid var(--border); }
+.transition-smooth { transition: background-color .16s ease, border-color .16s ease, box-shadow .16s ease, color .16s ease, opacity .16s ease, transform .16s ease; }
+.tnum { font-variant-numeric: tabular-nums; }
+[data-tauri-drag-region] { -webkit-app-region: drag; }
+[data-tauri-drag-region] button, [data-tauri-drag-region] input { -webkit-app-region: no-drag; }
+[data-sonner-toaster] { --width: 360px; }
+[data-sonner-toast] { border: 1px solid var(--border) !important; background: var(--surface) !important; color: var(--foreground) !important; box-shadow: 0 12px 32px rgba(0,0,0,.14) !important; }
+@media (max-width: 900px) { .mac-titlebar { height: 2rem; flex-basis: 2rem; } }
