@@ -11,6 +11,8 @@ import type {
 } from '@finagent/core'
 import { MATERIAL_PRICE_MOVE_PCT } from '../research-diff/materiality.ts'
 import type { ResearchDiffRepository } from '../research-diff/repository.ts'
+import { AUTOMATION_TYPE_KEYS } from './notifications.ts'
+import { createSyncI18n, type SupportedLocale } from '@finagent/i18n'
 
 /**
  * The automation executor (spec §21–25).
@@ -62,6 +64,8 @@ export interface AutomationRunContext {
   symbols?: string[]
   /** Notification dispatcher (kernel host: OS notification + in-app). */
   notify?: (event: NotificationEvent) => void | Promise<void>
+  /** V8: preferred UI locale for notification copy (default en-US). */
+  locale?: SupportedLocale
   idGen?: () => string
   now?: () => number
 }
@@ -100,7 +104,7 @@ export async function runAutomation(
       await ctx.researchStart(symbol, rule.strategyId)
     }
     if (rule.notify === 'all' || material) {
-      await ctx.notify?.(notificationFor(rule, symbol, material, outcome.signals, ranAt))
+      await ctx.notify?.(notificationFor(rule, symbol, material, outcome.signals, ranAt, ctx.locale))
       notified = true
     }
   }
@@ -215,16 +219,23 @@ function notificationFor(
   symbol: string,
   material: boolean,
   signals: MaterialSignals,
-  at: number
+  at: number,
+  locale?: SupportedLocale
 ): NotificationEvent {
-  const move = signals.priceMovePct
-  const moveText = move !== undefined ? ` (${move.toFixed(1)}% move)` : ''
+  const i18n = createSyncI18n({ locale: locale ?? 'en-US' })
+  const t = i18n.t.bind(i18n)
+  const typeLabel = t(AUTOMATION_TYPE_KEYS[rule.type])
+  const pct = signals.priceMovePct
+  const pctText = pct !== undefined && material ? `${pct.toFixed(1)}%` : ''
+  // V8 (spec §47): localized notification copy; the symbol stays as-is and the
+  // detailed signal description rides in the structured payload (never visible
+  // as raw English in the OS banner).
   const title = material
-    ? `${symbol} material change${moveText}`
-    : `${symbol} reviewed — no material change`
+    ? t('automation.notification.materialTitle', { symbol })
+    : t('automation.notification.noMaterialTitle', { symbol })
   const message = material
-    ? `${rule.type} flagged a material change: ${describeSignals(signals)}`
-    : `Lightweight refresh found nothing above the materiality bar (${rule.type}).`
+    ? t('automation.notification.materialBodyDetail', { symbol, type: typeLabel, pct: pctText })
+    : t('automation.notification.noMaterialBodyDetail', { symbol, type: typeLabel })
   return {
     id: `automation-${rule.id}-${symbol}-${at}`,
     source: 'automation',
@@ -235,16 +246,4 @@ function notificationFor(
     at,
     payload: { ruleId: rule.id, ruleType: rule.type, ...signals },
   }
-}
-
-/** Deterministic human-readable list of which signals fired. */
-function describeSignals(signals: MaterialSignals): string {
-  const parts: string[] = []
-  if (signals.priceMovePct !== undefined && signals.priceMovePct >= MATERIAL_PRICE_MOVE_PCT) {
-    parts.push(`price moved ${signals.priceMovePct.toFixed(1)}%`)
-  }
-  if (signals.diffMaterial) parts.push('research diff flagged material')
-  if (signals.ratingChanged) parts.push('analyst rating change')
-  if (signals.earningsAnnounced) parts.push('earnings announced')
-  return parts.length > 0 ? parts.join(', ') : 'signal threshold crossed'
 }

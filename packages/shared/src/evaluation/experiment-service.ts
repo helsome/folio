@@ -31,6 +31,7 @@ import type {
   ExperimentMetadata,
   RegressionResult,
   Run,
+  SupportedLocale,
   ToolCall,
   ToolCallRecord,
   WorkspaceContext,
@@ -58,7 +59,12 @@ export interface ExperimentKernel {
   };
   runs: {
     subscribe(listener: (event: AgentEvent) => void): () => void;
-    startRun(sessionId: string, content: string, workspaceContext?: WorkspaceContext): Promise<Run>;
+    startRun(
+      sessionId: string,
+      content: string,
+      workspaceContext?: WorkspaceContext,
+      locale?: SupportedLocale
+    ): Promise<Run>;
     /** True while a run's terminal persistence is still landing (AgentKernel). */
     isRunning?(): boolean;
   };
@@ -337,7 +343,12 @@ export class ExperimentService {
     try {
       let run: Run;
       try {
-        run = await this.kernel.runs.startRun(session.id, caseItem.input.prompt, caseItem.input.workspaceContext);
+        run = await this.kernel.runs.startRun(
+          session.id,
+          caseItem.input.prompt,
+          caseItem.input.workspaceContext,
+          caseItem.locale
+        );
       } catch (error) {
         // Infra-level failure (e.g. runtime spawn failed): record a failed run
         // so the experiment still summarizes, and keep going.
@@ -353,7 +364,7 @@ export class ExperimentService {
           error: toApiErrorLike(error),
           toolCalls: [],
         };
-        await this.traceRun(failedRun, session.id);
+        await this.traceRun(failedRun, session.id, caseItem.locale);
         await this.kernel.deleteSession(session.id).catch(() => undefined);
         return { run: failedRun, aborted: false };
       }
@@ -397,7 +408,7 @@ export class ExperimentService {
         failureModes: outcome.failureModes,
         error: outcome.error,
       };
-      const traceRef = await this.traceRun(evalRun, session.id);
+      const traceRef = await this.traceRun(evalRun, session.id, caseItem.locale);
       evalRun.traceRef = traceRef;
       // RunManager clears `activeRun` only after all terminal persistence lands
       // (run update, session idle, messages). Deleting the session or starting
@@ -459,7 +470,11 @@ export class ExperimentService {
   }
 
   /** Persist the trace link for a finished run; never throws. */
-  private async traceRun(run: EvaluationRun, folioSessionId: string): Promise<EvaluationRun['traceRef']> {
+  private async traceRun(
+    run: EvaluationRun,
+    folioSessionId: string,
+    locale?: SupportedLocale
+  ): Promise<EvaluationRun['traceRef']> {
     try {
       let threadId: string | undefined;
       const llmApi = this.kernel.getLlmApi?.();
@@ -473,6 +488,7 @@ export class ExperimentService {
         threadId,
         startedAt: run.startedAt,
         completedAt: run.completedAt,
+        locale,
       });
     } catch {
       return undefined;

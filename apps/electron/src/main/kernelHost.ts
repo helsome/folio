@@ -615,7 +615,7 @@ export class AgentKernelHost {
       (STRATEGY_IDS as readonly string[]).includes(request.strategyId)
         ? (request.strategyId as StrategyId)
         : undefined;
-    return this.researchService.start(symbol, strategyId);
+    return this.researchService.start(symbol, strategyId, await this.effectiveRunLocale());
   }
 
   async researchCancel(input: unknown): Promise<void> {
@@ -1889,7 +1889,8 @@ export class AgentKernelHost {
     return runAutomation(rule, {
       registry: this.registry,
       diffRepo: this.diffRepository,
-      researchStart: (symbol, strategyId) => this.researchService.start(symbol, strategyId),
+      locale: await this.effectiveRunLocale(),
+      researchStart: async (symbol, strategyId) => this.researchService.start(symbol, strategyId, await this.effectiveRunLocale()),
       notify: (event) => void this.dispatchNotification(event),
       portfolioSymbols: async () => {
         try {

@@ -6,6 +6,7 @@ import type {
   StrategyId,
 } from '@finagent/core';
 import { createCodeError } from '../agent/errors.ts';
+import type { SupportedLocale } from '@finagent/core';
 import { isStrategyId } from '../strategies/presets.ts';
 import { planForStrategy } from './planner.ts';
 import { ResearchReportRepository } from './repository.ts';
@@ -59,7 +60,7 @@ export class ResearchService {
     void this.recoverStaleRuns();
   }
 
-  async start(symbol: string, strategyId?: StrategyId): Promise<ResearchRunSummary> {
+  async start(symbol: string, strategyId?: StrategyId, locale?: SupportedLocale): Promise<ResearchRunSummary> {
     const key = normalizeSymbol(symbol);
     if (!key) {
       throw createCodeError('RESEARCH_SYMBOL_INVALID', 'Research requires a non-empty symbol.');
@@ -93,7 +94,7 @@ export class ResearchService {
     this.memory.set(runId, summary);
     await this.repository.saveRunSummary(summary);
 
-    void this.execute(key, runId, controller.signal, strategyId);
+    void this.execute(key, runId, controller.signal, strategyId, locale);
     return summary;
   }
 
@@ -139,7 +140,8 @@ export class ResearchService {
     key: string,
     runId: string,
     signal: AbortSignal,
-    strategyId?: StrategyId
+    strategyId?: StrategyId,
+    locale?: SupportedLocale
   ): Promise<void> {
     try {
       const result = await this.runner.run({
@@ -147,6 +149,7 @@ export class ResearchService {
         runId,
         strategyId,
         signal,
+        locale,
         onStatus: async (summary) => {
           this.memory.set(runId, summary);
           await this.repository.saveRunSummary(summary);

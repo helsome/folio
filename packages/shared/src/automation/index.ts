@@ -29,3 +29,7 @@ export {
   type BriefWatchlistMover,
   type DailyBrief,
 } from './brief.ts'
+export {
+  formatAutomationNotification,
+  type AutomationNotification,
+} from './notifications.ts'

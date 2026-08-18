@@ -47,6 +47,9 @@ describe('ResearchRunner', () => {
     expect(result.report!.runStatus).toBe('completed');
     expect(result.report!.sections).toHaveLength(RESEARCH_CAPABILITY_PLAN.length);
     expect(result.report!.capabilityRuns).toHaveLength(RESEARCH_CAPABILITY_PLAN.length);
+    // The report records which locale produced it (V8 §44–46); default en-US
+    // in this process.
+    expect(result.report!.locale).toBe('en-US');
 
     // Status transitions observed.
     expect(statuses).toEqual(['fetching', 'synthesizing', 'completed']);

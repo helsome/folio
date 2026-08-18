@@ -10,6 +10,8 @@ import type {
   ResearchSynthesizer,
   StrategyId,
 } from '@finagent/core';
+import { i18nCurrentLocale } from '@finagent/i18n';
+import type { SupportedLocale } from '@finagent/core';
 import type { CapabilityRegistry } from '@finagent/core';
 import { CapabilityExecutor, type RunOutcome } from '../capabilities/index.ts';
 import {
@@ -35,6 +37,8 @@ export interface ResearchRunRequest {
   strategyId?: StrategyId;
   signal?: AbortSignal;
   onStatus?: (summary: ResearchRunSummary) => void | Promise<void>;
+  /** V8: preferred response/UI locale for the report (overrides ambient). */
+  locale?: SupportedLocale;
 }
 
 export interface ResearchRunResult {
@@ -154,6 +158,7 @@ export class ResearchRunner {
       plan,
       outcomes,
       synthesis,
+      locale: request.locale,
     });
 
     const summary = await emit(computeRunStatus(plan, successIds), {
@@ -222,8 +227,9 @@ function assembleReport(args: {
   plan: PlannedCapability[];
   outcomes: RunOutcome[];
   synthesis: ResearchSynthesis;
+  locale?: SupportedLocale;
 }): ResearchReport {
-  const { runId, symbol, strategyId, generatedAt, plan, outcomes, synthesis } = args;
+  const { runId, symbol, strategyId, generatedAt, plan, outcomes, synthesis, locale } = args;
 
   const outcomeByCapability = new Map(outcomes.map((o) => [o.record.capabilityId, o]));
 
@@ -272,6 +278,11 @@ function assembleReport(args: {
     symbol,
     ...(strategyId ? { strategyId } : {}),
     generatedAt,
+    // Stamp the generating locale so the report records which language produced
+    // it (V8 §44–46). The run's explicit locale wins; legacy/tests fall back to
+    // the ambient UI locale; legacy stored reports omit the field entirely and
+    // their prose is never translated either way.
+    locale: locale ?? i18nCurrentLocale(),
     summary: synthesis.summary,
     stance: synthesis.stance,
     confidence: synthesis.confidence,

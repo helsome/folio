@@ -239,6 +239,26 @@ describe('runAutomation material filter', () => {
     expect(notifications[0]?.source).toBe('automation')
   })
 
+  it('localizes the automation notification copy per locale (spec §47, §80)', async () => {
+    const en = makeContext({ quotes: { 'AAPL.US': quote(106, 100) } })
+    en.context.locale = 'en-US'
+    en.context.watchlistSymbols = async () => ['AAPL.US']
+    await runAutomation(rule({}), en.context)
+    expect(en.notifications[0]?.title).toContain('AAPL.US')
+    expect(en.notifications[0]?.title).toMatch(/attention/i)
+    expect(en.notifications[0]?.message).toMatch(/material change/i)
+
+    const zh = makeContext({ quotes: { 'NVDA.US': quote(106, 100) } })
+    zh.context.locale = 'zh-CN'
+    zh.context.watchlistSymbols = async () => ['NVDA.US']
+    await runAutomation(rule({}), zh.context)
+    expect(zh.notifications[0]?.title).toContain('NVDA.US')
+    expect(zh.notifications[0]?.title).toContain('需要关注')
+    expect(zh.notifications[0]?.message).toContain('重要变化')
+    // The stable type id stays untouched in the structured payload.
+    expect(zh.notifications[0]?.payload?.ruleType).toBe('watchlist-daily-review')
+  })
+
   it('researches a symbol with a material research diff', async () => {
     const { context, researchCalls } = makeContext({
       quotes: { 'NVDA.US': quote(100, 100) },

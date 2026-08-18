@@ -1,4 +1,5 @@
 import type { CapabilityProvenance, CapabilityRunStatus } from './capability.ts';
+import type { SupportedLocale } from './locale.ts';
 
 /**
  * Research domain — Deep Research runs, evidence-backed reports, and the
@@ -59,6 +60,12 @@ export interface ResearchReport {
   generatedAt: number;
   /** V5: research strategy that produced this report (spec §100). */
   strategyId?: string;
+  /**
+   * Locale that produced this report, stamped at generation time (V8 spec
+   * §44–46). Absent on legacy reports = as-generated; the report's prose is
+   * never translated, this only records which language it was written in.
+   */
+  locale?: SupportedLocale;
   summary: string;
   stance: ResearchStance;
   /** 0..1. */

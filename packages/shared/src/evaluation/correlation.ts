@@ -9,7 +9,7 @@
 //
 // Failures are isolated: any backend/network error degrades to `none` and is
 // recorded as an observability error instead of breaking the agent (§87).
-import type { TraceReference } from '@finagent/core';
+import type { SupportedLocale, TraceReference } from '@finagent/core';
 import type { EvaluationBackend, TraceMatch } from './backend.ts';
 import { type TraceLinkRecord, EvaluationStore } from './store.ts';
 
@@ -26,6 +26,8 @@ export interface TraceCorrelationInput {
   threadId?: string;
   startedAt: number;
   completedAt?: number;
+  /** Case/experiment runtime locale, stamped into trace metadata (spec §74). */
+  locale?: SupportedLocale;
 }
 
 export class TraceCorrelationService {
@@ -46,6 +48,7 @@ export class TraceCorrelationService {
       sessionId: input.folioSessionId,
       threadId: input.threadId,
       runId: input.folioRunId,
+      locale: input.locale,
     };
     try {
       if (this.backend.kind === 'local') {
@@ -69,6 +72,7 @@ export class TraceCorrelationService {
             sessionId: input.folioSessionId,
             threadId: input.threadId,
             runId: input.folioRunId,
+            locale: input.locale,
           }
         : fallback;
       await this.persist(input.folioRunId, ref);

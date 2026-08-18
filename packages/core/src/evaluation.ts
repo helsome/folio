@@ -12,7 +12,7 @@
 // accounting for Layer 2 (financial research) and Layer 3 (investment outcome)
 // linkage. It does not replace the existing outcome/calibration domain.
 
-import type { ApiError, ToolCallRecord, WorkspaceContext } from './index.ts';
+import type { ApiError, ToolCallRecord, SupportedLocale, WorkspaceContext } from './index.ts';
 
 // ── Benchmark cases ─────────────────────────────────────────────────────────
 
@@ -92,6 +92,13 @@ export interface EvaluationCase {
   expected: EvaluationExpectations;
   tags: string[];
   source: EvaluationCaseSource;
+  /**
+   * Runtime locale for this case (spec §37–38). The Eval Runner drives the
+   * agent's response language from the case/experiment, NOT the user's UI
+   * locale. Defaults to 'en-US' for older cases so benchmark reproducibility
+   * is preserved. Does not change stored user content or historical reports.
+   */
+  locale?: SupportedLocale;
 }
 
 export interface EvaluationDataset {
@@ -365,6 +372,8 @@ export interface TraceReference {
   threadId?: string;
   sessionId?: string;
   runId?: string;
+  /** Case/experiment runtime locale stamped into trace metadata (spec §74). */
+  locale?: SupportedLocale;
 }
 
 export interface EvaluationResultRecord {
