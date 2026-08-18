@@ -50,6 +50,7 @@ export class TraceCorrelationService {
     try {
       if (this.backend.kind === 'local') {
         // Local mode: nothing to query; the local backend records its own ref.
+        await this.persist(input.folioRunId, fallback);
         return fallback;
       }
       const matches = await this.backend.findTraces({
