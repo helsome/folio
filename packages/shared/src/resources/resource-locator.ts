@@ -66,6 +66,29 @@ export function getPiExtensionEntry(): string {
     : join(getRuntimeRoot(), '.pi', 'extensions', 'finagent', 'index.ts');
 }
 
+/**
+ * Entry file for the bundled LangSmith Pi extension (V7 §6-10).
+ *
+ * - Dev: the TypeScript wrapper at `.pi/extensions/langsmith/index.ts` (kept
+ *   in-repo; it re-exports the `@langchain/langsmith-pi-extension` factory).
+ * - Packaged: the self-contained bundle shipped to `extensions/langsmith/index.js`
+ *   (MIT — vendoring is permitted; built by `bun run build:extension`).
+ */
+export function getLangSmithExtensionEntry(): string {
+  return isPackaged()
+    ? join(getRuntimeRoot(), 'extensions', 'langsmith', 'index.js')
+    : join(getRuntimeRoot(), '.pi', 'extensions', 'langsmith', 'index.ts');
+}
+
+/**
+ * All bundled Pi extensions, in load order. `extra` paths are appended after
+ * the Finagent extension (V7 §6-7): the runtime loads them all via repeated
+ * `--extension` flags.
+ */
+export function listBundledPiExtensions(extra: string[] = []): string[] {
+  return [getPiExtensionEntry(), ...extra];
+}
+
 /** Working directory for the Pi runtime spawn (extension paths resolve from here). */
 export function getPiCwd(): string {
   return getRuntimeRoot();

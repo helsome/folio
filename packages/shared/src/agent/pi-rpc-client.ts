@@ -22,6 +22,13 @@ export interface PiRuntimeLog {
 export interface PiRpcClientOptions {
   command?: string;
   args?: string[];
+  /**
+   * Additional Pi extensions appended as repeated `--extension` flags (V7).
+   * Each entry is a path to an extension entry file, resolved against `cwd`.
+   * The Finagent extension is included by default via the args default;
+   * pass this list to add LangSmith or other extensions (spec §6-7).
+   */
+  extensions?: string[];
   cwd?: string;
   sessionDir?: string;
   /** Static env or a provider evaluated at each spawn (credential changes). */
@@ -93,7 +100,7 @@ interface PendingControl {
 
 export class PiRpcClient {
   private readonly command: string;
-  private readonly args: string[];
+  private args: string[];
   private readonly env?: NodeJS.ProcessEnv | (() => NodeJS.ProcessEnv | Promise<NodeJS.ProcessEnv>);
   private readonly cwd?: string;
   private readonly sessionDir?: string;
@@ -115,7 +122,7 @@ export class PiRpcClient {
 
   constructor(options: PiRpcClientOptions = {}) {
     this.command = options.command ?? readDefaultPiCommand();
-    const defaultArgs = readDefaultPiArgs();
+    const defaultArgs = readDefaultPiArgs(options.extensions ?? readDefaultPiExtensions());
     this.args = options.args ?? (
       options.sessionDir
         ? [...defaultArgs, '--session-dir', options.sessionDir]
@@ -191,6 +198,16 @@ export class PiRpcClient {
   async restart(): Promise<void> {
     await this.dispose();
     this.exited = false;
+  }
+
+  /**
+   * Change the extension list used at the next spawn (V7 §6-7). The running
+   * process keeps its current extensions; call {@link restart} afterwards to
+   * apply immediately.
+   */
+  updateExtensions(extensions: string[]): void {
+    const base = readDefaultPiArgs(extensions);
+    this.args = this.sessionDir ? [...base, '--session-dir', this.sessionDir] : base;
   }
 
 
@@ -691,7 +708,24 @@ function readDefaultPiCommand() {
   return process.env.FINAGENT_PI_COMMAND ?? 'bunx';
 }
 
-function readDefaultPiArgs() {
+/**
+ * Extra extension entry paths (V7 §6-7): FINAGENT_PI_EXTENSIONS is a
+ * comma-separated list; each entry becomes its own `--extension` flag.
+ */
+function readDefaultPiExtensions(): string[] {
+  // FINAGENT_PI_EXTENSIONS is authoritative when set (multi-extension, V7).
+  const raw = process.env.FINAGENT_PI_EXTENSIONS;
+  const list = parseArgs(raw)
+    ?.flatMap((value) => value.split(','))
+    .map((value) => value.trim())
+    .filter(Boolean) ?? [];
+  if (list.length > 0) return list;
+  // Back-compat: the single-extension env var applies when no list is set.
+  const legacy = process.env.FINAGENT_PI_EXTENSION;
+  return legacy ? [legacy] : ['.pi/extensions/finagent/index.ts'];
+}
+
+function readDefaultPiArgs(extensions: string[] = readDefaultPiExtensions()) {
   const explicitArgs = parseArgs(process.env.FINAGENT_PI_ARGS);
   if (explicitArgs) return explicitArgs;
 
@@ -708,7 +742,9 @@ function readDefaultPiArgs() {
     args.push('--model', model);
   }
 
-  args.push('--extension', process.env.FINAGENT_PI_EXTENSION ?? '.pi/extensions/finagent/index.ts');
+  for (const extension of extensions) {
+    args.push('--extension', extension);
+  }
   return args;
 }
 
@@ -822,4 +858,4 @@ function isNodeError(error: unknown): error is Error & { code: string } {
   return error instanceof Error && typeof (error as { code?: unknown }).code === 'string';
 }
 
-export { readDefaultPiArgs, readDefaultPiCommand };
+export { readDefaultPiArgs, readDefaultPiCommand, readDefaultPiExtensions };

@@ -97,6 +97,15 @@ export class PiRuntimeAdapter implements AgentRuntime {
     return { ok: true, data: this.registry.getTools() };
   }
 
+  /**
+   * Set the Pi extension list for future spawns (V7 multi-extension). The
+   * main process applies this before restarting the runtime when tracing
+   * configuration changes.
+   */
+  setExtensions(extensions: string[]): void {
+    this.rpcClient.updateExtensions(extensions);
+  }
+
   /** LLM control surface for the main process / settings UI. */
   getLlmApi(): LlmRuntimeApi {
     return {
