@@ -1,0 +1,81 @@
+name: Eval Nightly (full live)
+
+# Full benchmark against live providers with an LLM judge. Deliberately NOT a
+# PR/push gate: it costs API credits and can be flaky around real market data
+# (spec §73, §79). Runs on a schedule (daily 03:17 UTC) and on demand via
+# workflow_dispatch for release/manual experiments.
+on:
+  schedule:
+    - cron: '17 3 * * *'
+  workflow_dispatch:
+
+# Never cancel a nightly run; superseded manual runs may be cancelled.
+concurrency:
+  group: eval-nightly
+  cancel-in-progress: false
+
+permissions:
+  contents: read
+
+jobs:
+  eval-full:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Live eval with the Anthropic judge. Secrets are passed through env
+      # only — never echoed, never written to logs. FINAGENT_JUDGE_API_KEY is
+      # set from the same secret so either credential convention the CLI
+      # checks is satisfied. FINAGENT_ENV_FILE_CONTENT is optional; an absent
+      # secret resolves to an empty string.
+      - name: Run full live eval
+        id: eval-full
+        # continue-on-error: a metric regression is a signal to review, not a
+        # reason to page — the run is still reported via the artifact.
+        continue-on-error: true
+        run: |
+          bun run eval:full -- --mode live --judge-provider anthropic \
+            --out artifacts/eval-full.json 2>&1 | tee artifacts/eval-full.log
+        env:
+          LANGSMITH_PI_API_KEY: ${{ secrets.LANGSMITH_PI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FINAGENT_JUDGE_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          FINAGENT_ENV_FILE_CONTENT: ${{ secrets.FINAGENT_ENV_FILE_CONTENT }}
+
+      # Report artifact: printed summary table (grep from the CLI output) plus
+      # the JSON artifact. No issue automation — keep this a report only.
+      - name: Summarize eval results
+        if: always()
+        run: |
+          {
+            echo '## Nightly full eval'
+            echo ''
+            echo "Run status: **${{ steps.eval-full.outcome }}**"
+            echo '(failure means the CLI exited non-zero, e.g. a gate regression or run error)'
+            echo ''
+            echo '### Summary table'
+            echo '```'
+            grep -Ei 'metric|score|pass|fail|total|sample|threshold' \
+              artifacts/eval-full.log | tail -n 60 || true
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload eval artifact
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-full-live
+          path: |
+            artifacts/eval-full.json
+            artifacts/eval-full.log
+          if-no-files-found: warn

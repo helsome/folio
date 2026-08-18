@@ -1,0 +1,48 @@
+name: Eval Smoke (PR gate)
+
+# Deterministic-only regression gate. Runs the fixture subset of the
+# evaluation benchmark (high-value regression/golden cases) with the
+# deterministic evaluator path — no LLM calls, no market data, no network
+# (spec §74). Expensive live/cloud eval is intentionally NOT here (spec §73,
+# §79); see eval-nightly.yml.
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+# Cancel superseded runs: a newer commit on the same PR/branch wins.
+concurrency:
+  group: eval-smoke-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  eval-smoke:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Bun
+        uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: latest
+
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+
+      # Fixture mode with deterministic evaluators only: the CLI exits 0 on
+      # pass and 1 on gate failure (metric regression past threshold) or run
+      # error, so a non-zero exit here fails the job/PR.
+      - name: Run fixture eval smoke gate
+        run: bun run eval:smoke -- --mode fixture --out artifacts/eval-smoke.json
+
+      - name: Upload eval smoke artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: eval-smoke
+          path: artifacts/eval-smoke.json
+          if-no-files-found: error
