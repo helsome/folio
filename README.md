@@ -5,215 +5,215 @@
 </p>
 
 <p align="center">
-  <a href="README.md">English</a> · <a href="README.zh-CN.md">简体中文</a>
+  <a href="README.en.md">English</a> · <a href="README.md">简体中文</a>
 </p>
 
 <p align="center">
-  <strong>Local-first AI-native investment research workbench</strong><br />
-  Research the market, understand your exposure, and keep an evidence-backed view of what changed.
+  <strong>本地优先的 AI 原生投资研究工作台</strong><br />
+  研究市场、理解你的敞口，并持续保有基于证据的判断——清楚看到什么发生了变化。
 </p>
 
 <p align="center">
-  <a href="https://github.com/helsome/folio/releases">Releases</a> ·
-  <a href="docs/architecture.md">Architecture</a> ·
-  <a href="docs/PRD.md">Product requirements</a>
+  <a href="https://github.com/helsome/folio/releases">发布版本</a> ·
+  <a href="docs/architecture.zh-CN.md">系统架构</a> ·
+  <a href="docs/PRD.md">产品需求</a>
 </p>
 
 > 一句话：行情终端告诉你 **What happened**；Folio 的 Agent 帮你回答 **Why does this matter to you**，记录 **What did you believe before**，并持续追踪 **What changed**。
 
-## Our Product
+## 我们的产品
 
-Folio is a desktop research environment for public-market investors. It combines a quiet finance workspace with an agent copilot that can fetch structured market data, explain the evidence, and carry research forward into theses, alerts, and portfolio decisions.
+Folio 是为公开市场投资者打造的桌面研究环境。它将安静整洁的金融工作区与 Agent 副驾驶（copilot）相结合——Agent 可以获取结构化的行情数据、解释证据，并将研究持续推进到投资论点、提醒与投资组合决策中。
 
-Folio is local-first: sessions, credentials, and research state stay on the device by default. Market data and model providers are explicit integrations, not hidden dependencies.
+Folio 本地优先：会话、凭证与研究状态默认保存在设备本地。行情数据与模型提供商是明确的集成项，而非隐藏的依赖。
 
-> Folio is a research and decision-support tool. It is read-only by design and does not expose order or trading capabilities.
+> Folio 是研究与决策支持工具，设计上只读，不提供下单或交易能力。
 
-## Screenshots
+## 截图
 
 <p align="center">
-  <img src="docs/screenshots/today.png" alt="Folio Today workspace" width="900" />
+  <img src="docs/screenshots/today.png" alt="Folio Today 工作区" width="900" />
 </p>
 
 <p align="center">
-  <em>Today — portfolio attention items, watchlist context, and quick research actions.</em>
+  <em>Today——投资组合关注事项、自选清单上下文与快速研究操作。</em>
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/discover.png" alt="Folio Discover screener" width="49%" />
-  <img src="docs/screenshots/workspace.png" alt="Folio security workspace" width="49%" />
+  <img src="docs/screenshots/discover.png" alt="Folio Discover 筛选器" width="49%" />
+  <img src="docs/screenshots/workspace.png" alt="Folio 证券工作区" width="49%" />
 </p>
 
-## Key Features
+## 核心功能
 
-### Research Workspace
+### 研究工作区
 
-- Watchlists, quotes, K-line charts, financial statements, news, and security overviews.
-- A three-pane desktop layout: navigation, market workspace, and Agent copilot.
-- Compare 2–4 symbols across valuation, growth, margins, ROE, dividends, returns, ratings, and momentum.
-- Data freshness is visible; missing values render as `—` instead of being guessed.
+- 自选清单、行情、K 线图、财务报表、新闻与证券概览。
+- 三栏桌面布局：导航、市场工作区与 Agent 副驾驶。
+- 在估值、成长性、利润率、ROE、股息、回报、评级与动量等维度对比 2–4 只标的。
+- 数据新鲜度可见；缺失值显示为 `—`，不会凭空猜测。
 
-### Deep Research
+### 深度研究
 
-- One-click research from a focused security.
-- Parallel capability fetches with bounded concurrency, timeouts, cancellation, and honest partial-failure states.
-- Structured data bundle → agent synthesis → evidence-backed `ResearchReport`.
-- Reports contain stance, confidence, sections, bull case, bear case, catalysts, risks, and links back to the capability run behind each claim.
+- 从聚焦的证券一键发起研究。
+- 并行能力调用：有界并发、超时、取消与诚实的部分失败状态。
+- 结构化数据包 → Agent 综合 → 基于证据的 `ResearchReport`。
+- 报告包含立场、置信度、章节、看多论点、看空论点、催化剂、风险，以及每条论断背后对应能力执行记录的链接。
 
-### Agent Copilot
+### Agent 副驾驶
 
-- Persistent sessions and streamed answers powered by the Pi Agent runtime.
-- Model and thinking-level controls, stop/cancel, workspace context, and structured quote/portfolio cards.
-- Markdown answers render with headings, lists, tables, links, and code blocks.
-- Internal synthesis sessions stay out of the visible conversation history.
+- 由 Pi Agent 运行时驱动的持久会话与流式回答。
+- 模型与思考级别控制、停止/取消、工作区上下文，以及结构化的行情/投资组合卡片。
+- Markdown 回答支持标题、列表、表格、链接与代码块。
+- 内部综合会话不会出现在可见的对话历史中。
 
-### Skills & Capability Layer
+### 技能与能力层
 
-- A single capability registry powers provider execution, agent tools, UI availability, and skill readiness.
-- Skills declare required and optional capabilities; the Skills Center shows Ready, Partial, and Disabled states.
-- Progressive loading keeps skill instructions and reference material available without putting every document into every prompt.
-- The agent never claims a missing capability is available.
+- 单一能力注册表驱动提供商执行、Agent 工具、UI 可用性与技能就绪状态。
+- 技能声明所需与可选能力；技能中心展示就绪、部分就绪与已禁用状态。
+- 渐进式加载让技能指令与参考资料随时可用，而无需把每份文档都塞进每个提示词。
+- Agent 绝不会声称某个缺失的能力可用。
 
-### Discover & Learning Loop
+### 发现与学习循环
 
-- 17 deterministic screening tasks across market movers, fundamentals, technicals, and events.
-- Eight research strategies: Comprehensive, Value, Growth, Technical, Earnings, Event Driven, Risk Review, and Income.
-- Candidate actions flow into Research, Compare, and Watchlist with evidence and reasons attached.
-- Research Diff highlights changed verdicts, valuation moves, new risks, and confidence deltas.
+- 覆盖市场异动、基本面、技术面与事件的 17 个确定性筛选任务。
+- 八种研究策略：综合、价值、成长、技术、财报、事件驱动、风险复盘与收益。
+- 候选操作连同证据与理由流入研究、对比与自选清单。
+- 研究差异对比（Research Diff）突出显示结论变化、估值变动、新风险与置信度变化。
 
-### Portfolio, Thesis & Monitoring
+### 投资组合、论点与监控
 
-- Portfolio allocation, concentration, Herfindahl, large-position, earnings, news, drawdown, and exposure signals.
-- Save a report as an editable investment thesis and re-evaluate it against fresh data.
-- Alert rules for price, news, earnings, ratings, dividends, position weight, and drawdown.
-- Today combines portfolio attention items, watchlist movers, alerts, upcoming events, recent research, and theses needing review.
+- 投资组合配置、集中度、赫芬达尔指数、大额持仓、财报、新闻、回撤与敞口信号。
+- 将报告保存为可编辑的投资论点，并基于新数据重新评估。
+- 针对价格、新闻、财报、评级、股息、持仓权重与回撤的提醒规则。
+- Today 整合投资组合关注事项、自选异动、提醒、即将到来的事件、近期研究与待复审的论点。
 
-## How It Works
+## 工作原理
 
 ```text
-Longbridge / Massive providers
+Longbridge / Massive 提供商
               │
               ▼
-     Capability Registry
+     能力注册表（Capability Registry）
               │
        ┌──────┼───────────────┐
        ▼      ▼               ▼
-    Agent   Research       Product UI
-    tools   + Thesis       + Skills
-             + Alerts      + Compare
-             + Risk        + Today
+    Agent   研究            产品 UI
+    工具   + 论点           + 技能
+           + 提醒           + 对比
+           + 风险           + Today
               │
               ▼
-     Evidence-backed reports
+      基于证据的报告
 ```
 
-The core boundary is deliberately small: providers return normalized data with provenance, capabilities expose typed operations, and product workflows consume those contracts instead of importing vendor-specific code.
+核心边界刻意保持很小：提供商返回带来源（provenance）的规范化数据，能力暴露类型化操作，产品工作流消费这些契约，而不是导入厂商专属代码。
 
-## Flexible Integrations
+## 灵活集成
 
-- **Market data:** Longbridge is the primary connector for US/HK/CN market data and brokerage portfolio access; Massive is available as a secondary US market-data provider.
-- **Agent runtime:** Pi runtime for configured LLM providers, with a deterministic local provider for development and offline golden paths.
-- **Desktop:** Electron with a macOS arm64 packaged build. The renderer, preload bridge, and main-process kernel are separated by context isolation and a whitelisted IPC surface.
-- **Skills:** Vendored `SKILL.md` resources with references, enable/disable state, triggers, and capability requirements.
+- **行情数据：** Longbridge 是美股/港股/内地市场数据与券商投资组合访问的主要连接器；Massive 是美股市场的备选数据提供商。
+- **Agent 运行时：** 为已配置的 LLM 提供商提供 Pi 运行时，另有用于开发与离线黄金路径的确定性本地提供商。
+- **桌面端：** Electron，含 macOS arm64 打包构建。渲染进程、预加载桥与主进程内核通过上下文隔离与白名单化 IPC 接口面分离。
+- **技能：** 内置 `SKILL.md` 资源，含引用、启用/禁用状态、触发器与能力要求。
 
-## Quick Start
+## 快速开始
 
-### For Users
+### 面向用户
 
-Download the latest macOS build from the [Releases page](https://github.com/helsome/folio/releases). After launching Folio:
+从[发布页面](https://github.com/helsome/folio/releases)下载最新的 macOS 构建。启动 Folio 后：
 
-1. Configure an LLM provider in **Settings → Models**, or use the local provider for a deterministic demo.
-2. Connect Longbridge in **Settings → Connections** if you want live market data and portfolio access.
-3. Select a symbol from the Watchlist and open **Deep Research**.
+1. 在 **设置 → 模型** 中配置 LLM 提供商，或使用本地提供商进行确定性演示。
+2. 如需实时行情数据与投资组合访问，在 **设置 → 连接** 中连接 Longbridge。
+3. 从自选清单中选择标的，打开**深度研究**。
 
-Longbridge authentication can also be completed from the terminal:
+Longbridge 认证也可以在终端完成：
 
 ```bash
 longbridge auth login
 ```
 
-### For Developers
+### 面向开发者
 
-Prerequisites: [Bun](https://bun.sh), the [Longbridge CLI](https://open.longbridge.com/longbridge/longbridge-terminal/install) for live data, and an LLM provider for the Pi runtime.
+前置条件：[Bun](https://bun.sh)、用于实时数据的 [Longbridge CLI](https://open.longbridge.com/longbridge/longbridge-terminal/install)，以及用于 Pi 运行时的 LLM 提供商。
 
 ```bash
-# Clone and install
+# 克隆并安装
 git clone https://github.com/helsome/folio.git
 cd folio
 bun install
 
-# Run the desktop app in development
+# 以开发模式运行桌面应用
 bun run dev
 
-# Deterministic local agent path — no external LLM required
+# 确定性本地 Agent 路径——无需外部 LLM
 FINAGENT_AGENT_PROVIDER=local bun run dev
 ```
 
-### Commands
+### 命令
 
-| Command | Description |
+| 命令 | 说明 |
 | --- | --- |
-| `bun run dev` | Start the Electron renderer in development mode |
-| `bun test` | Run the full unit and integration suite |
-| `bun run typecheck` | Typecheck every workspace package |
-| `bun run build` | Build packages, renderer, preload, and main process |
-| `bun run test:e2e` | Run the Electron golden-path E2E suite |
-| `bun run release:check` | Run the release gates |
-| `bun run release:package` | Build the macOS arm64 app, DMG, and SHA256 checksums |
+| `bun run dev` | 以开发模式启动 Electron 渲染进程 |
+| `bun test` | 运行完整单元与集成测试套件 |
+| `bun run typecheck` | 对所有工作区包执行类型检查 |
+| `bun run build` | 构建包、渲染进程、预加载与主进程 |
+| `bun run test:e2e` | 运行 Electron 黄金路径 E2E 套件 |
+| `bun run release:check` | 运行发布门槛检查 |
+| `bun run release:package` | 构建 macOS arm64 应用、DMG 与 SHA256 校验和 |
 
-The packaged artifacts are staged in `dist/release/`.
+打包产物暂存于 `dist/release/`。
 
-## Security & Product Boundaries
+## 安全与产品边界
 
-- Electron runs with `contextIsolation: true`, `nodeIntegration: false`, and a whitelisted preload bridge.
-- API keys and custom provider credentials are encrypted at rest with Electron `safeStorage` in the main process.
-- Longbridge commands use argv-safe execution, symbol validation, and read-only capability registration.
-- Skill resources are path-safe: traversal and symlink escapes are rejected.
-- Research reports distinguish unavailable data from negative evidence and never fabricate missing numbers.
-- Unsigned local builds may trigger a macOS security prompt; signing and notarization are opt-in release steps.
+- Electron 以 `contextIsolation: true`、`nodeIntegration: false` 运行，并采用白名单化预加载桥。
+- API 密钥与自定义提供商凭证在主进程中使用 Electron `safeStorage` 加密存储。
+- Longbridge 命令使用 argv 安全执行、标的校验与只读能力注册。
+- 技能资源路径安全：拒绝路径穿越与符号链接逃逸。
+- 研究报告区分“数据不可用”与“负面证据”，绝不编造缺失的数字。
+- 未签名的本地构建可能触发 macOS 安全提示；签名与公证是发布阶段的可选步骤。
 
-## Project Status
+## 项目状态
 
-Folio is in beta. The current repository includes the V5 research, discovery, monitoring, outcome, and adaptive-calibration surfaces, plus the V6 quiet workspace visual system.
+Folio 处于测试版（beta）。当前仓库包含 V5 研究、发现、监控、结果与自适应校准相关功能面，以及 V6 安静工作区视觉系统。
 
-- Unit and integration tests: **912 passing**
-- Typecheck: **green**
-- Electron E2E and packaged smoke gates: available through the release scripts
-- Current package channel: `0.4.0-beta.1`
+- 单元与集成测试：**912 项通过**
+- 类型检查：**通过**
+- Electron E2E 与打包冒烟门槛：可通过发布脚本运行
+- 当前包通道：`0.4.0-beta.1`
 
-Known limitations and release decisions are documented in [`docs/release-gates.md`](docs/release-gates.md) ([简体中文](docs/release-gates.zh-CN.md)) and [`docs/provider-b-decision.md`](docs/provider-b-decision.md) ([简体中文](docs/provider-b-decision.zh-CN.md)).
+已知限制与发布决策记录在 [`docs/release-gates.zh-CN.md`](docs/release-gates.zh-CN.md)（[英文原文](docs/release-gates.md)）与 [`docs/provider-b-decision.zh-CN.md`](docs/provider-b-decision.zh-CN.md)（[英文原文](docs/provider-b-decision.md)）。
 
-## Roadmap
+## 路线图
 
-### Near Term
+### 近期
 
-- More provider coverage behind the same capability contracts.
-- Better report navigation and evidence inspection.
-- More useful portfolio-aware research prompts without leaking internal runtime instructions into the user conversation.
+- 在同一能力契约下覆盖更多提供商。
+- 更好的报告导航与证据检视。
+- 更有用的组合感知研究提示，同时不把内部运行时指令泄漏进用户对话。
 
-### Longer Term
+### 长期
 
-- Cross-platform packaged builds.
-- More research strategies and outcome calibration samples.
-- Richer scheduled briefs, notification channels, and user-defined monitoring rules.
-- A contributor-friendly skill and provider extension model.
+- 跨平台打包构建。
+- 更多研究策略与结果校准样本。
+- 更丰富的定时简报、通知渠道与用户自定义监控规则。
+- 便于贡献者使用的技能与提供商扩展模型。
 
-## Documentation
+## 文档
 
-- [`docs/architecture.md`](docs/architecture.md) — system architecture and runtime boundaries · [简体中文](docs/architecture.zh-CN.md)
-- [`docs/PRD.md`](docs/PRD.md) — product requirements and invariants (document is in Chinese)
-- [`docs/UI-SYSTEM.md`](docs/UI-SYSTEM.md) — visual system and component rules · [简体中文](docs/UI-SYSTEM.zh-CN.md)
-- [`docs/longbridge-auth.md`](docs/longbridge-auth.md) — Longbridge authentication · [简体中文](docs/longbridge-auth.zh-CN.md)
-- [`docs/longbridge-skill-setup.md`](docs/longbridge-skill-setup.md) — skill setup and capability coverage · [简体中文](docs/longbridge-skill-setup.zh-CN.md)
-- [`docs/release-gates.md`](docs/release-gates.md) — release validation checklist · [简体中文](docs/release-gates.zh-CN.md)
+- [`docs/architecture.zh-CN.md`](docs/architecture.zh-CN.md) — 系统架构与运行时边界 · [English](docs/architecture.md)
+- [`docs/PRD.md`](docs/PRD.md) — 产品需求与不变式（本文档为中文）
+- [`docs/UI-SYSTEM.zh-CN.md`](docs/UI-SYSTEM.zh-CN.md) — 视觉系统与组件规则 · [English](docs/UI-SYSTEM.md)
+- [`docs/longbridge-auth.zh-CN.md`](docs/longbridge-auth.zh-CN.md) — Longbridge 认证 · [English](docs/longbridge-auth.md)
+- [`docs/longbridge-skill-setup.zh-CN.md`](docs/longbridge-skill-setup.zh-CN.md) — 技能安装与能力覆盖 · [English](docs/longbridge-skill-setup.md)
+- [`docs/release-gates.zh-CN.md`](docs/release-gates.zh-CN.md) — 发布验证清单 · [English](docs/release-gates.md)
 
-## Contributing
+## 参与贡献
 
-Issues and pull requests are welcome. Before opening a change, run:
+欢迎提交 Issue 与 Pull Request。提交改动前请运行：
 
 ```bash
 bun test
 bun run typecheck
 ```
 
-For UI changes, include a screenshot or a short visual QA note when the layout or interaction changes materially.
+UI 改动请附上截图或简要的视觉 QA 说明（当布局或交互发生实质性变化时）。
