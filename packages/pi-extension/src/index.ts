@@ -104,9 +104,15 @@ function wrapPortfolioExecute(
   };
 }
 
-/** Finance tools generated from the shared capability registry manifests. */
-export function createCapabilityTools(): Tool[] {
-  return wrapToolsWithPrivacy(buildCapabilityTools(fullCapabilities), PI_PRIVACY_LEVEL);
+/**
+ * Finance tools generated from the shared capability registry manifests.
+ *
+ * The privacy level is read from `env` (default: the process env) so tests
+ * can exercise each level without re-importing the module; the default path
+ * keeps the module-load const semantics used by {@link registerTools}.
+ */
+export function createCapabilityTools(env: NodeJS.ProcessEnv = process.env): Tool[] {
+  return wrapToolsWithPrivacy(buildCapabilityTools(fullCapabilities), readPrivacyLevelEnv(env));
 }
 
 // Tool registry

@@ -1,6 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test';
 import { createCapabilityTools as buildCapabilityTools, fullCapabilities } from '@finagent/shared/capabilities';
-import { readPrivacyLevelEnv, wrapToolsWithPrivacy, type Tool } from './index.ts';
+import { createCapabilityTools, readPrivacyLevelEnv, wrapToolsWithPrivacy, type Tool } from './index.ts';
 
 const PORTFOLIO_TEXT = 'Portfolio overview\n\nDATA: {"holdings":[{"symbol":"AAPL","qty":10}],"cash":123456.78}';
 const QUOTE_TEXT = 'Quote\n\nDATA: {"price": 432.1}';
@@ -112,57 +112,36 @@ describe('wrapToolsWithPrivacy', () => {
   });
 });
 
-interface FreshIndexModule {
-  createCapabilityTools: () => Tool[];
-  tools: Tool[];
+function portfolioExecute(env: NodeJS.ProcessEnv): Tool['execute'] {
+  const tool = createCapabilityTools(env).find((t) => t.name === 'get_portfolio');
+  expect(tool).toBeDefined();
+  return tool!.execute;
 }
 
 describe('createCapabilityTools env wiring', () => {
-  let bust = 0;
+  // createCapabilityTools(env) reads FINAGENT_PRIVACY_LEVEL from the given
+  // env per call, so each variant is testable without re-importing the
+  // module (cache-busted dynamic imports corrupt bun's module registry in
+  // parallel test workers — see V7 integration notes).
 
-  // The module reads FINAGENT_PRIVACY_LEVEL once at load time, so each env
-  // variant needs a fresh module evaluation. The unique query string busts
-  // bun's module cache; a static import cannot control env before load.
-  // The wrapped execute is the wrapPortfolioExecute closure (its source carries
-  // the notice literal), while a raw capability execute carries the DATA
-  // template — that source marker is the observable, fetcher-free proof that
-  // the module-load env read selected the execute.
-  async function freshIndex(envValue: string | undefined): Promise<FreshIndexModule> {
-    const saved = process.env.FINAGENT_PRIVACY_LEVEL;
-    if (envValue === undefined) delete process.env.FINAGENT_PRIVACY_LEVEL;
-    else process.env.FINAGENT_PRIVACY_LEVEL = envValue;
-    try {
-      bust += 1;
-      return (await import(`./index.ts?v=${bust}`)) as FreshIndexModule;
-    } finally {
-      if (saved === undefined) delete process.env.FINAGENT_PRIVACY_LEVEL;
-      else process.env.FINAGENT_PRIVACY_LEVEL = saved;
-    }
-  }
-
-  function portfolioExecute(mod: FreshIndexModule): Tool['execute'] {
-    const tool = mod.createCapabilityTools().find((t) => t.name === 'get_portfolio');
-    expect(tool).toBeDefined();
-    return tool!.execute;
-  }
-
-  it('wraps portfolio tools once at module load when FINAGENT_PRIVACY_LEVEL=standard', async () => {
-    expect(portfolioExecute(await freshIndex('standard')).toString()).toContain(
+  it('wraps portfolio tools when FINAGENT_PRIVACY_LEVEL=standard or minimal', () => {
+    expect(portfolioExecute({ FINAGENT_PRIVACY_LEVEL: 'standard' }).toString()).toContain(
       'portfolio details redacted'
     );
-    expect(portfolioExecute(await freshIndex('minimal')).toString()).toContain(
+    expect(portfolioExecute({ FINAGENT_PRIVACY_LEVEL: 'minimal' }).toString()).toContain(
       'portfolio details redacted'
     );
   });
 
-  it('does not wrap when FINAGENT_PRIVACY_LEVEL is unset', async () => {
-    expect(portfolioExecute(await freshIndex(undefined)).toString()).not.toContain(
-      'portfolio details redacted'
-    );
+  it('does not wrap when FINAGENT_PRIVACY_LEVEL is unset', () => {
+    expect(portfolioExecute({}).toString()).not.toContain('portfolio details redacted');
   });
 
-  it('does not wrap when the module load saw an unknown level', async () => {
-    expect(portfolioExecute(await freshIndex('bogus')).toString()).not.toContain(
+  it('does not wrap when the level is unknown or full', () => {
+    expect(portfolioExecute({ FINAGENT_PRIVACY_LEVEL: 'bogus' }).toString()).not.toContain(
+      'portfolio details redacted'
+    );
+    expect(portfolioExecute({ FINAGENT_PRIVACY_LEVEL: 'full' }).toString()).not.toContain(
       'portfolio details redacted'
     );
   });
@@ -175,12 +154,19 @@ describe('createCapabilityTools env wiring', () => {
 });
 
 describe('contract predicate scope', () => {
-  it('does not wrap tools whose name lacks "portfolio" (e.g. get_positions)', async () => {
-    // The contract predicate is /^portfolio\./ or a name containing
-    // "portfolio"; `get_positions` matches neither and keeps its raw DATA.
-    const tool: Tool = { ...stubPortfolioTool(), name: 'get_positions' };
+  it('wraps every portfolio-family tool name (get_portfolio, get_positions, get_assets, get_cash_flow)', async () => {
+    for (const name of ['get_portfolio', 'get_positions', 'get_assets', 'get_cash_flow']) {
+      const tool: Tool = { ...stubPortfolioTool(), name };
+      const [wrapped] = wrapToolsWithPrivacy([tool], 'standard');
+      const out = await wrapped.execute('c1', {}, new AbortController().signal);
+      expect(out.content[0].text).toContain('portfolio details redacted');
+    }
+  });
+
+  it('leaves non-portfolio tools (get_quote) raw', async () => {
+    const tool: Tool = { ...stubQuoteTool(), name: 'get_quote' };
     const [wrapped] = wrapToolsWithPrivacy([tool], 'standard');
     const out = await wrapped.execute('c1', {}, new AbortController().signal);
-    expect(out.content[0].text).toBe(PORTFOLIO_TEXT);
+    expect(out.content[0].text).toBe(QUOTE_TEXT);
   });
 });
