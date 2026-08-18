@@ -204,6 +204,20 @@ var electronAPI = {
   export: {
     markdown: (input) => import_electron.ipcRenderer.invoke("export:markdown", input),
     shareCard: (input) => import_electron.ipcRenderer.invoke("export:shareCard", input)
+  },
+  evaluation: {
+    getSettings: () => import_electron.ipcRenderer.invoke("evaluation:getSettings"),
+    setSettings: (input) => import_electron.ipcRenderer.invoke("evaluation:setSettings", input),
+    setCredential: (input) => import_electron.ipcRenderer.invoke("evaluation:setCredential", input),
+    removeCredential: () => import_electron.ipcRenderer.invoke("evaluation:removeCredential"),
+    testConnection: () => import_electron.ipcRenderer.invoke("evaluation:testConnection"),
+    listExperiments: () => import_electron.ipcRenderer.invoke("evaluation:listExperiments"),
+    getExperiment: (input) => import_electron.ipcRenderer.invoke("evaluation:getExperiment", input),
+    getCase: (input) => import_electron.ipcRenderer.invoke("evaluation:getCase", input),
+    listBaselines: () => import_electron.ipcRenderer.invoke("evaluation:listBaselines"),
+    submitFeedback: (input) => import_electron.ipcRenderer.invoke("evaluation:submitFeedback", input),
+    listFeedback: () => import_electron.ipcRenderer.invoke("evaluation:listFeedback"),
+    status: () => import_electron.ipcRenderer.invoke("evaluation:status")
   }
 };
 import_electron.contextBridge.exposeInMainWorld("electronAPI", electronAPI);
