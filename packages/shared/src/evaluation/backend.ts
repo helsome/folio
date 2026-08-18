@@ -103,12 +103,15 @@ export class LocalEvaluationBackend implements EvaluationBackend {
 const DEFAULT_LANGSMITH_API = 'https://api.smith.langchain.com';
 const DEFAULT_LANGSMITH_UI = 'https://smith.langchain.com';
 
+/** Minimal fetch shape (avoids bundling bun's `typeof fetch` extras like preconnect). */
+export type FetchLike = (input: string | URL | globalThis.Request, init?: RequestInit) => Promise<Response>;
+
 export interface LangSmithBackendOptions {
   apiKey: string;
   project: string;
   endpoint?: string;
   /** Injectable fetch for tests. */
-  fetchImpl?: typeof fetch;
+  fetchImpl?: FetchLike;
   now?: () => number;
 }
 
@@ -125,7 +128,7 @@ export class LangSmithEvaluationBackend implements EvaluationBackend {
   private readonly project: string;
   private readonly apiBase: string;
   private readonly uiBase: string;
-  private readonly fetchImpl: typeof fetch;
+  private readonly fetchImpl: FetchLike;
   private readonly now: () => number;
   private orgId?: string;
   private lastError?: string;

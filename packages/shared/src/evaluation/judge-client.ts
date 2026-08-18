@@ -5,6 +5,7 @@
 // the experiment runner. Judge calls happen in the main process / CLI, never
 // in the Pi runtime, and never on the agent's critical path.
 import { createCodeError } from '../agent/errors.ts';
+import type { FetchLike } from './backend.ts';
 
 export interface JudgeMessage {
   role: 'system' | 'user';
@@ -23,7 +24,7 @@ export interface JudgeClientOptions {
   model: string;
   apiKey: string;
   baseUrl?: string;
-  fetchImpl?: typeof fetch;
+  fetchImpl?: FetchLike;
 }
 
 const ANTHROPIC_DEFAULT = 'https://api.anthropic.com/v1/messages';
