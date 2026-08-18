@@ -1,6 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { ArrowLeft, ExternalLink, ThumbsDown, ThumbsUp } from 'lucide-react';
-import type { EvaluationResultRecord, EvaluationRun } from '@finagent/core';
+import type { EvaluationCase, EvaluationResultRecord, EvaluationRun } from '@finagent/core';
 import { useFinagentClient, type EvaluationExperimentDetail } from '../../client';
 import { Button } from '../primitives/Button';
 import { failureModeLabel, metricKindLabel, metricLabel, scorePercent } from './format';
@@ -49,6 +49,7 @@ export const CaseDetail: React.FC<{
   const client = useFinagentClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [caseDef, setCaseDef] = useState<EvaluationCase | null>(null);
   const [feedback, setFeedback] = useState<'good' | 'bad' | null>(null);
   const [note, setNote] = useState('');
   const [noteOpen, setNoteOpen] = useState(false);
@@ -65,6 +66,17 @@ export const CaseDetail: React.FC<{
       setLoading(false);
     })();
   }, [detail, onLoadDetail]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void (async () => {
+      const result = await client.evaluation?.getCase(caseRef.caseId);
+      if (!cancelled && result?.ok) setCaseDef(result.data ?? null);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [caseRef.caseId, client]);
 
   const openTrace = (url: string): void => {
     void client.openExternal?.(url);
@@ -169,11 +181,71 @@ export const CaseDetail: React.FC<{
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="max-w-4xl space-y-4">
-          <p className="rounded-[10px] border mac-section-divider bg-surface-muted px-3 py-2 text-[11px] text-foreground/48">
-            The case prompt, workspace context, and expected behaviors live on the benchmark
-            dataset and are not exposed by the current evaluation channel — this view shows the
-            recorded run and its evaluation.
-          </p>
+          <div className="mac-stock-tile rounded-[14px] p-5">
+            <h3 className="text-[13px] font-semibold text-foreground">Case definition</h3>
+            {caseDef ? (
+              <div className="mt-2 space-y-3 text-[12.5px]">
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-foreground/44">Prompt</p>
+                  <p className="mt-0.5 whitespace-pre-wrap leading-relaxed text-foreground/78">
+                    {caseDef.input.prompt}
+                  </p>
+                </div>
+                {caseDef.input.workspaceContext && (
+                  <div>
+                    <p className="text-[11px] uppercase tracking-wide text-foreground/44">Workspace context</p>
+                    <p className="mt-0.5 font-mono text-[11.5px] text-foreground/64">
+                      {JSON.stringify(caseDef.input.workspaceContext)}
+                    </p>
+                  </div>
+                )}
+                <div>
+                  <p className="text-[11px] uppercase tracking-wide text-foreground/44">
+                    Expected behavior
+                  </p>
+                  <div className="mt-1 flex flex-wrap gap-1.5">
+                    <span className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10.5px] text-foreground/64">
+                      {caseDef.category} · {caseDef.difficulty}
+                    </span>
+                    {caseDef.expected.requiredCapabilities?.map((cap) => (
+                      <span key={`req-${cap}`} className="rounded-full border border-[var(--mac-green)]/30 bg-[var(--mac-green)]/10 px-2 py-0.5 font-mono text-[10.5px] text-[var(--mac-green)]">
+                        {cap}
+                      </span>
+                    ))}
+                    {caseDef.expected.forbiddenCapabilities?.map((cap) => (
+                      <span key={`forb-${cap}`} className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 font-mono text-[10.5px] text-destructive">
+                        forbidden: {cap}
+                      </span>
+                    ))}
+                    {caseDef.expected.maxToolCalls != null && (
+                      <span className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10.5px] text-foreground/64">
+                        ≤{caseDef.expected.maxToolCalls} calls
+                      </span>
+                    )}
+                    {caseDef.expected.mustHaveEvidence && (
+                      <span className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10.5px] text-foreground/64">
+                        evidence required
+                      </span>
+                    )}
+                    {caseDef.expected.requiredResearchDimensions?.map((dimension) => (
+                      <span key={`dim-${dimension}`} className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10.5px] text-foreground/64">
+                        {dimension}
+                      </span>
+                    ))}
+                  </div>
+                  {caseDef.expected.expectedAnswerHint && (
+                    <p className="mt-1.5 text-[11.5px] text-foreground/54">
+                      {caseDef.expected.expectedAnswerHint}
+                    </p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <p className="mt-1 text-[11.5px] text-foreground/44">
+                {run?.answer ? '' : 'Annotated prompt and expectations unavailable for this case definition.'}
+              </p>
+            )}
+          </div>
 
           <div className="mac-stock-tile rounded-[14px] p-5">
             <h3 className="text-[13px] font-semibold text-foreground">Agent answer</h3>
