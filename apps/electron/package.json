@@ -19,7 +19,7 @@
     "test:package-smoke": "node e2e/package-smoke.mjs",
     "build:preload": "bun build src/preload/index.ts --outfile src/preload/index.cjs --target node --format cjs --external electron",
     "build:main": "bun build src/main/index.ts --outfile src/main/index.js --bundle --target node --format esm --external electron",
-    "build:extension": "bun build ../../.pi/extensions/finagent/index.ts --outfile build/extensions/finagent/index.js --bundle --target node --format esm",
+    "build:extension": "bun build ../../.pi/extensions/finagent/index.ts --outfile build/extensions/finagent/index.js --bundle --target node --format esm && bun build ../../.pi/extensions/langsmith/index.ts --outfile build/extensions/langsmith/index.js --bundle --target node --format esm",
     "package": "bun run build && bun run build:extension && bun run package:builder",
     "package:builder": "electron-builder",
     "test:v5": "node e2e/v5.mjs"
