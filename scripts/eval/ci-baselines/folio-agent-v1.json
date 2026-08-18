@@ -1,7 +1,29 @@
 {
-  "datasetVersion": "folio-agent-v1",
+  "datasetId": "folio-agent-v1",
+  "datasetVersion": "1.0.0",
   "gitSha": null,
-  "createdAt": null,
-  "metrics": {},
-  "thresholds": {}
+  "createdAt": 1787033510832,
+  "metrics": {
+    "task_completion": 1,
+    "tool_recall": 0.2,
+    "tool_precision": 0.867,
+    "tool_error_rate": 1,
+    "argument_validity": 1,
+    "max_tool_calls": 1,
+    "evidence_presence": 0.333,
+    "provenance_presence": 1,
+    "freshness_compliance": 0.182,
+    "latency": 1
+  },
+  "thresholds": {
+    "tool_recall": 0.05,
+    "argument_validity": 0.05,
+    "tool_precision": 0.05,
+    "task_completion": 0.05,
+    "evidence_presence": 0.05,
+    "provenance_presence": 0.05,
+    "tool_error_rate": 0.05,
+    "max_tool_calls": 0.1,
+    "latency": 0.2
+  }
 }

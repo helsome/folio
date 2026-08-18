@@ -13,7 +13,7 @@
 //
 // Exit codes: 0 = gate passed (or no baseline configured) with no infra
 // errors; 1 = gate regression, experiment cancelled, or an infra error.
-import { mkdtemp, mkdir, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { homedir } from 'node:os';
@@ -28,8 +28,19 @@ import { LocalEvaluationBackend, resolveBackend } from '../../packages/shared/sr
 import { TraceCorrelationService } from '../../packages/shared/src/evaluation/correlation.ts';
 import { createJudgeClient, resolveJudgeConfig } from '../../packages/shared/src/evaluation/judge-client.ts';
 import { embeddedDatasets } from '../../packages/shared/src/evaluation/datasets/index.ts';
-import { createBaselineFromExperiment, ExperimentService } from '../../packages/shared/src/evaluation/experiment-service.ts';
-import type { EvaluationCase, EvaluationDataset, EvaluationExperiment, EvaluationRun, ExperimentConfig } from '../../packages/core/src/index.ts';
+import {
+  createBaselineFromExperiment,
+  ExperimentService,
+  type GateEvaluation,
+} from '../../packages/shared/src/evaluation/experiment-service.ts';
+import type {
+  EvaluationBaseline,
+  EvaluationCase,
+  EvaluationDataset,
+  EvaluationExperiment,
+  EvaluationRun,
+  ExperimentConfig,
+} from '../../packages/core/src/index.ts';
 
 // ── CLI flags ──────────────────────────────────────────────────────────────
 
@@ -726,10 +737,15 @@ async function main(): Promise<number> {
       config.provider = config.model.split('/')[0];
     }
 
+    const storeBaseline = options.baseline
+      ? (await store.listBaselines()).find((entry) => entry.id === options.baseline) ??
+        await loadCommittedBaseline(options.baseline)
+      : undefined;
     const experiment = await service.runExperiment({
       dataset: { ...dataset, cases },
       config,
-      baselineId: options.baseline,
+      baseline: storeBaseline,
+      baselineId: storeBaseline ? undefined : options.baseline,
       judgeClient,
       onProgress: (event) => {
         const mark = event.kind === 'case_started' ? '→' : '✓';
@@ -753,11 +769,14 @@ async function main(): Promise<number> {
     printCaseTable(runs, results);
     printSummary(experiment, runs, results);
 
-    // Baseline handling: gate against an existing baseline, optionally store one.
-    let regressions: Awaited<ReturnType<ExperimentService['evaluateGate']>>['regressions'] | undefined;
+    // Baseline handling: gate against an existing baseline (store, then the
+    // committed scripts/eval/ci-baselines/<id>.json), optionally store one.
+    let regressions: GateEvaluation['regressions'] | undefined;
     let gatePassed = true;
     if (options.baseline) {
-      const baseline = (await store.listBaselines()).find((entry) => entry.id === options.baseline);
+      const baseline =
+        (await store.listBaselines()).find((entry) => entry.id === options.baseline) ??
+        (await loadCommittedBaseline(options.baseline));
       if (!baseline) {
         console.error(`Baseline not found: ${options.baseline}`);
         return 1;
@@ -797,6 +816,33 @@ async function main(): Promise<number> {
   } finally {
     await kernel?.dispose();
     await rm(runtimeDir, { recursive: true, force: true }).catch(() => undefined);
+  }
+}
+
+/**
+ * Load a baseline committed to scripts/eval/ci-baselines/<id>.json (spec §75).
+ * Format: { datasetId, datasetVersion, gitSha?, createdAt?, metrics, thresholds? }.
+ * Returns undefined when the file is missing or malformed.
+ */
+async function loadCommittedBaseline(id: string): Promise<EvaluationBaseline | undefined> {
+  try {
+    const path = join(process.cwd(), 'scripts', 'eval', 'ci-baselines', `${id}.json`);
+    const parsed = JSON.parse(await readFile(path, 'utf8')) as Record<string, unknown>;
+    const metrics = parsed.metrics as Record<keyof EvaluationBaseline['metrics'], number> | undefined;
+    if (!metrics || typeof metrics !== 'object') return undefined;
+    return {
+      id,
+      name: id,
+      datasetId: typeof parsed.datasetId === 'string' ? parsed.datasetId : 'folio-agent-v1',
+      datasetVersion: typeof parsed.datasetVersion === 'string' ? parsed.datasetVersion : '1.0.0',
+      experimentId: id,
+      gitSha: typeof parsed.gitSha === 'string' ? parsed.gitSha : '',
+      createdAt: typeof parsed.createdAt === 'number' ? parsed.createdAt : 0,
+      metrics,
+      thresholds: (parsed.thresholds as Record<string, number> | undefined) ?? {},
+    };
+  } catch {
+    return undefined;
   }
 }
 

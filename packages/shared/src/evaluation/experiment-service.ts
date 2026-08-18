@@ -78,7 +78,10 @@ export interface RunExperimentInput {
   dataset: EvaluationDataset;
   config: ExperimentConfig;
   name?: string;
+  /** Store-backed baseline id to gate against. */
   baselineId?: string;
+  /** Pre-resolved baseline (e.g. committed scripts/eval/ci-baselines JSON). */
+  baseline?: EvaluationBaseline;
   judgeClient?: JudgeClient;
   onProgress?: (event: { kind: 'case_started' | 'case_completed'; caseId: string; index: number; total: number }) => void;
   signal?: AbortSignal;
@@ -208,7 +211,7 @@ export class ExperimentService {
       throw new Error(`Unsupported experiment mode: ${String(config.mode)}. Expected 'fixture' or 'live'.`);
     }
 
-    let baseline: EvaluationBaseline | undefined;
+    let baseline: EvaluationBaseline | undefined = input.baseline;
     if (input.baselineId) {
       baseline = (await this.store.listBaselines()).find((entry) => entry.id === input.baselineId);
       if (!baseline) {

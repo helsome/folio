@@ -34,11 +34,13 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
-      # Fixture mode with deterministic evaluators only: the CLI exits 0 on
-      # pass and 1 on gate failure (metric regression past threshold) or run
-      # error, so a non-zero exit here fails the job/PR.
+      # Fixture mode with deterministic evaluators only, gated against the
+      # committed baseline (scripts/eval/ci-baselines/folio-agent-v1.json,
+      # spec §75-76): the CLI exits 0 on pass and 1 on gate failure (critical
+      # metric regression past threshold) or run error, so a non-zero exit
+      # here fails the job/PR.
       - name: Run fixture eval smoke gate
-        run: bun run eval:smoke -- --mode fixture --out artifacts/eval-smoke.json
+        run: bun run eval:smoke -- --mode fixture --baseline folio-agent-v1 --out artifacts/eval-smoke.json
 
       - name: Upload eval smoke artifact
         uses: actions/upload-artifact@v4
