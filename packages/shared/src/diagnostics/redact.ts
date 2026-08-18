@@ -12,8 +12,9 @@ const REDACTED = '[REDACTED]';
 
 export const REDACTION_POLICY =
   'Strips API keys (sk-/rk-/pk-/ak-…), AWS access keys (AKIA…), Bearer and ' +
-  'X-Api-Key/Authorization tokens, JWTs, VCS tokens (gh*/github_pat_), and ' +
-  'base64-ish blobs. Private conversation contents and portfolio details are never collected.';
+  'X-Api-Key/Authorization tokens, JWTs, VCS tokens (gh*/github_pat_), ' +
+  'LangSmith keys (lsv2_pt_/lsv2_sk_…), and base64-ish blobs. Private ' +
+  'conversation contents and portfolio details are never collected.';
 
 type Replacement = string;
 
@@ -30,6 +31,10 @@ const PATTERNS: ReadonlyArray<readonly [RegExp, Replacement]> = [
   [/\beyJ[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\.[A-Za-z0-9_-]{8,}\b/g, REDACTED],
   // GitHub / common VCS tokens.
   [/\b(?:gh[pousr]_|github_pat_)[A-Za-z0-9]{8,}\b/g, REDACTED],
+  // LangSmith API keys: lsv2_pt_/lsv2_sk_ prefixes, or a bare lsv2_ + 8+ chars.
+  // The suffix is hex, which the base64 pattern below deliberately skips, and
+  // contains underscores, which the api-key header pattern cannot span.
+  [/\blsv2_(?:pt_|sk_)?[A-Za-z0-9]{8,}\b/g, REDACTED],
   // Base64-ish blobs: long runs (≥40 chars) that include an uppercase char,
   // which excludes lowercase git SHAs and hex identifiers.
   [/\b(?=[A-Za-z0-9+/]{40,}={0,2})(?=[A-Za-z0-9+/]*[A-Z])[A-Za-z0-9+/]{40,}={0,2}/g, REDACTED],

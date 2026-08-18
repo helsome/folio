@@ -33,6 +33,20 @@ describe('redact', () => {
     expect(redact('github_pat_abcdefghijklmnopqrstuvwxyz')).toContain('[REDACTED]');
   });
 
+  it('redacts LangSmith lsv2_ keys inline', () => {
+    const suffix = 'b'.repeat(16);
+    expect(redact(`send to https://api.smith.langchain.com with key lsv2_pt_${suffix}`)).toContain('[REDACTED]');
+    expect(redact(`lsv2_pt_${suffix}`)).not.toContain(suffix);
+    expect(redact(`lsv2_sk_${suffix}`)).not.toContain(suffix);
+    expect(redact(`lsv2_${suffix}`)).not.toContain(suffix);
+    expect(redact(`key=lsv2_sk_${suffix} restart`)).toContain('[REDACTED]');
+  });
+
+  it('leaves short or unusual lsv2_ lookalikes alone', () => {
+    expect(redact('lsv2_test')).toBe('lsv2_test');
+    expect(redact('lsv2_')).toBe('lsv2_');
+  });
+
   it('redacts base64-ish blobs but leaves lowercase hex alone', () => {
     // 72 chars of base64 alphabet (mixed case), no padding.
     const blob = 'ZGlhZ25vc3RpY3Mtc2VjcmV0LWJsb2Itd2l0aC1taXhlZC1jYXNlLTEyMzQ1Njc4OTAtWFla';
