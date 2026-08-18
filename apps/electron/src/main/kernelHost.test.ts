@@ -247,6 +247,47 @@ mock.module('@finagent/shared', () => ({
   redactForShare: (report: unknown) => report,
   computeSkillCalibrations: () => [],
   computeStrategyCalibrations: () => [],
+  // V7 evaluation/observability (kernelHost constructor wiring; spec §15).
+  EvaluationStore: class {
+    getSettingsSync = () => ({
+      tracingEnabled: false,
+      langsmithProject: 'folio-agent',
+      langsmithEndpoint: '',
+      privacyLevel: 'standard',
+      onlineEvaluationEnabled: false,
+      apiKeyConfigured: false,
+      updatedAt: 0,
+    });
+    saveSettings = async (settings: unknown) => settings;
+    getSettings = async () => ({});
+    addRun = async () => undefined;
+    listExperiments = async () => [];
+    getExperiment = async () => undefined;
+    listRuns = async () => [];
+    listResults = async () => [];
+    listBaselines = async () => [];
+    listDatasets = async () => [];
+    addFeedback = async () => undefined;
+    listFeedback = async () => [];
+    recordTraceLink = async () => undefined;
+    lookupTraceLink = async () => undefined;
+  },
+  TraceCorrelationService: class {
+    recordRun = async () => ({ backend: 'none' });
+    lookup = async () => undefined;
+  },
+  resolveBackend: () => ({
+    kind: 'none',
+    status: async () => ({ kind: 'none', available: true }),
+    findTraces: async () => [],
+  }),
+  EvaluationRedactor: class {
+    redactAnswer = (answer: string | undefined) => answer;
+    redactToolCall = (toolCall: unknown) => toolCall;
+  },
+  PiRuntimeAdapter: class {},
+  sanitizeSettings: (input: unknown) => input,
+  embeddedDatasets: [],
 }));
 
 mock.module('@finagent/skill-hub', () => ({

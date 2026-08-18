@@ -340,6 +340,10 @@ ipcMain.handle('evaluation:listBaselines', async () =>
   toIpcResult(() => agentKernelHost.listEvaluationBaselines())
 );
 
+ipcMain.handle('evaluation:getCase', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.getEvaluationCase(input))
+);
+
 ipcMain.handle('evaluation:submitFeedback', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.submitEvaluationFeedback(input))
 );

@@ -55,6 +55,7 @@ import type {
   AgentEventPayload,
   ApiError,
   EvaluationBaseline,
+  EvaluationCase,
   EvaluationExperiment,
   EvaluationResultRecord,
   EvaluationRun,
@@ -1053,6 +1054,22 @@ export class AgentKernelHost {
 
   async listEvaluationFeedback(): Promise<HumanFeedback[]> {
     return this.evaluationStore.listFeedback();
+  }
+
+  /** Resolve a benchmark case definition for the case-detail view (spec §69). */
+  async getEvaluationCase(input: unknown): Promise<EvaluationCase | undefined> {
+    const request = requireObject(input);
+    const id = requireString(request.id, 'id');
+    for (const entry of embeddedDatasets) {
+      const found = entry.load().cases.find((case_) => case_.id === id);
+      if (found) return found;
+    }
+    const userDatasets = await this.evaluationStore.listDatasets();
+    for (const dataset of userDatasets) {
+      const found = dataset.cases.find((case_) => case_.id === id);
+      if (found) return found;
+    }
+    return undefined;
   }
 
   /** Diagnostics: extension/trace/backend availability without secrets (spec §86). */

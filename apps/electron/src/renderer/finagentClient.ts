@@ -174,6 +174,7 @@ function createElectronClient(): FinagentClient {
       testConnection: () => ipcResult(window.electronAPI.evaluation.testConnection()),
       listExperiments: () => ipcResult(window.electronAPI.evaluation.listExperiments()),
       getExperiment: (id) => ipcResult(window.electronAPI.evaluation.getExperiment({ id })),
+      getCase: (id) => ipcResult(window.electronAPI.evaluation.getCase({ id })),
       listBaselines: () => ipcResult(window.electronAPI.evaluation.listBaselines()),
       submitFeedback: (input) => ipcResult(window.electronAPI.evaluation.submitFeedback(input)),
       listFeedback: () => ipcResult(window.electronAPI.evaluation.listFeedback()),

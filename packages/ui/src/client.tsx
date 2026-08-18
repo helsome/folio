@@ -9,6 +9,7 @@ import type {
   CredentialInfo,
   CustomProviderConfig,
   EvaluationBaseline,
+  EvaluationCase,
   EvaluationExperiment,
   EvaluationResultRecord,
   EvaluationRun,
@@ -144,6 +145,8 @@ export interface EvaluationChannel {
   testConnection: () => Promise<ApiResult<LangSmithConnectionStatus>>;
   listExperiments: () => Promise<ApiResult<EvaluationExperiment[]>>;
   getExperiment: (id: string) => Promise<ApiResult<EvaluationExperimentDetail | undefined>>;
+  /** Benchmark case definition (prompt/expectations) for the detail view (spec §69). */
+  getCase: (id: string) => Promise<ApiResult<EvaluationCase | undefined>>;
   listBaselines: () => Promise<ApiResult<EvaluationBaseline[]>>;
   submitFeedback: (input: { caseId: string; verdict: 'good' | 'bad'; note?: string }) => Promise<ApiResult<void>>;
   listFeedback: () => Promise<ApiResult<EvaluationFeedbackItem[]>>;
@@ -387,6 +390,7 @@ export const fallbackClient: FinagentClient = {
     testConnection: missingClient('evaluation.testConnection'),
     listExperiments: missingClient('evaluation.listExperiments'),
     getExperiment: missingClient('evaluation.getExperiment'),
+    getCase: missingClient('evaluation.getCase'),
     listBaselines: missingClient('evaluation.listBaselines'),
     submitFeedback: missingClient('evaluation.submitFeedback'),
     listFeedback: missingClient('evaluation.listFeedback'),

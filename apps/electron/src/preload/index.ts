@@ -160,6 +160,7 @@ export interface ElectronAPI {
     testConnection: () => Promise<unknown>;
     listExperiments: () => Promise<unknown>;
     getExperiment: (input: { id: string }) => Promise<unknown>;
+    getCase: (input: { id: string }) => Promise<unknown>;
     listBaselines: () => Promise<unknown>;
     submitFeedback: (input: { caseId: string; verdict: 'good' | 'bad'; note?: string }) => Promise<unknown>;
     listFeedback: () => Promise<unknown>;
@@ -361,6 +362,7 @@ const electronAPI: ElectronAPI = {
     testConnection: () => ipcRenderer.invoke('evaluation:testConnection'),
     listExperiments: () => ipcRenderer.invoke('evaluation:listExperiments'),
     getExperiment: (input) => ipcRenderer.invoke('evaluation:getExperiment', input),
+    getCase: (input) => ipcRenderer.invoke('evaluation:getCase', input),
     listBaselines: () => ipcRenderer.invoke('evaluation:listBaselines'),
     submitFeedback: (input) => ipcRenderer.invoke('evaluation:submitFeedback', input),
     listFeedback: () => ipcRenderer.invoke('evaluation:listFeedback'),
