@@ -1,4 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
+import { initReactI18next } from 'react-i18next'
+import { createInstance } from 'i18next'
+import { buildI18nOptions } from '@finagent/i18n'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type {
@@ -17,6 +20,10 @@ let restoreDom: (() => void) | undefined
 
 beforeAll(() => {
   restoreDom = installHappyDom().restore
+  // Initialize the renderer i18next instance so `useTranslation` resolves the
+  // en-US resources (components call t('performance.*') in English).
+  const instance = createInstance()
+  instance.use(initReactI18next).init(buildI18nOptions({ locale: 'en-US' }))
 })
 
 afterAll(() => {

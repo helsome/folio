@@ -6,51 +6,59 @@ import type {
 import { EVALUATION_METRICS } from '@finagent/core';
 
 /**
- * Pure display helpers for the Evaluation Center. Kept free of React so the
- * shape/formatting logic is unit-testable (spec §64–68, §111).
+ * Pure display helpers for the Evaluation Center (spec §64–68, §111). Kept
+ * free of React so the shape logic is unit-testable.
+ *
+ * The label helpers return *i18n keys* (not English text) so the Evaluation
+ * Center is translatable, while metric/failure-mode ids stay stable — the id
+ * → display-key mapping is never a translated string itself (§35). Callers
+ * pass the returned key through `t(...)`. Unknown ids fall back to the raw id
+ * (or a spaced id) rather than inventing a label.
  */
 
-const METRIC_LABELS: Readonly<Record<EvaluationMetricId, string>> = Object.fromEntries(
-  EVALUATION_METRICS.map((metric) => [metric.id, metric.name])
-) as Record<EvaluationMetricId, string>;
+const METRIC_IDS: Readonly<Record<string, true>> = Object.fromEntries(
+  EVALUATION_METRICS.map((metric) => [metric.id, true] as const)
+) as Record<string, true>;
 
-const METRIC_KIND_LABELS: Readonly<Record<string, string>> = {
+const METRIC_KIND_KEYS: Readonly<Record<string, string>> = {
   deterministic: 'deterministic',
-  'llm-judge': 'llm judge',
+  'llm-judge': 'llmJudge',
   trajectory: 'trajectory',
   outcome: 'outcome',
 };
 
 export function metricLabel(id: string): string {
-  return METRIC_LABELS[id as EvaluationMetricId] ?? id;
+  return METRIC_IDS[id] === true ? `evaluation.metrics.${id}` : id;
 }
 
 export function metricKindLabel(id: string): string | null {
   const metric = EVALUATION_METRICS.find((entry) => entry.id === id);
-  return metric ? METRIC_KIND_LABELS[metric.kind] ?? metric.kind : null;
+  if (!metric) return null;
+  const suffix = METRIC_KIND_KEYS[metric.kind];
+  return suffix ? `evaluation.metricKinds.${suffix}` : metric.kind;
 }
 
-const FAILURE_MODE_LABELS: Readonly<Record<string, string>> = {
-  wrong_tool: 'Wrong tool',
-  missing_tool: 'Missing tool',
-  wrong_args: 'Wrong arguments',
-  tool_loop: 'Tool loop',
-  duplicate_tool: 'Duplicate tool call',
-  ignored_tool_result: 'Ignored tool result',
-  provider_failure: 'Provider failure',
-  no_evidence: 'No evidence',
-  unsupported_claim: 'Unsupported claim',
-  premature_answer: 'Premature answer',
-  context_miss: 'Context miss',
-  strategy_miss: 'Strategy miss',
-  timeout: 'Timeout',
-  runtime_error: 'Runtime error',
-  judge_error: 'Judge error',
-  resource_unavailable: 'Resource unavailable',
+const FAILURE_MODE_IDS: Readonly<Record<string, string>> = {
+  wrong_tool: 'wrong_tool',
+  missing_tool: 'missing_tool',
+  wrong_args: 'wrong_args',
+  tool_loop: 'tool_loop',
+  duplicate_tool: 'duplicate_tool',
+  ignored_tool_result: 'ignored_tool_result',
+  provider_failure: 'provider_failure',
+  no_evidence: 'no_evidence',
+  unsupported_claim: 'unsupported_claim',
+  premature_answer: 'premature_answer',
+  context_miss: 'context_miss',
+  strategy_miss: 'strategy_miss',
+  timeout: 'timeout',
+  runtime_error: 'runtime_error',
+  judge_error: 'judge_error',
+  resource_unavailable: 'resource_unavailable',
 };
 
 export function failureModeLabel(mode: string): string {
-  return FAILURE_MODE_LABELS[mode] ?? mode.replaceAll('_', ' ');
+  return mode in FAILURE_MODE_IDS ? `evaluation.failureModeLabels.${mode}` : mode.replaceAll('_', ' ');
 }
 
 /** Normalized 0..1 → percent; null / undefined → em dash. */

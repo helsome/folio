@@ -9,6 +9,7 @@ import { activeSymbolAtom, navSectionAtom, watchlistAtom } from '../../atoms'
 import { pendingResearchStrategyAtom } from '../../atoms/discoverAtoms'
 import type { ScreeningChannel, ScreeningRunRequest } from '../../client/screening'
 import { installHappyDom } from '../../test/setupHappyDom'
+import { makeTestI18n, I18nextProvider } from '../../test/i18nTest'
 import { DiscoverView } from './DiscoverView'
 
 let restoreDom: (() => void) | undefined
@@ -70,9 +71,27 @@ async function renderDiscoverView(client: FinagentClient) {
   const root = createRoot(container)
   await act(async () => {
     root.render(
-      <FinagentClientProvider client={client}>
-        <DiscoverView />
-      </FinagentClientProvider>
+      <I18nextProvider i18n={makeTestI18n('en-US')}>
+        <FinagentClientProvider client={client}>
+          <DiscoverView />
+        </FinagentClientProvider>
+      </I18nextProvider>
+    )
+  })
+  return { container, root }
+}
+
+async function renderDiscoverViewZh(client: FinagentClient) {
+  const container = document.createElement('div')
+  document.body.appendChild(container)
+  const root = createRoot(container)
+  await act(async () => {
+    root.render(
+      <I18nextProvider i18n={makeTestI18n('zh-CN')}>
+        <FinagentClientProvider client={client}>
+          <DiscoverView />
+        </FinagentClientProvider>
+      </I18nextProvider>
     )
   })
   return { container, root }
@@ -206,5 +225,22 @@ describe('DiscoverView', () => {
     expect(container.querySelector('[data-testid="discover-error"]')?.textContent).toContain('not wired')
     expect(container.querySelector('[data-testid="candidate-MSFT.US"]')).toBeNull()
     expect(container.textContent).toContain('No screening runs yet.')
+  })
+
+  it('renders translated Simplified Chinese labels and strategy titles in zh-CN', async () => {
+    const { container } = await renderDiscoverViewZh(clientWithScreening())
+
+    const text = container.textContent ?? ''
+    expect(text).toContain('机会发现')
+    expect(text).toContain('市场异动')
+    expect(text).toContain('基本面')
+    expect(text).toContain('涨幅居前')
+    // A known strategy name renders in Chinese after a successful run.
+    click(container, 'discover-run-strong-momentum')
+    await flushAsync()
+    expect(container.textContent).toContain('强势动能')
+    // No raw keys or English chrome leak through.
+    expect(text).not.toContain('discover.')
+    expect(text).not.toContain('Strong Momentum')
   })
 })

@@ -103,6 +103,45 @@ describe('buildPaletteCommands', () => {
   })
 })
 
+describe('localized labels', () => {
+  const zhLabels = {
+    openSymbolHint: '打开标的',
+    openSymbol: (symbol: string) => `打开 ${symbol}`,
+    goToHint: '前往',
+    startResearch: (symbol: string | null) =>
+      symbol != null ? `研究 ${symbol}` : '研究当前标的',
+    quickActionHint: '快捷操作',
+    openConnections: '打开连接',
+    quickActionSettingsHint: '快捷操作 · 设置',
+    navigation: {
+      portfolio: '投资组合',
+      research: '研究',
+      thesis: '投资逻辑',
+      compare: '对比',
+      alerts: '提醒',
+      skills: '技能',
+      evaluation: '评测',
+      settings: '设置',
+    },
+  }
+
+  it('renders translated labels for command entries', () => {
+    const commands = buildPaletteCommands({ query: '', watchlist: [], activeSymbol: null, labels: zhLabels })
+    const nav = commands.find((c) => c.kind === 'navigation' && c.section === 'portfolio')
+    expect(nav?.label).toBe('投资组合')
+    const openConnections = commands.find((c) => c.action === 'open-connections')
+    expect(openConnections?.label).toBe('打开连接')
+  })
+
+  it('keeps English aliases searchable under a localized label (best effort, §70)', () => {
+    const commands = buildPaletteCommands({ query: '', watchlist: [], activeSymbol: null, labels: zhLabels })
+    const filtered = filterCommands('ale', commands)
+    const alert = filtered.find((c) => c.kind === 'navigation' && c.section === 'alerts')
+    expect(alert).toBeDefined()
+    expect(alert?.label).toBe('提醒')
+  })
+})
+
 describe('movePaletteSelection', () => {
   it('moves forward with wrap-around', () => {
     expect(movePaletteSelection(0, 1, 3)).toBe(1)

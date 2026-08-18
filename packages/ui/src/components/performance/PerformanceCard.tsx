@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { formatPercent } from '../../lib/money';
 
 /**
@@ -52,6 +53,7 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
   rows,
   emptyMessage,
 }) => {
+  const { t } = useTranslation();
   return (
     <section
       className="rounded-[10px] border mac-list-row p-4"
@@ -64,12 +66,12 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
         <table className="mt-2.5 w-full border-separate border-spacing-0">
           <thead>
             <tr>
-              <th className={HEADER_CELL}>Name</th>
-              <th className={`${HEADER_CELL} text-right`}>Samples</th>
-              <th className={`${HEADER_CELL} text-right`}>Hit Rate</th>
+              <th className={HEADER_CELL}>{t('performance.name')}</th>
+              <th className={`${HEADER_CELL} text-right`}>{t('performance.samples')}</th>
+              <th className={`${HEADER_CELL} text-right`}>{t('performance.hitRate')}</th>
               <th className={`${HEADER_CELL} text-right`}>{metricLabel}</th>
-              <th className={`${HEADER_CELL} text-right`}>Unable</th>
-              <th className={`${HEADER_CELL} text-right`}>Status</th>
+              <th className={`${HEADER_CELL} text-right`}>{t('performance.unable')}</th>
+              <th className={`${HEADER_CELL} text-right`}>{t('performance.status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -96,7 +98,7 @@ export const PerformanceCard: React.FC<PerformanceCardProps> = ({
                       className="inline-flex items-center rounded-full border border-dashed border-[var(--mac-border)] px-2 py-0.5 text-[10px] text-foreground/56"
                       data-testid="observational-badge"
                     >
-                      Observational Only
+                      {t('performance.observationalOnly')}
                     </span>
                   )}
                 </td>

@@ -1,9 +1,8 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { AllocationItem, PortfolioRiskReport, RiskSignal } from '@finagent/core';
 import { severityVisual } from '../../atoms/portfolioRiskAtoms';
-
-const fmtPct = (n: number): string => `${(n * 100).toFixed(1)}%`;
-const fmtMoney = (n: number): string => `$${n.toFixed(2)}`;
+import { formatCurrency, formatPercentRatio } from '@finagent/i18n';
 
 interface PortfolioRiskPanelProps {
   report: PortfolioRiskReport;
@@ -11,6 +10,7 @@ interface PortfolioRiskPanelProps {
 
 /** Renders the PortfolioRiskReport: summary, concentration, allocation, and signals. */
 export const PortfolioRiskPanel: React.FC<PortfolioRiskPanelProps> = ({ report }) => {
+  const { t } = useTranslation();
   const { summary, allocation, concentration, signals } = report;
   const earnings = signals.filter((s) => s.kind === 'upcoming_earnings');
   const otherSignals = signals.filter((s) => s.kind !== 'upcoming_earnings');
@@ -19,28 +19,39 @@ export const PortfolioRiskPanel: React.FC<PortfolioRiskPanelProps> = ({ report }
     <div className="space-y-3" data-testid="portfolio-risk-panel">
       <div className="mac-stock-tile rounded-[14px] p-4">
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
-          Risk summary
+          {t('portfolio.riskSummary')}
         </h3>
         <p className="text-[13px] leading-relaxed text-foreground/78">{summary}</p>
       </div>
 
       <div className="mac-stock-tile rounded-[14px] p-4">
         <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
-          Concentration
+          {t('portfolio.concentration')}
         </h3>
         <div className="grid grid-cols-3 gap-3">
-          <ConcentrationMetric label="Top position" value={fmtPct(concentration.top1Weight)} />
-          <ConcentrationMetric label="Top five" value={fmtPct(concentration.top5Weight)} />
-          <ConcentrationMetric label="Herfindahl" value={concentration.herfindahl.toFixed(2)} />
+          <ConcentrationMetric
+            label={t('portfolio.topPosition')}
+            value={formatPercentRatio(concentration.top1Weight)}
+          />
+          <ConcentrationMetric
+            label={t('portfolio.topFive')}
+            value={formatPercentRatio(concentration.top5Weight)}
+          />
+          <ConcentrationMetric
+            label={t('portfolio.herfindahl')}
+            value={concentration.herfindahl.toFixed(2)}
+          />
         </div>
       </div>
 
       <div className="mac-stock-tile rounded-[14px] p-4">
         <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
-          Allocation ({allocation.length})
+          {t('portfolio.allocation')} ({allocation.length})
         </h3>
         {allocation.length === 0 ? (
-          <div className="py-6 text-center text-[13px] text-foreground/44">No positions.</div>
+          <div className="py-6 text-center text-[13px] text-foreground/44">
+            {t('portfolio.noPositions')}
+          </div>
         ) : (
           <div className="space-y-2">
             {allocation.map((item) => (
@@ -53,7 +64,7 @@ export const PortfolioRiskPanel: React.FC<PortfolioRiskPanelProps> = ({ report }
       {earnings.length > 0 && (
         <div className="mac-stock-tile rounded-[14px] p-4">
           <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
-            Upcoming earnings
+            {t('portfolio.upcomingEarnings')}
           </h3>
           <ul className="space-y-1">
             {earnings.map((signal) => (
@@ -88,7 +99,7 @@ const AllocationBar: React.FC<{ item: AllocationItem }> = ({ item }) => (
     <div className="mb-1 flex items-center justify-between text-[12px]">
       <span className="font-medium text-foreground/82">{item.symbol}</span>
       <span className="text-foreground/54">
-        {fmtMoney(item.marketValue)} · {fmtPct(item.weight)}
+        {formatCurrency(item.marketValue)} · {formatPercentRatio(item.weight)}
       </span>
     </div>
     <div className="h-1.5 w-full overflow-hidden rounded-full bg-foreground/8">

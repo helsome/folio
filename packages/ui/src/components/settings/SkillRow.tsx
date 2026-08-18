@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { SkillReadiness } from '@finagent/core';
 import type { SkillListItem } from '../../client';
 import { SkillReadinessBadge } from './SkillReadinessBadge';
@@ -29,6 +30,7 @@ export const SkillRow: React.FC<SkillRowProps> = ({
   onToggle,
   onOpen,
 }) => {
+  const { t } = useTranslation();
   const isToggling = togglingId === skill.id;
   const toggleBusy = togglingId !== null;
   const rowError = toggleError?.skillId === skill.id ? toggleError.message : null;
@@ -66,7 +68,7 @@ export const SkillRow: React.FC<SkillRowProps> = ({
             onChange={() => onToggle(skill)}
             disabled={toggleBusy}
             loading={isToggling}
-            label={`${skill.enabled ? 'Disable' : 'Enable'} ${skill.name}`}
+            label={`${skill.enabled ? t('settings.skills.disable') : t('settings.skills.enable')} ${skill.name}`}
           />
         </span>
       </div>

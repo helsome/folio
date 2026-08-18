@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
+import { useTranslation } from 'react-i18next'
 import { useFinagentClient } from '../../client'
 import { automationStateAtom, loadBriefAtom } from '../../atoms/automationAtoms'
 import type { BriefItem, BriefItemSource } from '../../client/automation'
@@ -21,6 +22,7 @@ const SOURCE_DOT: Record<BriefItemSource, string> = {
 
 /** Today-section rendering of the Daily Brief (spec §27–28). */
 export const DailyBriefSection: React.FC<DailyBriefSectionProps> = ({ onManage }) => {
+  const { t } = useTranslation()
   const client = useFinagentClient()
   const { brief, briefLoading } = useAtomValue(automationStateAtom)
   const loadBrief = useSetAtom(loadBriefAtom)
@@ -33,10 +35,10 @@ export const DailyBriefSection: React.FC<DailyBriefSectionProps> = ({ onManage }
   const content = (() => {
     if (brief === null && briefLoading) return <SectionState kind="loading" />
     if (brief === null) {
-      return <SectionState kind="empty" message="Daily Brief is not available yet." />
+      return <SectionState kind="empty" message={t('today.dailyBriefUnavailable')} />
     }
     if (brief.items.length === 0 && brief.quiet.count === 0) {
-      return <SectionState kind="empty" message="Nothing to report." />
+      return <SectionState kind="empty" message={t('today.nothingToReport')} />
     }
     return (
       <div className="space-y-2">
@@ -64,14 +66,14 @@ export const DailyBriefSection: React.FC<DailyBriefSectionProps> = ({ onManage }
 
   return (
     <TodaySection
-      title="Daily Brief"
+      title={t('today.dailyBrief')}
       action={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={onManage}>
-            Manage
+            {t('today.manage')}
           </Button>
           <Button variant="ghost" size="sm" onClick={() => void loadBrief(client)}>
-            Refresh
+            {t('common.refresh')}
           </Button>
         </div>
       }
@@ -87,39 +89,42 @@ interface BriefRowProps {
   onToggle: () => void
 }
 
-const BriefRow: React.FC<BriefRowProps> = ({ item, expanded, onToggle }) => (
-  <li className="rounded-[9px] border border-border bg-surface/60 px-3 py-2">
-    <div className="flex items-start justify-between gap-3">
-      <div className="min-w-0">
-        <div className="flex items-center gap-2">
-          <span
-            className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${SOURCE_DOT[item.source]}`}
-          />
-          <span className="truncate text-[13px] font-medium text-foreground">
-            {item.symbol ? `${item.symbol} · ` : ''}
-            {item.title}
-          </span>
+const BriefRow: React.FC<BriefRowProps> = ({ item, expanded, onToggle }) => {
+  const { t } = useTranslation()
+  return (
+    <li className="rounded-[9px] border border-border bg-surface/60 px-3 py-2">
+      <div className="flex items-start justify-between gap-3">
+        <div className="min-w-0">
+          <div className="flex items-center gap-2">
+            <span
+              className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${SOURCE_DOT[item.source]}`}
+            />
+            <span className="truncate text-[13px] font-medium text-foreground">
+              {item.symbol ? `${item.symbol} · ` : ''}
+              {item.title}
+            </span>
+          </div>
+          <div className="mt-0.5 truncate text-[12px] text-foreground/54">{item.message}</div>
         </div>
-        <div className="mt-0.5 truncate text-[12px] text-foreground/54">{item.message}</div>
+        <span className="shrink-0 rounded-full bg-foreground/8 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-foreground/54">
+          {t(`today.source.${item.source}`)}
+        </span>
       </div>
-      <span className="shrink-0 rounded-full bg-foreground/8 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-foreground/54">
-        {item.source}
-      </span>
-    </div>
-    {item.payload !== undefined && (
-      <button
-        type="button"
-        onClick={onToggle}
-        className="mt-1.5 text-[11px] text-foreground/38 underline-offset-2 hover:text-foreground/60 hover:underline"
-        aria-expanded={expanded}
-      >
-        {expanded ? 'Hide' : 'Why am I seeing this?'}
-      </button>
-    )}
-    {expanded && item.payload !== undefined && (
-      <pre className="mt-1.5 overflow-x-auto rounded-[8px] bg-foreground/5 p-2 text-[11px] leading-relaxed text-foreground/60">
-        {JSON.stringify(item.payload, null, 2)}
-      </pre>
-    )}
-  </li>
-)
+      {item.payload !== undefined && (
+        <button
+          type="button"
+          onClick={onToggle}
+          className="mt-1.5 text-[11px] text-foreground/38 underline-offset-2 hover:text-foreground/60 hover:underline"
+          aria-expanded={expanded}
+        >
+          {expanded ? t('today.hide') : t('today.whySeeingThis')}
+        </button>
+      )}
+      {expanded && item.payload !== undefined && (
+        <pre className="mt-1.5 overflow-x-auto rounded-[8px] bg-foreground/5 p-2 text-[11px] leading-relaxed text-foreground/60">
+          {JSON.stringify(item.payload, null, 2)}
+        </pre>
+      )}
+    </li>
+  )
+}

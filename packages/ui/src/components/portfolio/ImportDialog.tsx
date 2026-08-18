@@ -1,4 +1,5 @@
 import React, { useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ImportSource, PortfolioImportDraft } from '@finagent/core';
 import { Dialog } from '../primitives/Dialog';
 import { Button } from '../primitives/Button';
@@ -24,6 +25,7 @@ export interface ImportDialogProps {
 }
 
 export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImported }) => {
+  const { t } = useTranslation();
   const [step, setStep] = useState<DialogStep>('pick');
   const [draft, setDraft] = useState<PortfolioImportDraft | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -51,7 +53,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImp
     setError(null);
     const parsed = await parsePortfolioImport(source, text);
     if (!parsed) {
-      setError('Import parsing is not available in this build yet.');
+      setError(t('portfolio.import.errorUnavailable'));
       return;
     }
     setDraft(parsed);
@@ -61,7 +63,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImp
   const handlePaste = () => {
     const text = pasteRef.current?.value ?? '';
     if (text.trim() === '') {
-      setError('Paste some holdings first, e.g. AAPL.US 100 180.5');
+      setError(t('portfolio.import.errorPasteEmpty'));
       return;
     }
     void runParse('paste', text);
@@ -72,12 +74,12 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImp
     reader.onload = () => {
       const text = typeof reader.result === 'string' ? reader.result : '';
       if (text.trim() === '') {
-        setError('The file is empty.');
+        setError(t('portfolio.import.errorFileEmpty'));
         return;
       }
       void runParse('csv', text);
     };
-    reader.onerror = () => setError('Could not read that file.');
+    reader.onerror = () => setError(t('portfolio.import.errorFileRead'));
     reader.readAsText(file);
   };
 
@@ -88,7 +90,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImp
     const portfolio = await confirmPortfolioImport(draft, name);
     setConfirming(false);
     if (!portfolio) {
-      setConfirmError('Import failed — please try again.');
+      setConfirmError(t('portfolio.import.errorImportFailed'));
       return;
     }
     onImported();
@@ -96,19 +98,18 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImp
   };
 
   return (
-    <Dialog open={open} onClose={handleClose} title="Import Portfolio" className="max-w-2xl">
+    <Dialog open={open} onClose={handleClose} title={t('portfolio.import.title')} className="max-w-2xl">
       {step === 'pick' && (
         <div className="space-y-3">
           <p className="text-[13px] text-foreground/70">
-            Add a manual portfolio from your own records. It stays separate from
-            broker-synced accounts.
+            {t('portfolio.import.description')}
           </p>
           <div className="flex flex-col gap-2">
             <Button variant="secondary" onClick={() => setStep('paste')}>
-              Paste holdings
+              {t('portfolio.import.pasteHoldings')}
             </Button>
             <Button variant="secondary" onClick={() => fileInputRef.current?.click()}>
-              Import CSV file…
+              {t('portfolio.import.importCsv')}
             </Button>
             <input
               ref={fileInputRef}
@@ -120,8 +121,8 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImp
                 if (file) handleFile(file);
               }}
             />
-            <Button variant="secondary" disabled title="Coming soon">
-              Screenshot (coming soon)
+            <Button variant="secondary" disabled title={t('portfolio.import.screenshotComingSoon')}>
+              {t('portfolio.import.screenshotComingSoon')}
             </Button>
           </div>
         </div>
@@ -130,7 +131,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImp
       {step === 'paste' && (
         <div className="space-y-3">
           <p className="text-[13px] text-foreground/70">
-            Paste lines in one of these formats:
+            {t('portfolio.import.pasteInstructions')}
           </p>
           <pre className="rounded-[10px] bg-foreground/4 px-3 py-2 text-[11px] text-foreground/60">
             {'AAPL.US 100 180.5\nAAPL.US, 100, 180.5\nAAPL.US 180.5'}
@@ -138,7 +139,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImp
           <textarea
             ref={pasteRef}
             defaultValue=""
-            placeholder="e.g. 0700.HK 500 320&#10;TSLA.US, 20, 245.5"
+            placeholder={t('portfolio.import.pastePlaceholder')}
             rows={6}
             className="w-full rounded-[10px] border border-[var(--mac-border)] bg-background px-3 py-2 text-[13px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-accent/28"
           />
@@ -149,10 +150,10 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImp
           )}
           <div className="flex justify-end gap-2">
             <Button variant="secondary" size="sm" onClick={() => setStep('pick')}>
-              Back
+              {t('common.back')}
             </Button>
             <Button size="sm" onClick={handlePaste}>
-              Parse
+              {t('portfolio.import.parse')}
             </Button>
           </div>
         </div>
@@ -177,7 +178,7 @@ export const ImportDialog: React.FC<ImportDialogProps> = ({ open, onClose, onImp
           )}
           <div className="flex justify-end">
             <Button variant="secondary" size="sm" onClick={handleClose}>
-              Close
+              {t('common.close')}
             </Button>
           </div>
         </div>

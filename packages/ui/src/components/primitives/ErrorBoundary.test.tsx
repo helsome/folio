@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client';
 import { act } from 'react-dom/test-utils';
 import { ErrorBoundary } from './ErrorBoundary';
 import { installHappyDom } from '../../test/setupHappyDom';
+import { withI18n } from '../../test/i18n';
 
 const happyDom = installHappyDom();
 afterAll(() => happyDom.restore());
@@ -20,7 +21,7 @@ function renderBoundary(children: React.ReactNode): { container: HTMLElement; ro
   document.body.appendChild(container);
   const root = createRoot(container);
   act(() => {
-    root.render(<ErrorBoundary>{children}</ErrorBoundary>);
+    root.render(withI18n(<ErrorBoundary>{children}</ErrorBoundary>));
   });
   return { container, root };
 }

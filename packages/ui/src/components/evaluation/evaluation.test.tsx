@@ -2,6 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import { fallbackClient, FinagentClientProvider } from '../../client';
+import { I18nProvider } from '../../i18n/I18nProvider';
 import { installHappyDom } from '../../test/setupHappyDom';
 import { EvaluationCenter } from './EvaluationCenter';
 import { EvaluationSettingsTab } from '../settings/EvaluationSettingsTab';
@@ -21,7 +22,11 @@ async function render(element: React.ReactElement) {
   document.body.appendChild(container);
   const root = createRoot(container);
   await act(async () => {
-    root.render(<FinagentClientProvider client={fallbackClient}>{element}</FinagentClientProvider>);
+    root.render(
+      <FinagentClientProvider client={fallbackClient}>
+        <I18nProvider>{element}</I18nProvider>
+      </FinagentClientProvider>
+    );
   });
   return { container, root };
 }

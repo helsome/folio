@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import type { Quote, StaticInfo, MarketStatus } from '@finagent/core';
 import { activeSymbolAtom, navSectionAtom } from '../../atoms';
 import { useFinagentClient } from '../../client';
@@ -28,6 +29,7 @@ const StatCell: React.FC<StatCellProps> = ({ label, value }) => (
 );
 
 export const SecurityHeader: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const symbol = useAtomValue(activeSymbolAtom);
   const setNavSection = useSetAtom(navSectionAtom);
@@ -111,7 +113,7 @@ export const SecurityHeader: React.FC = () => {
           {symbol}
         </div>
         <div className="mt-1 text-[12px] text-foreground/54">
-          Quote unavailable: {error}
+          {t('security.header.quoteUnavailable', { error })}
         </div>
       </div>
     );
@@ -134,13 +136,13 @@ export const SecurityHeader: React.FC = () => {
   const name = info?.name ?? symbol;
 
   const stats: StatCellProps[] = [
-    { label: 'Open', value: formatPrice(quote.open) },
-    { label: 'High', value: formatPrice(quote.high) },
-    { label: 'Low', value: formatPrice(quote.low) },
-    { label: 'Prev Close', value: formatPrice(quote.prevClose) },
-    { label: 'Volume', value: formatNumber(quote.volume) },
-    { label: 'Turnover', value: DASH },
-    { label: 'Market Status', value: marketStatus ?? DASH },
+    { label: t('security.header.open'), value: formatPrice(quote.open) },
+    { label: t('security.header.high'), value: formatPrice(quote.high) },
+    { label: t('security.header.low'), value: formatPrice(quote.low) },
+    { label: t('security.header.prevClose'), value: formatPrice(quote.prevClose) },
+    { label: t('security.header.volume'), value: formatNumber(quote.volume) },
+    { label: t('security.header.turnover'), value: DASH },
+    { label: t('security.header.marketStatus'), value: marketStatus ?? DASH },
   ];
 
   return (
@@ -183,7 +185,7 @@ export const SecurityHeader: React.FC = () => {
             className="mac-primary-button rounded-[8px] px-3 py-1.5 text-[12px] font-semibold"
             data-testid="deep-research-button"
           >
-            Deep Research
+            {t('security.header.deepResearch')}
           </button>
         </div>
       </div>

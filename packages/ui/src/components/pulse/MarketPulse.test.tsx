@@ -5,6 +5,7 @@ import type { ScreeningCandidate } from '@finagent/core'
 import { fallbackClient, FinagentClientProvider, type FinagentClient } from '../../client'
 import { partitionPulseMovers, type MarketPulseSnapshot } from '../../client/pulse'
 import { installHappyDom } from '../../test/setupHappyDom'
+import { withI18n } from '../../test/i18n'
 import { MarketPulse } from './MarketPulse'
 
 let restoreDom: (() => void) | undefined
@@ -83,7 +84,7 @@ async function renderPulse(client: FinagentClient): Promise<void> {
   await act(async () => {
     root.render(
       <FinagentClientProvider client={client}>
-        <MarketPulse />
+        {withI18n(<MarketPulse />)}
       </FinagentClientProvider>
     )
   })

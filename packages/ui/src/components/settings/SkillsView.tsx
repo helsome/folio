@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import { useFinagentClient, type SkillListItem } from '../../client';
 import { loadSkillReadiness, skillReadinessAtom } from '../../atoms/skillReadinessAtoms';
 import { filterSkills, SKILL_STATUS_FILTERS, type SkillStatusFilter } from './skillFilters';
@@ -7,8 +8,16 @@ import { useSkillToggle } from './useSkillToggle';
 import { SkillList } from './SkillList';
 import { SkillDetailDrawer } from './SkillDetailDrawer';
 
+const SKILL_FILTER_LABEL_KEY: Record<SkillStatusFilter, string> = {
+  all: 'settings.skills.filterAll',
+  ready: 'settings.skills.filterReady',
+  partial: 'settings.skills.filterPartial',
+  disabled: 'settings.skills.filterDisabled',
+};
+
 /** Skills home: search + status chips + rows, with a detail drawer. */
 export const SkillsView: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [skills, setSkills] = useState<SkillListItem[]>([]);
   const [loading, setLoading] = useState(true);
@@ -88,15 +97,15 @@ export const SkillsView: React.FC = () => {
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search skills…"
-              aria-label="Search skills"
+              placeholder={t('settings.skills.searchPlaceholder')}
+              aria-label={t('settings.skills.searchAria')}
               data-testid="skills-search"
               className="w-full rounded-[8px] border border-[var(--mac-border)] bg-background/60 py-1.5 pl-8 pr-3 text-[13px] text-foreground placeholder:text-foreground/40 transition-smooth hover:border-[var(--mac-border-strong)] focus:border-[var(--mac-blue)] focus:outline-none"
             />
           </div>
         </div>
 
-        <div role="group" aria-label="Filter skills by status" className="flex flex-wrap gap-1.5">
+        <div role="group" aria-label={t('settings.skills.filterGroupAria')} className="flex flex-wrap gap-1.5">
           {SKILL_STATUS_FILTERS.map((filter) => {
             const active = status === filter.value;
             return (
@@ -112,7 +121,7 @@ export const SkillsView: React.FC = () => {
                     : 'border-[var(--mac-border)] text-foreground/64 hover:border-[var(--mac-border-strong)] hover:text-foreground active:scale-95'
                 }`}
               >
-                {filter.label}
+                {t(SKILL_FILTER_LABEL_KEY[filter.value])}
               </button>
             );
           })}
@@ -121,7 +130,7 @@ export const SkillsView: React.FC = () => {
 
       <div className="mt-4">
         {loading ? (
-          <div className="py-10 text-center text-[13px] text-foreground/48">Loading skills…</div>
+          <div className="py-10 text-center text-[13px] text-foreground/48">{t('settings.skills.loading')}</div>
         ) : error ? (
           <div className="py-10 text-center">
             <div role="alert" className="text-[13px] text-destructive">
@@ -132,14 +141,14 @@ export const SkillsView: React.FC = () => {
               onClick={() => void loadSkills()}
               className="mt-3 rounded-[8px] border border-[var(--mac-border)] px-3 py-1.5 text-[12px] font-medium text-foreground/72 transition-smooth hover:border-[var(--mac-border-strong)] hover:text-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)]"
             >
-              Retry
+              {t('settings.skills.retry')}
             </button>
           </div>
         ) : skills.length === 0 ? (
-          <div className="py-10 text-center text-[13px] text-foreground/48">No skills installed</div>
+          <div className="py-10 text-center text-[13px] text-foreground/48">{t('settings.skills.noneInstalled')}</div>
         ) : filtered.length === 0 ? (
           <div className="py-10 text-center text-[13px] text-foreground/48">
-            No skills match your search or filter
+            {t('settings.skills.noMatch')}
           </div>
         ) : (
           <SkillList

@@ -1,26 +1,30 @@
 import React, { useEffect, useState } from 'react';
 import { useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import type { NewsItem } from '@finagent/core';
 import { activeSymbolAtom } from '../../atoms';
 import { useFinagentClient } from '../../client';
 
-const relativeTime = (timestamp: number): string => {
+type TFunc = (key: string, vars?: Record<string, unknown>) => string;
+
+const relativeTime = (timestamp: number, t: TFunc): string => {
   const diff = Date.now() - timestamp;
-  if (diff < 0) return 'just now';
+  if (diff < 0) return t('security.news.justNow');
   const minutes = Math.floor(diff / 60000);
-  if (minutes < 1) return 'just now';
-  if (minutes < 60) return `${minutes}m ago`;
+  if (minutes < 1) return t('security.news.justNow');
+  if (minutes < 60) return t('security.news.minutesAgo', { n: minutes });
   const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
+  if (hours < 24) return t('security.news.hoursAgo', { n: hours });
   const days = Math.floor(hours / 24);
-  if (days < 30) return `${days}d ago`;
+  if (days < 30) return t('security.news.daysAgo', { n: days });
   const months = Math.floor(days / 30);
-  if (months < 12) return `${months}mo ago`;
+  if (months < 12) return t('security.news.monthsAgo', { n: months });
   const years = Math.floor(months / 12);
-  return `${years}y ago`;
+  return t('security.news.yearsAgo', { n: years });
 };
 
 export const NewsView: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const symbol = useAtomValue(activeSymbolAtom);
 
@@ -74,7 +78,7 @@ export const NewsView: React.FC = () => {
   if (error) {
     return (
       <div className="p-4 text-[12px] text-foreground/54">
-        News unavailable: {error}
+        {t('security.news.unavailable', { error })}
       </div>
     );
   }
@@ -82,7 +86,7 @@ export const NewsView: React.FC = () => {
   if (!news || news.length === 0) {
     return (
       <div className="flex h-full items-center justify-center p-4 text-[13px] text-foreground/44">
-        No news available for this symbol.
+        {t('security.news.none')}
       </div>
     );
   }
@@ -108,7 +112,7 @@ export const NewsView: React.FC = () => {
               )}
             </div>
             <span className="shrink-0 pt-0.5 text-[11px] tabular-nums text-foreground/42">
-              {relativeTime(item.timestamp)}
+              {relativeTime(item.timestamp, t)}
             </span>
           </a>
         </li>

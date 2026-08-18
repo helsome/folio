@@ -1,5 +1,6 @@
 import React from 'react';
 import { useSetAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import { navSectionAtom, settingsTabAtom } from '../../atoms';
 import { Button } from './Button';
 
@@ -53,6 +54,7 @@ const ErrorFallback: React.FC<{
   onRetry: () => void;
   onOpenDiagnostics?: () => void;
 }> = ({ onRetry, onOpenDiagnostics }) => {
+  const { t } = useTranslation();
   const setNavSection = useSetAtom(navSectionAtom);
   const setSettingsTab = useSetAtom(settingsTabAtom);
 
@@ -70,17 +72,16 @@ const ErrorFallback: React.FC<{
       className="flex h-full w-full flex-col items-center justify-center gap-4 p-8 text-center"
       data-testid="error-boundary-fallback"
     >
-      <div className="text-[15px] font-semibold text-foreground">Something went wrong</div>
+      <div className="text-[15px] font-semibold text-foreground">{t('errors.sectionUnexpected')}</div>
       <div className="max-w-md text-[12px] text-foreground/60">
-        An unexpected error occurred in this section. Retry, or open Diagnostics to inspect the
-        app state and export a support bundle.
+        {t('errors.sectionUnexpectedDetail')}
       </div>
       <div className="flex gap-2">
         <Button variant="secondary" size="sm" onClick={onRetry}>
-          Retry
+          {t('common.retry')}
         </Button>
         <Button variant="outline" size="sm" onClick={openDiagnostics}>
-          Open Diagnostics
+          {t('errors.sectionOpenDiagnostics')}
         </Button>
       </div>
     </div>

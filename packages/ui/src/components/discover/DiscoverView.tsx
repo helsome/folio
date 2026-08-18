@@ -1,11 +1,11 @@
 import React, { useCallback, useEffect, useState } from 'react'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
-import type { ScreeningCandidate, ScreeningRun } from '@finagent/core'
+import { useTranslation } from 'react-i18next'
+import type { ScreeningCandidate, ScreeningRun, ScreeningStrategy } from '@finagent/core'
 import { activeSymbolAtom, addToWatchlistAtom, navSectionAtom, watchlistAtom } from '../../atoms'
 import { compareSymbolsAtom } from '../../atoms/compareAtoms'
 import {
   DISCOVER_TASKS,
-  FAMILY_LABELS,
   FAMILY_ORDER,
   RESEARCH_STRATEGY_BY_TASK,
   tasksByFamily,
@@ -41,6 +41,7 @@ function failureNote(run: ScreeningRun | null): string[] {
  * history.
  */
 export const DiscoverView: React.FC = () => {
+  const { t } = useTranslation()
   const client = useFinagentClient()
   const watchlist = useAtomValue(watchlistAtom)
   const [running, setRunning] = useAtom(screeningRunningStrategyAtom)
@@ -84,11 +85,11 @@ export const DiscoverView: React.FC = () => {
         setResults(run.candidates)
         void refreshRuns()
       } else {
-        setError('Screening is not available yet — the screening channel is not wired.')
+        setError(t('discover.notAvailable'))
       }
       setRunning(null)
     },
-    [client, running, watchlist, setRunning, setError, setResults, setLastRun, refreshRuns]
+    [client, running, watchlist, setRunning, setError, setResults, setLastRun, refreshRuns, t]
   )
 
   const handleReopen = useCallback(
@@ -99,10 +100,10 @@ export const DiscoverView: React.FC = () => {
         setLastRun(run)
         setResults(run.candidates)
       } else {
-        setError('Could not reload that run.')
+        setError(t('discover.reloadFailed'))
       }
     },
-    [client, setError, setLastRun, setResults]
+    [client, setError, setLastRun, setResults, t]
   )
 
   const handleAction = useCallback(
@@ -125,20 +126,22 @@ export const DiscoverView: React.FC = () => {
     [addToWatchlist, setActiveSymbol, setCompareSymbols, setNavSection, setPendingStrategy, lastRun]
   )
 
-  const runTitle = lastRun
-    ? (DISCOVER_TASKS.find((task) => task.id === lastRun.strategy)?.title ?? lastRun.strategy)
-    : ''
+  const strategyTitle = (id: ScreeningStrategy): string =>
+    DISCOVER_TASKS.some((task) => task.id === id) ? t(`discover.strategy.${id}.title`) : id
+
+  const runTitle = lastRun ? strategyTitle(lastRun.strategy) : ''
+
+  const scope =
+    watchlist.length > 0
+      ? t('discover.scopeWatchlist', { count: watchlist.length })
+      : t('discover.scopeUniverse')
 
   return (
     <div className="h-full overflow-y-auto p-4" data-testid="discover-view">
       <div className="mb-1">
-        <h1 className="text-[20px] font-semibold tracking-tight text-foreground">Discover</h1>
+        <h1 className="text-[20px] font-semibold tracking-tight text-foreground">{t('discover.title')}</h1>
         <p className="mt-0.5 text-[12.5px] text-foreground/54">
-          Pick a task to screen{' '}
-          {watchlist.length > 0
-            ? `your watchlist (${watchlist.length} symbols)`
-            : 'the built-in universe'}
-          {' \u2014 '}deterministic rules over live market data, no AI scanning.
+          {t('discover.subtitle', { scope })}
         </p>
       </div>
 
@@ -154,9 +157,9 @@ export const DiscoverView: React.FC = () => {
 
       <div className="space-y-5">
         {FAMILY_ORDER.map((family: StrategyFamily) => (
-          <section key={family} data-testid={`discover-family-${family}`} aria-label={FAMILY_LABELS[family]}>
+          <section key={family} data-testid={`discover-family-${family}`} aria-label={t(`discover.family.${family}`)}>
             <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-foreground/56">
-              {FAMILY_LABELS[family]}
+              {t(`discover.family.${family}`)}
             </h2>
             <div className="grid grid-cols-1 gap-2 lg:grid-cols-2">
               {tasksByFamily(family).map((task) => (
@@ -174,40 +177,40 @@ export const DiscoverView: React.FC = () => {
       </div>
 
       {results && (
-        <section className="mt-6" data-testid="discover-results" aria-label="Screening results">
+        <section className="mt-6" data-testid="discover-results" aria-label={t('discover.resultsAria')}>
           <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-foreground/56">
-            {runTitle} · {results.length} candidate{results.length === 1 ? '' : 's'}
+            {runTitle} · {t('discover.candidates', { count: results.length })}
           </h2>
           {failureNote(lastRun).length > 0 && (
             <div
               data-testid="discover-failures"
               className="mb-2 rounded-[8px] border border-[var(--mac-border)] bg-background/40 px-3 py-1.5 text-[11.5px] text-foreground/48"
             >
-              Data sources unavailable this run: {failureNote(lastRun).join(' · ')}
+              {t('discover.dataSourcesUnavailable', { list: failureNote(lastRun).join(' · ') })}
             </div>
           )}
           {results.length === 0 ? (
             <div className="rounded-[10px] border border-[var(--mac-border)] bg-background/40 px-3 py-6 text-center text-[12.5px] text-foreground/48">
-              No candidates matched this task in the current universe.
+              {t('discover.noCandidates')}
             </div>
           ) : (
             <div className="overflow-hidden rounded-[10px] border border-border bg-surface">
-              <div className="grid grid-cols-[minmax(0,1.8fr)_minmax(110px,1fr)_auto] gap-3 border-b border-border bg-surface-muted px-3 py-2 text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/38"><span>Candidate</span><span className="text-right">Metrics</span><span className="sr-only">Actions</span></div>
+              <div className="grid grid-cols-[minmax(0,1.8fr)_minmax(110px,1fr)_auto] gap-3 border-b border-border bg-surface-muted px-3 py-2 text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/38"><span>{t('discover.candidate')}</span><span className="text-right">{t('discover.metrics')}</span><span className="sr-only">{t('discover.actions')}</span></div>
               {results.map((candidate) => <CandidateCard key={candidate.symbol} candidate={candidate} onAction={handleAction} />)}
             </div>
           )}
         </section>
       )}
 
-      <section className="mt-6" data-testid="discover-history" aria-label="Previous runs">
+      <section className="mt-6" data-testid="discover-history" aria-label={t('discover.previousRunsAria')}>
         <h2 className="mb-2 text-[13px] font-semibold uppercase tracking-wider text-foreground/56">
-          Previous runs
+          {t('discover.previousRuns')}
         </h2>
         {runsLoading ? (
-          <div className="py-4 text-center text-[12.5px] text-foreground/40">Loading…</div>
+          <div className="py-4 text-center text-[12.5px] text-foreground/40">{t('common.loading')}</div>
         ) : runs.length === 0 ? (
           <div className="rounded-[10px] border border-[var(--mac-border)] bg-background/40 px-3 py-4 text-center text-[12.5px] text-foreground/48">
-            No screening runs yet.
+            {t('discover.noRuns')}
           </div>
         ) : (
           <ul className="space-y-1.5">
@@ -220,10 +223,10 @@ export const DiscoverView: React.FC = () => {
                 >
                   <div className="min-w-0">
                     <div className="truncate text-[12.5px] font-medium text-foreground">
-                      {task?.title ?? run.strategy}
+                      {task ? strategyTitle(run.strategy) : run.strategy}
                     </div>
                     <div className="text-[11.5px] text-foreground/44">
-                      {new Date(run.createdAt).toLocaleString()} · {run.candidates.length} candidates
+                      {new Date(run.createdAt).toLocaleString()} · {t('discover.candidates', { count: run.candidates.length })}
                     </div>
                   </div>
                   <button
@@ -232,7 +235,7 @@ export const DiscoverView: React.FC = () => {
                     data-testid={`discover-reopen-${run.id}`}
                     className="shrink-0 rounded-[8px] border border-[var(--mac-border)] px-2.5 py-1 text-[12px] font-medium text-foreground/72 transition-smooth hover:border-[var(--mac-border-strong)] hover:text-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)]"
                   >
-                    Reopen
+                    {t('discover.reopen')}
                   </button>
                 </li>
               )

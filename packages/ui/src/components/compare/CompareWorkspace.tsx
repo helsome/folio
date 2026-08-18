@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAtom } from 'jotai';
 import { compareSymbolsAtom, comparisonStateAtom, withComparisonSymbols } from '../../atoms/compareAtoms';
 import { loadComparison } from '../../client/compare';
@@ -8,6 +9,7 @@ import { CompareTable } from './CompareTable';
 
 /** Symbol picker (2–4) + comparison table + agent-context note. */
 export const CompareWorkspace: React.FC = () => {
+  const { t } = useTranslation();
   const [symbols, setSymbols] = useAtom(compareSymbolsAtom);
   const [state, setState] = useAtom(comparisonStateAtom);
   const [input, setInput] = useState('');
@@ -19,10 +21,10 @@ export const CompareWorkspace: React.FC = () => {
       if (data) {
         setState({ data, loading: false, error: null });
       } else {
-        setState({ data: null, loading: false, error: 'Comparison is unavailable in this environment.' });
+        setState({ data: null, loading: false, error: t('compare.unavailable') });
       }
     },
-    [setState]
+    [setState, t]
   );
 
   useEffect(() => {
@@ -44,7 +46,7 @@ export const CompareWorkspace: React.FC = () => {
     <div className="flex h-full flex-col overflow-y-auto p-4" data-testid="compare-workspace">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
-          Compare symbols (2–4)
+          {t('compare.title')}
         </h3>
         <DataFreshness
           providerName="Longbridge"
@@ -60,11 +62,11 @@ export const CompareWorkspace: React.FC = () => {
           onKeyDown={(event) => {
             if (event.key === 'Enter') add();
           }}
-          placeholder="Symbol, e.g. AAPL.US"
+          placeholder={t('compare.symbolPlaceholder')}
           className="mac-input flex-1 px-3 py-2 rounded-[10px] text-[13px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-accent/28 transition-smooth"
         />
         <Button size="sm" onClick={add} disabled={symbols.length >= 4}>
-          <span data-testid="compare-add">Add</span>
+          <span data-testid="compare-add">{t('common.add')}</span>
         </Button>
       </div>
 
@@ -93,13 +95,13 @@ export const CompareWorkspace: React.FC = () => {
           <CompareTable comparison={state.data} />
         ) : (
           <div className="py-8 text-center text-[13px] text-foreground/44">
-            Add at least two symbols to build a comparison.
+            {t('compare.addTwo')}
           </div>
         )}
       </div>
 
       <div className="mt-3 text-[11px] text-foreground/44">
-        The agent context carries these symbols while the Compare workspace is focused.
+        {t('compare.agentContext')}
       </div>
     </div>
   );

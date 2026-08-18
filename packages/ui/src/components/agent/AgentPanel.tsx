@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowUp, ChevronLeft, Square } from 'lucide-react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { PortfolioSnapshot, Quote, ToolCall } from '@finagent/core';
@@ -77,6 +78,7 @@ function extractPortfolio(toolCalls: ToolCall[]): PortfolioSnapshot | null {
 // ---------------------------------------------------------------------------
 
 export const AgentPanel: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [messages] = useAtom(activeMessagesAtom);
   const [activeSessionId] = useAtom(activeSessionIdAtom);
@@ -135,13 +137,13 @@ export const AgentPanel: React.FC = () => {
           />
           <h2 className="mb-2 text-[19px] font-semibold tracking-tight text-foreground">Copilot</h2>
           <p className="mb-5 text-[13px] leading-relaxed text-foreground/52">
-            Start a new session to explore markets with your agent.
+            {t('agent.empty.body')}
           </p>
           <button
             onClick={() => void createSession(client)}
             className="mac-primary-button h-9 rounded-[10px] px-4 text-[13px] font-semibold transition-smooth active:scale-[0.985]"
           >
-            Create New Session
+            {t('agent.empty.createSession')}
           </button>
         </div>
       </aside>
@@ -166,8 +168,8 @@ export const AgentPanel: React.FC = () => {
           type="button"
           onClick={() => setAgentPanelVisible(false)}
           className="flex h-7 w-7 shrink-0 items-center justify-center rounded-[8px] text-foreground/44 transition-smooth hover:bg-[var(--mac-sidebar-hover)] hover:text-foreground"
-          aria-label="Collapse agent panel"
-          title="Collapse panel"
+          aria-label={t('agent.panel.collapsePanel')}
+          title={t('agent.panel.collapsePanel')}
         >
           <ChevronLeft className="h-4 w-4" strokeWidth={1.8} />
         </button>
@@ -197,7 +199,7 @@ export const AgentPanel: React.FC = () => {
           value={input}
           onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
           onKeyDown={handleKeyDown}
-          placeholder={isRunning ? 'Agent is running…' : 'Ask the copilot…'}
+          placeholder={isRunning ? t('agent.panel.inputRunningPlaceholder') : t('agent.panel.inputPlaceholder')}
           disabled={isRunning}
           rows={2}
           className="mac-input w-full resize-none rounded-[14px] px-3 py-2.5 text-[13px] leading-relaxed text-foreground placeholder:text-foreground/38 focus:border-[rgba(var(--accent-rgb),0.34)] focus:outline-none focus:ring-2 focus:ring-accent/25 disabled:opacity-50"
@@ -211,7 +213,7 @@ export const AgentPanel: React.FC = () => {
               className="flex items-center gap-1.5 rounded-full border border-destructive/30 px-3 py-1.5 text-[12px] font-semibold text-destructive transition-smooth hover:bg-destructive/10"
             >
               <Square className="h-3 w-3 fill-current" />
-              Stop
+              {t('agent.panel.stop')}
             </button>
           ) : (
             <button
@@ -219,7 +221,7 @@ export const AgentPanel: React.FC = () => {
               onClick={() => void handleSend()}
               disabled={!input.trim()}
               className="mac-primary-button flex h-9 w-9 items-center justify-center rounded-full transition-smooth active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-45"
-              aria-label="Send message"
+              aria-label={t('agent.panel.sendMessage')}
             >
               <ArrowUp className="h-4 w-4" strokeWidth={1.8} />
             </button>
@@ -232,16 +234,17 @@ export const AgentPanel: React.FC = () => {
 
 /** Live streaming answer block while a run is executing. */
 const StreamingBlock: React.FC<{ answer: string }> = ({ answer }) => {
+  const { t } = useTranslation();
   return (
     <div data-testid="run-panel" className="rounded-[14px] border mac-section-divider bg-background/72 px-3.5 py-3 backdrop-blur-2xl">
       <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase text-foreground/48">
         <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
-        Agent running
+        {t('agent.panel.agentRunning')}
       </div>
       {answer.length > 0 ? (
         <MarkdownContent content={answer} className="text-[13px] text-foreground/72" />
       ) : (
-        <div className="text-[13px] italic text-foreground/40">Thinking…</div>
+        <div className="text-[13px] italic text-foreground/40">{t('agent.panel.thinking')}</div>
       )}
     </div>
   );

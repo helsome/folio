@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Holding, PortfolioSnapshot } from '@finagent/core';
 import { MetricGrid } from './MetricGrid';
 import { formatMoney } from '../../../lib/money';
@@ -14,6 +15,7 @@ interface PortfolioRiskCardProps {
 
 /** Renders concentration risk derived from a get_portfolio tool result. */
 export const PortfolioRiskCard: React.FC<PortfolioRiskCardProps> = ({ portfolio }) => {
+  const { t } = useTranslation();
   const totalValue = portfolio.totalAssets;
   const cash = portfolio.cash;
   const currency = portfolio.baseCurrency;
@@ -53,7 +55,7 @@ export const PortfolioRiskCard: React.FC<PortfolioRiskCardProps> = ({ portfolio 
     <div className="mac-stock-tile rounded-[14px] p-3.5">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground/40">
-          Portfolio risk
+          {t('agent.risk.title')}
         </span>
         <span className={`text-[12px] font-bold ${riskTone}`}>{risk ?? '—'}</span>
       </div>
@@ -61,12 +63,12 @@ export const PortfolioRiskCard: React.FC<PortfolioRiskCardProps> = ({ portfolio 
         <MetricGrid
           columns={2}
           items={[
-            { label: 'Total value', value: formatMoney(totalValue, currency) },
-            { label: 'Cash', value: formatMoney(cash, currency) },
-            { label: 'Cash %', value: fmtPct(cashPct) },
-            { label: 'Largest position', value: largest?.symbol ?? '—' },
-            { label: 'Largest weight', value: fmtPct(largestWeightPct) },
-            { label: 'Positions', value: positions.length },
+            { label: t('agent.risk.totalValue'), value: formatMoney(totalValue, currency) },
+            { label: t('agent.risk.cash'), value: formatMoney(cash, currency) },
+            { label: t('agent.risk.cashPct'), value: fmtPct(cashPct) },
+            { label: t('agent.risk.largestPosition'), value: largest?.symbol ?? '—' },
+            { label: t('agent.risk.largestWeight'), value: fmtPct(largestWeightPct) },
+            { label: t('agent.risk.positions'), value: positions.length },
           ]}
         />
       </div>

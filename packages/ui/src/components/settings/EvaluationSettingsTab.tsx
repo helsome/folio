@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ExternalLink, Info } from 'lucide-react';
 import type { EvaluationSettings, LangSmithConnectionStatus, PrivacyLevel } from '@finagent/core';
 import { useFinagentClient } from '../../client';
@@ -16,22 +17,10 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
 const DEFAULT_LANGSMITH_UI = 'https://smith.langchain.com';
 const ENDPOINT_PLACEHOLDER = 'https://api.smith.langchain.com';
 
-const PRIVACY_LEVELS: Array<{ id: PrivacyLevel; label: string; hint: string }> = [
-  {
-    id: 'minimal',
-    label: 'Minimal',
-    hint: 'No prompts, answers, or tool payloads in traces — names, status, and durations only.',
-  },
-  {
-    id: 'standard',
-    label: 'Standard',
-    hint: 'Prompts, answers, and tool arguments recorded after redaction; portfolio results reduced to schema summaries.',
-  },
-  {
-    id: 'full',
-    label: 'Full',
-    hint: 'Complete trace — explicit opt-in. Credentials and tokens are still redacted.',
-  },
+const PRIVACY_LEVELS: Array<{ id: PrivacyLevel; labelKey: string; hintKey: string }> = [
+  { id: 'minimal', labelKey: 'settings.evaluation.privacyMinimal', hintKey: 'settings.evaluation.privacyMinimalHint' },
+  { id: 'standard', labelKey: 'settings.evaluation.privacyStandard', hintKey: 'settings.evaluation.privacyStandardHint' },
+  { id: 'full', labelKey: 'settings.evaluation.privacyFull', hintKey: 'settings.evaluation.privacyFullHint' },
 ];
 
 const Spinner: React.FC = () => (
@@ -53,6 +42,7 @@ function formatUpdated(updatedAt: number): string {
 }
 
 export const EvaluationSettingsTab: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const channelAvailable = typeof client.evaluation?.getSettings === 'function';
 
@@ -86,7 +76,7 @@ export const EvaluationSettingsTab: React.FC = () => {
       if (result && result.error.code === 'CLIENT_UNAVAILABLE') {
         setUnavailable(true);
       } else {
-        setLoadError(result?.error.message ?? 'Failed to load evaluation settings.');
+        setLoadError(result?.error.message ?? t('settings.evaluation.failedToLoad'));
       }
       setLoading(false);
       return;
@@ -98,7 +88,7 @@ export const EvaluationSettingsTab: React.FC = () => {
     setEndpoint(result.data.settings.langsmithEndpoint);
     setPrivacyLevel(result.data.settings.privacyLevel);
     setLoading(false);
-  }, [client]);
+  }, [client, t]);
 
   useEffect(() => {
     void refresh();
@@ -112,7 +102,7 @@ export const EvaluationSettingsTab: React.FC = () => {
     if (result?.ok) {
       setSettings(result.data);
     } else {
-      setSaveError(result?.error.message ?? 'Could not update tracing.');
+      setSaveError(result?.error.message ?? t('settings.evaluation.couldNotUpdateTracing'));
     }
     setTracingBusy(false);
   };
@@ -128,9 +118,9 @@ export const EvaluationSettingsTab: React.FC = () => {
     });
     if (result?.ok) {
       setSettings(result.data);
-      setSaveSuccess('Settings saved.');
+      setSaveSuccess(t('settings.evaluation.settingsSaved'));
     } else {
-      setSaveError(result?.error.message ?? 'Could not save settings.');
+      setSaveError(result?.error.message ?? t('settings.evaluation.couldNotSaveSettings'));
     }
     setSaveBusy(false);
   };
@@ -145,16 +135,16 @@ export const EvaluationSettingsTab: React.FC = () => {
       if (status.connected) {
         setTestResult({
           ok: true,
-          message: status.project ? `Connected to “${status.project}”.` : 'Connected.',
+          message: status.project ? t('settings.evaluation.connectedTo', { project: status.project }) : t('settings.evaluation.connectedShort'),
         });
       } else {
         setTestResult({
           ok: false,
-          message: status.error ?? status.message ?? 'Not connected.',
+          message: status.error ?? status.message ?? t('settings.evaluation.notConnected'),
         });
       }
     } else {
-      setTestResult({ ok: false, message: result?.error.message ?? 'Connection test failed.' });
+      setTestResult({ ok: false, message: result?.error.message ?? t('settings.evaluation.connectionTestFailed') });
     }
     setTestBusy(false);
   };
@@ -174,7 +164,7 @@ export const EvaluationSettingsTab: React.FC = () => {
       setApiKey('');
       await refresh();
     } else {
-      setKeyError(result?.error.message ?? 'Could not save API key.');
+      setKeyError(result?.error.message ?? t('settings.evaluation.couldNotSaveApiKey'));
     }
     setKeyBusy(false);
   };
@@ -187,7 +177,7 @@ export const EvaluationSettingsTab: React.FC = () => {
       setApiKey('');
       await refresh();
     } else {
-      setKeyError(result?.error.message ?? 'Could not remove API key.');
+      setKeyError(result?.error.message ?? t('settings.evaluation.couldNotRemoveApiKey'));
     }
     setKeyBusy(false);
   };
@@ -196,22 +186,21 @@ export const EvaluationSettingsTab: React.FC = () => {
     return (
       <div className="max-w-2xl">
         <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
-          The evaluation channel isn&apos;t wired into this build yet — this tab will populate once the
-          Evaluation IPC lands.
+          {t('settings.evaluation.channelNotWired')}
         </div>
       </div>
     );
   }
 
   if (loading) {
-    return <div className="text-[12px] text-foreground/48">Loading evaluation settings…</div>;
+    return <div className="text-[12px] text-foreground/48">{t('settings.evaluation.loading')}</div>;
   }
 
   if (unavailable) {
     return (
       <div className="max-w-2xl">
         <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
-          Evaluation settings aren&apos;t available yet — the evaluation channel is not wired.
+          {t('settings.evaluation.channelNotAvailable')}
         </div>
       </div>
     );
@@ -221,7 +210,7 @@ export const EvaluationSettingsTab: React.FC = () => {
     return (
       <div className="max-w-2xl">
         <div className="rounded-[10px] border border-[color-mix(in_srgb,var(--info)_30%,transparent)] bg-[color-mix(in_srgb,var(--info)_10%,transparent)] px-4 py-3 text-[12px] text-foreground/78">
-          {loadError ?? 'Evaluation settings are unavailable.'}
+          {loadError ?? t('settings.evaluation.unavailable')}
         </div>
       </div>
     );
@@ -230,27 +219,26 @@ export const EvaluationSettingsTab: React.FC = () => {
   const connected = connection?.connected ?? false;
   const configured = settings.apiKeyConfigured;
   const hasKeyHint = configured
-    ? `Configured • updated ${formatUpdated(settings.updatedAt)}`
-    : 'Not configured';
+    ? t('settings.evaluation.keyHintConfigured', { date: formatUpdated(settings.updatedAt) })
+    : t('settings.evaluation.notConfiguredLower');
   const statusBadge = connected
-    ? { label: 'Connected', className: 'border-[var(--mac-green)]/30 bg-[var(--mac-green)]/10 text-[var(--mac-green)]' }
+    ? { labelKey: 'settings.evaluation.connected', className: 'border-[var(--mac-green)]/30 bg-[var(--mac-green)]/10 text-[var(--mac-green)]' }
     : connection?.error
-      ? { label: 'Error', className: 'border-destructive/30 bg-destructive/10 text-destructive' }
-      : { label: 'Not Configured', className: 'border-[var(--mac-yellow)]/40 bg-[var(--mac-yellow)]/10 text-[var(--mac-yellow)]' };
+      ? { labelKey: 'settings.evaluation.error', className: 'border-destructive/30 bg-destructive/10 text-destructive' }
+      : { labelKey: 'settings.evaluation.notConfigured', className: 'border-[var(--mac-yellow)]/40 bg-[var(--mac-yellow)]/10 text-[var(--mac-yellow)]' };
 
   return (
     <div className="max-w-2xl space-y-4">
       <div className="mac-stock-tile rounded-[14px] p-5">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-[14px] font-semibold text-foreground">LangSmith Connection</h2>
+            <h2 className="text-[14px] font-semibold text-foreground">{t('settings.evaluation.langsmithConnection')}</h2>
             <p className="mt-1 text-[12px] text-foreground/48">
-              Agent tracing for evaluation experiments (spec §61). Traces never leave your machine
-              unless you enable them.
+              {t('settings.evaluation.langsmithDesc')}
             </p>
           </div>
           <span className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${statusBadge.className}`}>
-            {statusBadge.label}
+            {t(statusBadge.labelKey)}
           </span>
         </div>
 
@@ -262,24 +250,24 @@ export const EvaluationSettingsTab: React.FC = () => {
 
         <div className="mt-4 flex items-center justify-between gap-4">
           <div>
-            <div className="text-[13px] font-medium text-foreground">Tracing</div>
+            <div className="text-[13px] font-medium text-foreground">{t('settings.evaluation.tracing')}</div>
             <div className="mt-0.5 text-[11px] text-foreground/48">
               {configured
-                ? 'Record agent runs to LangSmith for review.'
-                : 'Add an API key below to enable tracing.'}
+                ? t('settings.evaluation.tracingEnabledDesc')
+                : t('settings.evaluation.tracingDisabledDesc')}
             </div>
           </div>
           <Switch
             checked={settings.tracingEnabled}
             disabled={tracingBusy || !configured}
             onCheckedChange={(value) => void setTracing(value)}
-            aria-label="Toggle agent tracing"
+            aria-label={t('settings.evaluation.toggleTracingAria')}
           />
         </div>
 
         <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-2">
           <label className="flex flex-col gap-1.5">
-            <span className="text-[11px] font-medium text-foreground/54">Project</span>
+            <span className="text-[11px] font-medium text-foreground/54">{t('settings.evaluation.project')}</span>
             <input
               className={fieldClass}
               value={project}
@@ -290,7 +278,7 @@ export const EvaluationSettingsTab: React.FC = () => {
           </label>
           <label className="flex flex-col gap-1.5">
             <span className="text-[11px] font-medium text-foreground/54">
-              Endpoint <span className="text-foreground/36">(optional)</span>
+              {t('settings.evaluation.endpoint')} <span className="text-foreground/36">{t('settings.evaluation.optional')}</span>
             </span>
             <input
               className={fieldClass}
@@ -305,7 +293,7 @@ export const EvaluationSettingsTab: React.FC = () => {
         <div className="mt-4 flex items-center gap-3">
           <div className="flex flex-col gap-1.5">
             <span className="flex items-center gap-1 text-[11px] font-medium text-foreground/54">
-              Privacy level
+              {t('settings.evaluation.privacyLevel')}
               <Tooltip>
                 <TooltipTrigger asChild>
                   <span className="flex h-3.5 w-3.5 cursor-help items-center justify-center text-foreground/36">
@@ -313,19 +301,19 @@ export const EvaluationSettingsTab: React.FC = () => {
                   </span>
                 </TooltipTrigger>
                 <TooltipContent side="right" className="max-w-[240px]">
-                  {PRIVACY_LEVELS.find((level) => level.id === privacyLevel)?.hint}
+                  {t(PRIVACY_LEVELS.find((level) => level.id === privacyLevel)?.hintKey ?? '')}
                 </TooltipContent>
               </Tooltip>
             </span>
             <div className="w-44">
               <Select value={privacyLevel} onValueChange={(value) => setPrivacyLevel(value as PrivacyLevel)}>
-                <SelectTrigger aria-label="Privacy level">
+                <SelectTrigger aria-label={t('settings.evaluation.privacyLevel')}>
                   <SelectValue />
                 </SelectTrigger>
                 <SelectContent>
                   {PRIVACY_LEVELS.map((level) => (
                     <SelectItem key={level.id} value={level.id}>
-                      {level.label}
+                      {t(level.labelKey)}
                     </SelectItem>
                   ))}
                 </SelectContent>
@@ -335,15 +323,15 @@ export const EvaluationSettingsTab: React.FC = () => {
           <div className="mt-4 flex gap-2">
             <Button variant="secondary" size="sm" disabled={saveBusy} onClick={() => void saveSettings()}>
               {saveBusy ? <Spinner /> : null}
-              Save settings
+              {t('settings.evaluation.saveSettings')}
             </Button>
             <Button variant="secondary" size="sm" disabled={testBusy} onClick={() => void testConnection()}>
               {testBusy ? <Spinner /> : null}
-              Test Connection
+              {t('settings.evaluation.testConnection')}
             </Button>
             <Button variant="outline" size="sm" onClick={() => void openLangSmith()}>
               <ExternalLink className="h-3.5 w-3.5" />
-              Open LangSmith
+              {t('settings.evaluation.openLangSmith')}
             </Button>
           </div>
         </div>
@@ -360,13 +348,13 @@ export const EvaluationSettingsTab: React.FC = () => {
       <div className="mac-stock-tile rounded-[14px] p-5">
         <div className="flex items-center justify-between gap-4">
           <div>
-            <h2 className="text-[14px] font-semibold text-foreground">API Key</h2>
+            <h2 className="text-[14px] font-semibold text-foreground">{t('settings.evaluation.apiKey')}</h2>
             <p className="mt-1 text-[12px] text-foreground/48">
-              {hasKeyHint} — the key itself is never shown or read back.
+              {t('settings.evaluation.apiKeyHint', { keyHint: hasKeyHint })}
             </p>
           </div>
           <span className={`shrink-0 text-[11px] font-semibold ${configured ? 'text-[var(--mac-green)]' : 'text-foreground/44'}`}>
-            {configured ? 'Configured' : 'Not configured'}
+            {configured ? t('settings.evaluation.configured') : t('settings.evaluation.notConfiguredLower')}
           </span>
         </div>
         <div className="mt-4 flex items-center gap-2">
@@ -380,10 +368,10 @@ export const EvaluationSettingsTab: React.FC = () => {
           />
           <Button variant="default" size="sm" disabled={keyBusy || !apiKey.trim()} onClick={() => void saveApiKey()}>
             {keyBusy ? <Spinner /> : null}
-            Save
+            {t('settings.evaluation.save')}
           </Button>
           <Button variant="secondary" size="sm" disabled={keyBusy || !configured} onClick={() => void removeApiKey()}>
-            Remove
+            {t('settings.evaluation.remove')}
           </Button>
         </div>
         {keyError && <div className="mt-3 text-[11px] text-destructive">{keyError}</div>}

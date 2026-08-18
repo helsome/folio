@@ -1,8 +1,9 @@
 import React, { useRef } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { PortfolioImportDraft, PortfolioImportRow } from '@finagent/core';
 import { Button } from '../primitives/Button';
 import { Input } from '../primitives/Input';
-import { formatMoney, formatQuantity } from '../../lib/money';
+import { formatCurrency, formatNumber } from '@finagent/i18n';
 
 /**
  * Draft review step of the portfolio import flow (spec §47–48).
@@ -13,15 +14,15 @@ import { formatMoney, formatQuantity } from '../../lib/money';
  */
 
 export interface ConfidenceVisual {
-  label: string;
+  key: string;
   tone: 'high' | 'medium' | 'low';
 }
 
 /** Confidence tier presentation (spec §48) — pure, unit-testable. */
 export function confidenceVisual(confidence: number): ConfidenceVisual {
-  if (confidence >= 1) return { label: 'High', tone: 'high' };
-  if (confidence >= 0.6) return { label: 'Review', tone: 'medium' };
-  return { label: 'Needs review', tone: 'low' };
+  if (confidence >= 1) return { key: 'portfolio.confidence.high', tone: 'high' };
+  if (confidence >= 0.6) return { key: 'portfolio.confidence.review', tone: 'medium' };
+  return { key: 'portfolio.confidence.needsReview', tone: 'low' };
 }
 
 const TONE_CLASS: Record<ConfidenceVisual['tone'], string> = {
@@ -31,6 +32,7 @@ const TONE_CLASS: Record<ConfidenceVisual['tone'], string> = {
 };
 
 function RowLine({ row }: { row: PortfolioImportRow }) {
+  const { t } = useTranslation();
   const visual = confidenceVisual(row.confidence);
   const needsReview = row.confidence < 1;
   return (
@@ -44,20 +46,22 @@ function RowLine({ row }: { row: PortfolioImportRow }) {
       <td className="py-2 pr-3 text-[12px] font-semibold text-foreground">{row.symbol || '—'}</td>
       <td className="py-2 pr-3 text-[12px] text-foreground/60">{row.name ?? '—'}</td>
       <td className="py-2 pr-3 text-right text-[12px] text-foreground/80">
-        {formatQuantity(row.quantity)}
+        {formatNumber(row.quantity, undefined, { maximumFractionDigits: 0 })}
       </td>
       <td className="py-2 pr-3 text-right text-[12px] text-foreground/80">
-        {formatMoney(row.costPrice, row.currency)}
+        {formatCurrency(row.costPrice, row.currency)}
       </td>
       <td className="py-2 pr-3 text-[12px] text-foreground/60">{row.currency ?? '—'}</td>
       <td className="py-2 pr-3">
         <span
           className={`inline-block rounded-full px-2 py-0.5 text-[10px] font-medium ${TONE_CLASS[visual.tone]}`}
         >
-          {visual.label}
+          {t(visual.key)}
         </span>
         {needsReview && (
-          <span className="ml-1.5 text-[10px] text-foreground/50">review required</span>
+          <span className="ml-1.5 text-[10px] text-foreground/50">
+            {t('portfolio.import.reviewRequired')}
+          </span>
         )}
       </td>
       <td className="py-2 pr-1 text-[11px] text-foreground/50">{row.issues.join(' · ') || ''}</td>
@@ -80,14 +84,16 @@ export const ImportDraftReview: React.FC<ImportDraftReviewProps> = ({
   confirming = false,
   confirmError = null,
 }) => {
+  const { t } = useTranslation();
   const nameRef = useRef<HTMLInputElement>(null);
   const needsReview = draft.rows.some((row) => row.confidence < 1);
+  const sourceKey =
+    draft.source === 'paste' ? 'portfolio.import.sourcePasted' : 'portfolio.import.sourceCsv';
 
   return (
     <div className="space-y-4">
       <div className="text-[13px] text-foreground/70">
-        {draft.rows.length} row{draft.rows.length === 1 ? '' : 's'} parsed from{' '}
-        {draft.source === 'paste' ? 'pasted text' : 'CSV file'}.
+        {t('portfolio.import.rowsParsed', { count: draft.rows.length, source: t(sourceKey) })}
       </div>
 
       {draft.warnings.length > 0 && (
@@ -100,15 +106,15 @@ export const ImportDraftReview: React.FC<ImportDraftReviewProps> = ({
 
       {needsReview && (
         <div className="rounded-[10px] bg-[var(--mac-yellow)]/12 px-3 py-2 text-[12px] text-foreground/80">
-          Low-confidence rows need your review before importing.
+          {t('portfolio.import.lowConfidence')}
         </div>
       )}
 
       <Input
-        label="Portfolio name"
+        label={t('portfolio.import.portfolioName')}
         ref={nameRef}
-        defaultValue="Manual Portfolio"
-        placeholder="e.g. My Portfolio"
+        defaultValue={t('portfolio.import.portfolioNameDefault')}
+        placeholder={t('portfolio.import.portfolioNamePlaceholder')}
       />
 
       <div className="max-h-56 overflow-y-auto rounded-[10px] border border-[var(--mac-border)]">
@@ -116,25 +122,25 @@ export const ImportDraftReview: React.FC<ImportDraftReviewProps> = ({
           <thead>
             <tr className="border-b border-[var(--mac-border)] bg-foreground/4">
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-foreground/48">
-                Symbol
+                {t('portfolio.import.columnSymbol')}
               </th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-foreground/48">
-                Name
+                {t('portfolio.import.columnName')}
               </th>
               <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-foreground/48">
-                Qty
+                {t('portfolio.import.columnQty')}
               </th>
               <th className="px-3 py-2 text-right text-[10px] font-semibold uppercase tracking-wide text-foreground/48">
-                Cost
+                {t('portfolio.import.columnCost')}
               </th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-foreground/48">
-                Ccy
+                {t('portfolio.import.columnCcy')}
               </th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-foreground/48">
-                Confidence
+                {t('portfolio.import.columnConfidence')}
               </th>
               <th className="px-3 py-2 text-left text-[10px] font-semibold uppercase tracking-wide text-foreground/48">
-                Issues
+                {t('portfolio.import.columnIssues')}
               </th>
             </tr>
           </thead>
@@ -146,7 +152,7 @@ export const ImportDraftReview: React.FC<ImportDraftReviewProps> = ({
         </table>
         {draft.rows.length === 0 && (
           <div className="py-8 text-center text-[13px] text-foreground/44">
-            No rows were parsed from this input.
+            {t('portfolio.import.noRows')}
           </div>
         )}
       </div>
@@ -159,14 +165,14 @@ export const ImportDraftReview: React.FC<ImportDraftReviewProps> = ({
 
       <div className="flex justify-end gap-2 pt-1">
         <Button variant="secondary" size="sm" onClick={onCancel} disabled={confirming}>
-          Cancel
+          {t('common.cancel')}
         </Button>
         <Button
           size="sm"
-          onClick={() => onConfirm(nameRef.current?.value ?? 'Manual Portfolio')}
+          onClick={() => onConfirm(nameRef.current?.value ?? t('portfolio.import.portfolioNameDefault'))}
           disabled={confirming || draft.rows.length === 0}
         >
-          {confirming ? 'Importing…' : 'Confirm Import'}
+          {confirming ? t('portfolio.import.importing') : t('portfolio.import.confirmImport')}
         </Button>
       </div>
     </div>

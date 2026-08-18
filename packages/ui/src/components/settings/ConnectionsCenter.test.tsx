@@ -9,11 +9,13 @@ import {
 } from '../../client';
 import type { ConnectionEntry } from '../../client/connections';
 import { installHappyDom } from '../../test/setupHappyDom';
+import { initI18nForSettingsTests } from '../../test/i18nSettings';
 import { ConnectionsCenter } from './ConnectionsCenter';
 
 let restoreDom: (() => void) | undefined;
 
 beforeAll(() => {
+  initI18nForSettingsTests();
   restoreDom = installHappyDom().restore;
 });
 

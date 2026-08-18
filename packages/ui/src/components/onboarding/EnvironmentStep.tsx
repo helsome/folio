@@ -1,14 +1,19 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { HealthCheckItem, HealthCheckReport } from '../../client/connections';
 
-const ITEMS: Array<{ key: keyof HealthCheckReport; label: string }> = [
-  { key: 'ai', label: 'AI' },
-  { key: 'marketData', label: 'Market Data' },
-  { key: 'skills', label: 'Skills' },
-  { key: 'agentRuntime', label: 'Agent Runtime' },
+const ITEMS: Array<{ key: keyof HealthCheckReport; labelKey: string }> = [
+  { key: 'ai', labelKey: 'onboarding.environment.itemAi' },
+  { key: 'marketData', labelKey: 'onboarding.environment.itemMarketData' },
+  { key: 'skills', labelKey: 'onboarding.environment.itemSkills' },
+  { key: 'agentRuntime', labelKey: 'onboarding.environment.itemAgentRuntime' },
 ];
 
-const ItemRow: React.FC<{ label: string; item: HealthCheckItem }> = ({ label, item }) => (
+const ItemRow: React.FC<{ label: string; item: HealthCheckItem; t: (key: string) => string }> = ({
+  label,
+  item,
+  t,
+}) => (
   <div className="flex items-center justify-between gap-4 rounded-[10px] border mac-section-divider px-3 py-2">
     <span className="text-[13px] font-medium text-foreground">{label}</span>
     <span className="flex items-center gap-2 text-[12px]">
@@ -19,8 +24,8 @@ const ItemRow: React.FC<{ label: string; item: HealthCheckItem }> = ({ label, it
       )}
       <span className="text-foreground/60">
         {item.ok
-          ? item.detail ?? 'Ready'
-          : item.error?.message ?? item.detail ?? 'Unavailable'}
+          ? item.detail ?? t('onboarding.environment.ready')
+          : item.error?.message ?? item.detail ?? t('onboarding.environment.unavailable')}
       </span>
     </span>
   </div>
@@ -31,26 +36,25 @@ export const EnvironmentStep: React.FC<{
   report: HealthCheckReport | null;
   loading: boolean;
 }> = ({ report, loading }) => {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <h2 className="text-[18px] font-semibold text-foreground">Check Environment</h2>
-        <p className="text-[13px] text-foreground/66">
-          A quick check that everything you connected is ready to use.
-        </p>
+        <h2 className="text-[18px] font-semibold text-foreground">{t('onboarding.environment.title')}</h2>
+        <p className="text-[13px] text-foreground/66">{t('onboarding.environment.subtitle')}</p>
       </div>
 
       {loading ? (
-        <div className="text-[12px] text-foreground/48">Checking environment…</div>
+        <div className="text-[12px] text-foreground/48">{t('onboarding.environment.checking')}</div>
       ) : report ? (
         <div className="space-y-2">
-          {ITEMS.map(({ key, label }) => (
-            <ItemRow key={key} label={label} item={report[key]} />
+          {ITEMS.map(({ key, labelKey }) => (
+            <ItemRow key={key} label={t(labelKey)} item={report[key]} t={t} />
           ))}
         </div>
       ) : (
         <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
-          Health checks aren&apos;t available in this build yet.
+          {t('onboarding.environment.notAvailable')}
         </div>
       )}
     </div>

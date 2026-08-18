@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ExternalLink, ThumbsDown, ThumbsUp } from 'lucide-react';
 import type { EvaluationCase, EvaluationResultRecord, EvaluationRun } from '@finagent/core';
 import { useFinagentClient, type EvaluationExperimentDetail } from '../../client';
@@ -28,6 +29,21 @@ const VERDICT_STYLE: Record<EvaluationResultRecord['verdict'], string> = {
   'not-applicable': 'text-foreground/50 border-border bg-surface-muted',
 };
 
+const VERDICT_KEY: Record<EvaluationResultRecord['verdict'], string> = {
+  pass: 'evaluation.verdicts.pass',
+  fail: 'evaluation.verdicts.fail',
+  partial: 'evaluation.verdicts.partial',
+  'not-applicable': 'evaluation.verdicts.notApplicable',
+};
+
+const RUN_STATUS_KEY: Record<string, string> = {
+  completed: 'evaluation.runStatuses.completed',
+  failed: 'evaluation.runStatuses.failed',
+  cancelled: 'evaluation.runStatuses.cancelled',
+  timeout: 'evaluation.runStatuses.timeout',
+  skipped: 'evaluation.runStatuses.skipped',
+};
+
 /** Compact JSON summary of tool args (truncated for table display). */
 function argsSummary(args: Record<string, unknown>): string {
   const text = JSON.stringify(args);
@@ -46,6 +62,7 @@ export const CaseDetail: React.FC<{
   onLoadDetail: () => void;
   onBack: () => void;
 }> = ({ caseRef, detail, onLoadDetail, onBack }) => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -94,11 +111,11 @@ export const CaseDetail: React.FC<{
     setSubmitting(false);
     if (result?.ok) {
       setFeedback(verdict);
-      setFeedbackResult(`Feedback recorded (${verdict === 'good' ? '👍' : '👎'}).`);
+      setFeedbackResult(t('evaluation.feedbackRecorded', { emoji: verdict === 'good' ? '👍' : '👎' }));
       setNote('');
       setNoteOpen(false);
     } else {
-      setFeedbackError(result?.error.message ?? 'Could not submit feedback.');
+      setFeedbackError(result?.error.message ?? t('evaluation.couldNotSubmitFeedback'));
     }
   };
 
@@ -107,11 +124,11 @@ export const CaseDetail: React.FC<{
       <div className="flex h-full flex-col" data-testid="case-detail">
         <div className="border-b mac-section-divider px-4 py-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="h-3.5 w-3.5" /> Back
+            <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
         </div>
         <div className="flex items-center gap-2 p-4 text-[12px] text-foreground/48">
-          <Spinner /> Loading case…
+          <Spinner /> {t('evaluation.loadingCase')}
         </div>
       </div>
     );
@@ -122,11 +139,11 @@ export const CaseDetail: React.FC<{
       <div className="flex h-full flex-col" data-testid="case-detail">
         <div className="border-b mac-section-divider px-4 py-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="h-3.5 w-3.5" /> Back
+            <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
         </div>
         <div className="p-4 text-[12px] text-foreground/48">
-          {error ?? `Case ${caseRef.caseId} could not be loaded.`}
+          {error ?? t('evaluation.caseError', { id: caseRef.caseId })}
         </div>
       </div>
     );
@@ -141,11 +158,11 @@ export const CaseDetail: React.FC<{
       <div className="flex h-full flex-col" data-testid="case-detail">
         <div className="border-b mac-section-divider px-4 py-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="h-3.5 w-3.5" /> Back
+            <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
         </div>
         <div className="p-4 text-[12px] text-foreground/48">
-          No run or evaluation record for case {caseRef.caseId} in “{experiment.name}”.
+          {t('evaluation.noRunOrResult', { id: caseRef.caseId, name: experiment.name })}
         </div>
       </div>
     );
@@ -156,11 +173,11 @@ export const CaseDetail: React.FC<{
       <header className="flex items-center justify-between border-b mac-section-divider px-4 py-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="h-3.5 w-3.5" /> Back
+            <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
           <div>
             <h2 className="text-[15px] font-semibold text-foreground">
-              Case <span className="font-mono text-accent">{caseRef.caseId}</span>
+              {t('evaluation.caseTitle')} <span className="font-mono text-accent">{caseRef.caseId}</span>
             </h2>
             <p className="mt-0.5 text-[11px] text-foreground/48">
               {experiment.name} · {experiment.datasetId} v{experiment.datasetVersion}
@@ -170,11 +187,11 @@ export const CaseDetail: React.FC<{
         <div className="flex items-center gap-2">
           {result && (
             <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${VERDICT_STYLE[result.verdict]}`}>
-              {result.verdict}
+              {t(VERDICT_KEY[result.verdict])}
             </span>
           )}
           <span className="rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-[11px] text-foreground/64">
-            {run?.status ?? 'no run'}
+            {run ? t(RUN_STATUS_KEY[run.status] ?? run.status) : t('evaluation.noRun')}
           </span>
         </div>
       </header>
@@ -182,18 +199,18 @@ export const CaseDetail: React.FC<{
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="max-w-4xl space-y-4">
           <div className="mac-stock-tile rounded-[14px] p-5">
-            <h3 className="text-[13px] font-semibold text-foreground">Case definition</h3>
+            <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.caseDefinition')}</h3>
             {caseDef ? (
               <div className="mt-2 space-y-3 text-[12.5px]">
                 <div>
-                  <p className="text-[11px] uppercase tracking-wide text-foreground/44">Prompt</p>
+                  <p className="text-[11px] uppercase tracking-wide text-foreground/44">{t('evaluation.prompt')}</p>
                   <p className="mt-0.5 whitespace-pre-wrap leading-relaxed text-foreground/78">
                     {caseDef.input.prompt}
                   </p>
                 </div>
                 {caseDef.input.workspaceContext && (
                   <div>
-                    <p className="text-[11px] uppercase tracking-wide text-foreground/44">Workspace context</p>
+                    <p className="text-[11px] uppercase tracking-wide text-foreground/44">{t('evaluation.workspaceContext')}</p>
                     <p className="mt-0.5 font-mono text-[11.5px] text-foreground/64">
                       {JSON.stringify(caseDef.input.workspaceContext)}
                     </p>
@@ -201,7 +218,7 @@ export const CaseDetail: React.FC<{
                 )}
                 <div>
                   <p className="text-[11px] uppercase tracking-wide text-foreground/44">
-                    Expected behavior
+                    {t('evaluation.expectedBehavior')}
                   </p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
                     <span className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10.5px] text-foreground/64">
@@ -214,17 +231,17 @@ export const CaseDetail: React.FC<{
                     ))}
                     {caseDef.expected.forbiddenCapabilities?.map((cap) => (
                       <span key={`forb-${cap}`} className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 font-mono text-[10.5px] text-destructive">
-                        forbidden: {cap}
+                        {t('evaluation.forbiddenCapability', { cap })}
                       </span>
                     ))}
                     {caseDef.expected.maxToolCalls != null && (
                       <span className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10.5px] text-foreground/64">
-                        ≤{caseDef.expected.maxToolCalls} calls
+                        {t('evaluation.maxToolCalls', { count: caseDef.expected.maxToolCalls })}
                       </span>
                     )}
                     {caseDef.expected.mustHaveEvidence && (
                       <span className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10.5px] text-foreground/64">
-                        evidence required
+                        {t('evaluation.evidenceRequired')}
                       </span>
                     )}
                     {caseDef.expected.requiredResearchDimensions?.map((dimension) => (
@@ -242,25 +259,25 @@ export const CaseDetail: React.FC<{
               </div>
             ) : (
               <p className="mt-1 text-[11.5px] text-foreground/44">
-                {run?.answer ? '' : 'Annotated prompt and expectations unavailable for this case definition.'}
+                {run?.answer ? '' : t('evaluation.caseDefUnavailable')}
               </p>
             )}
           </div>
 
           <div className="mac-stock-tile rounded-[14px] p-5">
-            <h3 className="text-[13px] font-semibold text-foreground">Agent answer</h3>
+            <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.agentAnswer')}</h3>
             <p className="mt-2 whitespace-pre-wrap text-[12.5px] leading-relaxed text-foreground/78">
-              {run?.answer?.trim() ? run.answer : 'No answer recorded for this run.'}
+              {run?.answer?.trim() ? run.answer : t('evaluation.noAnswer')}
             </p>
             {run?.latencyMs != null && (
-              <p className="mt-2 text-[11px] text-foreground/44">Latency {run.latencyMs}ms</p>
+              <p className="mt-2 text-[11px] text-foreground/44">{t('evaluation.latency', { ms: run.latencyMs })}</p>
             )}
           </div>
 
           <div className="mac-stock-tile rounded-[14px] p-5">
             <div className="flex items-center justify-between">
-              <h3 className="text-[13px] font-semibold text-foreground">Tool timeline</h3>
-              <span className="text-[11px] text-foreground/42">{run?.toolCalls.length ?? 0} call(s)</span>
+              <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.toolTimeline')}</h3>
+              <span className="text-[11px] text-foreground/42">{t('evaluation.calls', { count: run?.toolCalls.length ?? 0 })}</span>
             </div>
             {run && run.toolCalls.length > 0 ? (
               <div className="mt-3 overflow-x-auto">
@@ -268,11 +285,11 @@ export const CaseDetail: React.FC<{
                   <thead>
                     <tr className="border-b mac-section-divider">
                       <th className="py-2 pr-3 text-left font-medium text-foreground/54">#</th>
-                      <th className="px-3 py-2 text-left font-medium text-foreground/54">Tool</th>
-                      <th className="px-3 py-2 text-left font-medium text-foreground/54">Args</th>
-                      <th className="px-3 py-2 text-left font-medium text-foreground/54">Status</th>
-                      <th className="px-3 py-2 text-right font-medium text-foreground/54">Latency</th>
-                      <th className="px-3 py-2 text-left font-medium text-foreground/54">Result</th>
+                      <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.tool')}</th>
+                      <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.args')}</th>
+                      <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.status')}</th>
+                      <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.latencyColumn')}</th>
+                      <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.result')}</th>
                     </tr>
                   </thead>
                   <tbody>
@@ -285,7 +302,7 @@ export const CaseDetail: React.FC<{
                         </td>
                         <td className="px-3 py-2">
                           <span className={toolCall.status === 'success' ? 'text-[var(--mac-green)]' : 'text-destructive'}>
-                            {toolCall.status}
+                            {t(`evaluation.runStatuses.${toolCall.status}`)}
                           </span>
                         </td>
                         <td className="px-3 py-2 text-right tabular-nums text-foreground/64">
@@ -300,23 +317,23 @@ export const CaseDetail: React.FC<{
                 </table>
               </div>
             ) : (
-              <p className="mt-3 text-[12px] text-foreground/44">No tool calls recorded.</p>
+              <p className="mt-3 text-[12px] text-foreground/44">{t('evaluation.noToolCalls')}</p>
             )}
           </div>
 
           {result && (
             <div className="mac-stock-tile rounded-[14px] p-5">
-              <h3 className="text-[13px] font-semibold text-foreground">Evaluator scores</h3>
+              <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.evaluatorScores')}</h3>
               <div className="mt-3 space-y-2.5">
                 {result.scores.length === 0 && (
-                  <p className="text-[12px] text-foreground/44">No scores recorded.</p>
+                  <p className="text-[12px] text-foreground/44">{t('evaluation.noScoresRecorded')}</p>
                 )}
                 {result.scores.map((score) => (
                   <div key={score.metric} className="rounded-[9px] border border-border bg-surface-muted px-3 py-2">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
-                        <span className="text-[12.5px] font-medium text-foreground">{metricLabel(score.metric)}</span>
-                        <span className="ml-2 text-[10.5px] text-foreground/40">{metricKindLabel(score.metric)}</span>
+                        <span className="text-[12.5px] font-medium text-foreground">{t(metricLabel(score.metric))}</span>
+                        <span className="ml-2 text-[10.5px] text-foreground/40">{metricKindLabel(score.metric) !== null ? t(metricKindLabel(score.metric) as string) : ''}</span>
                       </div>
                       <span className="shrink-0 text-[13px] font-semibold tabular-nums text-foreground">
                         {scorePercent(score.score)}
@@ -331,15 +348,15 @@ export const CaseDetail: React.FC<{
 
           <div className="mac-stock-tile rounded-[14px] p-5">
             <div className="flex items-center justify-between">
-              <h3 className="text-[13px] font-semibold text-foreground">Failure modes</h3>
+              <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.failureModes')}</h3>
               {run?.traceRef?.url && (
                 <Button variant="outline" size="sm" onClick={() => openTrace(run.traceRef!.url!)}>
-                  <ExternalLink className="h-3.5 w-3.5" /> Open LangSmith trace
+                  <ExternalLink className="h-3.5 w-3.5" /> {t('evaluation.openLangSmithTrace')}
                 </Button>
               )}
             </div>
             {(result?.failureModes.length ?? 0) === 0 ? (
-              <p className="mt-2 text-[12px] text-foreground/44">No failures recorded.</p>
+              <p className="mt-2 text-[12px] text-foreground/44">{t('evaluation.noFailuresRecorded')}</p>
             ) : (
               <div className="mt-3 flex flex-wrap gap-2">
                 {result?.failureModes.map((mode) => (
@@ -347,7 +364,7 @@ export const CaseDetail: React.FC<{
                     key={mode}
                     className="inline-flex rounded-full border border-destructive/30 bg-destructive/10 px-2.5 py-0.5 text-[11px] font-medium text-foreground/78"
                   >
-                    {failureModeLabel(mode)}
+                    {t(failureModeLabel(mode))}
                   </span>
                 ))}
               </div>
@@ -355,9 +372,9 @@ export const CaseDetail: React.FC<{
           </div>
 
           <div className="mac-stock-tile rounded-[14px] p-5">
-            <h3 className="text-[13px] font-semibold text-foreground">Human review</h3>
+            <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.humanReview')}</h3>
             <p className="mt-1 text-[11.5px] text-foreground/48">
-              Mark the run good/bad — this feeds the human feedback log (spec §82).
+              {t('evaluation.humanReviewDescription')}
             </p>
             <div className="mt-3 flex items-center gap-2">
               <Button
@@ -366,7 +383,7 @@ export const CaseDetail: React.FC<{
                 disabled={submitting}
                 onClick={() => void submitFeedback('good')}
               >
-                <ThumbsUp className="h-3.5 w-3.5" /> Good
+                <ThumbsUp className="h-3.5 w-3.5" /> {t('evaluation.good')}
               </Button>
               <Button
                 variant={feedback === 'bad' ? 'destructive' : 'secondary'}
@@ -374,10 +391,10 @@ export const CaseDetail: React.FC<{
                 disabled={submitting}
                 onClick={() => void submitFeedback('bad')}
               >
-                <ThumbsDown className="h-3.5 w-3.5" /> Bad
+                <ThumbsDown className="h-3.5 w-3.5" /> {t('evaluation.bad')}
               </Button>
               <Button variant="ghost" size="sm" onClick={() => setNoteOpen((open) => !open)}>
-                {noteOpen ? 'Hide note' : 'Add note'}
+                {noteOpen ? t('evaluation.hideNote') : t('evaluation.addNote')}
               </Button>
             </div>
             {noteOpen && (
@@ -386,7 +403,7 @@ export const CaseDetail: React.FC<{
                   className="mac-input h-9 flex-1 rounded-[10px] px-3 text-[12px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-accent/28"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
-                  placeholder="Optional note attached to the next 👍/👎"
+                  placeholder={t('evaluation.notePlaceholder')}
                 />
               </div>
             )}

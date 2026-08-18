@@ -1,18 +1,20 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ThesisImpact, ThesisImpactKind } from '@finagent/core';
 
-const KIND_BADGE: Record<ThesisImpactKind, { label: string; color: string }> = {
-  unchanged: { label: 'Unchanged', color: '#9ca3af' },
-  strengthened: { label: 'Strengthened', color: '#22c55e' },
-  weakened: { label: 'Weakened', color: '#f59e0b' },
-  invalidated: { label: 'Invalidated', color: '#ef4444' },
+const KIND_BADGE: Record<ThesisImpactKind, { color: string }> = {
+  unchanged: { color: '#9ca3af' },
+  strengthened: { color: '#22c55e' },
+  weakened: { color: '#f59e0b' },
+  invalidated: { color: '#ef4444' },
 };
 
 /** Impact history: kind badge + evaluator summary + date. */
 export const ThesisImpactList: React.FC<{ impacts: ThesisImpact[] }> = ({ impacts }) => {
+  const { t } = useTranslation();
   if (impacts.length === 0) {
     return (
-      <div className="py-6 text-center text-[13px] text-foreground/44">No re-evaluations yet.</div>
+      <div className="py-6 text-center text-[13px] text-foreground/44">{t('thesis.impact.noneYet')}</div>
     );
   }
 
@@ -27,7 +29,7 @@ export const ThesisImpactList: React.FC<{ impacts: ThesisImpact[] }> = ({ impact
                 className="text-[10px] font-semibold uppercase tracking-wide"
                 style={{ color: badge.color }}
               >
-                {badge.label}
+                {t(`thesis.impact.${impact.kind}`)}
               </span>
               <span className="text-[11px] text-foreground/44">
                 {new Date(impact.evaluatedAt).toLocaleDateString()}

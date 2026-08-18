@@ -138,6 +138,10 @@ function createElectronClient(): FinagentClient {
       setCompleted: (completed: boolean) =>
         ipcResult(window.electronAPI.onboarding.setCompleted({ completed })),
     },
+    prefs: {
+      get: () => ipcResult(window.electronAPI.appPreferences.get()),
+      update: (locale) => ipcResult(window.electronAPI.appPreferences.update({ locale })),
+    },
     screening: {
       run: (input) => ipcResult(window.electronAPI.screening.run(input)),
       listRuns: () => ipcResult(window.electronAPI.screening.listRuns()),

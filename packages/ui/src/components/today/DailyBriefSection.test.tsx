@@ -5,6 +5,7 @@ import type { AutomationRule } from '@finagent/core'
 import { fallbackClient, FinagentClientProvider, type FinagentClient } from '../../client'
 import type { DailyBrief } from '../../client/automation'
 import { installHappyDom } from '../../test/setupHappyDom'
+import { makeTestI18n, I18nextProvider } from '../../test/i18nTest'
 import { DailyBriefSection } from './DailyBriefSection'
 
 let restoreDom: (() => void) | undefined
@@ -80,9 +81,11 @@ describe('DailyBriefSection', () => {
 
     await act(async () => {
       root.render(
-        <FinagentClientProvider client={clientWithBrief(BRIEF)}>
-          <DailyBriefSection onManage={() => undefined} />
-        </FinagentClientProvider>
+        <I18nextProvider i18n={makeTestI18n('en-US')}>
+          <FinagentClientProvider client={clientWithBrief(BRIEF)}>
+            <DailyBriefSection onManage={() => undefined} />
+          </FinagentClientProvider>
+        </I18nextProvider>
       )
     })
     await flushAsync()
@@ -107,9 +110,11 @@ describe('DailyBriefSection', () => {
 
     await act(async () => {
       root.render(
-        <FinagentClientProvider client={clientWithBrief(BRIEF)}>
-          <DailyBriefSection onManage={() => undefined} />
-        </FinagentClientProvider>
+        <I18nextProvider i18n={makeTestI18n('en-US')}>
+          <FinagentClientProvider client={clientWithBrief(BRIEF)}>
+            <DailyBriefSection onManage={() => undefined} />
+          </FinagentClientProvider>
+        </I18nextProvider>
       )
     })
     await flushAsync()
@@ -134,9 +139,11 @@ describe('DailyBriefSection', () => {
 
     await act(async () => {
       root.render(
-        <FinagentClientProvider client={fallbackClient}>
-          <DailyBriefSection onManage={() => undefined} />
-        </FinagentClientProvider>
+        <I18nextProvider i18n={makeTestI18n('en-US')}>
+          <FinagentClientProvider client={fallbackClient}>
+            <DailyBriefSection onManage={() => undefined} />
+          </FinagentClientProvider>
+        </I18nextProvider>
       )
     })
     await flushAsync()
@@ -162,9 +169,11 @@ describe('DailyBriefSection', () => {
 
     await act(async () => {
       root.render(
-        <FinagentClientProvider client={clientWithBrief(quiet)}>
-          <DailyBriefSection onManage={() => undefined} />
-        </FinagentClientProvider>
+        <I18nextProvider i18n={makeTestI18n('en-US')}>
+          <FinagentClientProvider client={clientWithBrief(quiet)}>
+            <DailyBriefSection onManage={() => undefined} />
+          </FinagentClientProvider>
+        </I18nextProvider>
       )
     })
     await flushAsync()

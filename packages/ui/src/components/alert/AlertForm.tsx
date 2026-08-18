@@ -1,7 +1,9 @@
 import React, { useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { AlertRuleType } from '@finagent/core';
 import { ALERT_RULE_TYPES } from '@finagent/core';
-import { ALERT_TYPE_LABELS, type AlertRuleDraft } from '../../atoms';
+import type { AlertRuleDraft } from '../../atoms';
+import { ALERT_TYPE_KEYS } from './AlertCard';
 import { Button } from '../primitives/Button';
 import { Input } from '../primitives/Input';
 
@@ -18,6 +20,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({
   onSubmit,
   onCancel,
 }) => {
+  const { t } = useTranslation();
   const [symbol, setSymbol] = useState(initialSymbol.toUpperCase());
   const [type, setType] = useState<AlertRuleType>('price_above');
   const [targetPrice, setTargetPrice] = useState('');
@@ -34,23 +37,23 @@ export const AlertForm: React.FC<AlertFormProps> = ({
 
     if (needsSymbol) {
       if (!symbol.trim()) {
-        next.symbol = 'Symbol is required';
+        next.symbol = t('alerts.form.symbolRequired');
       } else if (!SYMBOL_REGEX.test(symbol)) {
-        next.symbol = 'Invalid format. Use: AAPL.US, 0700.HK';
+        next.symbol = t('alerts.form.symbolInvalid');
       }
     }
 
     if (type === 'price_above' || type === 'price_below') {
       const value = parseFloat(targetPrice);
       if (!targetPrice.trim() || isNaN(value) || value <= 0) {
-        next.targetPrice = 'Enter a positive target price';
+        next.targetPrice = t('alerts.form.targetPricePositive');
       }
     }
 
     if (type === 'earnings') {
       const value = parseInt(horizonDays, 10);
       if (isNaN(value) || value <= 0) {
-        next.horizonDays = 'Enter a positive number of days';
+        next.horizonDays = t('alerts.form.horizonDaysPositive');
       }
     }
 
@@ -58,16 +61,16 @@ export const AlertForm: React.FC<AlertFormProps> = ({
       const min = minWeight.trim() === '' ? undefined : parseFloat(minWeight);
       const max = maxWeight.trim() === '' ? undefined : parseFloat(maxWeight);
       if (min === undefined && max === undefined) {
-        next.minWeight = 'Enter a min or max weight';
+        next.minWeight = t('alerts.form.weightMinMax');
       } else {
         if (min !== undefined && (isNaN(min) || min < 0 || min > 100)) {
-          next.minWeight = 'Weight must be 0–100%';
+          next.minWeight = t('alerts.form.weightRange');
         }
         if (max !== undefined && (isNaN(max) || max < 0 || max > 100)) {
-          next.maxWeight = 'Weight must be 0–100%';
+          next.maxWeight = t('alerts.form.weightRange');
         }
         if (min !== undefined && max !== undefined && min > max) {
-          next.maxWeight = 'Max must be ≥ min';
+          next.maxWeight = t('alerts.form.weightOrder');
         }
       }
     }
@@ -75,7 +78,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({
     if (type === 'portfolio_drawdown') {
       const value = parseFloat(threshold);
       if (!threshold.trim() || isNaN(value) || value <= 0 || value > 100) {
-        next.threshold = 'Drawdown must be 0–100%';
+        next.threshold = t('alerts.form.drawdownRange');
       }
     }
 
@@ -107,11 +110,13 @@ export const AlertForm: React.FC<AlertFormProps> = ({
 
   return (
     <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="text-lg font-semibold text-[oklch(var(--text-primary))]">Create Alert</div>
+      <div className="text-lg font-semibold text-[oklch(var(--text-primary))]">
+        {t('alerts.createAlert')}
+      </div>
 
       {needsSymbol && (
         <Input
-          label="Symbol"
+          label={t('alerts.form.symbol')}
           value={symbol}
           onChange={(e: React.ChangeEvent<HTMLInputElement>) => setSymbol(e.target.value.toUpperCase())}
           placeholder="AAPL.US"
@@ -120,20 +125,22 @@ export const AlertForm: React.FC<AlertFormProps> = ({
       )}
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-[oklch(var(--text-secondary))]">Alert Type</label>
+        <label className="text-sm font-medium text-[oklch(var(--text-secondary))]">
+          {t('alerts.form.alertType')}
+        </label>
         <div className="grid grid-cols-2 gap-2">
-          {ALERT_RULE_TYPES.map((t) => (
+          {ALERT_RULE_TYPES.map((tType) => (
             <button
-              key={t}
+              key={tType}
               type="button"
-              onClick={() => setType(t)}
+              onClick={() => setType(tType)}
               className={`p-2 rounded-lg border text-sm transition-all ${
-                type === t
+                type === tType
                   ? 'border-[oklch(var(--accent-primary))] bg-[oklch(var(--accent-primary))]/10 text-[oklch(var(--text-primary))]'
                   : 'border-[oklch(var(--bg-primary))] text-[oklch(var(--text-secondary))] hover:border-[oklch(var(--accent-primary))]/50'
               }`}
             >
-              {ALERT_TYPE_LABELS[t]}
+              {t(ALERT_TYPE_KEYS[tType])}
             </button>
           ))}
         </div>
@@ -141,7 +148,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({
 
       {(type === 'price_above' || type === 'price_below') && (
         <Input
-          label="Target Price"
+          label={t('alerts.form.targetPrice')}
           type="number"
           step="0.01"
           value={targetPrice}
@@ -153,7 +160,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({
 
       {type === 'earnings' && (
         <Input
-          label="Horizon (days)"
+          label={t('alerts.form.horizonDays')}
           type="number"
           step="1"
           value={horizonDays}
@@ -166,7 +173,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({
       {type === 'position_weight' && (
         <div className="grid grid-cols-2 gap-2">
           <Input
-            label="Min Weight %"
+            label={t('alerts.form.minWeight')}
             type="number"
             step="0.1"
             value={minWeight}
@@ -175,7 +182,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({
             error={errors.minWeight}
           />
           <Input
-            label="Max Weight %"
+            label={t('alerts.form.maxWeight')}
             type="number"
             step="0.1"
             value={maxWeight}
@@ -188,7 +195,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({
 
       {type === 'portfolio_drawdown' && (
         <Input
-          label="Drawdown Threshold %"
+          label={t('alerts.form.drawdownThreshold')}
           type="number"
           step="0.1"
           value={threshold}
@@ -200,10 +207,10 @@ export const AlertForm: React.FC<AlertFormProps> = ({
 
       <div className="flex gap-2 pt-2">
         <Button type="submit" className="flex-1">
-          Create Alert
+          {t('alerts.form.create')}
         </Button>
         <Button type="button" variant="secondary" onClick={onCancel}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       </div>
     </form>

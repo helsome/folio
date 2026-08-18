@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { ApiResult, ManualPortfolio, PortfolioImportDraft, PortfolioImportRow } from '@finagent/core';
 import { installHappyDom } from '../../test/setupHappyDom';
+import { withI18n } from '../../test/i18n';
 import { ImportDialog } from './ImportDialog';
 
 let restoreDom: (() => void) | undefined;
@@ -73,7 +74,7 @@ async function render(onImported: () => void = () => {}) {
   document.body.appendChild(container);
   const root = createRoot(container);
   await act(async () => {
-    root.render(<ImportDialog open onClose={() => {}} onImported={onImported} />);
+    root.render(withI18n(<ImportDialog open onClose={() => {}} onImported={onImported} />));
   });
   return { container, root };
 }

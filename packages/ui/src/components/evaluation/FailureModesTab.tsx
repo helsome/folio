@@ -1,4 +1,5 @@
 import React, { useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type {
   EvaluationExperiment,
   EvaluationFailureMode,
@@ -32,6 +33,14 @@ const VERDICT_CLASS: Record<string, string> = {
   partial: 'bg-[var(--mac-yellow)]/10 text-[var(--mac-yellow)]',
 };
 
+const RUN_STATUS_KEY: Record<string, string> = {
+  completed: 'evaluation.runStatuses.completed',
+  failed: 'evaluation.runStatuses.failed',
+  cancelled: 'evaluation.runStatuses.cancelled',
+  timeout: 'evaluation.runStatuses.timeout',
+  skipped: 'evaluation.runStatuses.skipped',
+};
+
 function aggregateFailures(list: EvaluationExperimentDetail[]): FailureRow[] {
   const byMode = new Map<EvaluationFailureMode, FailureRow>();
   for (const detail of list) {
@@ -61,6 +70,7 @@ export const FailureModesTab: React.FC<{
   onLoadDetail: (experimentId: string) => Promise<EvaluationExperimentDetail | null>;
   onOpenCase: (caseRef: CaseRef) => void;
 }> = ({ experiments, details, onLoadDetail, onOpenCase }) => {
+  const { t } = useTranslation();
   const [scope, setScope] = useState<string>('all');
   const [caseQuery, setCaseQuery] = useState('');
   const [loading, setLoading] = useState(false);
@@ -76,7 +86,7 @@ export const FailureModesTab: React.FC<{
       setLoadError(null);
       const settled = await Promise.allSettled(missing.map((id) => onLoadDetail(id)));
       const failed = settled.filter((entry) => entry.status === 'rejected').length;
-      if (failed > 0) setLoadError(`Could not load ${failed} experiment detail(s).`);
+      if (failed > 0) setLoadError(t('evaluation.couldNotLoadDetails', { count: failed }));
       setLoading(false);
     })();
   }, [scope, experiments, details, onLoadDetail]);
@@ -109,7 +119,7 @@ export const FailureModesTab: React.FC<{
   if (experiments.length === 0) {
     return (
       <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
-        No experiments to inspect.
+        {t('evaluation.noExperimentsToInspect')}
       </div>
     );
   }
@@ -126,7 +136,7 @@ export const FailureModesTab: React.FC<{
               : 'border-border text-foreground/56 hover:text-foreground'
           }`}
         >
-          All experiments
+          {t('evaluation.allExperiments')}
         </button>
         {experiments.map((experiment) => (
           <button
@@ -147,13 +157,13 @@ export const FailureModesTab: React.FC<{
 
       <div className="flex items-center justify-between gap-3">
         <p className="text-[11px] text-foreground/44">
-          {loading ? 'Loading details…' : `${rows.length} mode(s) · ${totalFailures} failure(s)`}
+          {loading ? t('evaluation.loadingDetails') : t('evaluation.failureSummary', { modes: rows.length, failures: totalFailures })}
         </p>
         <input
           className="mac-input h-8 w-56 rounded-[10px] px-3 text-[12px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-accent/28"
           value={caseQuery}
           onChange={(e) => setCaseQuery(e.target.value)}
-          placeholder="Filter by case id…"
+          placeholder={t('evaluation.filterByCaseId')}
         />
       </div>
 
@@ -161,11 +171,11 @@ export const FailureModesTab: React.FC<{
 
       {loading ? (
         <div className="flex items-center gap-2 text-[12px] text-foreground/48">
-          <Spinner /> Loading experiment details…
+          <Spinner /> {t('evaluation.loadingExperimentDetails')}
         </div>
       ) : rows.length === 0 ? (
         <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
-          {caseQuery.trim() ? 'No failure modes match the case filter.' : 'No failure modes recorded.'}
+          {caseQuery.trim() ? t('evaluation.noFailureMatch') : t('evaluation.noFailureModesRecorded')}
         </div>
       ) : (
         <div className="space-y-2.5">
@@ -174,13 +184,13 @@ export const FailureModesTab: React.FC<{
               <div className="flex items-center justify-between gap-3">
                 <div className="flex items-center gap-2">
                   <span className="text-[13px] font-semibold text-foreground">
-                    {failureModeLabel(row.mode)}
+                    {t(failureModeLabel(row.mode))}
                   </span>
                   <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-[10.5px] font-semibold tabular-nums text-destructive">
                     {row.count}
                   </span>
                 </div>
-                <span className="text-[10.5px] text-foreground/36">{row.cases.length} case(s)</span>
+                <span className="text-[10.5px] text-foreground/36">{t('evaluation.caseCount', { count: row.cases.length })}</span>
               </div>
               <div className="mt-2.5 flex flex-wrap gap-1.5">
                 {row.cases.map((entry) => (
@@ -196,7 +206,7 @@ export const FailureModesTab: React.FC<{
                   >
                     {entry.caseId}
                     {entry.verdict === null && (
-                      <span className="text-[9.5px] uppercase text-foreground/36">{entry.runStatus}</span>
+                      <span className="text-[9.5px] uppercase text-foreground/36">{t(RUN_STATUS_KEY[entry.runStatus] ?? entry.runStatus)}</span>
                     )}
                   </button>
                 ))}

@@ -9,11 +9,13 @@ import {
   type SkillListItem,
 } from '../../client';
 import { installHappyDom } from '../../test/setupHappyDom';
+import { initI18nForSettingsTests } from '../../test/i18nSettings';
 import { SkillsView } from './SkillsView';
 
 let restoreDom: (() => void) | undefined;
 
 beforeAll(() => {
+  initI18nForSettingsTests();
   restoreDom = installHappyDom().restore;
 });
 

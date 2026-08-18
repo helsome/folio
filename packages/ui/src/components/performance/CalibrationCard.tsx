@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import { MIN_CALIBRATION_SAMPLES, WEIGHT_BOUNDS } from '@finagent/core';
 
 /**
@@ -50,6 +51,7 @@ const BODY_CELL = 'px-2 py-1.5 text-[12px] text-foreground/80';
 
 /** Renders one calibration table card; `rows: []` shows the empty message. */
 export const CalibrationCard: React.FC<CalibrationCardProps> = ({ title, rows, emptyMessage }) => {
+  const { t } = useTranslation();
   return (
     <section
       className="rounded-[10px] border mac-list-row p-4"
@@ -58,11 +60,11 @@ export const CalibrationCard: React.FC<CalibrationCardProps> = ({ title, rows, e
       <div className="flex items-baseline justify-between gap-2">
         <h4 className="text-[11px] font-semibold uppercase tracking-wide text-foreground">{title}</h4>
         <p className="text-[10px] text-text-muted">
-          Final weight bounded to [{WEIGHT_BOUNDS.min.toFixed(2)} – {WEIGHT_BOUNDS.max.toFixed(2)}]
+          {t('performance.finalWeightBounded', { min: WEIGHT_BOUNDS.min.toFixed(2), max: WEIGHT_BOUNDS.max.toFixed(2) })}
         </p>
       </div>
       <p className="mt-0.5 text-[10px] text-text-muted">
-        Informational only — below {MIN_CALIBRATION_SAMPLES} samples no adjustment is derived.
+        {t('performance.calibrationNote', { min: MIN_CALIBRATION_SAMPLES })}
       </p>
       {rows.length === 0 ? (
         <p className="mt-3 text-[12px] text-text-muted">{emptyMessage}</p>
@@ -70,12 +72,12 @@ export const CalibrationCard: React.FC<CalibrationCardProps> = ({ title, rows, e
         <table className="mt-2.5 w-full border-separate border-spacing-0">
           <thead>
             <tr>
-              <th className={HEADER_CELL}>Name</th>
-              <th className={`${HEADER_CELL} text-right`}>Base Weight</th>
-              <th className={`${HEADER_CELL} text-right`}>Historical Adjustment</th>
-              <th className={`${HEADER_CELL} text-right`}>Final (Bounded)</th>
-              <th className={`${HEADER_CELL} text-right`}>Samples</th>
-              <th className={`${HEADER_CELL} text-right`}>Status</th>
+              <th className={HEADER_CELL}>{t('performance.name')}</th>
+              <th className={`${HEADER_CELL} text-right`}>{t('performance.baseWeight')}</th>
+              <th className={`${HEADER_CELL} text-right`}>{t('performance.historicalAdjustment')}</th>
+              <th className={`${HEADER_CELL} text-right`}>{t('performance.finalBounded')}</th>
+              <th className={`${HEADER_CELL} text-right`}>{t('performance.samples')}</th>
+              <th className={`${HEADER_CELL} text-right`}>{t('performance.status')}</th>
             </tr>
           </thead>
           <tbody>
@@ -102,7 +104,7 @@ export const CalibrationCard: React.FC<CalibrationCardProps> = ({ title, rows, e
                       className="inline-flex items-center rounded-full border border-dashed border-[var(--mac-border)] px-2 py-0.5 text-[10px] text-foreground/56"
                       data-testid="observational-badge"
                     >
-                      Observational Only
+                      {t('performance.observationalOnly')}
                     </span>
                   )}
                 </td>

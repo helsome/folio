@@ -1,6 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react'
 import { Command as CommandPrimitive } from 'cmdk'
 import { Search } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
 import { getDefaultStore, useAtomValue, useSetAtom } from 'jotai'
 import {
   activeSymbolAtom,
@@ -14,6 +15,7 @@ import {
   commandPaletteOpenAtom,
   movePaletteSelection,
   type PaletteCommand,
+  type PaletteLabels,
 } from '../../atoms/commandPaletteAtoms'
 
 /**
@@ -56,6 +58,7 @@ export function useCommandPaletteHotkey(): void {
 }
 
 export const CommandPalette: React.FC = () => {
+  const { t } = useTranslation()
   const open = useAtomValue(commandPaletteOpenAtom)
   const setOpen = useSetAtom(commandPaletteOpenAtom)
   const watchlist = useAtomValue(watchlistAtom)
@@ -72,9 +75,35 @@ export const CommandPalette: React.FC = () => {
 
   useCommandPaletteHotkey()
 
+  const labels = useMemo<PaletteLabels>(
+    () => ({
+      openSymbolHint: t('navigation.paletteOpenSymbolHint'),
+      openSymbol: (symbol) => t('navigation.paletteOpenSymbol', { symbol }),
+      goToHint: t('navigation.paletteGoToHint'),
+      startResearch: (symbol) =>
+        symbol != null
+          ? t('navigation.paletteStartResearchOn', { symbol })
+          : t('navigation.paletteStartResearchCurrent'),
+      quickActionHint: t('navigation.paletteQuickActionHint'),
+      openConnections: t('navigation.paletteOpenConnections'),
+      quickActionSettingsHint: t('navigation.paletteQuickActionSettingsHint'),
+      navigation: {
+        portfolio: t('navigation.portfolio'),
+        research: t('navigation.research'),
+        thesis: t('navigation.thesis'),
+        compare: t('navigation.compare'),
+        alerts: t('navigation.alerts'),
+        skills: t('navigation.skills'),
+        evaluation: t('navigation.evaluation'),
+        settings: t('navigation.settings'),
+      },
+    }),
+    [t],
+  )
+
   const commands = useMemo(
-    () => buildPaletteCommands({ query, watchlist, activeSymbol }),
-    [query, watchlist, activeSymbol],
+    () => buildPaletteCommands({ query, watchlist, activeSymbol, labels }),
+    [query, watchlist, activeSymbol, labels],
   )
 
   // Reset query/selection and capture the previously-focused element on open,
@@ -147,9 +176,9 @@ export const CommandPalette: React.FC = () => {
             value={query}
             onValueChange={setQuery}
             onKeyDown={handleKeyDown}
-            placeholder="Search symbols, sections, actions…"
+            placeholder={t('navigation.paletteSearchPlaceholder')}
             className="h-12 w-full bg-transparent text-[14px] text-foreground placeholder:text-foreground/38 focus:outline-none"
-            aria-label="Command palette search"
+            aria-label={t('navigation.paletteSearchAria')}
             autoComplete="off"
             spellCheck={false}
           />
@@ -157,9 +186,9 @@ export const CommandPalette: React.FC = () => {
             Esc
           </kbd>
         </div>
-        <CommandPrimitive.List className="max-h-[50vh] overflow-y-auto py-2" role="listbox" aria-label="Command results">
+        <CommandPrimitive.List className="max-h-[50vh] overflow-y-auto py-2" role="listbox" aria-label={t('navigation.paletteResultsAria')}>
           {commands.length === 0 ? (
-            <CommandPrimitive.Empty className="px-4 py-3 text-[13px] text-foreground/42">No matches for “{query}”.</CommandPrimitive.Empty>
+            <CommandPrimitive.Empty className="px-4 py-3 text-[13px] text-foreground/42">{t('navigation.paletteNoMatches', { query })}</CommandPrimitive.Empty>
           ) : (
             commands.map((command, index) => (
               <CommandPrimitive.Item

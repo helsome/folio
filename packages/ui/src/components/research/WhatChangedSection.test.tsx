@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { ResearchDiff, ResearchReport } from '@finagent/core';
 import { installHappyDom } from '../../test/setupHappyDom';
+import { TestI18n } from '../../test/testI18n';
 import { WhatChangedSection } from './WhatChangedSection';
 
 let restoreDom: (() => void) | undefined;
@@ -20,7 +21,7 @@ function renderText(element: React.ReactElement): string {
   document.body.appendChild(container);
   const root = createRoot(container);
   act(() => {
-    root.render(element);
+    root.render(<TestI18n>{element}</TestI18n>);
   });
   return container.textContent ?? '';
 }

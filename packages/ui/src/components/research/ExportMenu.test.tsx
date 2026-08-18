@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { ResearchReport } from '@finagent/core';
 import { installHappyDom } from '../../test/setupHappyDom';
+import { TestI18n } from '../../test/testI18n';
 import { ExportMenu } from './ExportMenu';
 
 let restoreDom: (() => void) | undefined;
@@ -100,7 +101,11 @@ function renderMenu() {
   document.body.appendChild(container);
   const root = createRoot(container);
   act(() => {
-    root.render(<ExportMenu report={report()} />);
+    root.render(
+      <TestI18n>
+        <ExportMenu report={report()} />
+      </TestI18n>
+    );
   });
   return { container, root };
 }

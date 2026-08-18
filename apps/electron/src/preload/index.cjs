@@ -162,6 +162,10 @@ var electronAPI = {
     getCompleted: () => import_electron.ipcRenderer.invoke("onboarding:getCompleted"),
     setCompleted: (input) => import_electron.ipcRenderer.invoke("onboarding:setCompleted", input)
   },
+  appPreferences: {
+    get: () => import_electron.ipcRenderer.invoke("appPreferences:get"),
+    update: (input) => import_electron.ipcRenderer.invoke("appPreferences:update", input)
+  },
   screening: {
     run: (input) => import_electron.ipcRenderer.invoke("screening:run", input),
     listRuns: () => import_electron.ipcRenderer.invoke("screening:listRuns"),

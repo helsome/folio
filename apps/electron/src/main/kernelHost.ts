@@ -54,6 +54,8 @@ import type {
   StrategyId,
   AgentEventPayload,
   ApiError,
+  AppPreferencesSnapshot,
+  SupportedLocale,
   EvaluationBaseline,
   EvaluationCase,
   EvaluationExperiment,
@@ -67,6 +69,8 @@ import type {
   ToolCallRecord,
 } from '@finagent/core';
 import { STRATEGY_IDS } from '@finagent/core';
+import { isLocalePreference } from '@finagent/i18n';
+import { createAppPreferencesService, type AppPreferencesService } from './app-preferences.ts';
 import {
   AgentKernel,
   AlertEngine,
@@ -264,6 +268,9 @@ export class AgentKernelHost {
 
   // V7 evaluation & observability (spec §15, §52-55, §62-63).
   private readonly evaluationStore: EvaluationStore;
+
+  /** V8: main-owned locale preference (independent of any single store). */
+  private readonly appPreferences: AppPreferencesService;
   private evaluationSettings: EvaluationSettings;
   private evaluationBackend: EvaluationBackend;
   private evaluationRedactor: EvaluationRedactor;
@@ -286,6 +293,9 @@ export class AgentKernelHost {
 
     const provider = readAgentProvider();
     const userData = app.getPath('userData');
+
+    // V8: main-owned app preferences (locale), resolved against the OS locale.
+    this.appPreferences = createAppPreferencesService(new JsonFileStore(userData), () => app.getLocale());
 
     // V4 provider platform: the capability registry is built on top of the
     // provider router, which owns the Longbridge (primary) and Massive
@@ -472,11 +482,24 @@ export class AgentKernelHost {
         );
       }
     }
+    // V8: new agent responses follow the *effective* app locale unless the
+    // user explicitly requests another language in the prompt (spec §41–42).
+    // Resolved after validation and with a safe fallback so a prefs failure
+    // can never block an agent run (failure-isolation, spec §87).
     return this.kernel.runs.startRun(
       requireString(request.sessionId, 'sessionId'),
       requireString(request.content, 'content'),
-      workspaceContext
+      workspaceContext,
+      await this.effectiveRunLocale()
     );
+  }
+
+  private async effectiveRunLocale(): Promise<SupportedLocale> {
+    try {
+      return (await this.getAppPreferences()).effectiveLocale;
+    } catch {
+      return 'en-US';
+    }
   }
 
   async cancelRun(input: unknown): Promise<void> {
@@ -1917,6 +1940,24 @@ export class AgentKernelHost {
     const completed = request.completed === true;
     const store = new JsonFileStore(app.getPath('userData'));
     await store.write('onboarding.json', { completed });
+  }
+
+  // -------------------------------------------------------------------------
+  // App preferences (V8 spec §14–16): main-owned so the effective locale is
+  // known by OS notifications, dialogs, and the agent runtime — not just the
+  // renderer. Stored alongside onboarding in userData (JsonFileStore).
+  // -------------------------------------------------------------------------
+
+  async getAppPreferences(): Promise<AppPreferencesSnapshot> {
+    return this.appPreferences.get();
+  }
+
+  async updateAppPreferences(input: unknown): Promise<AppPreferencesSnapshot> {
+    const request = requireObject(input);
+    if (!isLocalePreference(request.locale)) {
+      throw createCodeError('INVALID_ARGUMENT', 'Invalid locale preference.');
+    }
+    return this.appPreferences.update(request.locale);
   }
 
   private async pushConnections(): Promise<void> {

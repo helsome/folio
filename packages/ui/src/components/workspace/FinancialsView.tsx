@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import type { CalcIndex, StaticInfo } from '@finagent/core';
 import { activeSymbolAtom } from '../../atoms';
 import { useFinagentClient } from '../../client';
@@ -24,6 +25,7 @@ const Row: React.FC<RowProps> = ({ label, value }) => (
 );
 
 export const FinancialsView: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const symbol = useAtomValue(activeSymbolAtom);
 
@@ -56,29 +58,29 @@ export const FinancialsView: React.FC = () => {
   return (
     <div className="space-y-3 p-4">
       <div className="rounded-[10px] border border-[var(--mac-border)] bg-[var(--mac-blue-soft)] px-4 py-3 text-[12px] text-foreground/70">
-        Financial statements coming in a later release.
+        {t('security.financials.banner')}
       </div>
 
       <section className="mac-stock-tile rounded-[12px] p-4">
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
-          Valuation Metrics
+          {t('security.financials.valuationMetrics')}
         </h3>
         <table className="w-full">
           <tbody>
             <Row
-              label="PE"
+              label={t('security.financials.pe')}
               value={calcIndex?.pe != null ? calcIndex.pe.toFixed(2) : DASH}
             />
             <Row
-              label="PB"
+              label={t('security.financials.pb')}
               value={calcIndex?.pb != null ? calcIndex.pb.toFixed(2) : DASH}
             />
             <Row
-              label="DPS Rate"
+              label={t('security.financials.dpsRate')}
               value={calcIndex?.dpsRate != null ? fmtPercent(calcIndex.dpsRate) : DASH}
             />
             <Row
-              label="Turnover Rate"
+              label={t('security.financials.turnoverRate')}
               value={
                 calcIndex?.turnoverRate != null
                   ? fmtPercent(calcIndex.turnoverRate)
@@ -86,7 +88,7 @@ export const FinancialsView: React.FC = () => {
               }
             />
             <Row
-              label="Total Market Value"
+              label={t('security.financials.totalMarketValue')}
               value={
                 calcIndex?.totalMarketValue != null
                   ? fmtNumber(calcIndex.totalMarketValue)
@@ -99,30 +101,30 @@ export const FinancialsView: React.FC = () => {
 
       <section className="mac-stock-tile rounded-[12px] p-4">
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
-          Static Info
+          {t('security.financials.staticInfo')}
         </h3>
         <table className="w-full">
           <tbody>
             <Row
-              label="EPS"
+              label={t('security.financials.eps')}
               value={staticInfo?.eps != null ? staticInfo.eps.toFixed(2) : DASH}
             />
             <Row
-              label="EPS (TTM)"
+              label={t('security.financials.epsTtm')}
               value={staticInfo?.epsTtm != null ? staticInfo.epsTtm.toFixed(2) : DASH}
             />
             <Row
-              label="DPS"
+              label={t('security.financials.dps')}
               value={
                 staticInfo?.dividend != null ? staticInfo.dividend.toFixed(4) : DASH
               }
             />
             <Row
-              label="BPS"
+              label={t('security.financials.bps')}
               value={staticInfo?.bps != null ? staticInfo.bps.toFixed(2) : DASH}
             />
             <Row
-              label="Total Shares"
+              label={t('security.financials.totalShares')}
               value={
                 staticInfo?.totalShares != null
                   ? fmtNumber(staticInfo.totalShares)
@@ -130,7 +132,7 @@ export const FinancialsView: React.FC = () => {
               }
             />
             <Row
-              label="Circulating Shares"
+              label={t('security.financials.circulatingShares')}
               value={
                 staticInfo?.circulatingShares != null
                   ? fmtNumber(staticInfo.circulatingShares)

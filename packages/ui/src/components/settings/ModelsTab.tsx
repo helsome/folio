@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useAtom, useSetAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import type {
   CredentialInfo,
   CustomProviderConfig,
@@ -32,26 +33,26 @@ const Spinner: React.FC = () => (
   </svg>
 );
 
-const statusBadge = (status: ProviderStatusKind): { label: string; className: string } => {
+const statusBadge = (status: ProviderStatusKind): { labelKey: string; className: string } => {
   switch (status) {
     case 'connected':
       return {
-        label: 'Connected',
+        labelKey: 'settings.model.statusConnected',
         className: 'border-[var(--mac-green)]/30 bg-[var(--mac-green)]/10 text-[var(--mac-green)]',
       };
     case 'missing_credential':
       return {
-        label: 'Missing Credential',
+        labelKey: 'settings.model.statusMissingCredential',
         className: 'border-[var(--mac-yellow)]/30 bg-[var(--mac-yellow)]/10 text-[var(--mac-yellow)]',
       };
     case 'unavailable':
       return {
-        label: 'Unavailable',
+        labelKey: 'settings.model.statusUnavailable',
         className: 'border-[var(--mac-red)]/30 bg-[var(--mac-red)]/10 text-[var(--mac-red)]',
       };
     case 'runtime_error':
       return {
-        label: 'Runtime Error',
+        labelKey: 'settings.model.statusRuntimeError',
         className: 'border-[var(--mac-red)]/30 bg-[var(--mac-red)]/10 text-[var(--mac-red)]',
       };
   }
@@ -70,6 +71,7 @@ const emptyCustomForm = {
 
 /** Core LLM settings: runtime/model, reasoning, providers, credentials, custom providers. */
 export const ModelsTab: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [llmState] = useAtom(llmStateAtom);
   const [models] = useAtom(llmModelsAtom);
@@ -163,7 +165,7 @@ export const ModelsTab: React.FC = () => {
     setCustomError(null);
     setCustomSuccess(null);
     if (!name.trim() || !baseUrl.trim() || !modelId.trim()) {
-      setCustomError('Name, Base URL, and Model ID are required.');
+      setCustomError(t('settings.model.customProviderRequired'));
       return;
     }
     const model: CustomProviderModel = {
@@ -185,7 +187,7 @@ export const ModelsTab: React.FC = () => {
     setCustomBusy(false);
     if (result.ok) {
       setCustomForm(emptyCustomForm);
-      setCustomSuccess('Custom provider added.');
+      setCustomSuccess(t('settings.model.customProviderAdded'));
       await loadProviders();
       void refreshProviders(client);
     } else {
@@ -206,10 +208,10 @@ export const ModelsTab: React.FC = () => {
 
   return (
     <div className="max-w-2xl space-y-8">
-      <Section title="Runtime & default model">
+      <Section title={t('settings.model.runtimeDefaultModel')}>
         <div className="mac-stock-tile rounded-[14px] p-4">
           <div className="mb-3 flex items-center justify-between">
-            <span className="text-[12px] text-foreground/54">Agent runtime</span>
+            <span className="text-[12px] text-foreground/54">{t('settings.model.agentRuntime')}</span>
             <span className="text-[12px] font-semibold text-foreground">{llmState.runtimeProvider}</span>
           </div>
           <div className="flex flex-wrap items-center gap-3">
@@ -218,17 +220,17 @@ export const ModelsTab: React.FC = () => {
           </div>
           {currentModel && (
             <div className="mt-3 border-t mac-section-divider pt-3 text-[12px] text-foreground/54">
-              Active model: <span className="font-medium text-foreground">{currentModel.name || `${currentModel.provider}/${currentModel.id}`}</span>
+              {t('settings.model.activeModel')}: <span className="font-medium text-foreground">{currentModel.name || `${currentModel.provider}/${currentModel.id}`}</span>
             </div>
           )}
         </div>
       </Section>
 
-      <Section title="Provider status">
+      <Section title={t('settings.model.providerStatus')}>
         <div className="mac-stock-tile rounded-[14px] p-4">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-[12px] text-foreground/54">
-              {loadingProviders ? 'Loading providers…' : `${providers.length} providers`}
+              {loadingProviders ? t('settings.model.loadingProviders') : t('settings.model.providersCount', { count: providers.length })}
             </span>
             <button
               type="button"
@@ -237,7 +239,7 @@ export const ModelsTab: React.FC = () => {
               className="mac-secondary-button flex h-8 items-center gap-1.5 rounded-[10px] px-3 text-[12px] font-medium text-foreground transition-smooth disabled:opacity-50"
             >
               {loadingProviders ? <Spinner /> : null}
-              Refresh
+              {t('settings.model.refresh')}
             </button>
           </div>
           {providersError && <div className="mb-3 text-[12px] text-destructive">{providersError}</div>}
@@ -257,26 +259,26 @@ export const ModelsTab: React.FC = () => {
                     </div>
                     <div className="flex shrink-0 items-center gap-2">
                       {provider.modelCount != null && (
-                        <span className="text-[11px] text-foreground/42">{provider.modelCount} models</span>
+                        <span className="text-[11px] text-foreground/42">{t('settings.model.modelsCount', { count: provider.modelCount })}</span>
                       )}
                       <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${badge.className}`}>
-                        {badge.label}
+                        {t(badge.labelKey)}
                       </span>
                     </div>
                   </div>
                 );
               })}
             {!loadingProviders && providers.length === 0 && !providersError && (
-              <div className="text-[12px] text-foreground/48">No providers configured</div>
+              <div className="text-[12px] text-foreground/48">{t('settings.model.noProvidersConfigured')}</div>
             )}
           </div>
         </div>
       </Section>
 
-      <Section title="Credentials">
+      <Section title={t('settings.model.credentials')}>
         <div className="mac-stock-tile rounded-[14px] p-4">
           {providers.length === 0 && !loadingProviders ? (
-            <div className="text-[12px] text-foreground/48">No providers available</div>
+            <div className="text-[12px] text-foreground/48">{t('settings.model.noProvidersAvailable')}</div>
           ) : (
             <div className="space-y-4">
               {providers.map((provider) => {
@@ -292,7 +294,7 @@ export const ModelsTab: React.FC = () => {
                         {provider.displayName || id}
                       </span>
                       {isCredentialConfigured(id) && (
-                        <span className="text-[11px] font-semibold text-[var(--mac-green)]">Configured</span>
+                        <span className="text-[11px] font-semibold text-[var(--mac-green)]">{t('settings.model.configured')}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
@@ -302,7 +304,7 @@ export const ModelsTab: React.FC = () => {
                         onChange={(e) =>
                           setCredentialInputs((i) => ({ ...i, [id]: e.target.value }))
                         }
-                        placeholder="API key"
+                        placeholder={t('settings.model.apiKey')}
                         className="mac-input h-8 flex-1 rounded-[10px] px-3 text-[12px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-accent/28"
                       />
                       <button
@@ -311,7 +313,7 @@ export const ModelsTab: React.FC = () => {
                         disabled={busy || !(credentialInputs[id] ?? '').trim()}
                         className="mac-primary-button h-8 rounded-[10px] px-3 text-[12px] font-semibold transition-smooth disabled:cursor-not-allowed disabled:opacity-45"
                       >
-                        {busy ? <Spinner /> : 'Save'}
+                        {busy ? <Spinner /> : t('common.save')}
                       </button>
                       <button
                         type="button"
@@ -319,7 +321,7 @@ export const ModelsTab: React.FC = () => {
                         disabled={busy || !isCredentialConfigured(id)}
                         className="mac-secondary-button h-8 rounded-[10px] px-3 text-[12px] font-medium text-foreground transition-smooth disabled:cursor-not-allowed disabled:opacity-45"
                       >
-                        Remove
+                        {t('common.remove')}
                       </button>
                       <button
                         type="button"
@@ -328,7 +330,7 @@ export const ModelsTab: React.FC = () => {
                         className="mac-secondary-button flex h-8 items-center gap-1.5 rounded-[10px] px-3 text-[12px] font-medium text-foreground transition-smooth disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         {testing ? <Spinner /> : null}
-                        Test
+                        {t('settings.model.test')}
                       </button>
                     </div>
                     {credentialErrors[id] && (
@@ -354,16 +356,16 @@ export const ModelsTab: React.FC = () => {
         </div>
       </Section>
 
-      <Section title="Custom providers">
+      <Section title={t('settings.model.customProviders')}>
         <div className="mac-stock-tile space-y-3 rounded-[14px] p-4">
           <div className="grid grid-cols-2 gap-3">
-            <Field label="Name" value={customForm.name} onChange={(v) => setCustomForm((f) => ({ ...f, name: v }))} placeholder="my-provider" />
-            <Field label="Display name" value={customForm.displayName} onChange={(v) => setCustomForm((f) => ({ ...f, displayName: v }))} placeholder="My Provider" />
-            <Field label="Base URL" value={customForm.baseUrl} onChange={(v) => setCustomForm((f) => ({ ...f, baseUrl: v }))} placeholder="https://api.example.com/v1" className="col-span-2" />
-            <Field label="API key" type="password" value={customForm.apiKey} onChange={(v) => setCustomForm((f) => ({ ...f, apiKey: v }))} placeholder="sk-…" />
-            <Field label="Context window (optional)" value={customForm.contextWindow} onChange={(v) => setCustomForm((f) => ({ ...f, contextWindow: v }))} placeholder="128000" />
-            <Field label="Model ID" value={customForm.modelId} onChange={(v) => setCustomForm((f) => ({ ...f, modelId: v }))} placeholder="model-id" />
-            <Field label="Model display name" value={customForm.modelName} onChange={(v) => setCustomForm((f) => ({ ...f, modelName: v }))} placeholder="My Model" />
+            <Field label={t('settings.model.name')} value={customForm.name} onChange={(v) => setCustomForm((f) => ({ ...f, name: v }))} placeholder="my-provider" />
+            <Field label={t('settings.model.displayName')} value={customForm.displayName} onChange={(v) => setCustomForm((f) => ({ ...f, displayName: v }))} placeholder="My Provider" />
+            <Field label={t('settings.model.baseUrl')} value={customForm.baseUrl} onChange={(v) => setCustomForm((f) => ({ ...f, baseUrl: v }))} placeholder="https://api.example.com/v1" className="col-span-2" />
+            <Field label={t('settings.model.apiKey')} type="password" value={customForm.apiKey} onChange={(v) => setCustomForm((f) => ({ ...f, apiKey: v }))} placeholder="sk-…" />
+            <Field label={t('settings.model.contextWindowOptional')} value={customForm.contextWindow} onChange={(v) => setCustomForm((f) => ({ ...f, contextWindow: v }))} placeholder="128000" />
+            <Field label={t('settings.model.modelId')} value={customForm.modelId} onChange={(v) => setCustomForm((f) => ({ ...f, modelId: v }))} placeholder="model-id" />
+            <Field label={t('settings.model.modelDisplayName')} value={customForm.modelName} onChange={(v) => setCustomForm((f) => ({ ...f, modelName: v }))} placeholder="My Model" />
           </div>
           <label className="flex items-center gap-2 text-[12px] text-foreground/72">
             <input
@@ -372,7 +374,7 @@ export const ModelsTab: React.FC = () => {
               onChange={(e) => setCustomForm((f) => ({ ...f, reasoning: e.target.checked }))}
               className="accent-[var(--mac-blue)]"
             />
-            Reasoning model
+            {t('settings.model.reasoningModel')}
           </label>
           {customError && <div className="text-[11px] text-destructive">{customError}</div>}
           {customSuccess && <div className="text-[11px] text-[var(--mac-green)]">{customSuccess}</div>}
@@ -383,13 +385,13 @@ export const ModelsTab: React.FC = () => {
             className="mac-primary-button flex h-9 items-center gap-2 rounded-[10px] px-4 text-[13px] font-semibold transition-smooth disabled:cursor-not-allowed disabled:opacity-45"
           >
             {customBusy ? <Spinner /> : null}
-            Add custom provider
+            {t('settings.model.addCustomProvider')}
           </button>
 
           {customProviders.length > 0 && (
             <div className="space-y-1.5 border-t mac-section-divider pt-3">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-foreground/42">
-                Existing custom providers
+                {t('settings.model.existingCustomProviders')}
               </div>
               {customProviders.map((cred) => (
                 <div key={cred.provider} className="flex items-center justify-between gap-3">
@@ -399,7 +401,7 @@ export const ModelsTab: React.FC = () => {
                     onClick={() => void removeCustomProvider(cred.provider)}
                     className="mac-secondary-button h-8 rounded-[10px] px-3 text-[12px] font-medium text-foreground transition-smooth"
                   >
-                    Remove
+                    {t('common.remove')}
                   </button>
                 </div>
               ))}

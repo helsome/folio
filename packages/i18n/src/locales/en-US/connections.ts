@@ -1,0 +1,40 @@
+import type { NamespaceResource } from '../keys.ts';
+
+/** Connections / providers surface (spec §11, §14). Provider & model ids stay untranslated (§11). */
+export const connections = {
+  title: 'Connections',
+  providerCount: '{{count}} provider(s)',
+  notWired:
+    "Provider connections aren't wired into this build yet — this list will populate once the Connections IPC lands.",
+  loading: 'Loading connections…',
+  noneConfigured: 'No providers configured yet.',
+  capabilityMatrix: 'Capability matrix',
+  noCoverage: 'Coverage data will appear once providers are registered.',
+  provider: 'Provider',
+  kindFinancialData: 'Financial Data',
+  kindBrokerAccount: 'Broker Account',
+  waitingAuthorization: 'Waiting for authorization…',
+  openVerificationPage: 'Open verification page',
+  authorizeHint: 'Authorize in your browser, then return here — this page will update automatically.',
+  enterApiKey: 'Enter your API key',
+  apiKey: 'API key',
+  saving: 'Saving…',
+  connect: 'Connect',
+  connecting: 'Connecting…',
+  testConnection: 'Test Connection',
+  testing: 'Testing…',
+  disconnect: 'Disconnect',
+  disconnecting: 'Disconnecting…',
+  reconnect: 'Reconnect',
+  installSetup: 'Install / Setup',
+  byokNote:
+    'Your own key governs usage. Free tiers may return end-of-day data (5 calls/min) and require attribution ("Powered by Polygon.io").',
+  dismissError: 'Dismiss error',
+  dismiss: 'Dismiss',
+  portfolioReady: 'Portfolio ✓',
+  connectionFailed: 'Connection failed.',
+  enterApiKeyError: 'Enter an API key.',
+  saveApiKeyFailed: 'Could not save the API key.',
+  disconnectFailed: 'Disconnect failed.',
+  testFailed: 'Test failed.',
+} satisfies NamespaceResource;

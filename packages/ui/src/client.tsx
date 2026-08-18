@@ -49,6 +49,8 @@ import type {
   ThesisImpact,
   ToolDefinition,
   WorkspaceContext,
+  AppPreferencesSnapshot,
+  LocalePreference,
 } from '@finagent/core';
 import type { ConnectionsChannel, HealthChannel } from './client/connections';
 import type { DiagnosticsBundle } from './client/diagnostics';
@@ -189,6 +191,11 @@ export interface FinagentClient {
   onboarding?: {
     getCompleted: () => Promise<ApiResult<boolean>>;
     setCompleted: (completed: boolean) => Promise<ApiResult<void>>;
+  };
+  /** V8: main-owned app preferences (locale). Renderer never stores it. */
+  prefs?: {
+    get: () => Promise<ApiResult<AppPreferencesSnapshot>>;
+    update: (locale: LocalePreference) => Promise<ApiResult<AppPreferencesSnapshot>>;
   };
   alerts?: {
     loadRules: () => Promise<ApiResult<AlertRule[]>>;
@@ -395,6 +402,24 @@ export const fallbackClient: FinagentClient = {
     submitFeedback: missingClient('evaluation.submitFeedback'),
     listFeedback: missingClient('evaluation.listFeedback'),
     status: missingClient('evaluation.status'),
+  },
+  prefs: {
+    get: async () => ({
+      ok: true,
+      data: {
+        preference: 'system',
+        systemLocale: typeof navigator !== 'undefined' ? navigator.language : 'en-US',
+        effectiveLocale: 'en-US',
+      } as AppPreferencesSnapshot,
+    }),
+    update: async (locale: LocalePreference) => ({
+      ok: true,
+      data: {
+        preference: locale,
+        systemLocale: typeof navigator !== 'undefined' ? navigator.language : 'en-US',
+        effectiveLocale: 'en-US',
+      } as AppPreferencesSnapshot,
+    }),
   },
 };
 

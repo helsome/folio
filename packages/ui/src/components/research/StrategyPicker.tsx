@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { StrategyId } from '@finagent/core';
 
 /**
@@ -7,59 +8,52 @@ import type { StrategyId } from '@finagent/core';
  * renderer mirrors, so the UI never imports @finagent/shared (node/executor
  * code). Ids are validated main-side — the research:start handler rejects
  * unknown strategy ids, and the service throws RESEARCH_STRATEGY_INVALID.
+ * Names/descriptions are localized; ids and focus chips stay ASCII (§11).
  */
 const STRATEGY_PRESETS: ReadonlyArray<{
   id: StrategyId;
-  name: string;
-  description: string;
+  /** camelCase `key` used to build the i18n resource keys. */
+  key: string;
   focus: string[];
 }> = [
   {
     id: 'comprehensive',
-    name: 'Comprehensive',
-    description: 'Full-spectrum deep dive across market, company and research data.',
+    key: 'comprehensive',
     focus: ['full plan', 'market', 'company', 'research'],
   },
   {
     id: 'value',
-    name: 'Value',
-    description: 'Fundamental value analysis — valuation multiples, financials and dividend history.',
+    key: 'value',
     focus: ['valuation', 'financials', 'dividends', 'profile'],
   },
   {
     id: 'growth',
-    name: 'Growth',
-    description: 'Growth focus — revenue/EPS trajectory, consensus estimates and valuation.',
+    key: 'growth',
     focus: ['earnings growth', 'consensus', 'valuation'],
   },
   {
     id: 'technical',
-    name: 'Technical',
-    description: 'Technical analysis — price trend, intraday action, order flow and market temperature.',
+    key: 'technical',
     focus: ['price action', 'trend', 'depth', 'trades'],
   },
   {
     id: 'earnings',
-    name: 'Earnings',
-    description: 'Earnings intelligence — EPS forecasts, calendar catalysts and news.',
+    key: 'earnings',
     focus: ['EPS forecasts', 'calendar', 'news'],
   },
   {
     id: 'event-driven',
-    name: 'Event-Driven',
-    description: 'Event-driven scan — news, calendar, ratings changes and dividend actions.',
+    key: 'eventDriven',
     focus: ['news', 'catalysts', 'ratings', 'dividends'],
   },
   {
     id: 'risk-review',
-    name: 'Risk Review',
-    description: 'Risk review — financial red flags, news, ratings and trend health.',
+    key: 'riskReview',
     focus: ['financials', 'news', 'ratings', 'trend'],
   },
   {
     id: 'income',
-    name: 'Income',
-    description: 'Income focus — dividend history, payout capacity and financial stability.',
+    key: 'income',
     focus: ['dividends', 'yield', 'payout', 'profile'],
   },
 ];
@@ -73,10 +67,11 @@ export interface StrategyPickerProps {
 
 /** Preset card strip for the Deep Research start flow. */
 export const StrategyPicker: React.FC<StrategyPickerProps> = ({ value, onChange }) => {
+  const { t } = useTranslation();
   return (
     <div className="mb-3" data-testid="strategy-picker">
       <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-text-muted">
-        Research strategy
+        {t('research.researchStrategy')}
       </div>
       <div className="flex gap-2 overflow-x-auto pb-1">
         {STRATEGY_PRESETS.map((preset) => {
@@ -92,9 +87,11 @@ export const StrategyPicker: React.FC<StrategyPickerProps> = ({ value, onChange 
                 selected ? 'border-accent bg-accent/10' : 'mac-list-row'
               }`}
             >
-              <span className="block text-[12px] font-semibold text-foreground">{preset.name}</span>
+              <span className="block text-[12px] font-semibold text-foreground">
+                {t(`research.strategies.${preset.key}Name`)}
+              </span>
               <span className="mt-0.5 block text-[10.5px] leading-snug text-text-muted">
-                {preset.description}
+                {t(`research.strategies.${preset.key}Description`)}
               </span>
               <span className="mt-1.5 flex flex-wrap gap-1">
                 {preset.focus.map((chip) => (

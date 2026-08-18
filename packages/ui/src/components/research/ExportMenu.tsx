@@ -1,4 +1,5 @@
 import React, { useEffect, useRef, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ResearchReport } from '@finagent/core';
 import { loadExportMarkdown, loadShareCard } from '../../atoms/exportAtoms';
 
@@ -17,11 +18,11 @@ interface ExportMenuProps {
 
 type MenuAction = 'markdown-copy' | 'markdown-download' | 'share-copy' | 'share-download';
 
-const MENU_ITEMS: ReadonlyArray<{ id: MenuAction; label: string; testId: string }> = [
-  { id: 'markdown-copy', label: 'Copy Markdown', testId: 'export-copy-markdown' },
-  { id: 'markdown-download', label: 'Download .md', testId: 'export-download-markdown' },
-  { id: 'share-copy', label: 'Copy share text', testId: 'export-copy-share-text' },
-  { id: 'share-download', label: 'Download share card .svg', testId: 'export-download-card' },
+const MENU_ITEMS: ReadonlyArray<{ id: MenuAction; labelKey: string; testId: string }> = [
+  { id: 'markdown-copy', labelKey: 'copyMarkdown', testId: 'export-copy-markdown' },
+  { id: 'markdown-download', labelKey: 'downloadMarkdown', testId: 'export-download-markdown' },
+  { id: 'share-copy', labelKey: 'copyShareText', testId: 'export-copy-share-text' },
+  { id: 'share-download', labelKey: 'downloadShareCard', testId: 'export-download-card' },
 ];
 
 function safeFileName(report: ResearchReport): string {
@@ -52,6 +53,7 @@ async function copyText(text: string): Promise<boolean> {
 }
 
 export const ExportMenu: React.FC<ExportMenuProps> = ({ report }) => {
+  const { t } = useTranslation();
   const [open, setOpen] = useState(false);
   const [busy, setBusy] = useState<MenuAction | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -81,12 +83,12 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ report }) => {
       const ok = await attempt();
       if (!ok) {
         // Keep the menu open so the failure reason stays visible.
-        setError('Export unavailable — export channel not wired.');
+        setError(t('research.export.unavailable'));
         return;
       }
       setOpen(false);
     } catch {
-      setError('Export failed — please try again.');
+      setError(t('research.export.failed'));
     } finally {
       setBusy(null);
     }
@@ -117,7 +119,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ report }) => {
         className="inline-flex h-8 items-center justify-center rounded-[10px] border mac-list-row px-3 text-[12px] font-medium text-foreground transition-smooth hover:border-[var(--mac-border-strong)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35"
         data-testid="export-menu-trigger"
       >
-        Export
+        {t('common.export')}
       </button>
       {open && (
         <div
@@ -135,7 +137,7 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ report }) => {
               className="block w-full rounded-[8px] px-2.5 py-1.5 text-left text-[12px] text-foreground/85 transition-smooth hover:bg-[var(--mac-sidebar-hover)] disabled:cursor-not-allowed disabled:opacity-45"
               data-testid={item.testId}
             >
-              {busy === item.id ? 'Working…' : item.label}
+              {busy === item.id ? t('research.export.working') : t(`research.export.${item.labelKey}`)}
             </button>
           ))}
           {error && (

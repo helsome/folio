@@ -14,6 +14,7 @@ import type {
   ToolCall,
   ToolDefinition,
   WorkspaceContext,
+  SupportedLocale,
 } from '@finagent/core';
 import type { SkillHub } from '@finagent/skill-hub';
 import { FinanceToolRegistry } from './finance-tool-registry.ts';
@@ -22,6 +23,12 @@ import { MarketDataService } from './market-data-service.ts';
 import { PiRpcClient, type PiRpcClientOptions, type PiState } from './pi-rpc-client.ts';
 import { PiEventAdapter } from './pi-event-adapter.ts';
 import { createCodeError } from './errors.ts';
+
+/** Response-language names fed to the Pi runtime (English instruction). */
+const RUNTIME_LOCALE_NAMES: Record<SupportedLocale, string> = {
+  'zh-CN': 'Simplified Chinese',
+  'en-US': 'English',
+};
 
 export interface PiRuntimeAdapterOptions {
   registry?: FinanceToolRegistry;
@@ -143,7 +150,7 @@ export class PiRuntimeAdapter implements AgentRuntime {
 
     const adapter = new PiEventAdapter({ sessionId: input.sessionId, runId: input.runId, now: this.now });
     const stream = this.rpcClient.promptStreaming(
-      buildPrompt(input.content, state, input.workspaceContext, this.skillHub, this.readinessProvider)
+      buildPrompt(input.content, state, input.workspaceContext, this.skillHub, this.readinessProvider, input.locale)
     );
     let aborted = false;
 
@@ -343,7 +350,8 @@ function buildPrompt(
   state: RuntimeSessionState,
   workspaceContext?: WorkspaceContext,
   skillHub?: SkillHub,
-  readinessProvider?: (skillId: string) => SkillReadiness | undefined
+  readinessProvider?: (skillId: string) => SkillReadiness | undefined,
+  locale?: SupportedLocale
 ): string {
   const recentSymbols = state.recentSymbols.length > 0
     ? `\nRecent symbols: ${state.recentSymbols.join(', ')}`
@@ -365,6 +373,14 @@ function buildPrompt(
 
   const skillSection = buildSkillIndexSection(skillHub, readinessProvider);
 
+  // V8 (spec §41–43): one shared prompt + a stable response-language
+  // instruction. Never fork the system prompt per language — only the
+  // presentation instruction changes; an explicit user language request in
+  // `content` always wins over this default.
+  const localeInstruction = locale
+    ? `\nPreferred response language: ${RUNTIME_LOCALE_NAMES[locale]} (use this language for your final answer unless the user explicitly asks for another; never translate ticker symbols, tool identifiers, data fields, or citations).`
+    : '';
+
   return [
     'You are Finagent, a finance agent backend.',
     'Use only registered finance tools for market, K-line, intraday, and portfolio data.',
@@ -373,11 +389,12 @@ function buildPrompt(
     'Keep the final answer concise and include risk/data-gap notes when relevant.',
     'When the user asks about market data, technicals, fundamentals, news, or portfolio analysis, consult the available skills below, then load the relevant skill file with read_skill_resource before acting on that subtopic.',
     workspaceSection,
+    localeInstruction,
     skillSection,
     recentSymbols,
     '',
     `User request: ${content}`,
-  ].join('\n');
+  ].filter((part) => part.trim().length > 0).join('\n');
 }
 
 function buildSkillIndexSection(

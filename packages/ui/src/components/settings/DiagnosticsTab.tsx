@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useFinagentClient } from '../../client';
 import {
   collectDiagnosticsSnapshot,
@@ -28,6 +29,7 @@ function fmtTime(at: number): string {
 }
 
 export const DiagnosticsTab: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [bundle, setBundle] = useState<DiagnosticsBundle | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -41,9 +43,9 @@ export const DiagnosticsTab: React.FC = () => {
       setBundle(snapshot);
     } else {
       setBundle(null);
-      setError('Diagnostics are not available yet — the diagnostics channel is not wired.');
+      setError(t('diagnostics.notAvailable'));
     }
-  }, [client]);
+  }, [client, t]);
 
   useEffect(() => {
     void refresh();
@@ -61,7 +63,7 @@ export const DiagnosticsTab: React.FC = () => {
   const onCopySummary = useCallback(async () => {
     if (!bundle) return;
     try {
-      await navigator.clipboard.writeText(buildSummary(bundle));
+      await navigator.clipboard.writeText(buildSummary(bundle, t));
       setCopied(true);
       setTimeout(() => setCopied(false), 1500);
     } catch {
@@ -73,17 +75,17 @@ export const DiagnosticsTab: React.FC = () => {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div className="text-[13px] text-foreground/72">
-          App health snapshot for troubleshooting and support.
+          {t('diagnostics.subtitle')}
         </div>
         <div className="flex gap-2">
           <Button variant="secondary" size="sm" onClick={() => void refresh()}>
-            Refresh
+            {t('diagnostics.refresh')}
           </Button>
           <Button variant="secondary" size="sm" onClick={() => void onCopySummary()}>
-            {copied ? 'Copied' : 'Copy summary'}
+            {copied ? t('diagnostics.copied') : t('diagnostics.copySummary')}
           </Button>
           <Button variant="default" size="sm" disabled={exporting} onClick={() => void onExport()}>
-            {exporting ? 'Exporting…' : 'Export Diagnostics'}
+            {exporting ? t('diagnostics.exporting') : t('diagnostics.exportDiagnostics')}
           </Button>
         </div>
       </div>
@@ -96,39 +98,39 @@ export const DiagnosticsTab: React.FC = () => {
 
       {bundle && (
         <>
-          <Section title="Application">
-            <Row label="Version" value={bundle.app.version} />
-            <Row label="Platform" value={`${bundle.app.platform.os} / ${bundle.app.platform.arch}`} />
-            <Row label="Electron" value={bundle.app.platform.electron ?? '—'} />
-            <Row label="Collected" value={fmtTime(new Date(bundle.collectedAt).getTime())} />
+          <Section title={t('diagnostics.sectionApplication')}>
+            <Row label={t('diagnostics.version')} value={bundle.app.version} />
+            <Row label={t('diagnostics.platform')} value={`${bundle.app.platform.os} / ${bundle.app.platform.arch}`} />
+            <Row label={t('diagnostics.electron')} value={bundle.app.platform.electron ?? '—'} />
+            <Row label={t('diagnostics.collected')} value={fmtTime(new Date(bundle.collectedAt).getTime())} />
           </Section>
 
-          <Section title="Agent runtime">
-            <Row label="Provider" value={bundle.runtime.agent.providerId ?? '—'} />
-            <Row label="State" value={bundle.runtime.agent.state ?? '—'} />
+          <Section title={t('diagnostics.sectionAgentRuntime')}>
+            <Row label={t('diagnostics.provider')} value={bundle.runtime.agent.providerId ?? '—'} />
+            <Row label={t('diagnostics.state')} value={bundle.runtime.agent.state ?? '—'} />
           </Section>
 
-          <Section title="Providers">
-            <Row label="LLM provider" value={bundle.providers.llm.id ?? '—'} />
-            <Row label="LLM model" value={bundle.providers.llm.model ?? '—'} />
-            <Row label="Broker connected" value={bundle.providers.broker.connected ? 'Yes' : 'No'} />
-            <Row label="Broker accounts" value={String(bundle.providers.broker.accountCount)} />
-            <Row label="Longbridge CLI" value={bundle.providers.longbridgeCliVersion ?? '—'} />
+          <Section title={t('diagnostics.sectionProviders')}>
+            <Row label={t('diagnostics.llmProvider')} value={bundle.providers.llm.id ?? '—'} />
+            <Row label={t('diagnostics.llmModel')} value={bundle.providers.llm.model ?? '—'} />
+            <Row label={t('diagnostics.brokerConnected')} value={bundle.providers.broker.connected ? t('diagnostics.yes') : t('diagnostics.no')} />
+            <Row label={t('diagnostics.brokerAccounts')} value={String(bundle.providers.broker.accountCount)} />
+            <Row label={t('diagnostics.longbridgeCli')} value={bundle.providers.longbridgeCliVersion ?? '—'} />
           </Section>
 
-          <Section title="Financial providers">
+          <Section title={t('diagnostics.sectionFinancialProviders')}>
             {bundle.providers.financial.length === 0 ? (
-              <div className="text-[12px] text-foreground/44">None connected.</div>
+              <div className="text-[12px] text-foreground/44">{t('diagnostics.noneConnected')}</div>
             ) : (
               bundle.providers.financial.map((provider) => (
-                <FinancialProviderRow key={provider.id} provider={provider} />
+                <FinancialProviderRow key={provider.id} provider={provider} t={t} />
               ))
             )}
           </Section>
 
-          <Section title="Skills & capabilities">
-            <Row label="Skills loaded" value={String(bundle.skills.loaded)} />
-            <Row label="Capabilities available" value={String(bundle.capabilities.available.length)} />
+          <Section title={t('diagnostics.sectionSkillsCapabilities')}>
+            <Row label={t('diagnostics.skillsLoaded')} value={String(bundle.skills.loaded)} />
+            <Row label={t('diagnostics.capabilitiesAvailable')} value={String(bundle.capabilities.available.length)} />
             <div className="flex flex-wrap gap-1 pt-1">
               {bundle.capabilities.available.map((id) => (
                 <span
@@ -141,18 +143,18 @@ export const DiagnosticsTab: React.FC = () => {
             </div>
           </Section>
 
-          <Section title="Resources">
-            <Row label="Mode" value={bundle.resources.dev ? 'Development' : 'Packaged'} />
-            <Row label="Runtime root" value={bundle.resources.root} />
+          <Section title={t('diagnostics.sectionResources')}>
+            <Row label={t('diagnostics.mode')} value={bundle.resources.dev ? t('diagnostics.development') : t('diagnostics.packaged')} />
+            <Row label={t('diagnostics.runtimeRoot')} value={bundle.resources.root} />
           </Section>
 
-          <Section title="Last errors">
+          <Section title={t('diagnostics.sectionLastErrors')}>
             {bundle.errors.length === 0 ? (
-              <div className="text-[12px] text-foreground/44">No recent errors.</div>
+              <div className="text-[12px] text-foreground/44">{t('diagnostics.noRecentErrors')}</div>
             ) : (
               <ul className="space-y-2">
                 {bundle.errors.map((entry) => (
-                  <ErrorRow key={`${entry.at}-${entry.message}`} entry={entry} />
+                  <ErrorRow key={`${entry.at}-${entry.message}`} entry={entry} t={t} />
                 ))}
               </ul>
             )}
@@ -163,27 +165,31 @@ export const DiagnosticsTab: React.FC = () => {
   );
 };
 
-const FinancialProviderRow: React.FC<{ provider: DiagnosticsFinancialProvider }> = ({
-  provider,
-}) => (
+const FinancialProviderRow: React.FC<{
+  provider: DiagnosticsFinancialProvider;
+  t: (key: string) => string;
+}> = ({ provider, t }) => (
   <div className="rounded-[10px] border mac-section-divider p-3">
     <div className="flex items-baseline justify-between">
       <span className="text-[13px] font-semibold text-foreground">{provider.id}</span>
       <span className="font-mono text-[12px] text-foreground/72">{provider.status}</span>
     </div>
     <div className="mt-1 text-[11px] text-foreground/52">
-      Markets: {provider.coverage.markets.join(', ') || '—'}
+      {t('diagnostics.markets')}: {provider.coverage.markets.join(', ') || '—'}
     </div>
     <div className="text-[11px] text-foreground/52">
-      Capabilities: {provider.coverage.capabilities.join(', ') || '—'}
+      {t('diagnostics.capabilities')}: {provider.coverage.capabilities.join(', ') || '—'}
     </div>
   </div>
 );
 
-const ErrorRow: React.FC<{ entry: DiagnosticsErrorEntry }> = ({ entry }) => (
+const ErrorRow: React.FC<{ entry: DiagnosticsErrorEntry; t: (key: string) => string }> = ({
+  entry,
+  t,
+}) => (
   <li className="rounded-[10px] border mac-section-divider p-3">
     <div className="flex items-baseline justify-between gap-4">
-      <span className="font-mono text-[12px] text-foreground">{entry.source ?? 'unknown'}</span>
+      <span className="font-mono text-[12px] text-foreground">{entry.source ?? t('diagnostics.unknown')}</span>
       <span className="font-mono text-[11px] text-foreground/44">{fmtTime(entry.at)}</span>
     </div>
     <div className="mt-1 text-[12px] text-foreground/78">{entry.message}</div>
@@ -196,16 +202,37 @@ const ErrorRow: React.FC<{ entry: DiagnosticsErrorEntry }> = ({ entry }) => (
 );
 
 /** Human-readable one-line-ish summary used by the copy button. */
-function buildSummary(bundle: DiagnosticsBundle): string {
+function buildSummary(bundle: DiagnosticsBundle, t: (key: string, opts?: Record<string, unknown>) => string): string {
   const lines = [
-    `Folio ${bundle.app.version} (${bundle.app.platform.os}/${bundle.app.platform.arch})`,
-    `Agent runtime: ${bundle.runtime.agent.providerId ?? '—'} (${bundle.runtime.agent.state ?? '—'})`,
-    `LLM: ${bundle.providers.llm.id ?? '—'} / ${bundle.providers.llm.model ?? '—'}`,
-    `Broker: ${bundle.providers.broker.connected ? 'connected' : 'disconnected'} (${bundle.providers.broker.accountCount} account(s))`,
-    `Longbridge CLI: ${bundle.providers.longbridgeCliVersion ?? '—'}`,
-    `Skills loaded: ${bundle.skills.loaded}, capabilities: ${bundle.capabilities.available.length}`,
-    `Resources: ${bundle.resources.dev ? 'dev' : 'packaged'} @ ${bundle.resources.root}`,
-    `Recent errors: ${bundle.errors.length}`,
+    t('diagnostics.summaryFolio', {
+      version: bundle.app.version,
+      os: bundle.app.platform.os,
+      arch: bundle.app.platform.arch,
+    }),
+    t('diagnostics.summaryAgentRuntime', {
+      provider: bundle.runtime.agent.providerId ?? '—',
+      state: bundle.runtime.agent.state ?? '—',
+    }),
+    t('diagnostics.summaryLlm', {
+      provider: bundle.providers.llm.id ?? '—',
+      model: bundle.providers.llm.model ?? '—',
+    }),
+    t('diagnostics.summaryBroker', {
+      status: bundle.providers.broker.connected
+        ? t('diagnostics.brokerConnectedStatus')
+        : t('diagnostics.brokerDisconnectedStatus'),
+      count: bundle.providers.broker.accountCount,
+    }),
+    t('diagnostics.summaryLongbridgeCli', { version: bundle.providers.longbridgeCliVersion ?? '—' }),
+    t('diagnostics.summarySkills', {
+      loaded: bundle.skills.loaded,
+      capabilities: bundle.capabilities.available.length,
+    }),
+    t('diagnostics.summaryResources', {
+      mode: bundle.resources.dev ? t('diagnostics.resourceModeDev') : t('diagnostics.resourceModePackaged'),
+      root: bundle.resources.root,
+    }),
+    t('diagnostics.summaryRecentErrors', { count: bundle.errors.length }),
   ];
   return lines.join('\n');
 }

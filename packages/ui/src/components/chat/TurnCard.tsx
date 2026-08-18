@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Message } from '@finagent/core';
 import { MarkdownContent } from './MarkdownContent';
 
@@ -7,6 +8,7 @@ interface TurnCardProps {
 }
 
 export const TurnCard: React.FC<TurnCardProps> = ({ message }) => {
+  const { t } = useTranslation();
   const isUser = message.role === 'user';
   const isTool = message.role === 'tool';
   const toolCalls = message.toolCalls ?? [];
@@ -26,7 +28,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({ message }) => {
       >
         {isTool && message.toolName && (
           <div className="mb-1.5 text-[12px] font-semibold text-accent">
-            Tool: {message.toolName}
+            {t('agent.tool.label', { name: message.toolName })}
           </div>
         )}
         {isUser ? (
@@ -37,7 +39,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({ message }) => {
         {!isUser && toolCalls.length > 0 && (
           <div className="mt-3 border-t mac-section-divider pt-3">
             <div className="mb-2 text-[11px] font-semibold uppercase text-foreground/42">
-              Tool calls
+              {t('agent.tool.calls')}
             </div>
             <div className="space-y-1.5">
               {toolCalls.map((toolCall) => (

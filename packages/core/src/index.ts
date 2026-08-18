@@ -1,5 +1,9 @@
 // Core type definitions for Finagent
 
+import type { SupportedLocale } from './locale.ts';
+
+export type { SupportedLocale, LocalePreference } from './locale.ts';
+
 export interface Quote {
   symbol: string;
   lastPrice: number;
@@ -354,6 +358,8 @@ export interface AgentRunInput {
   runId: string;
   content: string;
   workspaceContext?: WorkspaceContext;
+  /** V8: effective UI locale for new agent responses (spec §41–42). */
+  locale?: SupportedLocale;
 }
 
 /** A model as reported by the Pi model registry. */
@@ -513,3 +519,4 @@ export * from './portfolio-import.ts';
 export * from './performance.ts';
 export * from './calibration.ts';
 export * from './evaluation.ts';
+export * from './locale.ts';

@@ -32,7 +32,8 @@
     "@finagent/skill-hub": "workspace:*",
     "@finagent/ui": "workspace:*",
     "react": "^18.3.0",
-    "react-dom": "^18.3.0"
+    "react-dom": "^18.3.0",
+    "@finagent/i18n": "workspace:*"
   },
   "devDependencies": {
     "@tailwindcss/vite": "^4.2.4",

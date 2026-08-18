@@ -106,6 +106,11 @@ mock.module('@finagent/shared', () => ({
     }
   },
   JsonFileStore: noopStore,
+  createCodeError: (code: string, message: string, action?: string) => ({
+    code,
+    message,
+    ...(action !== undefined ? { action } : {}),
+  }),
   createFullRegistry: () => ({ list: () => [] }),
   CapabilityExecutor: class {},
   ResearchService: class {

@@ -24,7 +24,8 @@
     "test:package-smoke": "cd apps/electron && bun run test:package-smoke",
     "test:release": "bun run release:check",
     "release:check": "bun run scripts/release-check.mjs",
-    "release:package": "bun run scripts/release-package.mjs"
+    "release:package": "bun run scripts/release-package.mjs",
+    "i18n:check": "bun scripts/i18n-check.ts"
   },
   "devDependencies": {
     "@earendil-works/pi-coding-agent": "file:.pi/extensions/langsmith/vendor/pi-coding-agent",

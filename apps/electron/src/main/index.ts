@@ -417,6 +417,16 @@ ipcMain.handle('onboarding:setCompleted', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.setOnboardingCompleted(input))
 );
 
+// V8: app preferences (locale) — main-owned so the renderer, agent runtime,
+// notifications, and dialogs share one effective locale (spec §14–16).
+ipcMain.handle('appPreferences:get', async () =>
+  toIpcResult(() => agentKernelHost.getAppPreferences())
+);
+
+ipcMain.handle('appPreferences:update', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.updateAppPreferences(input))
+);
+
 // V5: screening / diff / outcome / import (spec §5–49)
 ipcMain.handle('screening:run', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.screeningRun(input))

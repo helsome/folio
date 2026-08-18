@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useFinagentClient, type AboutInfo } from '../../client';
 
 // Dev fallbacks mirror apps/electron/package.json. They render until the
@@ -13,6 +14,7 @@ const FALLBACK_INFO: AboutInfo = {
 
 /** About/version panel: version, channel, and build (git SHA) for this install. */
 export const AboutView: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [info, setInfo] = useState<AboutInfo>(FALLBACK_INFO);
 
@@ -31,9 +33,9 @@ export const AboutView: React.FC = () => {
   }, [client]);
 
   const rows: Array<{ label: string; value: string }> = [
-    { label: 'Version', value: info.version },
-    { label: 'Channel', value: info.channel },
-    { label: 'Build', value: info.build },
+    { label: t('settings.about.version'), value: info.version },
+    { label: t('settings.about.channel'), value: info.channel },
+    { label: t('settings.about.build'), value: info.build },
   ];
 
   return (

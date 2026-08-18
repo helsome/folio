@@ -1,0 +1,43 @@
+import type { SameKeysAs } from '../keys.ts';
+import type { errors as enErrors } from '../en-US/errors.ts';
+
+/** User-facing error copy — Simplified Chinese (finance-product natural, §62). */
+export const errors = {
+  unknown: '出了点问题,请重试。',
+  sectionUnexpected: '出了点问题',
+  sectionUnexpectedDetail:
+    '此区域发生意外错误。请重试,或打开「诊断」检查应用状态并导出支持包。',
+  sectionOpenDiagnostics: '打开诊断',
+  invalidArgument: '请求参数无效。',
+  storageReadFailed: '无法读取 Folio 数据,请重试。',
+  storageWriteFailed: '无法保存更改,请重试。',
+  piRuntimeNotFound: 'Agent 运行时不可用。',
+  piRuntimeError: 'Agent 运行时发生错误。',
+  piRuntimeStopped: 'Agent 运行时意外停止。',
+  piProtocolError: 'Agent 运行时返回了意外的响应。',
+  piRequestTimeout: 'Agent 运行时响应超时。',
+  piHealthTimeout: 'Agent 运行时未能响应健康检查。',
+  piToolTimeout: '金融工具调用超时。',
+  piToolLimitExceeded: '本次请求的工具调用次数过多。',
+  toolNotFound: '请求的金融工具不可用。',
+  sessionNotFound: '该对话已不存在。',
+  researchSymbolInvalid: '请输入有效的标的代码进行研究。',
+  researchRunNotFound: '该研究任务已不存在。',
+  reportNotFound: '该研究报告已不存在。',
+  synthesisTimeout: '研究分析超时。',
+  synthesisParseError: '无法解析研究分析结果。',
+  synthesisCancelled: '研究分析已取消。',
+  thesisNotFound: '该投资逻辑已不存在。',
+  thesisParseError: '无法解析该投资逻辑。',
+  judgeParseError: '无法解析评测打分结果。',
+  performanceHorizonInvalid: '不支持该绩效区间。',
+  screeningStrategyInvalid: '不支持该筛选策略。',
+  importEmpty: '未找到可导入的持仓。',
+  importSourceInvalid: '导入来源无效。',
+  automationRuleInvalid: '该自动化规则无效。',
+  automationRuleNotFound: '该自动化规则已不存在。',
+  loginInProgress: '已有提供方正在登录。',
+  loginStartFailed: '无法启动提供方登录。',
+  unknownProvider: '无法识别该提供方。',
+  configUnsupported: '不支持该配置选项。',
+} satisfies SameKeysAs<typeof enErrors>;

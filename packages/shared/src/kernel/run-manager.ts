@@ -10,6 +10,7 @@ import type {
   ToolCall,
   ToolCallRecord,
   WorkspaceContext,
+  SupportedLocale,
 } from '@finagent/core';
 import type { RunRepository } from '../storage/index.ts';
 import type { SessionManager } from './session-manager.ts';
@@ -67,7 +68,12 @@ export class RunManager {
     return this.activeRun?.sessionId === sessionId;
   }
 
-  async startRun(sessionId: string, content: string, workspaceContext?: WorkspaceContext): Promise<Run> {
+  async startRun(
+    sessionId: string,
+    content: string,
+    workspaceContext?: WorkspaceContext,
+    locale?: SupportedLocale
+  ): Promise<Run> {
     const text = content.trim();
     if (!text) {
       throw createCodeError('INVALID_ARGUMENT', 'Message content is required.');
@@ -114,7 +120,7 @@ export class RunManager {
       payload: { run, userMessage },
     });
 
-    void this.execute(run, session, workspaceContext);
+    void this.execute(run, session, workspaceContext, locale);
     return run;
   }
 
@@ -128,7 +134,12 @@ export class RunManager {
     await this.runtime.cancel({ sessionId, runId });
   }
 
-  private async execute(run: Run, session: SessionMeta, workspaceContext?: WorkspaceContext): Promise<void> {
+  private async execute(
+    run: Run,
+    session: SessionMeta,
+    workspaceContext?: WorkspaceContext,
+    locale?: SupportedLocale
+  ): Promise<void> {
     let failure: ApiError | undefined;
     let answer = '';
     const toolCalls: ToolCall[] = [];
@@ -147,6 +158,7 @@ export class RunManager {
         runId: run.id,
         content: run.input,
         workspaceContext,
+        locale,
       })) {
         this.emit(event);
         if (event.type === 'message_delta' || event.type === 'message_completed') {

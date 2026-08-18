@@ -34,6 +34,11 @@ jobs:
       - name: Install dependencies
         run: bun install --frozen-lockfile
 
+      # V8 bilingual gate (spec §81–84, §103): zh/en key + interpolation parity.
+      # Offline and instant; non-zero exit blocks the PR.
+      - name: Check i18n parity
+        run: bun run i18n:check
+
       # Fixture mode with deterministic evaluators only, gated against the
       # committed baseline (scripts/eval/ci-baselines/folio-agent-v1.json,
       # spec §75-76): the CLI exits 0 on pass and 1 on gate failure (critical

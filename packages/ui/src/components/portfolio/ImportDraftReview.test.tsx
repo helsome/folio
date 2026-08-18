@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { PortfolioImportDraft, PortfolioImportRow } from '@finagent/core';
 import { installHappyDom } from '../../test/setupHappyDom';
+import { withI18n } from '../../test/i18n';
 import { ImportDraftReview, confidenceVisual } from './ImportDraftReview';
 
 let restoreDom: (() => void) | undefined;
@@ -48,17 +49,19 @@ async function render(
   const root = createRoot(container);
   await act(async () => {
     root.render(
-      <ImportDraftReview draft={d} onConfirm={onConfirm} onCancel={onCancel} />
+      withI18n(
+        <ImportDraftReview draft={d} onConfirm={onConfirm} onCancel={onCancel} />
+      )
     );
   });
   return { container, root };
 }
 
 describe('confidenceVisual (spec §48)', () => {
-  it('maps the three tiers to labels', () => {
-    expect(confidenceVisual(1.0)).toEqual({ label: 'High', tone: 'high' });
-    expect(confidenceVisual(0.6)).toEqual({ label: 'Review', tone: 'medium' });
-    expect(confidenceVisual(0.3)).toEqual({ label: 'Needs review', tone: 'low' });
+  it('maps the three tiers to translation keys', () => {
+    expect(confidenceVisual(1.0)).toEqual({ key: 'portfolio.confidence.high', tone: 'high' });
+    expect(confidenceVisual(0.6)).toEqual({ key: 'portfolio.confidence.review', tone: 'medium' });
+    expect(confidenceVisual(0.3)).toEqual({ key: 'portfolio.confidence.needsReview', tone: 'low' });
   });
 });
 

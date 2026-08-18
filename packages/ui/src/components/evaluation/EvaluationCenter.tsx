@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
 import type {
   EvaluationBaseline,
@@ -33,11 +34,11 @@ import { FailureModesTab } from './FailureModesTab';
 
 type InternalTab = 'overview' | 'experiments' | 'model-comparison' | 'failure-modes';
 
-const TAB_LABELS: Array<{ id: InternalTab; label: string }> = [
-  { id: 'overview', label: 'Overview' },
-  { id: 'experiments', label: 'Experiments' },
-  { id: 'model-comparison', label: 'Model Comparison' },
-  { id: 'failure-modes', label: 'Failure Modes' },
+const TAB_LABELS: Array<{ id: InternalTab; labelKey: string }> = [
+  { id: 'overview', labelKey: 'evaluation.overview' },
+  { id: 'experiments', labelKey: 'evaluation.experiments' },
+  { id: 'model-comparison', labelKey: 'evaluation.modelComparison' },
+  { id: 'failure-modes', labelKey: 'evaluation.failureModes' },
 ];
 
 export interface CaseRef {
@@ -53,6 +54,7 @@ const Spinner: React.FC = () => (
 );
 
 export const EvaluationCenter: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [experiments, setExperiments] = useState<EvaluationExperiment[]>([]);
   const [baselines, setBaselines] = useState<EvaluationBaseline[]>([]);
@@ -72,10 +74,10 @@ export const EvaluationCenter: React.FC = () => {
       client.evaluation?.listBaselines(),
     ]);
     if (experimentsResult?.ok) setExperiments(experimentsResult.data);
-    else setLoadError(experimentsResult?.error.message ?? 'Failed to load experiments.');
+    else setLoadError(experimentsResult?.error.message ?? t('evaluation.loadExperimentsFailed'));
     if (baselinesResult?.ok) setBaselines(baselinesResult.data);
     setLoading(false);
-  }, [client]);
+  }, [client, t]);
 
   useEffect(() => {
     void refresh();
@@ -143,14 +145,12 @@ export const EvaluationCenter: React.FC = () => {
     <div className="flex h-full flex-col" data-testid="evaluation-center">
       <header className="flex items-center justify-between border-b mac-section-divider px-4 py-3">
         <div>
-          <h2 className="text-[15px] font-semibold text-foreground">Evaluation Center</h2>
-          <p className="mt-0.5 text-[11.5px] text-text-muted">
-            Benchmark results for the agent engineering loop — internal tool.
-          </p>
+          <h2 className="text-[15px] font-semibold text-foreground">{t('evaluation.center')}</h2>
+          <p className="mt-0.5 text-[11.5px] text-text-muted">{t('evaluation.centerDescription')}</p>
         </div>
         <Button variant="secondary" size="sm" disabled={loading} onClick={() => void refresh()}>
           {loading ? <Spinner /> : <RefreshCw className="h-3.5 w-3.5" />}
-          Refresh
+          {t('evaluation.refresh')}
         </Button>
       </header>
 
@@ -167,14 +167,14 @@ export const EvaluationCenter: React.FC = () => {
                   : 'text-foreground/52 hover:text-foreground'
               }`}
             >
-              {entry.label}
+              {t(entry.labelKey)}
             </button>
           ))}
         </div>
 
         {loading && !loadError ? (
           <div className="flex items-center gap-2 text-[12px] text-foreground/48">
-            <Spinner /> Loading experiments…
+            <Spinner /> {t('evaluation.loadingExperiments')}
           </div>
         ) : loadError && experiments.length === 0 ? (
           <div className="rounded-[10px] border border-[color-mix(in_srgb,var(--info)_30%,transparent)] bg-[color-mix(in_srgb,var(--info)_10%,transparent)] px-4 py-3 text-[12px] text-foreground/78">
@@ -184,7 +184,7 @@ export const EvaluationCenter: React.FC = () => {
               onClick={() => void refresh()}
               className="ml-2 text-accent underline underline-offset-2"
             >
-              Retry
+              {t('evaluation.retry')}
             </button>
           </div>
         ) : (
@@ -230,10 +230,11 @@ const OverviewTab: React.FC<{
   baselines: EvaluationBaseline[];
   onViewSummary: (experimentId: string) => void;
 }> = ({ experiment, baselines, onViewSummary }) => {
+  const { t } = useTranslation();
   if (!experiment) {
     return (
       <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
-        No completed experiments yet — run an evaluation from the CLI to see results here.
+        {t('evaluation.noCompletedExperiments')}
       </div>
     );
   }
@@ -241,7 +242,7 @@ const OverviewTab: React.FC<{
   if (!summary) {
     return (
       <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
-        Latest experiment “{experiment.name}” has no summary yet.
+        {t('evaluation.latestExperimentNoSummary', { name: experiment.name })}
       </div>
     );
   }
@@ -255,7 +256,7 @@ const OverviewTab: React.FC<{
       <div className="flex items-center justify-between gap-4">
         <div>
           <p className="text-[11px] font-medium uppercase tracking-wide text-foreground/44">
-            Latest experiment
+            {t('evaluation.latestExperiment')}
           </p>
           <h3 className="mt-0.5 text-[16px] font-semibold text-foreground">{experiment.name}</h3>
           <p className="mt-0.5 text-[11.5px] text-foreground/48">
@@ -263,51 +264,55 @@ const OverviewTab: React.FC<{
           </p>
         </div>
         <Button variant="secondary" size="sm" onClick={() => onViewSummary(experiment.id)}>
-          View Summary <ChevronRight className="h-3.5 w-3.5" />
+          {t('evaluation.viewSummary')} <ChevronRight className="h-3.5 w-3.5" />
         </Button>
       </div>
 
       <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <StatCard label="Cases" value={String(summary.totalRuns)} sub={`${summary.completedRuns} completed`} />
+        <StatCard label={t('evaluation.cases')} value={String(summary.totalRuns)} sub={t('evaluation.completedCount', { count: summary.completedRuns })} />
         <StatCard
-          label="Pass rate"
+          label={t('evaluation.passRate')}
           value={passRate === null ? '—' : scorePercent(passRate)}
-          sub={`${summary.completedRuns} runs scored`}
+          sub={t('evaluation.runsScored', { count: summary.completedRuns })}
         />
         <StatCard
-          label="Composite"
+          label={t('evaluation.composite')}
           value={scorePercent(summary.compositeScore)}
-          sub={regression?.compositeDelta != null ? `${regression.compositeDelta >= 0 ? '+' : ''}${regression.compositeDelta.toFixed(2)} vs baseline` : 'no baseline'}
+          sub={
+            regression?.compositeDelta != null
+              ? t('evaluation.vsBaseline', { delta: regression.compositeDelta >= 0 ? `+${regression.compositeDelta.toFixed(2)}` : regression.compositeDelta.toFixed(2) })
+              : t('evaluation.noBaseline')
+          }
         />
         <StatCard
-          label="Top failure mode"
-          value={topFailure ? failureModeLabel(topFailure.mode) : '—'}
-          sub={topFailure ? `${topFailure.count} run(s)` : 'no failures'}
+          label={t('evaluation.topFailureMode')}
+          value={topFailure ? t(failureModeLabel(topFailure.mode)) : '—'}
+          sub={topFailure ? t('evaluation.runsCount', { count: topFailure.count }) : t('evaluation.noFailures')}
         />
       </div>
 
       <div className="mac-stock-tile rounded-[14px] p-5">
         <div className="flex items-center justify-between">
-          <h4 className="text-[13px] font-semibold text-foreground">Per-metric breakdown</h4>
+          <h4 className="text-[13px] font-semibold text-foreground">{t('evaluation.perMetricBreakdown')}</h4>
           <span className="text-[11px] text-foreground/42">
-            Always shown alongside the composite (spec §111)
+            {t('evaluation.breakdownNote')}
           </span>
         </div>
         <div className="mt-3 overflow-x-auto">
           <table className="w-full border-collapse text-[12px]">
             <thead>
               <tr className="border-b mac-section-divider">
-                <th className="py-2 pr-3 text-left font-medium text-foreground/54">Metric</th>
-                <th className="px-3 py-2 text-left font-medium text-foreground/54">Kind</th>
-                <th className="px-3 py-2 text-right font-medium text-foreground/54">Score</th>
-                <th className="px-3 py-2 text-right font-medium text-foreground/54">Samples</th>
+                <th className="py-2 pr-3 text-left font-medium text-foreground/54">{t('evaluation.metric')}</th>
+                <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.kind')}</th>
+                <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.score')}</th>
+                <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.samples')}</th>
               </tr>
             </thead>
             <tbody>
               {summary.metricAggregates.map((aggregate) => (
                 <tr key={aggregate.metric} className="border-b mac-section-divider last:border-0">
-                  <td className="py-2 pr-3 text-foreground">{metricLabel(aggregate.metric)}</td>
-                  <td className="px-3 py-2 text-foreground/48">{metricKindLabel(aggregate.metric)}</td>
+                  <td className="py-2 pr-3 text-foreground">{t(metricLabel(aggregate.metric))}</td>
+                  <td className="px-3 py-2 text-foreground/48">{metricKindLabel(aggregate.metric) !== null ? t(metricKindLabel(aggregate.metric) as string) : '—'}</td>
                   <td className="px-3 py-2 text-right font-medium tabular-nums text-foreground">
                     {scorePercent(aggregate.score)}
                   </td>
@@ -323,12 +328,12 @@ const OverviewTab: React.FC<{
 
       {summary.failureModes.length > 0 && (
         <div className="mac-stock-tile rounded-[14px] p-5">
-          <h4 className="text-[13px] font-semibold text-foreground">Failure modes</h4>
+          <h4 className="text-[13px] font-semibold text-foreground">{t('evaluation.failureModes')}</h4>
           <div className="mt-3 flex flex-wrap gap-2">
             {[...summary.failureModes]
               .sort((a, b) => b.count - a.count)
               .map((entry) => (
-                <FailureModeTag key={entry.mode} mode={failureModeLabel(entry.mode)} count={entry.count} />
+                <FailureModeTag key={entry.mode} mode={t(failureModeLabel(entry.mode))} count={entry.count} />
               ))}
           </div>
         </div>
@@ -339,12 +344,12 @@ const OverviewTab: React.FC<{
 
 // ── Experiments (spec §65) ─────────────────────────────────────────────────
 
-const STATUS_LABEL: Record<string, { label: string; className: string }> = {
-  completed: { label: 'completed', className: 'text-[var(--mac-green)] border-[var(--mac-green)]/30 bg-[var(--mac-green)]/10' },
-  running: { label: 'running', className: 'text-accent border-accent/30 bg-accent/10' },
-  queued: { label: 'queued', className: 'text-foreground/56 border-border bg-surface-muted' },
-  failed: { label: 'failed', className: 'text-destructive border-destructive/30 bg-destructive/10' },
-  cancelled: { label: 'cancelled', className: 'text-foreground/56 border-border bg-surface-muted' },
+const STATUS_LABEL: Record<string, { labelKey: string; className: string }> = {
+  completed: { labelKey: 'evaluation.statusCompleted', className: 'text-[var(--mac-green)] border-[var(--mac-green)]/30 bg-[var(--mac-green)]/10' },
+  running: { labelKey: 'evaluation.statusRunning', className: 'text-accent border-accent/30 bg-accent/10' },
+  queued: { labelKey: 'evaluation.statusQueued', className: 'text-foreground/56 border-border bg-surface-muted' },
+  failed: { labelKey: 'evaluation.statusFailed', className: 'text-destructive border-destructive/30 bg-destructive/10' },
+  cancelled: { labelKey: 'evaluation.statusCancelled', className: 'text-foreground/56 border-border bg-surface-muted' },
 };
 
 const ExperimentsTab: React.FC<{
@@ -352,32 +357,32 @@ const ExperimentsTab: React.FC<{
   baselines: EvaluationBaseline[];
   onViewSummary: (experimentId: string) => void;
 }> = ({ experiments, baselines, onViewSummary }) => {
+  const { t } = useTranslation();
   if (experiments.length === 0) {
     return (
       <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
-        No experiments recorded yet.
+        {t('evaluation.noExperimentsRecorded')}
       </div>
     );
   }
   return (
     <div className="space-y-3">
       <p className="text-[11px] text-foreground/44">
-        {experiments.length} experiment(s), newest first. Sample counts are shown wherever a score
-        appears.
+        {t('evaluation.experimentsIntro', { count: experiments.length })}
       </p>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-[12px]" data-testid="experiments-table">
           <thead>
             <tr className="border-b mac-section-divider">
-              <th className="py-2 pr-3 text-left font-medium text-foreground/54">Name</th>
-              <th className="px-3 py-2 text-left font-medium text-foreground/54">Dataset</th>
-              <th className="px-3 py-2 text-left font-medium text-foreground/54">Model</th>
-              <th className="px-3 py-2 text-left font-medium text-foreground/54">Git</th>
-              <th className="px-3 py-2 text-left font-medium text-foreground/54">Date</th>
-              <th className="px-3 py-2 text-right font-medium text-foreground/54">Score</th>
-              <th className="px-3 py-2 text-right font-medium text-foreground/54">Regression</th>
-              <th className="px-3 py-2 text-left font-medium text-foreground/54">Status</th>
-              <th className="py-2 pl-3 text-right font-medium text-foreground/54">Actions</th>
+              <th className="py-2 pr-3 text-left font-medium text-foreground/54">{t('evaluation.name')}</th>
+              <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.dataset')}</th>
+              <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.model')}</th>
+              <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.git')}</th>
+              <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.date')}</th>
+              <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.score')}</th>
+              <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.regressionColumn')}</th>
+              <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.status')}</th>
+              <th className="py-2 pl-3 text-right font-medium text-foreground/54">{t('evaluation.actions')}</th>
             </tr>
           </thead>
           <tbody>
@@ -400,12 +405,12 @@ const ExperimentsTab: React.FC<{
                   </td>
                   <td className="px-3 py-2">
                     <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${status.className}`}>
-                      {status.label}
+                      {t(status.labelKey)}
                     </span>
                   </td>
                   <td className="py-2 pl-3 text-right">
                     <Button variant="secondary" size="sm" onClick={() => onViewSummary(experiment.id)}>
-                      View Summary
+                      {t('evaluation.viewSummary')}
                     </Button>
                   </td>
                 </tr>
@@ -421,32 +426,32 @@ const ExperimentsTab: React.FC<{
 // ── Model comparison (spec §67) ────────────────────────────────────────────
 
 const ModelComparisonTab: React.FC<{ experiments: EvaluationExperiment[] }> = ({ experiments }) => {
+  const { t } = useTranslation();
   const groups = useMemo(() => groupExperimentsByModel(experiments), [experiments]);
   const rows = useMemo(() => buildModelMetricRows(groups), [groups]);
 
   if (groups.length === 0) {
     return (
       <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
-        No completed experiments to compare yet.
+        {t('evaluation.noCompletedToCompare')}
       </div>
     );
   }
   return (
     <div className="space-y-3">
       <p className="text-[11px] text-foreground/44">
-        Completed experiments grouped by model. Only metrics that actually have data appear;
-        empty cells mean the metric was not scored for that model.
+        {t('evaluation.modelComparisonIntro')}
       </p>
       <div className="overflow-x-auto">
         <table className="w-full border-collapse text-[12px]" data-testid="model-comparison-table">
           <thead>
             <tr className="border-b mac-section-divider">
-              <th className="py-2 pr-3 text-left font-medium text-foreground/54">Metric</th>
+              <th className="py-2 pr-3 text-left font-medium text-foreground/54">{t('evaluation.metric')}</th>
               {groups.map((group) => (
                 <th key={group.key} className="px-3 py-2 text-left font-medium text-foreground/54">
                   {group.label}
                   <div className="mt-0.5 text-[10px] font-normal text-foreground/36">
-                    {group.experiments.length} experiment(s)
+                    {t('evaluation.experimentCount', { count: group.experiments.length })}
                   </div>
                 </th>
               ))}
@@ -456,8 +461,8 @@ const ModelComparisonTab: React.FC<{ experiments: EvaluationExperiment[] }> = ({
             {rows.map((row) => (
               <tr key={row.metricId} className="border-b mac-section-divider last:border-0">
                 <td className="py-2 pr-3">
-                  <div className="font-medium text-foreground">{row.label}</div>
-                  {row.kind && <div className="text-[10px] text-foreground/40">{row.kind}</div>}
+                  <div className="font-medium text-foreground">{t(row.label)}</div>
+                  {row.kind && <div className="text-[10px] text-foreground/40">{t(row.kind)}</div>}
                 </td>
                 {row.cells.map((cell, index) => (
                   <td key={index} className="px-3 py-2 align-top">

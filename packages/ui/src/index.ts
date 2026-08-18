@@ -1,4 +1,5 @@
 export * from './lib/utils';
+export * from './i18n/I18nProvider';
 export * from './atoms';
 export * from './client';
 export * from './components/primitives/Button';

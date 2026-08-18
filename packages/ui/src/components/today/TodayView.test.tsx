@@ -5,6 +5,7 @@ import type { PortfolioSnapshot, Quote } from '@finagent/core'
 import { fallbackClient, FinagentClientProvider, type FinagentClient } from '../../client'
 import { installHappyDom } from '../../test/setupHappyDom'
 import { formatMoney } from '../../lib/money'
+import { makeTestI18n, I18nextProvider } from '../../test/i18nTest'
 import { TodayView } from './TodayView'
 
 let restoreDom: (() => void) | undefined
@@ -86,9 +87,11 @@ describe('TodayView', () => {
 
     await act(async () => {
       root.render(
-        <FinagentClientProvider client={clientWithPortfolio()}>
-          <TodayView />
-        </FinagentClientProvider>
+        <I18nextProvider i18n={makeTestI18n('en-US')}>
+          <FinagentClientProvider client={clientWithPortfolio()}>
+            <TodayView />
+          </FinagentClientProvider>
+        </I18nextProvider>
       )
     })
     await flushAsync()
@@ -105,6 +108,37 @@ describe('TodayView', () => {
     expect(text).not.toContain('NaN')
     expect(text).not.toContain('undefined')
     expect(text).not.toContain('[object Object]')
+
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  })
+
+  it('renders translated Simplified Chinese copy in zh-CN', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+
+    await act(async () => {
+      root.render(
+        <I18nextProvider i18n={makeTestI18n('zh-CN')}>
+          <FinagentClientProvider client={clientWithPortfolio()}>
+            <TodayView />
+          </FinagentClientProvider>
+        </I18nextProvider>
+      )
+    })
+    await flushAsync()
+
+    const text = container.textContent ?? ''
+    expect(text).toContain('早上好')
+    expect(text).toContain('投资组合')
+    expect(text).toContain('自选涨跌幅')
+    expect(text).toContain('深度研究')
+    // No English-only chrome leaks through in zh-CN.
+    expect(text).not.toContain('Watchlist movers')
+    expect(text).not.toContain('today.')
 
     await act(async () => {
       root.unmount()

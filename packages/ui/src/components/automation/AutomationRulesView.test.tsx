@@ -4,6 +4,7 @@ import { createRoot, type Root } from 'react-dom/client'
 import type { AutomationRule, AutomationRun } from '@finagent/core'
 import { fallbackClient, FinagentClientProvider, type FinagentClient } from '../../client'
 import { installHappyDom } from '../../test/setupHappyDom'
+import { withI18n } from '../../test/i18n'
 import { AutomationRulesView } from './AutomationRulesView'
 
 let restoreDom: (() => void) | undefined
@@ -92,9 +93,11 @@ describe('AutomationRulesView', () => {
 
     await act(async () => {
       root.render(
-        <FinagentClientProvider client={client}>
-          <AutomationRulesView />
-        </FinagentClientProvider>
+        withI18n(
+          <FinagentClientProvider client={client}>
+            <AutomationRulesView />
+          </FinagentClientProvider>
+        )
       )
     })
     await flushAsync()
@@ -118,9 +121,11 @@ describe('AutomationRulesView', () => {
 
     await act(async () => {
       root.render(
-        <FinagentClientProvider client={client}>
-          <AutomationRulesView />
-        </FinagentClientProvider>
+        withI18n(
+          <FinagentClientProvider client={client}>
+            <AutomationRulesView />
+          </FinagentClientProvider>
+        )
       )
     })
     await flushAsync()
@@ -148,9 +153,11 @@ describe('AutomationRulesView', () => {
 
     await act(async () => {
       root.render(
-        <FinagentClientProvider client={client}>
-          <AutomationRulesView />
-        </FinagentClientProvider>
+        withI18n(
+          <FinagentClientProvider client={client}>
+            <AutomationRulesView />
+          </FinagentClientProvider>
+        )
       )
     })
     await flushAsync()
@@ -177,9 +184,11 @@ describe('AutomationRulesView', () => {
 
     await act(async () => {
       root.render(
-        <FinagentClientProvider client={fallbackClient}>
-          <AutomationRulesView />
-        </FinagentClientProvider>
+        withI18n(
+          <FinagentClientProvider client={fallbackClient}>
+            <AutomationRulesView />
+          </FinagentClientProvider>
+        )
       )
     })
     await flushAsync()

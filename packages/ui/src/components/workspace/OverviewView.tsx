@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import type {
   Quote,
   Kline,
@@ -57,6 +58,7 @@ const Metric: React.FC<MetricProps> = ({ label, value, color, mono = true }) => 
 );
 
 export const OverviewView: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const symbol = useAtomValue(activeSymbolAtom);
 
@@ -132,62 +134,62 @@ export const OverviewView: React.FC = () => {
   return (
     <div className="grid grid-cols-1 gap-3 p-4 md:grid-cols-2 xl:grid-cols-3">
       {/* Quote */}
-      <Block title="Quote">
+      <Block title={t('security.overview.quote')}>
         {quote ? (
           <>
             <Metric
-              label="Last"
+              label={t('security.overview.last')}
               value={fmtPrice(quote.lastPrice)}
               color={signColor(quote.change)}
             />
             <Metric
-              label="Change"
+              label={t('security.overview.change')}
               value={`${fmtSigned(quote.change)} (${quote.change >= 0 ? '+' : ''}${fmtPercent(quote.changePercent)})`}
               color={signColor(quote.change)}
             />
-            <Metric label="Volume" value={fmtNumber(quote.volume)} />
+            <Metric label={t('security.header.volume')} value={fmtNumber(quote.volume)} />
           </>
         ) : (
-          <Metric label="Quote" value={DASH} />
+          <Metric label={t('security.overview.quote')} value={DASH} />
         )}
       </Block>
 
       {/* Performance */}
-      <Block title="Performance">
+      <Block title={t('security.overview.performance')}>
         {quote ? (
           <>
-            <Metric label="Day Range" value={`${fmtPrice(quote.low)} – ${fmtPrice(quote.high)}`} />
-            <Metric label="Open" value={fmtPrice(quote.open)} />
-            <Metric label="Prev Close" value={fmtPrice(quote.prevClose)} />
+            <Metric label={t('security.overview.dayRange')} value={`${fmtPrice(quote.low)} – ${fmtPrice(quote.high)}`} />
+            <Metric label={t('security.header.open')} value={fmtPrice(quote.open)} />
+            <Metric label={t('security.header.prevClose')} value={fmtPrice(quote.prevClose)} />
           </>
         ) : (
-          <Metric label="Day Range" value={DASH} />
+          <Metric label={t('security.overview.dayRange')} value={DASH} />
         )}
         {rangeLoading ? (
-          <Metric label="52W Range" value="Loading…" />
+          <Metric label={t('security.overview.week52Range')} value={t('common.loading')} />
         ) : yearHigh !== null && yearLow !== null ? (
-          <Metric label="52W Range" value={`${fmtPrice(yearLow)} – ${fmtPrice(yearHigh)}`} />
+          <Metric label={t('security.overview.week52Range')} value={`${fmtPrice(yearLow)} – ${fmtPrice(yearHigh)}`} />
         ) : (
-          <Metric label="52W Range" value={DASH} />
+          <Metric label={t('security.overview.week52Range')} value={DASH} />
         )}
       </Block>
 
       {/* Valuation */}
-      <Block title="Valuation">
+      <Block title={t('security.overview.valuation')}>
         {calcIndex ? (
           <>
-            <Metric label="PE" value={calcIndex.pe != null ? calcIndex.pe.toFixed(2) : DASH} />
-            <Metric label="PB" value={calcIndex.pb != null ? calcIndex.pb.toFixed(2) : DASH} />
+            <Metric label={t('security.overview.pe')} value={calcIndex.pe != null ? calcIndex.pe.toFixed(2) : DASH} />
+            <Metric label={t('security.overview.pb')} value={calcIndex.pb != null ? calcIndex.pb.toFixed(2) : DASH} />
             <Metric
-              label="DPS Rate"
+              label={t('security.overview.dpsRate')}
               value={calcIndex.dpsRate != null ? fmtPercent(calcIndex.dpsRate) : DASH}
             />
             <Metric
-              label="Turnover Rate"
+              label={t('security.overview.turnoverRate')}
               value={calcIndex.turnoverRate != null ? fmtPercent(calcIndex.turnoverRate) : DASH}
             />
             <Metric
-              label="Total Market Value"
+              label={t('security.overview.totalMarketValue')}
               value={
                 calcIndex.totalMarketValue != null
                   ? fmtNumber(calcIndex.totalMarketValue)
@@ -196,54 +198,54 @@ export const OverviewView: React.FC = () => {
             />
           </>
         ) : (
-          <Metric label="Valuation" value={DASH} />
+          <Metric label={t('security.overview.valuation')} value={DASH} />
         )}
       </Block>
 
       {/* Basic Fundamentals */}
-      <Block title="Basic Fundamentals">
+      <Block title={t('security.overview.basicFundamentals')}>
         {staticInfo ? (
           <>
-            <Metric label="EPS" value={staticInfo.eps != null ? staticInfo.eps.toFixed(2) : DASH} />
+            <Metric label={t('security.overview.eps')} value={staticInfo.eps != null ? staticInfo.eps.toFixed(2) : DASH} />
             <Metric
-              label="EPS (TTM)"
+              label={t('security.overview.epsTtm')}
               value={staticInfo.epsTtm != null ? staticInfo.epsTtm.toFixed(2) : DASH}
             />
             <Metric
-              label="Dividend"
+              label={t('security.overview.dividend')}
               value={staticInfo.dividend != null ? staticInfo.dividend.toFixed(4) : DASH}
             />
             <Metric
-              label="Total Shares"
+              label={t('security.overview.totalShares')}
               value={
                 staticInfo.totalShares != null ? fmtNumber(staticInfo.totalShares) : DASH
               }
             />
           </>
         ) : (
-          <Metric label="Fundamentals" value={DASH} />
+          <Metric label={t('security.overview.basicFundamentals')} value={DASH} />
         )}
       </Block>
 
       {/* Position */}
-      <Block title="Position">
+      <Block title={t('security.overview.position')}>
         {holding ? (
           <>
-            <Metric label="Quantity" value={formatQuantity(holding.quantity)} />
-            <Metric label="Avg Cost" value={formatMoney(holding.costPrice, holding.currency)} />
-            <Metric label="Market Value" value={formatMoney(holding.marketValue, holding.currency)} />
+            <Metric label={t('security.overview.quantity')} value={formatQuantity(holding.quantity)} />
+            <Metric label={t('security.overview.avgCost')} value={formatMoney(holding.costPrice, holding.currency)} />
+            <Metric label={t('security.overview.marketValue')} value={formatMoney(holding.marketValue, holding.currency)} />
             <Metric
-              label="Unrealized PnL"
+              label={t('security.overview.unrealizedPnL')}
               value={`${formatSignedMoney(holding.unrealizedPnL, holding.currency)} (${formatPercent(holding.unrealizedPnLPercent)})`}
               color={signColor(holding.unrealizedPnL ?? 0)}
             />
             <Metric
-              label="Portfolio Weight"
+              label={t('security.overview.portfolioWeight')}
               value={portfolioWeight != null ? fmtPercent(portfolioWeight) : DASH}
             />
           </>
         ) : (
-          <Metric label="No position" value={DASH} />
+          <Metric label={t('security.overview.noPosition')} value={DASH} />
         )}
       </Block>
     </div>

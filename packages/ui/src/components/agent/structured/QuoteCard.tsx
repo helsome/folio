@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { Quote } from '@finagent/core';
 import { MetricGrid } from './MetricGrid';
 
@@ -24,6 +25,7 @@ interface QuoteCardProps {
 
 /** Renders a defensive, Quote-shaped object produced by a get_quote tool call. */
 export const QuoteCard: React.FC<QuoteCardProps> = ({ quote }) => {
+  const { t } = useTranslation();
   const symbol = quote.symbol || '—';
   const change = quote.change ?? 0;
   const changePercent = quote.changePercent ?? 0;
@@ -34,7 +36,7 @@ export const QuoteCard: React.FC<QuoteCardProps> = ({ quote }) => {
     <div className="mac-stock-tile rounded-[14px] p-3.5">
       <div className="flex items-start justify-between">
         <div className="min-w-0">
-          <div className="text-[10px] font-semibold uppercase tracking-wider text-foreground/40">Quote</div>
+          <div className="text-[10px] font-semibold uppercase tracking-wider text-foreground/40">{t('agent.quote.title')}</div>
           <div className="mt-0.5 truncate text-[15px] font-semibold text-foreground">{symbol}</div>
         </div>
         <div className="text-right">
@@ -50,12 +52,12 @@ export const QuoteCard: React.FC<QuoteCardProps> = ({ quote }) => {
         <MetricGrid
           columns={3}
           items={[
-            { label: 'Open', value: fmtNum(quote.open) },
-            { label: 'High', value: fmtNum(quote.high) },
-            { label: 'Low', value: fmtNum(quote.low) },
-            { label: 'Prev close', value: fmtNum(quote.prevClose) },
-            { label: 'Volume', value: fmtCompact(quote.volume) },
-            { label: 'Updated', value: fmtTime(quote.timestamp) },
+            { label: t('agent.quote.open'), value: fmtNum(quote.open) },
+            { label: t('agent.quote.high'), value: fmtNum(quote.high) },
+            { label: t('agent.quote.low'), value: fmtNum(quote.low) },
+            { label: t('agent.quote.prevClose'), value: fmtNum(quote.prevClose) },
+            { label: t('agent.quote.volume'), value: fmtCompact(quote.volume) },
+            { label: t('agent.quote.updated'), value: fmtTime(quote.timestamp) },
           ]}
         />
       </div>

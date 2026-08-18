@@ -1,4 +1,5 @@
 import React, { useEffect } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAtom, useSetAtom } from 'jotai';
 import { MIN_EVALUATED_SAMPLES, type PerformanceHorizon } from '@finagent/core';
 import {
@@ -24,21 +25,21 @@ import { PerformanceCard, type PerformanceRowView } from './PerformanceCard';
 const HORIZONS: PerformanceHorizon[] = ['1w', '1m', '3m'];
 
 const HORIZON_LABEL: Record<PerformanceHorizon, string> = {
-  '1w': '1 Week',
-  '1m': '1 Month',
-  '3m': '3 Months',
+  '1w': 'performance.horizon1W',
+  '1m': 'performance.horizon1M',
+  '3m': 'performance.horizon3M',
 };
 
 /** Renderer-facing mirror of the research strategy preset names (StrategyPicker). */
 const STRATEGY_NAMES: Readonly<Record<string, string>> = {
-  comprehensive: 'Comprehensive',
-  value: 'Value',
-  growth: 'Growth',
-  technical: 'Technical',
-  earnings: 'Earnings',
-  'event-driven': 'Event-Driven',
-  'risk-review': 'Risk Review',
-  income: 'Income',
+  comprehensive: 'performance.strategies.comprehensive',
+  value: 'performance.strategies.value',
+  growth: 'performance.strategies.growth',
+  technical: 'performance.strategies.technical',
+  earnings: 'performance.strategies.earnings',
+  'event-driven': 'performance.strategies.event-driven',
+  'risk-review': 'performance.strategies.risk-review',
+  income: 'performance.strategies.income',
 };
 
 /** 'longbridge-value-investing' → 'Longbridge Value Investing' (display only). */
@@ -50,6 +51,7 @@ function skillLabel(skillId: string): string {
 }
 
 export const PerformanceView: React.FC = () => {
+  const { t } = useTranslation();
   const [state] = useAtom(performanceAtom);
   const [horizon, setHorizon] = useAtom(performanceHorizonAtom);
   const refresh = useSetAtom(refreshPerformanceAtom);
@@ -70,7 +72,7 @@ export const PerformanceView: React.FC = () => {
 
   const strategyRows: PerformanceRowView[] = state.strategies.map((s) => ({
     id: s.strategyId,
-    label: STRATEGY_NAMES[s.strategyId] ?? s.strategyId,
+    label: t(STRATEGY_NAMES[s.strategyId] ?? s.strategyId),
     samples: s.samples,
     hitRate: s.hitRate,
     metric: s.medianExcessReturn,
@@ -90,7 +92,7 @@ export const PerformanceView: React.FC = () => {
 
   const strategyCalibrationRows: CalibrationRowView[] = state.strategyCalibrations.map((c) => ({
     id: c.strategyId,
-    label: STRATEGY_NAMES[c.strategyId] ?? c.strategyId,
+    label: t(STRATEGY_NAMES[c.strategyId] ?? c.strategyId),
     baseWeight: c.baseWeight,
     historicalAdjustment:
       c.finalBoundedWeight === null ? undefined : c.finalBoundedWeight - c.baseWeight,
@@ -102,7 +104,7 @@ export const PerformanceView: React.FC = () => {
   return (
     <div className="max-w-3xl" data-testid="performance-view">
       <header className="flex items-center justify-between gap-2">
-        <h2 className="text-[16px] font-semibold tracking-tight text-foreground">Performance</h2>
+        <h2 className="text-[16px] font-semibold tracking-tight text-foreground">{t('performance.title')}</h2>
         <div className="flex gap-1" data-testid="performance-horizons">
           {HORIZONS.map((h) => (
             <button
@@ -115,48 +117,46 @@ export const PerformanceView: React.FC = () => {
                   : 'text-foreground/52 hover:text-foreground'
               }`}
             >
-              {HORIZON_LABEL[h]}
+              {t(HORIZON_LABEL[h])}
             </button>
           ))}
         </div>
       </header>
       <p className="mt-1 text-[12px] text-text-muted">
-        Track record of evaluated research opinions. Groups below {MIN_EVALUATED_SAMPLES} samples are
-        Observational Only — never tuned on a handful of outcomes.
+        {t('performance.intro', { min: MIN_EVALUATED_SAMPLES })}
       </p>
-      {state.loading && <p className="mt-2 text-[11px] text-text-muted">Loading…</p>}
+      {state.loading && <p className="mt-2 text-[11px] text-text-muted">{t('performance.loading')}</p>}
       <div className="mt-4 flex flex-col gap-4">
         <PerformanceCard
-          title="Skill Performance"
-          metricLabel="Avg Return"
+          title={t('performance.skillPerformance')}
+          metricLabel={t('performance.avgReturn')}
           rows={skillRows}
-          emptyMessage="No evaluated skill outcomes yet."
+          emptyMessage={t('performance.noSkillOutcomes')}
         />
         <PerformanceCard
-          title="Strategy Performance"
-          metricLabel="Median Excess Return"
+          title={t('performance.strategyPerformance')}
+          metricLabel={t('performance.medianExcessReturn')}
           rows={strategyRows}
-          emptyMessage="No evaluated strategy outcomes yet."
+          emptyMessage={t('performance.noStrategyOutcomes')}
         />
       </div>
       <div className="mt-6 border-t mac-section-divider pt-4" data-testid="calibration-area">
         <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/44">
-          Calibration (Advanced)
+          {t('performance.calibrationAdvanced')}
         </h3>
         <p className="mt-1 text-[11px] text-text-muted">
-          Informational only — how each track record would adjust a weight, never outside the
-          bounded range. Runtime weighting is not applied in this version.
+          {t('performance.calibrationIntro')}
         </p>
         <div className="mt-3 flex flex-col gap-4">
           <CalibrationCard
-            title="Skill Calibration"
+            title={t('performance.skillCalibration')}
             rows={calibrationRows}
-            emptyMessage="No calibrated skill outcomes yet."
+            emptyMessage={t('performance.noCalibratedSkillOutcomes')}
           />
           <CalibrationCard
-            title="Strategy Calibration"
+            title={t('performance.strategyCalibration')}
             rows={strategyCalibrationRows}
-            emptyMessage="No calibrated strategy outcomes yet."
+            emptyMessage={t('performance.noCalibratedStrategyOutcomes')}
           />
         </div>
       </div>

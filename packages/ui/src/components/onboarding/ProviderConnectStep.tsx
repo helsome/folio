@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { ConnectionEntry } from '../../client/connections';
 import { ConnectionCard } from '../settings/ConnectionCard';
 
@@ -21,6 +22,7 @@ export const ProviderConnectStep: React.FC<ProviderConnectStepProps> = ({
   entry,
   onChanged,
 }) => {
+  const { t } = useTranslation();
   return (
     <div className="space-y-4">
       <div className="space-y-1">
@@ -28,7 +30,7 @@ export const ProviderConnectStep: React.FC<ProviderConnectStepProps> = ({
           <h2 className="text-[18px] font-semibold text-foreground">{title}</h2>
           {recommended && (
             <span className="rounded-full border border-[var(--mac-blue)]/30 bg-[var(--mac-blue)]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--mac-blue)]">
-              Recommended
+              {t('onboarding.providerStep.recommended')}
             </span>
           )}
         </div>
@@ -39,8 +41,7 @@ export const ProviderConnectStep: React.FC<ProviderConnectStepProps> = ({
         <ConnectionCard entry={entry} onChanged={onChanged} />
       ) : (
         <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
-          This provider isn&apos;t available in this build yet — connect it later from Settings →
-          Connections.
+          {t('onboarding.providerStep.notAvailable')}
         </div>
       )}
     </div>

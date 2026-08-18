@@ -3,6 +3,7 @@ import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { StrategyId } from '@finagent/core';
 import { installHappyDom } from '../../test/setupHappyDom';
+import { TestI18n } from '../../test/testI18n';
 import { DEFAULT_STRATEGY_ID, StrategyPicker } from './StrategyPicker';
 
 let restoreDom: (() => void) | undefined;
@@ -31,7 +32,11 @@ async function render(value: StrategyId = DEFAULT_STRATEGY_ID, onChange: (id: St
   document.body.appendChild(container);
   const root = createRoot(container);
   await act(async () => {
-    root.render(<StrategyPicker value={value} onChange={onChange} />);
+    root.render(
+      <TestI18n>
+        <StrategyPicker value={value} onChange={onChange} />
+      </TestI18n>
+    );
   });
   return { container, root };
 }

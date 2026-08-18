@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { PortfolioFailureKind } from '@finagent/core';
 import {
@@ -20,19 +21,33 @@ import { AssetPieChart } from '../portfolio/AssetPieChart';
 import { PortfolioRiskPanel } from '../portfolio/PortfolioRiskPanel';
 import { ImportDialog } from '../portfolio/ImportDialog';
 import { Button } from '../primitives/Button';
-import { formatFreshness } from '../../lib/money';
+import { i18nCurrentLocale } from '@finagent/i18n';
 
 const FAILURE_HEADINGS: Record<PortfolioFailureKind, string> = {
-  'not-connected': 'LongBridge not connected',
-  'no-account-permission': 'No portfolio access',
-  empty: 'No portfolio yet',
-  partial: 'Holdings unavailable',
-  'provider-error': 'Portfolio unavailable',
-  'parse-error': "Couldn't read portfolio data",
-  timeout: 'Portfolio timed out',
+  'not-connected': 'portfolio.failure.notConnected',
+  'no-account-permission': 'portfolio.failure.noPermission',
+  empty: 'portfolio.failure.empty',
+  partial: 'portfolio.failure.partial',
+  'provider-error': 'portfolio.failure.providerError',
+  'parse-error': 'portfolio.failure.parseError',
+  timeout: 'portfolio.failure.timeout',
 };
 
+/** Locale-aware `Updated hh:mm:ss` freshness line (spec §34). */
+function formatFreshness(t: (k: string, o?: Record<string, unknown>) => string, fetchedAt: number | undefined): string {
+  if (fetchedAt === undefined || !Number.isFinite(fetchedAt) || fetchedAt <= 0) {
+    return t('portfolio.freshnessUpdatedUnknown');
+  }
+  const time = new Intl.DateTimeFormat(i18nCurrentLocale(), {
+    hour: '2-digit',
+    minute: '2-digit',
+    second: '2-digit',
+  }).format(fetchedAt);
+  return t('portfolio.freshnessUpdated', { time });
+}
+
 export const PortfolioSection: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const cache = useAtomValue(portfolioCacheAtom);
   const view = useAtomValue(portfolioViewAtom);
@@ -65,7 +80,7 @@ export const PortfolioSection: React.FC = () => {
         onClick={() => void analyzeRisk().catch(() => {})}
         disabled={riskCache.loading}
       >
-        {riskCache.loading ? 'Analyzing…' : 'Analyze Portfolio'}
+        {riskCache.loading ? t('portfolio.analyzing') : t('portfolio.analyzePortfolio')}
       </Button>
 
       {riskCache.loading && (
@@ -73,7 +88,7 @@ export const PortfolioSection: React.FC = () => {
       )}
       {riskCache.error && (
         <div className="mt-3 text-[12px] text-foreground/54">
-          Risk analysis failed: {riskCache.error}
+          {t('portfolio.riskAnalysisFailed', { message: riskCache.error })}
         </div>
       )}
       {riskCache.report && <PortfolioRiskPanel report={riskCache.report} />}
@@ -95,7 +110,7 @@ export const PortfolioSection: React.FC = () => {
       <div className="space-y-3 p-4">
         <div className="mac-stock-tile rounded-[12px] p-4">
           <div className="text-[13px] font-semibold text-foreground">
-            {FAILURE_HEADINGS[cache.failure.kind]}
+            {t(FAILURE_HEADINGS[cache.failure.kind])}
           </div>
           <div className="mt-1 text-[12px] text-foreground/54">{cache.failure.message}</div>
         </div>
@@ -107,7 +122,7 @@ export const PortfolioSection: React.FC = () => {
   if (!view) {
     return (
       <div className="space-y-3 p-4">
-        <div className="text-[13px] text-foreground/44">No portfolio data.</div>
+        <div className="text-[13px] text-foreground/44">{t('portfolio.noPortfolioData')}</div>
         {riskSection}
       </div>
     );
@@ -121,25 +136,28 @@ export const PortfolioSection: React.FC = () => {
   const isPartial = cache.failure?.kind === 'partial';
   const showAccountSelector =
     view.accounts.length > 1 || manualState.portfolios.length > 0;
+  const freshnessProvider = isManualAccountId(selectedAccount)
+    ? t('portfolio.manualPortfolio')
+    : 'Longbridge';
 
   return (
     <div className="space-y-3 overflow-y-auto p-4">
       <div className="flex items-center justify-between">
-        <h2 className="text-[13px] font-semibold text-foreground">Portfolio</h2>
+        <h2 className="text-[13px] font-semibold text-foreground">{t('portfolio.title')}</h2>
         <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>
-          Import…
+          {t('portfolio.importButton')}
         </Button>
       </div>
 
       {showAccountSelector && (
         <label className="flex items-center gap-2 text-[12px] text-foreground/54">
-          Account
+          {t('portfolio.account')}
           <select
             value={selectedAccount ?? ''}
             onChange={(e) => setSelectedAccount(e.target.value === '' ? null : e.target.value)}
             className="rounded-[8px] border border-[var(--mac-border)] bg-background px-2 py-1 text-[12px] text-foreground"
           >
-            <option value="">All accounts</option>
+            <option value="">{t('portfolio.allAccounts')}</option>
             {view.accounts.map((account) => (
               <option key={account.id} value={account.id}>
                 {account.name} ({account.currency ?? '—'})
@@ -147,7 +165,7 @@ export const PortfolioSection: React.FC = () => {
             ))}
             {manualState.portfolios.map((portfolio) => (
               <option key={portfolio.id} value={manualAccountId(portfolio.id)}>
-                {portfolio.name} (Manual)
+                {portfolio.name} ({t('portfolio.manual')})
               </option>
             ))}
           </select>
@@ -165,7 +183,7 @@ export const PortfolioSection: React.FC = () => {
 
       <div>
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
-          Holdings ({view.holdings.length})
+          {t('portfolio.holdings')} ({view.holdings.length})
         </h3>
         <div className="space-y-2">
           {view.holdings.map((holding) => (
@@ -177,17 +195,14 @@ export const PortfolioSection: React.FC = () => {
           ))}
           {view.holdings.length === 0 && (
             <div className="py-8 text-center text-[13px] text-foreground/44">
-              No holdings in this account.
+              {t('portfolio.noHoldingsInAccount')}
             </div>
           )}
         </div>
       </div>
 
       <div className="text-[11px] text-foreground/44">
-        {formatFreshness(
-          isManualAccountId(selectedAccount) ? 'Manual portfolio' : 'Longbridge',
-          view.snapshot.fetchedAt
-        )}
+        {freshnessProvider} · {formatFreshness(t, view.snapshot.fetchedAt)}
       </div>
 
       {riskSection}

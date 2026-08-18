@@ -31,10 +31,24 @@ export interface PaletteCommand {
   action?: 'research-current' | 'open-connections'
 }
 
+/** Localized strings used to render palette entries (§70). */
+export interface PaletteLabels {
+  openSymbolHint: string
+  openSymbol: (symbol: string) => string
+  goToHint: string
+  startResearch: (activeSymbol: string | null) => string
+  quickActionHint: string
+  openConnections: string
+  quickActionSettingsHint: string
+  navigation: Partial<Record<NavSection, string>>
+}
+
 export interface PaletteCommandInput {
   query: string
   watchlist: string[]
   activeSymbol: string | null
+  /** Localizer for command labels. When absent, English aliases are used. */
+  labels?: PaletteLabels
 }
 
 /** The app sections reachable from the palette, in sidebar order. */
@@ -48,6 +62,22 @@ export const NAVIGATION_COMMANDS: Array<{ section: NavSection; label: string }> 
   { section: 'evaluation', label: 'Evaluation' },
   { section: 'settings', label: 'Settings' },
 ]
+
+const NAVIGATION_LABEL: Record<NavSection, string> = Object.fromEntries(
+  NAVIGATION_COMMANDS.map((n) => [n.section, n.label]),
+) as Record<NavSection, string>
+
+const DEFAULT_LABELS: PaletteLabels = {
+  openSymbolHint: 'Open symbol',
+  openSymbol: (symbol) => `Open ${symbol}`,
+  goToHint: 'Go to',
+  startResearch: (symbol) =>
+    symbol != null ? `Start research on ${symbol}` : 'Start research on current symbol',
+  quickActionHint: 'Quick action',
+  openConnections: 'Open Connections',
+  quickActionSettingsHint: 'Quick action · Settings',
+  navigation: NAVIGATION_LABEL,
+}
 
 /** Fully-qualified `CODE.MARKET` symbol (same markets as the Watchlist). */
 const SYMBOL_PATTERN = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/
@@ -118,37 +148,47 @@ export function filterCommands(query: string, commands: PaletteCommand[]): Palet
  * matches + free-text symbol, then navigation sections, then quick actions.
  */
 export function buildPaletteCommands(input: PaletteCommandInput): PaletteCommand[] {
-  const { query, watchlist, activeSymbol } = input
+  const { query, watchlist, activeSymbol, labels } = input
+  const L = labels ?? DEFAULT_LABELS
   const needle = query.trim()
   const commands: PaletteCommand[] = []
 
   if (needle !== '') {
     const matches = matchWatchlistSymbols(needle, watchlist)
     for (const symbol of matches) {
-      commands.push({ id: `symbol:${symbol}`, kind: 'symbol', label: symbol, hint: 'Open symbol', symbol })
+      commands.push({ id: `symbol:${symbol}`, kind: 'symbol', label: symbol, hint: L.openSymbolHint, symbol })
     }
     const freeText = normalizeSymbolInput(needle)
     if (freeText != null && !watchlist.includes(freeText)) {
-      commands.push({ id: `symbol:${freeText}`, kind: 'symbol', label: `Open ${freeText}`, hint: 'Open symbol', symbol: freeText })
+      commands.push({ id: `symbol:${freeText}`, kind: 'symbol', label: L.openSymbol(freeText), hint: L.openSymbolHint, symbol: freeText })
     }
   }
 
-  for (const { section, label } of NAVIGATION_COMMANDS) {
-    commands.push({ id: `nav:${section}`, kind: 'navigation', label, hint: 'Go to', section })
+  for (const { section, label: enLabel } of NAVIGATION_COMMANDS) {
+    // English alias stays a keyword for best-effort search in non-English UIs (§70).
+    const localized = L.navigation[section]
+    commands.push({
+      id: `nav:${section}`,
+      kind: 'navigation',
+      label: localized ?? enLabel,
+      hint: L.goToHint,
+      keywords: localized ? [enLabel] : undefined,
+      section,
+    })
   }
 
   commands.push({
     id: 'action:research-current',
     kind: 'action',
-    label: activeSymbol != null ? `Start research on ${activeSymbol}` : 'Start research on current symbol',
-    hint: 'Quick action',
+    label: L.startResearch(activeSymbol),
+    hint: L.quickActionHint,
     action: 'research-current',
   })
   commands.push({
     id: 'action:open-connections',
     kind: 'action',
-    label: 'Open Connections',
-    hint: 'Quick action · Settings',
+    label: L.openConnections,
+    hint: L.quickActionSettingsHint,
     action: 'open-connections',
   })
 

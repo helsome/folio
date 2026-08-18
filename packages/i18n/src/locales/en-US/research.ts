@@ -1,0 +1,129 @@
+import type { NamespaceResource } from '../keys.ts';
+
+/**
+ * Research (Deep Research) surface — run panel, report view, what-changed
+ * diff, export menu, strategy picker (V8 spec §29, §44–55). Strategy ids,
+ * capability ids and section keys are domain identifiers (§11) and stay
+ * ASCII; only their UI labels are localised.
+ */
+export const research = {
+  deepResearch: 'Deep Research',
+  stop: 'Stop',
+  starting: 'Starting…',
+  subtitleFor:
+    'Structured research for {{symbol}} — facts from the capability layer, synthesis by the agent.',
+  subtitleEmpty: 'Open a symbol from the watchlist to start research.',
+  notAvailable: 'Deep Research is not available yet.',
+  fetching: 'Fetching market data…',
+  synthesizing: 'Synthesizing report…',
+  capabilitiesCount: '{{done}}/{{planned}} capabilities',
+  failedCount: '({{failed}} failed)',
+  empty: 'No research yet. Pick a symbol and start Deep Research.',
+  runStatus: {
+    queued: 'Queued',
+    fetching: 'Fetching',
+    synthesizing: 'Synthesizing',
+    completed: 'Completed',
+    partial: 'Partial',
+    failed: 'Failed',
+    cancelled: 'Cancelled',
+  },
+  reportFor: '{{symbol}} · Research Report',
+  confidence: 'Confidence',
+  partialRun: 'Partial run — unavailable data is marked explicitly.',
+  allCompleted: 'All planned capabilities completed.',
+  capabilityCalls: '{{count}} capability calls',
+  stance: {
+    bullish: 'POSITIVE',
+    bearish: 'NEGATIVE',
+    neutral: 'NEUTRAL',
+  },
+  verdict: {
+    positive: 'Positive',
+    negative: 'Negative',
+    neutral: 'Neutral',
+    unavailable: 'Unavailable',
+  },
+  bullCase: 'Bull Case',
+  bearCase: 'Bear Case',
+  catalysts: 'Catalysts',
+  risks: 'Risks',
+  evidence: 'Evidence',
+  evidenceNote:
+    'Every claim below is linked to the exact capability run that produced the data.',
+  evidenceSourceCount: '{{count}} evidence source',
+  evidenceSourceCountOther: '{{count}} evidence sources',
+  whatChanged: 'What Changed',
+  since: 'Since {{date}}',
+  noMaterialChanges: 'No material changes.',
+  material: 'Material',
+  category: {
+    valuation: 'Valuation',
+    financials: 'Financials',
+    technical: 'Technical',
+    'analyst-rating': 'Analyst Rating',
+    momentum: 'Momentum',
+    earnings: 'Earnings',
+    news: 'News',
+    risk: 'Risk',
+    growth: 'Growth',
+    sentiment: 'Sentiment',
+  },
+  direction: {
+    improved: 'Improved',
+    worsened: 'Worsened',
+    unchanged: 'Unchanged',
+    new: 'New',
+    removed: 'Removed',
+  },
+  impact: {
+    invalidated: 'INVALIDATED',
+    weakened: 'WEAKENED',
+    strengthened: 'STRENGTHENED',
+    unchanged: 'UNCHANGED',
+  },
+  researchStrategy: 'Research strategy',
+  opinion: {
+    none: 'No opinion yet',
+    title: 'Opinion: {{stance}}, {{confidence}}% confidence, {{horizon}} horizon',
+    stance: {
+      bullish: 'Bullish',
+      bearish: 'Bearish',
+      neutral: 'Neutral',
+    },
+  },
+  strategies: {
+    comprehensiveName: 'Comprehensive',
+    comprehensiveDescription:
+      'Full-spectrum deep dive across market, company and research data.',
+    valueName: 'Value',
+    valueDescription:
+      'Fundamental value analysis — valuation multiples, financials and dividend history.',
+    growthName: 'Growth',
+    growthDescription:
+      'Growth focus — revenue/EPS trajectory, consensus estimates and valuation.',
+    technicalName: 'Technical',
+    technicalDescription:
+      'Technical analysis — price trend, intraday action, order flow and market temperature.',
+    earningsName: 'Earnings',
+    earningsDescription: 'Earnings intelligence — EPS forecasts, calendar catalysts and news.',
+    eventDrivenName: 'Event-Driven',
+    eventDrivenDescription:
+      'Event-driven scan — news, calendar, ratings changes and dividend actions.',
+    riskReviewName: 'Risk Review',
+    riskReviewDescription:
+      'Risk review — financial red flags, news, ratings and trend health.',
+    incomeName: 'Income',
+    incomeDescription:
+      'Income focus — dividend history, payout capacity and financial stability.',
+  },
+  export: {
+    copyMarkdown: 'Copy Markdown',
+    downloadMarkdown: 'Download .md',
+    copyShareText: 'Copy share text',
+    downloadShareCard: 'Download share card .svg',
+    working: 'Working…',
+    unavailable: 'Export unavailable — export channel not wired.',
+    failed: 'Export failed — please try again.',
+  },
+} satisfies NamespaceResource;

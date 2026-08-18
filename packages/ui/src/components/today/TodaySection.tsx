@@ -1,4 +1,5 @@
 import React from 'react'
+import { useTranslation } from 'react-i18next'
 
 /**
  * Presentational shell for a "Today" dashboard section (spec §31). Each
@@ -23,24 +24,20 @@ export const TodaySection: React.FC<TodaySectionProps> = ({ title, action, child
   </section>
 )
 
-interface SectionStateProps {
-  kind: 'loading' | 'error' | 'empty'
-  message?: string
-}
-
 /** One of the three non-data states a section can show. */
-export const SectionState: React.FC<SectionStateProps> = ({ kind, message }) => {
+export const SectionState: React.FC<{ kind: 'loading' | 'error' | 'empty'; message?: string }> = ({ kind, message }) => {
+  const { t } = useTranslation()
   if (kind === 'loading') {
-    return <div className="py-2 text-[13px] text-foreground/42">Loading…</div>
+    return <div className="py-2 text-[13px] text-foreground/42">{t('today.sectionLoading')}</div>
   }
   if (kind === 'error') {
     return (
       <div className="py-2 text-[13px] text-[var(--mac-red)]">
-        {message ?? 'Something went wrong.'}
+        {message ?? t('today.sectionError')}
       </div>
     )
   }
   return (
-    <div className="py-2 text-[13px] text-foreground/42">{message ?? 'Nothing here yet.'}</div>
+    <div className="py-2 text-[13px] text-foreground/42">{message ?? t('today.sectionEmpty')}</div>
   )
 }

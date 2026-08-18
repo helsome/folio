@@ -115,6 +115,10 @@ export interface ElectronAPI {
     getCompleted: () => Promise<unknown>;
     setCompleted: (input: { completed: boolean }) => Promise<unknown>;
   };
+  appPreferences: {
+    get: () => Promise<unknown>;
+    update: (input: { locale: unknown }) => Promise<unknown>;
+  };
   screening: {
     run: (input: unknown) => Promise<unknown>;
     listRuns: () => Promise<unknown>;
@@ -309,6 +313,10 @@ const electronAPI: ElectronAPI = {
   onboarding: {
     getCompleted: () => ipcRenderer.invoke('onboarding:getCompleted'),
     setCompleted: (input: { completed: boolean }) => ipcRenderer.invoke('onboarding:setCompleted', input),
+  },
+  appPreferences: {
+    get: () => ipcRenderer.invoke('appPreferences:get'),
+    update: (input: { locale: unknown }) => ipcRenderer.invoke('appPreferences:update', input),
   },
   screening: {
     run: (input: unknown) => ipcRenderer.invoke('screening:run', input),

@@ -1,12 +1,14 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { PortfolioView } from '../../atoms/portfolioAtoms';
-import { formatMoney, formatPercent, formatSignedMoney } from '../../lib/money';
+import { formatCurrency, formatSignedCurrency, formatPercent } from '@finagent/i18n';
 
 interface PortfolioCardProps {
   view: PortfolioView;
 }
 
 export const PortfolioCard: React.FC<PortfolioCardProps> = ({ view }) => {
+  const { t } = useTranslation();
   const invested = view.totalAssets !== undefined && view.totalPnL !== undefined
     ? view.totalAssets - view.totalPnL
     : undefined;
@@ -22,14 +24,14 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({ view }) => {
     <div className="mac-stock-tile rounded-[14px] p-4">
       <div className="flex justify-between items-start">
         <div>
-          <div className="text-[13px] text-foreground/54">Total Value</div>
+          <div className="text-[13px] text-foreground/54">{t('portfolio.totalValue')}</div>
           <div className="text-3xl font-semibold tracking-tight text-foreground">
-            {formatMoney(view.totalAssets, view.baseCurrency)}
+            {formatCurrency(view.totalAssets, view.baseCurrency)}
           </div>
         </div>
         <div className="text-right">
           <div className={`text-lg font-semibold ${pnlColor}`}>
-            {formatSignedMoney(view.totalPnL, view.baseCurrency)}
+            {formatSignedCurrency(view.totalPnL, view.baseCurrency)}
           </div>
           <div className={`text-sm ${pnlColor}`}>{formatPercent(pnlPercent)}</div>
         </div>
@@ -37,19 +39,19 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({ view }) => {
 
       <div className="mt-4 flex justify-between text-sm">
         <div>
-          <span className="text-foreground/54">Cash: </span>
+          <span className="text-foreground/54">{t('portfolio.cash')}: </span>
           <span className="font-medium text-foreground">
-            {formatMoney(view.cash, view.baseCurrency)}
+            {formatCurrency(view.cash, view.baseCurrency)}
           </span>
         </div>
         <div>
-          <span className="text-foreground/54">Today: </span>
+          <span className="text-foreground/54">{t('portfolio.today')}: </span>
           <span className={`font-medium ${pnlColor}`}>
-            {formatSignedMoney(view.todayPnL, view.baseCurrency)}
+            {formatSignedCurrency(view.todayPnL, view.baseCurrency)}
           </span>
         </div>
         <div>
-          <span className="text-foreground/54">Positions: </span>
+          <span className="text-foreground/54">{t('portfolio.positions')}: </span>
           <span className="font-medium text-foreground">{view.holdings.length}</span>
         </div>
       </div>

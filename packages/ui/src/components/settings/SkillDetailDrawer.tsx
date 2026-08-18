@@ -1,5 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
+import { useTranslation } from 'react-i18next';
 import type { SkillReadiness } from '@finagent/core';
 import { useFinagentClient, type SkillListItem, type SkillResourceItem } from '../../client';
 import { SkillReadinessBadge } from './SkillReadinessBadge';
@@ -39,6 +40,7 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
   toggleError,
   onToggle,
 }) => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const closeRef = useRef<HTMLButtonElement>(null);
 
@@ -145,7 +147,7 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
       <aside
         role="dialog"
         aria-modal="true"
-        aria-label={`${skill.name} details`}
+        aria-label={`${skill.name} ${t('settings.skills.details')}`}
         data-testid="skill-detail-drawer"
         className="absolute right-0 top-0 flex h-full w-full max-w-[420px] flex-col border-l border-[var(--mac-border-strong)] bg-background shadow-middle"
       >
@@ -159,7 +161,7 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
           <button
             ref={closeRef}
             type="button"
-            aria-label="Close"
+            aria-label={t('settings.skills.close')}
             onClick={onClose}
             className="shrink-0 rounded-[7px] p-1.5 text-foreground/48 transition-smooth hover:bg-[var(--mac-sidebar-hover)] hover:text-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)]"
           >
@@ -172,21 +174,21 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
         <div className="flex-1 overflow-y-auto px-5 py-4">
           <div className="space-y-5">
             <section>
-              <SectionLabel>Description</SectionLabel>
+              <SectionLabel>{t('settings.skills.description')}</SectionLabel>
               <p className="mt-1.5 text-[13px] leading-relaxed text-foreground/72">
                 {skill.description || '—'}
               </p>
             </section>
 
             <section>
-              <SectionLabel>Capabilities</SectionLabel>
+              <SectionLabel>{t('settings.skills.capabilities')}</SectionLabel>
               {!readiness ? (
-                <p className="mt-1.5 text-[12px] text-foreground/48">Capability requirements unavailable</p>
+                <p className="mt-1.5 text-[12px] text-foreground/48">{t('settings.skills.capabilityUnavailable')}</p>
               ) : (
                 <div className="mt-1.5 space-y-2">
                   {readiness.required.length > 0 && (
                     <div>
-                      <div className="text-[11px] font-medium text-foreground/56">Required</div>
+                      <div className="text-[11px] font-medium text-foreground/56">{t('settings.skills.required')}</div>
                       <ul className="mt-1 space-y-1">
                         {readiness.required.map((id) => {
                           const present = !missingSet.has(id);
@@ -208,7 +210,7 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
                   {readiness.optional.length > 0 && (
                     <div>
                       <div className="text-[11px] font-medium text-foreground/56">
-                        Optional ({readiness.availableOptional}/{readiness.optional.length} available)
+                        {t('settings.skills.optionalAvailable', { available: readiness.availableOptional, total: readiness.optional.length })}
                       </div>
                       <ul className="mt-1 space-y-1">
                         {readiness.optional.map((id) => (
@@ -227,9 +229,9 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
             </section>
 
             <section>
-              <SectionLabel>Triggers</SectionLabel>
+              <SectionLabel>{t('settings.skills.triggers')}</SectionLabel>
               {skill.keywords.length === 0 ? (
-                <p className="mt-1.5 text-[12px] text-foreground/48">No trigger keywords</p>
+                <p className="mt-1.5 text-[12px] text-foreground/48">{t('settings.skills.noTriggers')}</p>
               ) : (
                 <div className="mt-1.5 flex flex-wrap gap-1.5">
                   {skill.keywords.map((keyword) => (
@@ -245,22 +247,22 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
             </section>
 
             <section>
-              <SectionLabel>Details</SectionLabel>
+              <SectionLabel>{t('settings.skills.details')}</SectionLabel>
               <dl className="mt-1.5 grid grid-cols-2 gap-x-4 gap-y-2 text-[12px]">
                 <div>
-                  <dt className="text-foreground/44">Version</dt>
+                  <dt className="text-foreground/44">{t('settings.skills.version')}</dt>
                   <dd className="text-foreground/72">{skill.version ?? '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-foreground/44">Author</dt>
+                  <dt className="text-foreground/44">{t('settings.skills.author')}</dt>
                   <dd className="text-foreground/72">{skill.author ?? '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-foreground/44">Risk level</dt>
+                  <dt className="text-foreground/44">{t('settings.skills.riskLevel')}</dt>
                   <dd className="text-foreground/72">{skill.riskLevel ?? '—'}</dd>
                 </div>
                 <div>
-                  <dt className="text-foreground/44">Tier</dt>
+                  <dt className="text-foreground/44">{t('settings.skills.tier')}</dt>
                   <dd className="text-foreground/72">{skill.tier ?? '—'}</dd>
                 </div>
               </dl>
@@ -269,9 +271,9 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
             <section className="rounded-[10px] border border-[var(--mac-border)] px-3 py-2.5">
               <div className="flex items-center justify-between gap-3">
                 <div className="min-w-0">
-                  <div className="text-[13px] font-medium text-foreground">Enabled</div>
+                  <div className="text-[13px] font-medium text-foreground">{t('settings.skills.enabled')}</div>
                   <div className="text-[11px] text-foreground/48">
-                    {skill.enabled ? 'This skill is active' : 'This skill is disabled'}
+                    {skill.enabled ? t('settings.skills.activeDesc') : t('settings.skills.disabledDesc')}
                   </div>
                 </div>
                 <SkillToggle
@@ -279,7 +281,7 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
                   onChange={() => onToggle(skill)}
                   disabled={togglingId !== null}
                   loading={togglingId === skill.id}
-                  label={`${skill.enabled ? 'Disable' : 'Enable'} ${skill.name}`}
+                  label={`${skill.enabled ? t('settings.skills.disable') : t('settings.skills.enable')} ${skill.name}`}
                 />
               </div>
               {drawerError && (
@@ -290,15 +292,15 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
             </section>
 
             <section>
-              <SectionLabel>References</SectionLabel>
+              <SectionLabel>{t('settings.skills.references')}</SectionLabel>
               {!skill.enabled ? (
-                <p className="mt-1.5 text-[12px] text-foreground/48">Enable this skill to browse its resources.</p>
+                <p className="mt-1.5 text-[12px] text-foreground/48">{t('settings.skills.enableToBrowse')}</p>
               ) : resourcesLoading ? (
-                <p className="mt-1.5 text-[12px] text-foreground/48">Loading resources…</p>
+                <p className="mt-1.5 text-[12px] text-foreground/48">{t('settings.skills.loadingResources')}</p>
               ) : resourcesError ? (
                 <p className="mt-1.5 text-[12px] text-destructive">{resourcesError}</p>
               ) : referenceResources.length === 0 ? (
-                <p className="mt-1.5 text-[12px] text-foreground/48">No references</p>
+                <p className="mt-1.5 text-[12px] text-foreground/48">{t('settings.skills.noReferences')}</p>
               ) : (
                 <div className="mt-1.5 space-y-1">
                   {referenceResources.map((resource) => (
@@ -322,7 +324,7 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
               {activePath && (
                 <div className="mt-2">
                   {contentLoading && (
-                    <p className="text-[12px] text-foreground/48">Loading {activePath}…</p>
+                    <p className="text-[12px] text-foreground/48">{t('settings.skills.loadingPath', { path: activePath })}</p>
                   )}
                   {contentError && <p className="text-[12px] text-destructive">{contentError}</p>}
                   {content !== null && (
@@ -346,7 +348,7 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
                 className="flex w-full items-center justify-between gap-2 px-3 py-2.5 text-left transition-smooth hover:bg-[var(--mac-sidebar-hover)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)]"
               >
                 <span className="text-[12px] font-medium text-foreground/72">
-                  Advanced / Developer Details
+                  {t('settings.skills.advancedDeveloper')}
                 </span>
                 <svg
                   width="10"
@@ -362,7 +364,7 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
               {advancedOpen && (
                 <div className="space-y-2 border-t mac-section-divider px-3 py-3">
                   {!skill.enabled ? (
-                    <p className="text-[12px] text-foreground/48">Enable this skill to view raw files.</p>
+                    <p className="text-[12px] text-foreground/48">{t('settings.skills.enableToViewRaw')}</p>
                   ) : (
                     resources
                       .filter(
@@ -375,9 +377,9 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
                         return (
                           <div key={resource.path}>
                             <div className="font-mono text-[11px] text-foreground/56">{resource.path}</div>
-                            {!doc && <p className="text-[12px] text-foreground/40">Queued…</p>}
+                            {!doc && <p className="text-[12px] text-foreground/40">{t('settings.skills.queued')}</p>}
                             {doc?.status === 'loading' && (
-                              <p className="text-[12px] text-foreground/48">Loading…</p>
+                              <p className="text-[12px] text-foreground/48">{t('settings.skills.loading')}</p>
                             )}
                             {doc?.status === 'error' && (
                               <p className="text-[12px] text-destructive">{doc.error}</p>

@@ -75,19 +75,19 @@ function experiment(
 }
 
 describe('labels', () => {
-  it('maps metric ids to human names', () => {
-    expect(metricLabel('task_completion')).toBe('Task Completion');
+  it('maps metric ids to display keys', () => {
+    expect(metricLabel('task_completion')).toBe('evaluation.metrics.task_completion');
     expect(metricLabel('nope')).toBe('nope');
   });
 
-  it('maps metric ids to evaluator kinds', () => {
-    expect(metricKindLabel('groundedness')).toBe('llm judge');
-    expect(metricKindLabel('task_completion')).toBe('deterministic');
+  it('maps metric ids to evaluator-kind display keys', () => {
+    expect(metricKindLabel('groundedness')).toBe('evaluation.metricKinds.llmJudge');
+    expect(metricKindLabel('task_completion')).toBe('evaluation.metricKinds.deterministic');
     expect(metricKindLabel('nope')).toBeNull();
   });
 
-  it('maps failure modes to labels, falling back to spaced ids', () => {
-    expect(failureModeLabel('wrong_tool')).toBe('Wrong tool');
+  it('maps failure modes to display keys, falling back to spaced ids', () => {
+    expect(failureModeLabel('wrong_tool')).toBe('evaluation.failureModeLabels.wrong_tool');
     expect(failureModeLabel('custom_mode')).toBe('custom mode');
   });
 });

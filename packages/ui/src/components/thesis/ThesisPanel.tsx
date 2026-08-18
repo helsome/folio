@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import type { InvestmentThesis, ThesisStance } from '@finagent/core';
 import { activeSymbolAtom } from '../../atoms';
 import {
@@ -20,10 +21,10 @@ import { Button } from '../primitives/Button';
 import { ThesisEditor } from './ThesisEditor';
 import { ThesisImpactList } from './ThesisImpactList';
 
-const STANCE_BADGE: Record<ThesisStance, { label: string; color: string }> = {
-  bullish: { label: 'Bullish', color: '#22c55e' },
-  bearish: { label: 'Bearish', color: '#ef4444' },
-  neutral: { label: 'Neutral', color: '#9ca3af' },
+const STANCE_BADGE: Record<ThesisStance, { color: string }> = {
+  bullish: { color: '#22c55e' },
+  bearish: { color: '#ef4444' },
+  neutral: { color: '#9ca3af' },
 };
 
 interface ThesisCardProps {
@@ -33,19 +34,20 @@ interface ThesisCardProps {
 }
 
 const ThesisCard: React.FC<ThesisCardProps> = ({ thesis, onReEvaluate, onEdit }) => {
+  const { t } = useTranslation();
   const badge = STANCE_BADGE[thesis.stance];
   return (
     <div className="rounded-[10px] border border-foreground/8 p-3" data-testid="thesis-card">
       <div className="flex items-center justify-between gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: badge.color }}>
-          {badge.label}
+          {t(`thesis.stance.${thesis.stance}`)}
         </span>
         <div className="flex items-center gap-1">
           <Button variant="ghost" size="sm" onClick={onEdit}>
-            Edit
+            {t('common.edit')}
           </Button>
           <Button variant="outline" size="sm" onClick={onReEvaluate}>
-            Re-evaluate
+            {t('thesis.reEvaluate')}
           </Button>
         </div>
       </div>
@@ -53,14 +55,14 @@ const ThesisCard: React.FC<ThesisCardProps> = ({ thesis, onReEvaluate, onEdit })
       <p className="mt-2 text-[13px] leading-relaxed text-foreground">{thesis.summary}</p>
 
       <div className="mt-3 grid grid-cols-2 gap-2">
-        <PointList title="Bull" points={thesis.bullCase} tone="#22c55e" />
-        <PointList title="Bear" points={thesis.bearCase} tone="#ef4444" />
-        <PointList title="Catalysts" points={thesis.catalysts} tone="#3b82f6" />
-        <PointList title="Risks" points={thesis.risks} tone="#f59e0b" />
+        <PointList title={t('thesis.bull')} points={thesis.bullCase} tone="#22c55e" />
+        <PointList title={t('thesis.bear')} points={thesis.bearCase} tone="#ef4444" />
+        <PointList title={t('thesis.catalysts')} points={thesis.catalysts} tone="#3b82f6" />
+        <PointList title={t('thesis.risks')} points={thesis.risks} tone="#f59e0b" />
       </div>
 
       <div className="mt-3 text-[11px] text-foreground/44">
-        Last reviewed {new Date(thesis.lastReviewedAt).toLocaleDateString()}
+        {t('thesis.lastReviewed', { date: new Date(thesis.lastReviewedAt).toLocaleDateString() })}
       </div>
     </div>
   );
@@ -87,6 +89,7 @@ const PointList: React.FC<{ title: string; points: string[]; tone: string }> = (
 
 /** Thesis cards for the active symbol + "Save as Thesis" when a report exists. */
 export const ThesisPanel: React.FC = () => {
+  const { t } = useTranslation();
   const symbol = useAtomValue(activeSymbolAtom);
   const [theses, setTheses] = useAtom(thesesAtom);
   const [impacts, setImpacts] = useAtom(thesisImpactsAtom);
@@ -116,7 +119,7 @@ export const ThesisPanel: React.FC = () => {
   if (!symbol) {
     return (
       <div className="flex h-full items-center justify-center p-4 text-[13px] text-foreground/44">
-        Select a symbol to view its investment thesis.
+        {t('thesis.selectSymbol')}
       </div>
     );
   }
@@ -143,25 +146,25 @@ export const ThesisPanel: React.FC = () => {
     <div className="flex h-full flex-col overflow-y-auto p-4" data-testid="thesis-panel">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
-          Thesis
+          {t('thesis.thesis')}
         </h3>
         {report && (
           <Button size="sm" onClick={handleSaveFromReport} disabled={loading}>
-            Save as Thesis
+            {t('thesis.saveAsThesis')}
           </Button>
         )}
       </div>
 
       {!report && (
         <div className="mb-3 rounded-[10px] border border-dashed border-foreground/12 p-3 text-[12px] text-foreground/54">
-          No research report yet. Run Deep Research for {symbol} to save a thesis.
+          {t('thesis.noReportFor', { symbol })}
         </div>
       )}
 
       {loading && symbolTheses.length === 0 ? (
         <div className="h-24 animate-pulse rounded-[12px] bg-foreground/6" />
       ) : symbolTheses.length === 0 ? (
-        <div className="py-8 text-center text-[13px] text-foreground/44">No thesis saved.</div>
+        <div className="py-8 text-center text-[13px] text-foreground/44">{t('thesis.noneSaved')}</div>
       ) : (
         <div className="space-y-3">
           {symbolTheses.map((thesis) =>
@@ -189,13 +192,13 @@ export const ThesisPanel: React.FC = () => {
 
       {lastImpact && (
         <div className="mt-3 rounded-[10px] bg-foreground/6 p-3 text-[12px] text-foreground/70">
-          Re-evaluation complete — see the impact below.
+          {t('thesis.reEvaluateComplete')}
         </div>
       )}
 
       <div className="mt-4">
         <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
-          Re-evaluation history
+          {t('thesis.reEvaluationHistory')}
         </h3>
         <ThesisImpactList impacts={symbolImpacts} />
       </div>

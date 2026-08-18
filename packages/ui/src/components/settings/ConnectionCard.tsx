@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import type { FinancialProviderStatus } from '@finagent/core';
 import { useFinagentClient } from '../../client';
 import {
@@ -19,9 +20,9 @@ import { Input } from '../primitives/Input';
 /** Official Longbridge setup docs (never curl|sh from the renderer). */
 const LONGBRIDGE_SETUP_URL = 'https://open.longbridge.com/skill/install.md';
 
-const KIND_LABEL: Record<ConnectionKind, string> = {
-  'financial-data': 'Financial Data',
-  'broker-account': 'Broker Account',
+const KIND_LABEL_KEY: Record<ConnectionKind, string> = {
+  'financial-data': 'connections.kindFinancialData',
+  'broker-account': 'connections.kindBrokerAccount',
 };
 
 const STATUS_DOT: Record<FinancialProviderStatus, string> = {
@@ -41,6 +42,7 @@ export const ConnectionCard: React.FC<{
   entry: ConnectionEntry;
   onChanged: () => void;
 }> = ({ entry, onChanged }) => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [busy, setBusy] = useState<BusyAction | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -89,9 +91,9 @@ export const ConnectionCard: React.FC<{
       }
       onChanged();
     } else {
-      setError(result.error?.message ?? 'Connection failed.');
+      setError(result.error?.message ?? t('connections.connectionFailed'));
     }
-  }, [client, entry.providerId, onChanged]);
+  }, [client, entry.providerId, onChanged, t]);
 
   const handleConnect = useCallback(() => {
     if (entry.configurable) {
@@ -105,7 +107,7 @@ export const ConnectionCard: React.FC<{
   const handleSaveKey = useCallback(async () => {
     const key = apiKey.trim();
     if (!key) {
-      setError('Enter an API key.');
+      setError(t('connections.enterApiKeyError'));
       return;
     }
     await run('setConfig', async () => {
@@ -117,9 +119,9 @@ export const ConnectionCard: React.FC<{
         onChanged();
         return { ok: true, error: null };
       }
-      return { ok: false, error: result.error?.message ?? 'Could not save the API key.' };
+      return { ok: false, error: result.error?.message ?? t('connections.saveApiKeyFailed') };
     });
-  }, [apiKey, client, entry.providerId, onChanged, run]);
+  }, [apiKey, client, entry.providerId, onChanged, run, t]);
 
   const handleDisconnect = useCallback(() => {
     void run('disconnect', async () => {
@@ -128,9 +130,9 @@ export const ConnectionCard: React.FC<{
         onChanged();
         return { ok: true, error: null };
       }
-      return { ok: false, error: result.error?.message ?? 'Disconnect failed.' };
+      return { ok: false, error: result.error?.message ?? t('connections.disconnectFailed') };
     });
-  }, [client, entry.providerId, onChanged, run]);
+  }, [client, entry.providerId, onChanged, run, t]);
 
   const handleTest = useCallback(() => {
     void run('test', async () => {
@@ -141,9 +143,9 @@ export const ConnectionCard: React.FC<{
         setTestSummary(`${connectionStatusLabel(health.status)}${latency}`);
         return { ok: true, error: null };
       }
-      return { ok: false, error: result.error?.message ?? 'Test failed.' };
+      return { ok: false, error: result.error?.message ?? t('connections.testFailed') };
     });
-  }, [client, entry.providerId, run]);
+  }, [client, entry.providerId, run, t]);
 
   const handleCancel = useCallback(() => {
     setVerificationUrl(null);
@@ -167,21 +169,21 @@ export const ConnectionCard: React.FC<{
     if (waiting) {
       return (
         <Button variant="outline" size="sm" onClick={handleCancel} disabled={busy !== null}>
-          Cancel
+          {t('common.cancel')}
         </Button>
       );
     }
     if (status === 'not-installed') {
       return (
         <Button variant="outline" size="sm" onClick={handleInstall}>
-          Install / Setup
+          {t('connections.installSetup')}
         </Button>
       );
     }
     if (status === 'not-connected') {
       return (
         <Button size="sm" onClick={handleConnect} disabled={busy !== null} data-testid={`connect-${entry.providerId}`}>
-          {busy === 'connect' ? 'Connecting…' : 'Connect'}
+          {busy === 'connect' ? t('connections.connecting') : t('connections.connect')}
         </Button>
       );
     }
@@ -195,10 +197,10 @@ export const ConnectionCard: React.FC<{
             disabled={busy !== null}
             data-testid={`test-${entry.providerId}`}
           >
-            {busy === 'test' ? 'Testing…' : 'Test Connection'}
+            {busy === 'test' ? t('connections.testing') : t('connections.testConnection')}
           </Button>
           <Button size="sm" variant="ghost" onClick={handleDisconnect} disabled={busy !== null}>
-            {busy === 'disconnect' ? 'Disconnecting…' : 'Disconnect'}
+            {busy === 'disconnect' ? t('connections.disconnecting') : t('connections.disconnect')}
           </Button>
         </>
       );
@@ -207,7 +209,7 @@ export const ConnectionCard: React.FC<{
     return (
       <>
         <Button size="sm" onClick={handleConnect} disabled={busy !== null}>
-          {busy === 'connect' ? 'Connecting…' : 'Reconnect'}
+          {busy === 'connect' ? t('connections.connecting') : t('connections.reconnect')}
         </Button>
         <Button
           size="sm"
@@ -216,10 +218,10 @@ export const ConnectionCard: React.FC<{
           disabled={busy !== null}
           data-testid={`test-${entry.providerId}`}
         >
-          {busy === 'test' ? 'Testing…' : 'Test Connection'}
+          {busy === 'test' ? t('connections.testing') : t('connections.testConnection')}
         </Button>
         <Button size="sm" variant="ghost" onClick={handleDisconnect} disabled={busy !== null}>
-          Disconnect
+          {t('connections.disconnect')}
         </Button>
       </>
     );
@@ -235,7 +237,7 @@ export const ConnectionCard: React.FC<{
           <div className="flex items-center gap-2">
             <h3 className="truncate text-[14px] font-semibold text-foreground">{entry.name}</h3>
             <span className="shrink-0 rounded-full border mac-section-divider px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/54">
-              {KIND_LABEL[entry.kind]}
+              {t(KIND_LABEL_KEY[entry.kind])}
             </span>
           </div>
           <div className="mt-1.5 flex items-center gap-1.5">
@@ -258,7 +260,7 @@ export const ConnectionCard: React.FC<{
         <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t mac-section-divider pt-2.5 text-[11px] text-foreground/54">
           {accountLabel && <span>{accountLabel}</span>}
           {quoteAccess && <span>{quoteAccess}</span>}
-          {portfolioReady && <span className="text-[var(--mac-green)]">Portfolio ✓</span>}
+          {portfolioReady && <span className="text-[var(--mac-green)]">{t('connections.portfolioReady')}</span>}
           {lastCheck != null && (
             <span className="tabular-nums">{new Date(lastCheck).toLocaleString()}</span>
           )}
@@ -267,38 +269,37 @@ export const ConnectionCard: React.FC<{
 
       {waiting && (
         <div className="mt-3 rounded-[10px] border border-[var(--mac-yellow)]/30 bg-[var(--mac-yellow)]/10 p-3">
-          <div className="text-[12px] font-medium text-foreground">Waiting for authorization…</div>
+          <div className="text-[12px] font-medium text-foreground">{t('connections.waitingAuthorization')}</div>
           {verificationUrl && (
-            <ExternalLink url={verificationUrl} label="Open verification page" clientHasOpenExternal={hasOpenExternal(client)} onOpen={() => void openExternalUrl(client, verificationUrl)} />
+            <ExternalLink url={verificationUrl} label={t('connections.openVerificationPage')} clientHasOpenExternal={hasOpenExternal(client)} onOpen={() => void openExternalUrl(client, verificationUrl)} />
           )}
           <div className="mt-1.5 text-[11px] text-foreground/48">
-            Authorize in your browser, then return here — this page will update automatically.
+            {t('connections.authorizeHint')}
           </div>
         </div>
       )}
 
       {byok && showApiKey && (
         <div className="mt-3 space-y-2 rounded-[10px] border mac-section-divider p-3">
-          <div className="text-[12px] font-medium text-foreground">Enter your API key</div>
+          <div className="text-[12px] font-medium text-foreground">{t('connections.enterApiKey')}</div>
           <Input
             type="password"
             value={apiKey}
             onChange={(event) => setApiKey(event.target.value)}
-            placeholder="API key"
+            placeholder={t('connections.apiKey')}
             autoComplete="off"
           />
           <div className="flex items-center gap-2">
             <Button size="sm" onClick={() => void handleSaveKey()} disabled={busy !== null}>
-              {busy === 'setConfig' ? 'Saving…' : 'Save'}
+              {busy === 'setConfig' ? t('connections.saving') : t('common.save')}
             </Button>
             <Button size="sm" variant="ghost" onClick={() => setShowApiKey(false)} disabled={busy !== null}>
-              Cancel
+              {t('common.cancel')}
             </Button>
           </div>
           {byok && (
             <div className="text-[10px] leading-relaxed text-foreground/42">
-              Your own key governs usage. Free tiers may return end-of-day data (5 calls/min) and
-              require attribution (&quot;Powered by Polygon.io&quot;).
+              {t('connections.byokNote')}
             </div>
           )}
         </div>
@@ -319,9 +320,9 @@ export const ConnectionCard: React.FC<{
             type="button"
             className="ml-2 underline underline-offset-2"
             onClick={clearError}
-            aria-label="Dismiss error"
+            aria-label={t('connections.dismissError')}
           >
-            Dismiss
+            {t('connections.dismiss')}
           </button>
         </div>
       )}

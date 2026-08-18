@@ -1,5 +1,6 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import { activeSymbolAtom } from '../../atoms';
 import { useFinagentClient } from '../../client';
 import { Button } from '../primitives/Button';
@@ -13,6 +14,7 @@ type Period = (typeof PERIODS)[number];
 type ChartStatus = 'loading' | 'ready' | 'error';
 
 export function ChartView() {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const symbol = useAtomValue(activeSymbolAtom);
 
@@ -55,7 +57,7 @@ export function ChartView() {
       .catch((err: unknown) => {
         if (cancelled || seq !== seqRef.current) return;
         setStatus('error');
-        setError(err instanceof Error ? err.message : 'Failed to load chart data');
+        setError(err instanceof Error ? err.message : t('security.chart.loadFailed'));
       });
     return () => {
       cancelled = true;
@@ -68,30 +70,30 @@ export function ChartView() {
   if (!symbol) {
     body = (
       <div className="flex h-full items-center justify-center text-[12.5px] text-text-muted">
-        Select a symbol to view its chart
+        {t('security.chart.selectSymbol')}
       </div>
     );
   } else if (status === 'loading') {
     body = (
       <div className="flex h-full items-center justify-center text-[12.5px] text-text-muted">
-        <span className="animate-pulse">Loading chart…</span>
+        <span className="animate-pulse">{t('security.chart.loading')}</span>
       </div>
     );
   } else if (status === 'error') {
     body = (
       <div className="flex h-full flex-col items-center justify-center gap-3 px-4 text-center">
         <span className="text-[12.5px] text-negative">
-          {error ?? 'Failed to load chart data'}
+          {error ?? t('security.chart.loadFailed')}
         </span>
         <Button variant="outline" size="sm" onClick={retry}>
-          Retry
+          {t('common.retry')}
         </Button>
       </div>
     );
   } else if (bars.length === 0) {
     body = (
       <div className="flex h-full items-center justify-center text-[12.5px] text-text-muted">
-        No chart data for this symbol
+        {t('security.chart.noData')}
       </div>
     );
   } else {

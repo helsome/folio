@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { useAtom, useSetAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import { completeOnboardingAtom, disclaimersAcceptedAtom, llmStateAtom } from '../../atoms';
 import { useFinagentClient } from '../../client';
 import {
@@ -15,16 +16,17 @@ import { ProviderConnectStep } from './ProviderConnectStep';
 import { EnvironmentStep } from './EnvironmentStep';
 import { Button } from '../primitives/Button';
 
-const STEP_TITLES: Record<WizardStep, string> = {
-  welcome: 'Welcome',
-  'connect-ai': 'Connect AI',
-  'connect-data': 'Connect Financial Data',
-  broker: 'Broker Account',
-  environment: 'Check Environment',
+const STEP_SHORT_KEY: Record<WizardStep, string> = {
+  welcome: 'onboarding.welcome.titleShort',
+  'connect-ai': 'onboarding.connectAi.titleShort',
+  'connect-data': 'onboarding.connectData.titleShort',
+  broker: 'onboarding.broker.titleShort',
+  environment: 'onboarding.environment.titleShort',
 };
 
 /** The first-run onboarding flow (spec §27–30). */
 export const OnboardingWizard: React.FC<{ onComplete: () => void }> = ({ onComplete }) => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [llmState] = useAtom(llmStateAtom);
   const [disclaimersAccepted] = useAtom(disclaimersAcceptedAtom);
@@ -80,17 +82,17 @@ export const OnboardingWizard: React.FC<{ onComplete: () => void }> = ({ onCompl
     <div
       className="flex h-full flex-col"
       role="dialog"
-      aria-label="Folio setup"
+      aria-label={t('onboarding.setupAria')}
       data-testid="onboarding-wizard"
     >
       <header className="flex items-center justify-between border-b mac-section-divider px-6 py-4">
         <div className="flex items-center gap-3">
-          <span className="text-[15px] font-semibold text-foreground">Set up Folio</span>
+          <span className="text-[15px] font-semibold text-foreground">{t('onboarding.setupTitle')}</span>
           <span className="rounded-full border mac-section-divider px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/48">
-            Step {index + 1} of {steps.length}
+            {t('onboarding.stepPrefix', { index: index + 1, total: steps.length })}
           </span>
         </div>
-        <span className="text-[12px] text-foreground/48">{STEP_TITLES[current]}</span>
+        <span className="text-[12px] text-foreground/48">{t(STEP_SHORT_KEY[current])}</span>
       </header>
 
       <div className="flex-1 overflow-y-auto px-6 py-5">
@@ -98,8 +100,8 @@ export const OnboardingWizard: React.FC<{ onComplete: () => void }> = ({ onCompl
         {current === 'connect-ai' && <ConnectAiStep />}
         {current === 'connect-data' && (
           <ProviderConnectStep
-            title="Connect Financial Data"
-            subtitle="Longbridge powers quotes, klines, and company data across US, HK, CN, and SG markets."
+            title={t('onboarding.connectData.title')}
+            subtitle={t('onboarding.connectData.subtitle')}
             recommended
             entry={longbridge}
             onChanged={() => void refresh()}
@@ -107,8 +109,8 @@ export const OnboardingWizard: React.FC<{ onComplete: () => void }> = ({ onCompl
         )}
         {current === 'broker' && (
           <ProviderConnectStep
-            title="Broker Account (optional)"
-            subtitle="Connect your Longbridge brokerage account for portfolio, positions, and cash flow."
+            title={t('onboarding.broker.title')}
+            subtitle={t('onboarding.broker.subtitle')}
             entry={longbridge}
             onChanged={() => void refresh()}
           />
@@ -118,7 +120,7 @@ export const OnboardingWizard: React.FC<{ onComplete: () => void }> = ({ onCompl
 
       <footer className="flex items-center justify-between border-t mac-section-divider px-6 py-4">
         <Button variant="ghost" size="sm" onClick={finish} data-testid="onboarding-skip">
-          Skip for now
+          {t('onboarding.skip')}
         </Button>
         <div className="flex items-center gap-2">
           {index > 0 && (
@@ -128,7 +130,7 @@ export const OnboardingWizard: React.FC<{ onComplete: () => void }> = ({ onCompl
               onClick={() => setCurrent(prevStep(steps, current))}
               data-testid="onboarding-back"
             >
-              Back
+              {t('onboarding.back')}
             </Button>
           )}
           <Button
@@ -137,7 +139,7 @@ export const OnboardingWizard: React.FC<{ onComplete: () => void }> = ({ onCompl
             disabled={!canContinue}
             data-testid={isLast ? 'onboarding-finish' : 'onboarding-continue'}
           >
-            {isLast ? 'Start Folio' : 'Continue'}
+            {isLast ? t('onboarding.startFolio') : t('onboarding.continue')}
           </Button>
         </div>
       </footer>

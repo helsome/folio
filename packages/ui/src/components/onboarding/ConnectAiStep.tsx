@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAtom, useSetAtom } from 'jotai';
 import type { LlmTestResult, ProviderStatus } from '@finagent/core';
 import {
@@ -21,6 +22,7 @@ const Spinner: React.FC = () => (
 
 /** Connect AI (spec §29): provider + credential + model. Reuses the LLM atoms. */
 export const ConnectAiStep: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [state] = useAtom(llmStateAtom);
   const [providers] = useAtom(llmProvidersAtom);
@@ -80,15 +82,13 @@ export const ConnectAiStep: React.FC = () => {
   return (
     <div className="space-y-4">
       <div className="space-y-1">
-        <h2 className="text-[18px] font-semibold text-foreground">Connect AI</h2>
-        <p className="text-[13px] text-foreground/66">
-          Choose an LLM provider, add its credential, and pick a model.
-        </p>
+        <h2 className="text-[18px] font-semibold text-foreground">{t('onboarding.connectAi.title')}</h2>
+        <p className="text-[13px] text-foreground/66">{t('onboarding.connectAi.subtitle')}</p>
       </div>
 
       <div className="rounded-[10px] border mac-section-divider p-3">
         <div className="mb-2 flex items-center justify-between">
-          <span className="text-[12px] font-semibold text-foreground">Model</span>
+          <span className="text-[12px] font-semibold text-foreground">{t('onboarding.connectAi.model')}</span>
           {activeModel && (
             <span className="text-[11px] font-semibold text-[var(--mac-green)]">
               ✓ {activeModel.name || `${activeModel.provider}/${activeModel.id}`}
@@ -99,9 +99,9 @@ export const ConnectAiStep: React.FC = () => {
       </div>
 
       <div className="space-y-2">
-        <div className="text-[12px] font-semibold text-foreground">Providers & credentials</div>
+        <div className="text-[12px] font-semibold text-foreground">{t('onboarding.connectAi.providersCredentials')}</div>
         {providers.length === 0 ? (
-          <div className="text-[12px] text-foreground/48">Loading providers…</div>
+          <div className="text-[12px] text-foreground/48">{t('onboarding.connectAi.loadingProviders')}</div>
         ) : (
           providers.map((provider: ProviderStatus) => {
             const id = provider.provider;
@@ -114,7 +114,7 @@ export const ConnectAiStep: React.FC = () => {
                     {provider.displayName || id}
                   </span>
                   {configured(id) && (
-                    <span className="text-[11px] font-semibold text-[var(--mac-green)]">Configured</span>
+                    <span className="text-[11px] font-semibold text-[var(--mac-green)]">{t('onboarding.connectAi.configured')}</span>
                   )}
                 </div>
                 <div className="mt-2 flex items-center gap-2">
@@ -122,15 +122,15 @@ export const ConnectAiStep: React.FC = () => {
                     type="password"
                     value={inputs[id] ?? ''}
                     onChange={(event) => setInputs((i) => ({ ...i, [id]: event.target.value }))}
-                    placeholder="API key"
+                    placeholder={t('onboarding.connectAi.apiKey')}
                     autoComplete="off"
                     className="flex-1"
                   />
                   <Button size="sm" onClick={() => void saveCredential(id)} disabled={saving || !(inputs[id] ?? '').trim()}>
-                    {saving ? <Spinner /> : 'Save'}
+                    {saving ? <Spinner /> : t('onboarding.connectAi.save')}
                   </Button>
                   <Button size="sm" variant="outline" onClick={() => void testProvider(id)} disabled={saving}>
-                    Test
+                    {t('onboarding.connectAi.test')}
                   </Button>
                 </div>
                 {errors[id] && <div className="mt-1.5 text-[11px] text-destructive">{errors[id]}</div>}

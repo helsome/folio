@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { useTranslation } from 'react-i18next'
 import { useAtomValue, useSetAtom } from 'jotai'
 import type { AutomationRule } from '@finagent/core'
 import { useFinagentClient } from '../../client'
@@ -16,6 +17,7 @@ import { RuleCard } from './RuleCard'
  * reads/writes rules through the defensive `automation` client channel.
  */
 export const AutomationRulesView: React.FC = () => {
+  const { t } = useTranslation()
   const client = useFinagentClient()
   const { rules, runs, rulesLoading, error } = useAtomValue(automationStateAtom)
   const loadRules = useSetAtom(loadAutomationRulesAtom)
@@ -37,7 +39,7 @@ export const AutomationRulesView: React.FC = () => {
   }
 
   if (rulesLoading && rules.length === 0) {
-    return <div className="py-4 text-[13px] text-foreground/42">Loading…</div>
+    return <div className="py-4 text-[13px] text-foreground/42">{t('automation.loading')}</div>
   }
   if (error !== null && rules.length === 0) {
     return <div className="py-4 text-[13px] text-[var(--mac-red)]">{error}</div>
@@ -45,7 +47,7 @@ export const AutomationRulesView: React.FC = () => {
   if (rules.length === 0) {
     return (
       <div className="py-4 text-[13px] text-foreground/42">
-        No automation rules yet. The five default rules are seeded by the app on first run.
+        {t('automation.noRules')}
       </div>
     )
   }
@@ -63,8 +65,7 @@ export const AutomationRulesView: React.FC = () => {
         />
       ))}
       <div className="pt-1 text-[11px] text-foreground/38">
-        Automations run after market close (16:30 local, weekdays) and on earnings
-        events. Only material changes trigger deep research.
+        {t('automation.footer')}
       </div>
     </div>
   )

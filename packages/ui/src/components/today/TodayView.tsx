@@ -1,6 +1,8 @@
 import React, { useEffect, useState } from 'react'
 import { ArrowUpRight, BriefcaseBusiness, GitCompareArrows, Search, Sparkles } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
+import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next';
 import { useAtomValue, useSetAtom } from 'jotai'
 import type { AlertTriggerEvent, ApiResult, CalendarEvent, InvestmentThesis, ResearchReport } from '@finagent/core'
 import {
@@ -33,12 +35,12 @@ const EVENT_ROWS = 10
 const REPORT_ROWS = 5
 const DASH = '\u2014'
 
-function formatWhen(timestamp: number): string {
+function formatWhen(timestamp: number, t: TFunction): string {
   if (!Number.isFinite(timestamp) || timestamp <= 0) return DASH
   const diff = Date.now() - timestamp
-  if (diff < 60_000) return 'just now'
-  if (diff < 3_600_000) return `${Math.floor(diff / 60_000)}m ago`
-  if (diff < 86_400_000) return `${Math.floor(diff / 3_600_000)}h ago`
+  if (diff < 60_000) return t('today.justNow')
+  if (diff < 3_600_000) return t('today.minutesAgo', { count: Math.floor(diff / 60_000) })
+  if (diff < 86_400_000) return t('today.hoursAgo', { count: Math.floor(diff / 3_600_000) })
   return new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
 }
 
@@ -64,6 +66,7 @@ async function loadUpcomingEvents(client: FinagentClient, symbols: string[]): Pr
 }
 
 export const TodayView: React.FC = () => {
+  const { t } = useTranslation()
   const client = useFinagentClient()
   const watchlist = useAtomValue(watchlistAtom)
   const movers = useAtomValue(watchlistMoversAtom)
@@ -151,11 +154,11 @@ export const TodayView: React.FC = () => {
     if (portfolioView) return <PortfolioCard view={portfolioView} />
     const failure = portfolioCache.failure
     if (failure?.kind === 'not-connected' || failure?.kind === 'no-account-permission') {
-      return <SectionState kind="empty" message="Connect Longbridge to see your portfolio." />
+      return <SectionState kind="empty" message={t('today.connectPortfolio')} />
     }
     if (failure) return <SectionState kind="error" message={failure.message} />
     if (portfolioCache.error) return <SectionState kind="error" message={portfolioCache.error} />
-    return <SectionState kind="empty" message="No portfolio data yet." />
+    return <SectionState kind="empty" message={t('today.noPortfolioData')} />
   })()
 
   const moversContent = (() => {
@@ -164,7 +167,7 @@ export const TodayView: React.FC = () => {
       return (
         <SectionState
           kind="empty"
-          message={watchlist.length === 0 ? 'Add symbols to your watchlist to see movers.' : 'No movers yet.'}
+          message={watchlist.length === 0 ? t('today.addSymbolsForMovers') : t('today.noMovers')}
         />
       )
     }
@@ -195,7 +198,7 @@ export const TodayView: React.FC = () => {
 
   const alertsContent = (() => {
     if (alertState.loading && triggeredAlerts.length === 0) return <SectionState kind="loading" />
-    if (triggeredAlerts.length === 0) return <SectionState kind="empty" message="No triggered alerts." />
+    if (triggeredAlerts.length === 0) return <SectionState kind="empty" message={t('today.noTriggeredAlerts')} />
     return (
       <ul className="space-y-1">
         {triggeredAlerts.map((event: AlertTriggerEvent) => (
@@ -208,7 +211,7 @@ export const TodayView: React.FC = () => {
                 <div className="truncate text-[12px] text-foreground/54">{event.message}</div>
               )}
             </div>
-            <span className="shrink-0 text-[11px] text-foreground/38">{formatWhen(event.triggeredAt)}</span>
+            <span className="shrink-0 text-[11px] text-foreground/38">{formatWhen(event.triggeredAt, t)}</span>
           </li>
         ))}
       </ul>
@@ -223,7 +226,7 @@ export const TodayView: React.FC = () => {
       return (
         <SectionState
           kind="empty"
-          message="Upcoming events are not available yet (calendar channel not wired)."
+          message={t('today.eventsUnavailable')}
         />
       )
     }
@@ -254,7 +257,7 @@ export const TodayView: React.FC = () => {
 
   const researchContent = (() => {
     if (reportsLoading && recentReports.length === 0) return <SectionState kind="loading" />
-    if (recentReports.length === 0) return <SectionState kind="empty" message="No research reports yet." />
+    if (recentReports.length === 0) return <SectionState kind="empty" message={t('today.noResearchReports')} />
     return (
       <ul className="space-y-1">
         {recentReports.map((report) => (
@@ -265,7 +268,7 @@ export const TodayView: React.FC = () => {
               </div>
               <div className="truncate text-[12px] text-foreground/54">{report.summary}</div>
             </div>
-            <span className="shrink-0 text-[11px] text-foreground/38">{formatWhen(report.generatedAt)}</span>
+            <span className="shrink-0 text-[11px] text-foreground/38">{formatWhen(report.generatedAt, t)}</span>
           </li>
         ))}
       </ul>
@@ -276,7 +279,7 @@ export const TodayView: React.FC = () => {
 
   const thesesContent = (() => {
     if (thesesLoading && needsReview.length === 0) return <SectionState kind="loading" />
-    if (needsReview.length === 0) return <SectionState kind="empty" message="All theses are up to date." />
+    if (needsReview.length === 0) return <SectionState kind="empty" message={t('today.allThesesUpToDate')} />
     return (
       <ul className="space-y-1">
         {needsReview.map((thesis) => (
@@ -287,7 +290,7 @@ export const TodayView: React.FC = () => {
               </div>
               <div className="truncate text-[12px] text-foreground/54">{thesis.summary}</div>
             </div>
-            <span className="shrink-0 text-[11px] text-foreground/38">{formatWhen(thesis.updatedAt)}</span>
+            <span className="shrink-0 text-[11px] text-foreground/38">{formatWhen(thesis.updatedAt, t)}</span>
           </li>
         ))}
       </ul>
@@ -298,13 +301,13 @@ export const TodayView: React.FC = () => {
     <div className="h-full overflow-y-auto px-5 py-6" data-testid="today-view">
       <section data-testid="today-hero" className="mb-5 rounded-[12px] border border-border bg-surface p-5">
         <div className="flex flex-wrap items-start justify-between gap-5">
-          <div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.14em] text-accent"><Sparkles className="h-3.5 w-3.5" />Quiet workspace</div><h1 className="mt-2 text-[24px] font-semibold tracking-[-.02em] text-foreground">Good morning</h1><p className="mt-1 text-[13px] text-foreground/52">What do you want to understand about your portfolio today?</p></div>
-          <div className="flex min-w-[280px] flex-1 justify-end"><label className="relative block w-full max-w-md"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/34" /><input data-testid="today-search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={handleSearchKeyDown} placeholder="Search a security, e.g. NVDA.US" aria-label="Search a security" className="h-10 w-full rounded-[9px] border border-input bg-background pl-9 pr-3 text-[13px] text-foreground placeholder:text-foreground/38 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring" /></label></div>
+          <div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.14em] text-accent"><Sparkles className="h-3.5 w-3.5" />{t('today.quietWorkspace')}</div><h1 className="mt-2 text-[24px] font-semibold tracking-[-.02em] text-foreground">{t('today.greeting')}</h1><p className="mt-1 text-[13px] text-foreground/52">{t('today.heroSubtitle')}</p></div>
+          <div className="flex min-w-[280px] flex-1 justify-end"><label className="relative block w-full max-w-md"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/34" /><input data-testid="today-search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={handleSearchKeyDown} placeholder={t('today.searchPlaceholder')} aria-label={t('today.searchAria')} className="h-10 w-full rounded-[9px] border border-input bg-background pl-9 pr-3 text-[13px] text-foreground placeholder:text-foreground/38 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring" /></label></div>
         </div>
         <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
-          <QuickAction icon={Search} label="Deep Research" hint="Evidence-backed report" onClick={handleResearchStock} tone="blue" />
-          <QuickAction icon={BriefcaseBusiness} label="Review Portfolio" hint="See risk and attention" onClick={handleAnalyzePortfolio} tone="green" />
-          <QuickAction icon={GitCompareArrows} label="Compare Stocks" hint="Line up a decision" onClick={handleCompare} tone="violet" />
+          <QuickAction icon={Search} label={t('today.quickActionDeepResearch')} hint={t('today.quickActionDeepResearchHint')} onClick={handleResearchStock} tone="blue" />
+          <QuickAction icon={BriefcaseBusiness} label={t('today.quickActionReviewPortfolio')} hint={t('today.quickActionReviewPortfolioHint')} onClick={handleAnalyzePortfolio} tone="green" />
+          <QuickAction icon={GitCompareArrows} label={t('today.quickActionCompareStocks')} hint={t('today.quickActionCompareStocksHint')} onClick={handleCompare} tone="violet" />
         </div>
       </section>
 
@@ -316,15 +319,15 @@ export const TodayView: React.FC = () => {
       </div>
 
       <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <TodaySection title="Portfolio">{portfolioContent}</TodaySection>
-        <TodaySection title="Watchlist movers">{moversContent}</TodaySection>
-        <TodaySection title="Triggered alerts">{alertsContent}</TodaySection>
-        <TodaySection title="Upcoming events">{upcomingContent}</TodaySection>
-        <TodaySection title="Recent research">{researchContent}</TodaySection>
-        <TodaySection title="Theses needing review">{thesesContent}</TodaySection>
+        <TodaySection title={t('today.portfolio')}>{portfolioContent}</TodaySection>
+        <TodaySection title={t('today.watchlistMovers')}>{moversContent}</TodaySection>
+        <TodaySection title={t('today.triggeredAlerts')}>{alertsContent}</TodaySection>
+        <TodaySection title={t('today.upcomingEvents')}>{upcomingContent}</TodaySection>
+        <TodaySection title={t('today.recentResearch')}>{researchContent}</TodaySection>
+        <TodaySection title={t('today.thesesNeedingReview')}>{thesesContent}</TodaySection>
       </div>
 
-      <Dialog open={automationOpen} onClose={() => setAutomationOpen(false)} title="Automation">
+      <Dialog open={automationOpen} onClose={() => setAutomationOpen(false)} title={t('today.automation')}>
         <AutomationRulesView />
       </Dialog>
     </div>

@@ -20,6 +20,7 @@ export default defineConfig({
       '@finagent/ui': resolve(rootPkg, 'packages/ui/src'),
       '@finagent/core': resolve(rootPkg, 'packages/core/src'),
       '@finagent/shared': resolve(rootPkg, 'packages/shared/src'),
+      '@finagent/i18n': resolve(rootPkg, 'packages/i18n/src'),
       '@finagent/longbridge-tools': resolve(rootPkg, 'packages/longbridge-tools/src'),
       '@finagent/pi-extension': resolve(rootPkg, 'packages/pi-extension/src'),
     },

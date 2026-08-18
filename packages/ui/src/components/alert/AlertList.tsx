@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { useAtom, useSetAtom } from 'jotai';
 import type { AlertRuleDraft } from '../../atoms';
 import {
@@ -16,6 +17,7 @@ import { Button } from '../primitives/Button';
 import { Dialog } from '../primitives/Dialog';
 
 export const AlertList: React.FC = () => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [state] = useAtom(alertStateAtom);
   const loadAlerts = useSetAtom(loadAlertsAtom);
@@ -39,24 +41,26 @@ export const AlertList: React.FC = () => {
       <div className="p-3 border-b border-[oklch(var(--bg-primary))]">
         <div className="flex justify-between items-center">
           <div className="text-xs font-semibold text-[oklch(var(--text-secondary))] uppercase tracking-wide">
-            Alerts ({state.rules.length})
+            {t('alerts.count', { count: state.rules.length })}
           </div>
           <Button size="sm" onClick={() => setShowForm(true)}>
-            + New
+            {t('alerts.new')}
           </Button>
         </div>
       </div>
 
       <div className="flex-1 overflow-y-auto p-2 space-y-2">
         {state.loading && (
-          <div className="text-center py-8 text-[oklch(var(--text-secondary))]">Loading alerts...</div>
+          <div className="text-center py-8 text-[oklch(var(--text-secondary))]">
+            {t('alerts.loading')}
+          </div>
         )}
 
         {!state.loading && state.rules.length === 0 && state.events.length === 0 && (
           <div className="text-center py-8 text-[oklch(var(--text-secondary))]">
-            <p>No alerts configured</p>
+            <p>{t('alerts.noAlerts')}</p>
             <Button size="sm" variant="ghost" onClick={() => setShowForm(true)} className="mt-2">
-              Create your first alert
+              {t('alerts.createFirst')}
             </Button>
           </div>
         )}
@@ -72,7 +76,9 @@ export const AlertList: React.FC = () => {
 
         {state.events.length > 0 && (
           <>
-            <div className="text-xs text-[oklch(var(--text-secondary))] px-2 py-1 mt-4">Recent triggers</div>
+            <div className="text-xs text-[oklch(var(--text-secondary))] px-2 py-1 mt-4">
+              {t('alerts.recentTriggers')}
+            </div>
             {state.events.slice(0, 10).map((event) => (
               <div
                 key={event.id}

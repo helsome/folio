@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import type { ResearchReport, ResearchSection } from '@finagent/core';
 import { loadResearchDiff, researchDiffAtom } from '../../atoms/diffAtoms';
 import { loadResearchReport } from '../../atoms/researchAtoms';
@@ -14,12 +15,6 @@ const STANCE_TONE: Record<ResearchReport['stance'], string> = {
   neutral: 'text-text-muted',
 };
 
-const STANCE_LABEL: Record<ResearchReport['stance'], string> = {
-  bullish: 'POSITIVE',
-  bearish: 'NEGATIVE',
-  neutral: 'NEUTRAL',
-};
-
 const VERDICT_TONE: Record<ResearchSection['verdict'], string> = {
   positive: 'text-positive',
   negative: 'text-negative',
@@ -27,15 +22,9 @@ const VERDICT_TONE: Record<ResearchSection['verdict'], string> = {
   unavailable: 'text-warning',
 };
 
-const VERDICT_LABEL: Record<ResearchSection['verdict'], string> = {
-  positive: 'Positive',
-  negative: 'Negative',
-  neutral: 'Neutral',
-  unavailable: 'Unavailable',
-};
-
 /** Full Deep Research report: stance, sections, cases, catalysts, risks, evidence. */
 export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ report }) => {
+  const { t } = useTranslation();
   const confidence = Math.round(report.confidence * 100);
   const [diffState, setDiffState] = useAtom(researchDiffAtom);
   const [previousReport, setPreviousReport] = useState<ResearchReport | null>(null);
@@ -67,16 +56,16 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
         <div className="flex items-baseline justify-between">
           <div>
             <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-              {report.symbol} · Research Report
+              {t('research.reportFor', { symbol: report.symbol })}
             </div>
             <h3 className={`mt-1 text-[17px] font-bold ${STANCE_TONE[report.stance]}`}>
-              {STANCE_LABEL[report.stance]}
+              {t(`research.stance.${report.stance}`)}
             </h3>
           </div>
           <div className="flex items-start gap-3">
             <div className="text-right">
               <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
-                Confidence
+                {t('research.confidence')}
               </div>
               <div className="tnum mt-0.5 text-[16px] font-semibold text-foreground">
                 {confidence}%
@@ -88,9 +77,9 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
         <MarkdownContent content={report.summary} className="mt-3 text-[13px] text-foreground/85" />
         <div className="mt-2 text-[11px] text-text-muted">
           {report.runStatus === 'partial'
-            ? 'Partial run — unavailable data is marked explicitly.'
-            : 'All planned capabilities completed.'}{' '}
-          · {report.capabilityRuns.length} capability calls ·{' '}
+            ? t('research.partialRun')
+            : t('research.allCompleted')}{' '}
+          · {t('research.capabilityCalls', { count: report.capabilityRuns.length })} ·{' '}
           {new Date(report.generatedAt).toLocaleString()}
         </div>
       </div>
@@ -108,17 +97,17 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
         ))}
       </div>
 
-      <CaseColumn title="Bull Case" points={report.bullCase} />
-      <CaseColumn title="Bear Case" points={report.bearCase} />
-      <CaseColumn title="Catalysts" points={report.catalysts} />
-      <CaseColumn title="Risks" points={report.risks} />
+      <CaseColumn title={t('research.bullCase')} points={report.bullCase} />
+      <CaseColumn title={t('research.bearCase')} points={report.bearCase} />
+      <CaseColumn title={t('research.catalysts')} points={report.catalysts} />
+      <CaseColumn title={t('research.risks')} points={report.risks} />
 
       <div className="rounded-[10px] border mac-list-row p-4">
         <h4 className="text-[12px] font-semibold uppercase tracking-wide text-foreground">
-          Evidence
+          {t('research.evidence')}
         </h4>
         <p className="mt-1 text-[11.5px] text-text-muted">
-          Every claim below is linked to the exact capability run that produced the data.
+          {t('research.evidenceNote')}
         </p>
         <div className="mt-3 flex flex-col gap-2">
           {report.sections.map((section) => (
@@ -130,22 +119,30 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
   );
 };
 
-const SectionCard: React.FC<{ section: ResearchSection }> = ({ section }) => (
-  <div className="rounded-[10px] border mac-list-row p-3">
-    <div className="flex items-center justify-between">
-      <span className="text-[12.5px] font-semibold text-foreground">{section.title}</span>
-      <span className={`text-[11px] font-semibold ${VERDICT_TONE[section.verdict]}`}>
-        {VERDICT_LABEL[section.verdict]}
-      </span>
-    </div>
-    <MarkdownContent content={section.summary} className="mt-1.5 text-[12px] text-foreground/75" />
-    {section.evidence.length > 0 && (
-      <div className="mt-1.5 text-[10.5px] text-text-muted">
-        {section.evidence.length} evidence source{section.evidence.length === 1 ? '' : 's'}
+const SectionCard: React.FC<{ section: ResearchSection }> = ({ section }) => {
+  const { t } = useTranslation();
+  return (
+    <div className="rounded-[10px] border mac-list-row p-3">
+      <div className="flex items-center justify-between">
+        <span className="text-[12.5px] font-semibold text-foreground">{section.title}</span>
+        <span className={`text-[11px] font-semibold ${VERDICT_TONE[section.verdict]}`}>
+          {t(`research.verdict.${section.verdict}`)}
+        </span>
       </div>
-    )}
-  </div>
-);
+      <MarkdownContent content={section.summary} className="mt-1.5 text-[12px] text-foreground/75" />
+      {section.evidence.length > 0 && (
+        <div className="mt-1.5 text-[10.5px] text-text-muted">
+          {t(
+            section.evidence.length === 1
+              ? 'research.evidenceSourceCount'
+              : 'research.evidenceSourceCountOther',
+            { count: section.evidence.length }
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 const CaseColumn: React.FC<{ title: string; points: string[] }> = ({ title, points }) => {
   if (points.length === 0) return null;

@@ -1,4 +1,5 @@
 import React from 'react';
+import { useTranslation } from 'react-i18next';
 import type { SkillReadiness } from '@finagent/core';
 import { readinessVisual } from '../../atoms/skillReadinessAtoms';
 
@@ -13,6 +14,7 @@ interface SkillReadinessBadgeProps {
  * chips for each missing (required-but-unregistered) capability.
  */
 export const SkillReadinessBadge: React.FC<SkillReadinessBadgeProps> = ({ readiness }) => {
+  const { t } = useTranslation();
   const visual = readinessVisual(readiness?.status);
 
   return (
@@ -20,7 +22,7 @@ export const SkillReadinessBadge: React.FC<SkillReadinessBadgeProps> = ({ readin
       <span aria-hidden="true" style={{ color: visual.color }}>
         {visual.icon}
       </span>
-      <span className="text-foreground/56">{readiness ? readiness.summary : 'unavailable'}</span>
+      <span className="text-foreground/56">{readiness ? readiness.summary : t('settings.skills.unavailable')}</span>
       {readiness && readiness.missing.length > 0 && (
         <span className="flex flex-wrap gap-1">
           {readiness.missing.map((capability) => (

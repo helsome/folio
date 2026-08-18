@@ -13,6 +13,7 @@ import {
   useFinagentClient,
   type FinagentClient,
 } from '../../client';
+import { I18nProvider } from '../../i18n/I18nProvider';
 import type { LongBridgeStatus } from '@finagent/core';
 
 interface AppShellProps {
@@ -22,19 +23,21 @@ interface AppShellProps {
 export const AppShell: React.FC<AppShellProps> = ({ client = fallbackClient }) => {
   return (
     <FinagentClientProvider client={client}>
-      <ThemeProvider>
-        <TooltipProvider delayDuration={450} skipDelayDuration={100}>
-          <KernelBridge client={client} />
-          <div className="mac-app-window flex h-screen flex-col overflow-hidden bg-background text-foreground">
-            <TitleBar />
-            <LongBridgeBanner />
-            <WorkbenchShell />
-          </div>
-          <OnboardingOverlay />
-          <CommandPalette />
-          <Toaster closeButton richColors={false} />
-        </TooltipProvider>
-      </ThemeProvider>
+      <I18nProvider>
+        <ThemeProvider>
+          <TooltipProvider delayDuration={450} skipDelayDuration={100}>
+            <KernelBridge client={client} />
+            <div className="mac-app-window flex h-screen flex-col overflow-hidden bg-background text-foreground">
+              <TitleBar />
+              <LongBridgeBanner />
+              <WorkbenchShell />
+            </div>
+            <OnboardingOverlay />
+            <CommandPalette />
+            <Toaster closeButton richColors={false} />
+          </TooltipProvider>
+        </ThemeProvider>
+      </I18nProvider>
     </FinagentClientProvider>
   );
 };

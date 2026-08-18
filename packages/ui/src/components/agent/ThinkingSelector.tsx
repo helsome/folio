@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, Brain, LoaderCircle } from 'lucide-react';
 import { useAtom, useSetAtom } from 'jotai';
 import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '../ui/dropdown-menu';
@@ -9,6 +10,7 @@ interface ThinkingSelectorProps { disabled?: boolean; }
 const capitalize = (value: string): string => value ? value.charAt(0).toUpperCase() + value.slice(1) : value;
 
 export const ThinkingSelector: React.FC<ThinkingSelectorProps> = ({ disabled = false }) => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [state] = useAtom(llmStateAtom);
   const hydrate = useSetAtom(hydrateLlmAtom);
@@ -28,8 +30,8 @@ export const ThinkingSelector: React.FC<ThinkingSelectorProps> = ({ disabled = f
   return <div>
     <DropdownMenu open={open} onOpenChange={setOpen}>
       <DropdownMenuTrigger asChild>
-        <button type="button" disabled={effectiveDisabled} aria-label="Reasoning" title={levels.length === 0 ? 'Thinking levels unavailable in this runtime' : undefined} className="flex max-w-[145px] items-center gap-1.5 rounded-[8px] border border-border bg-surface px-2.5 py-1.5 text-[12px] font-medium text-foreground/72 transition-colors hover:bg-surface-hover disabled:pointer-events-none disabled:opacity-45">
-          {busy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin text-accent" /> : <Brain className="h-3.5 w-3.5 text-foreground/42" />}<span className="truncate">Reasoning: {capitalize(state.thinkingLevel)}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 text-foreground/42" />
+        <button type="button" disabled={effectiveDisabled} aria-label={t('agent.reasoning.label')} title={levels.length === 0 ? t('agent.reasoning.unavailable') : undefined} className="flex max-w-[145px] items-center gap-1.5 rounded-[8px] border border-border bg-surface px-2.5 py-1.5 text-[12px] font-medium text-foreground/72 transition-colors hover:bg-surface-hover disabled:pointer-events-none disabled:opacity-45">
+          {busy ? <LoaderCircle className="h-3.5 w-3.5 animate-spin text-accent" /> : <Brain className="h-3.5 w-3.5 text-foreground/42" />}<span className="truncate">{t('agent.reasoning.withLevel', { level: capitalize(state.thinkingLevel) })}</span><ChevronDown className="h-3.5 w-3.5 shrink-0 text-foreground/42" />
         </button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align="start" className="w-44">

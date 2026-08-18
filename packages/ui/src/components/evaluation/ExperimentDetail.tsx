@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react';
+import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ExternalLink } from 'lucide-react';
 import type {
   EvaluationExperiment,
@@ -29,6 +30,21 @@ const VERDICT_STYLE: Record<EvaluationResultRecord['verdict'], string> = {
   'not-applicable': 'text-foreground/50 border-border bg-surface-muted',
 };
 
+const VERDICT_KEY: Record<EvaluationResultRecord['verdict'], string> = {
+  pass: 'evaluation.verdicts.pass',
+  fail: 'evaluation.verdicts.fail',
+  partial: 'evaluation.verdicts.partial',
+  'not-applicable': 'evaluation.verdicts.notApplicable',
+};
+
+const STATUS_KEY: Record<string, string> = {
+  completed: 'evaluation.statusCompleted',
+  running: 'evaluation.statusRunning',
+  queued: 'evaluation.statusQueued',
+  failed: 'evaluation.statusFailed',
+  cancelled: 'evaluation.statusCancelled',
+};
+
 export const ExperimentDetail: React.FC<{
   experimentId: string;
   detail: EvaluationExperimentDetail | null;
@@ -36,6 +52,7 @@ export const ExperimentDetail: React.FC<{
   onBack: () => void;
   onOpenCase: (caseRef: CaseRef) => void;
 }> = ({ experimentId, detail, onLoadDetail, onBack, onOpenCase }) => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -59,11 +76,11 @@ export const ExperimentDetail: React.FC<{
       <div className="flex h-full flex-col" data-testid="experiment-detail">
         <div className="border-b mac-section-divider px-4 py-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="h-3.5 w-3.5" /> Back
+            <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
         </div>
         <div className="flex items-center gap-2 p-4 text-[12px] text-foreground/48">
-          <Spinner /> Loading experiment…
+          <Spinner /> {t('evaluation.loadingExperiment')}
         </div>
       </div>
     );
@@ -74,11 +91,11 @@ export const ExperimentDetail: React.FC<{
       <div className="flex h-full flex-col" data-testid="experiment-detail">
         <div className="border-b mac-section-divider px-4 py-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="h-3.5 w-3.5" /> Back
+            <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
         </div>
         <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
-          {error ?? `Experiment ${experimentId} could not be loaded.`}
+          {error ?? t('evaluation.experimentError', { id: experimentId })}
         </div>
       </div>
     );
@@ -90,14 +107,19 @@ export const ExperimentDetail: React.FC<{
   const resultByCase = new Map(results.map((result) => [result.caseId, result]));
 
   const metaRows: Array<{ label: string; value: string }> = [
-    { label: 'Dataset', value: `${experiment.datasetId} v${experiment.datasetVersion}` },
-    { label: 'Model', value: `${experiment.config.provider ?? '—'} / ${experiment.config.model ?? '—'}` },
-    { label: 'Judge', value: `${experiment.config.judgeProvider ?? '—'} / ${experiment.config.judgeModel ?? '—'}` },
-    { label: 'Thinking level', value: experiment.config.thinkingLevel ?? '—' },
-    { label: 'Started', value: formatDate(experiment.startedAt) },
-    { label: 'Completed', value: formatDate(experiment.completedAt) },
-    { label: 'Git sha', value: shortSha(experiment.metadata.gitSha) },
-    { label: 'Runs', value: summary ? `${summary.completedRuns} / ${summary.totalRuns} completed` : String(runs.length) },
+    { label: t('evaluation.datasetLabel'), value: `${experiment.datasetId} v${experiment.datasetVersion}` },
+    { label: t('evaluation.model'), value: `${experiment.config.provider ?? '—'} / ${experiment.config.model ?? '—'}` },
+    { label: t('evaluation.judgeLabel'), value: `${experiment.config.judgeProvider ?? '—'} / ${experiment.config.judgeModel ?? '—'}` },
+    { label: t('evaluation.thinkingLevel'), value: experiment.config.thinkingLevel ?? '—' },
+    { label: t('evaluation.started'), value: formatDate(experiment.startedAt) },
+    { label: t('evaluation.completed'), value: formatDate(experiment.completedAt) },
+    { label: t('evaluation.gitSha'), value: shortSha(experiment.metadata.gitSha) },
+    {
+      label: t('evaluation.runsMeta'),
+      value: summary
+        ? t('evaluation.completedRuns', { completed: summary.completedRuns, total: summary.totalRuns })
+        : String(runs.length),
+    },
   ];
 
   return (
@@ -105,7 +127,7 @@ export const ExperimentDetail: React.FC<{
       <header className="flex items-center justify-between border-b mac-section-divider px-4 py-3">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
-            <ArrowLeft className="h-3.5 w-3.5" /> Back
+            <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
           <div>
             <h2 className="text-[15px] font-semibold text-foreground">{experiment.name}</h2>
@@ -121,14 +143,14 @@ export const ExperimentDetail: React.FC<{
               : 'text-foreground/56 border-border bg-surface-muted'
           }`}
         >
-          {experiment.status}
+          {t(STATUS_KEY[experiment.status] ?? experiment.status)}
         </span>
       </header>
 
       <div className="min-h-0 flex-1 overflow-y-auto p-4">
         <div className="max-w-4xl space-y-4">
           <div className="mac-stock-tile rounded-[14px] p-5">
-            <h3 className="text-[13px] font-semibold text-foreground">Configuration</h3>
+            <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.configuration')}</h3>
             <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2.5 sm:grid-cols-3">
               {metaRows.map((row) => (
                 <div key={row.label} className="flex flex-col gap-0.5">
@@ -142,26 +164,26 @@ export const ExperimentDetail: React.FC<{
           {summary && (
             <div className="mac-stock-tile rounded-[14px] p-5">
               <div className="flex items-baseline justify-between">
-                <h3 className="text-[13px] font-semibold text-foreground">Metric scores</h3>
+                <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.metricScores')}</h3>
                 <span className="text-[12px] font-semibold tabular-nums text-foreground">
-                  Composite {scorePercent(summary.compositeScore)} · Pass rate {scorePercent(summary.passRate)}
+                  {t('evaluation.compositeAndPassRate', { score: scorePercent(summary.compositeScore), rate: scorePercent(summary.passRate) })}
                 </span>
               </div>
               <div className="mt-3 overflow-x-auto">
                 <table className="w-full border-collapse text-[12px]">
                   <thead>
                     <tr className="border-b mac-section-divider">
-                      <th className="py-2 pr-3 text-left font-medium text-foreground/54">Metric</th>
-                      <th className="px-3 py-2 text-left font-medium text-foreground/54">Kind</th>
-                      <th className="px-3 py-2 text-right font-medium text-foreground/54">Score</th>
-                      <th className="px-3 py-2 text-right font-medium text-foreground/54">Samples</th>
+                      <th className="py-2 pr-3 text-left font-medium text-foreground/54">{t('evaluation.metric')}</th>
+                      <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.kind')}</th>
+                      <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.score')}</th>
+                      <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.samples')}</th>
                     </tr>
                   </thead>
                   <tbody>
                     {summary.metricAggregates.map((aggregate) => (
                       <tr key={aggregate.metric} className="border-b mac-section-divider last:border-0">
-                        <td className="py-2 pr-3 text-foreground">{metricLabel(aggregate.metric)}</td>
-                        <td className="px-3 py-2 text-foreground/48">{metricKindLabel(aggregate.metric)}</td>
+                        <td className="py-2 pr-3 text-foreground">{t(metricLabel(aggregate.metric))}</td>
+                        <td className="px-3 py-2 text-foreground/48">{metricKindLabel(aggregate.metric) !== null ? t(metricKindLabel(aggregate.metric) as string) : '—'}</td>
                         <td className="px-3 py-2 text-right font-medium tabular-nums text-foreground">
                           {scorePercent(aggregate.score)}
                         </td>
@@ -178,7 +200,7 @@ export const ExperimentDetail: React.FC<{
 
           {summary && summary.failureModes.length > 0 && (
             <div className="mac-stock-tile rounded-[14px] p-5">
-              <h3 className="text-[13px] font-semibold text-foreground">Failure modes</h3>
+              <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.failureModes')}</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 {[...summary.failureModes]
                   .sort((a, b) => b.count - a.count)
@@ -187,7 +209,7 @@ export const ExperimentDetail: React.FC<{
                       key={entry.mode}
                       className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-[11px] text-foreground/70"
                     >
-                      {failureModeLabel(entry.mode)} <span className="font-semibold tabular-nums text-foreground">{entry.count}</span>
+                      {t(failureModeLabel(entry.mode))} <span className="font-semibold tabular-nums text-foreground">{entry.count}</span>
                       <span className="text-foreground/36">/ {entry.sampleCount}</span>
                     </span>
                   ))}
@@ -196,17 +218,17 @@ export const ExperimentDetail: React.FC<{
           )}
 
           <div className="mac-stock-tile rounded-[14px] p-5">
-            <h3 className="text-[13px] font-semibold text-foreground">Runs</h3>
+            <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.runsSection')}</h3>
             <div className="mt-3 overflow-x-auto">
               <table className="w-full border-collapse text-[12px]" data-testid="runs-table">
                 <thead>
                   <tr className="border-b mac-section-divider">
-                    <th className="py-2 pr-3 text-left font-medium text-foreground/54">Case</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground/54">Status</th>
-                    <th className="px-3 py-2 text-right font-medium text-foreground/54">Verdict</th>
-                    <th className="px-3 py-2 text-right font-medium text-foreground/54">Latency</th>
-                    <th className="px-3 py-2 text-right font-medium text-foreground/54">Tools</th>
-                    <th className="px-3 py-2 text-left font-medium text-foreground/54">Trace</th>
+                    <th className="py-2 pr-3 text-left font-medium text-foreground/54">{t('evaluation.caseColumn')}</th>
+                    <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.status')}</th>
+                    <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.verdict')}</th>
+                    <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.latencyColumn')}</th>
+                    <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.tools')}</th>
+                    <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.trace')}</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -223,11 +245,11 @@ export const ExperimentDetail: React.FC<{
                             {run.caseId}
                           </button>
                         </td>
-                        <td className="px-3 py-2 text-foreground/64">{run.status}</td>
+                        <td className="px-3 py-2 text-foreground/64">{t(STATUS_KEY[run.status] ?? run.status)}</td>
                         <td className="px-3 py-2 text-right">
                           {result && (
                             <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${VERDICT_STYLE[result.verdict]}`}>
-                              {result.verdict}
+                              {t(VERDICT_KEY[result.verdict])}
                             </span>
                           )}
                           {!result && <span className="text-foreground/30">—</span>}
@@ -243,7 +265,7 @@ export const ExperimentDetail: React.FC<{
                               onClick={() => openTrace(run.traceRef!.url!)}
                               className="inline-flex items-center gap-1 text-accent hover:underline"
                             >
-                              <ExternalLink className="h-3 w-3" /> LangSmith
+                              <ExternalLink className="h-3 w-3" /> {t('evaluation.langsmith')}
                             </button>
                           ) : (
                             <span className="text-foreground/30">—</span>

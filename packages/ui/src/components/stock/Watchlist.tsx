@@ -1,6 +1,7 @@
 import React, { useEffect, useReducer, useRef } from 'react';
 import { CirclePlus, X } from 'lucide-react';
 import { useAtomValue, useSetAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import {
   watchlistAtom,
   quoteCacheAtomFamily,
@@ -24,6 +25,7 @@ const formatPercent = (value: number): string =>
   `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 
 export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = true }) => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const watchlist = useAtomValue(watchlistAtom);
   const addSymbol = useSetAtom(addToWatchlistAtom);
@@ -96,7 +98,7 @@ export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = tru
         {showHeader && (
           <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 px-0.5">
             <span className="text-[11px] font-semibold uppercase text-foreground/42">
-              Watchlist
+              {t('navigation.watchlist')}
             </span>
             <DataFreshness
               providerName="Longbridge"
@@ -119,7 +121,7 @@ export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = tru
             error={error}
             className="h-8 flex-1 text-[12px]"
           />
-          <Button size="icon" onClick={handleAddSymbol} aria-label="Add symbol">
+          <Button size="icon" onClick={handleAddSymbol} aria-label={t('navigation.watchlistAddSymbol')}>
             <CirclePlus className="h-4 w-4" strokeWidth={1.8} />
           </Button>
         </div>
@@ -141,8 +143,8 @@ export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = tru
         ))}
         {watchlist.length === 0 && (
           <div className="py-8 text-center text-[13px] text-foreground/44">
-            <p>No symbols in watchlist</p>
-            <p className="mt-1">Add symbols above</p>
+            <p>{t('navigation.watchlistEmpty')}</p>
+            <p className="mt-1">{t('navigation.watchlistAddSymbols')}</p>
           </div>
         )}
       </div>
@@ -165,6 +167,7 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({
   onSelect,
   onRemove,
 }) => {
+  const { t } = useTranslation();
   const client = useFinagentClient();
   const cache = useAtomValue(quoteCacheAtomFamily(symbol));
   const fetchQuote = useSetAtom(fetchQuoteAtom);
@@ -234,7 +237,7 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({
           onRemove();
         }}
         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-foreground/38 opacity-0 transition-smooth hover:bg-foreground/8 hover:text-[var(--negative)] group-hover:opacity-100"
-        aria-label={`Remove ${symbol}`}
+        aria-label={t('navigation.watchlistRemoveSymbol', { symbol })}
       >
         <X className="h-3 w-3" strokeWidth={1.8} />
       </button>

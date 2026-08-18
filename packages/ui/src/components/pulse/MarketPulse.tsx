@@ -1,5 +1,6 @@
 import React, { useEffect } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
+import { useTranslation } from 'react-i18next'
 import type { ScreeningCandidate } from '@finagent/core'
 import { loadPulseAtom, pulseCacheAtom } from '../../atoms/pulseAtoms'
 import { useFinagentClient } from '../../client'
@@ -41,14 +42,14 @@ function formatExposure(value: number | undefined): string {
   return `${value.toFixed(1)}%`
 }
 
-function impactLabel(impact: PulseImpactSign): string {
+function impactLabel(impact: PulseImpactSign, t: (key: string) => string): string {
   switch (impact) {
     case 'positive':
-      return 'Positive'
+      return t('today.impact.positive')
     case 'negative':
-      return 'Negative'
+      return t('today.impact.negative')
     default:
-      return 'Neutral'
+      return t('today.impact.neutral')
   }
 }
 
@@ -107,11 +108,11 @@ const MoverRow: React.FC<{ mover: ScreeningCandidate }> = ({ mover }) => {
   )
 }
 
-const MoverColumn: React.FC<{ title: string; movers: ScreeningCandidate[] }> = ({ title, movers }) => (
+const MoverColumn: React.FC<{ title: string; empty: string; movers: ScreeningCandidate[] }> = ({ title, empty, movers }) => (
   <div>
     <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">{title}</h4>
     {movers.length === 0 ? (
-      <p className="py-1 text-[13px] text-foreground/42">No movers</p>
+      <p className="py-1 text-[13px] text-foreground/42">{empty}</p>
     ) : (
       <ul className="space-y-1">
         {movers.map((mover) => (
@@ -122,24 +123,28 @@ const MoverColumn: React.FC<{ title: string; movers: ScreeningCandidate[] }> = (
   </div>
 )
 
-const ImpactRow: React.FC<{ item: PulsePersonalImpactItem }> = ({ item }) => (
+const ImpactRow: React.FC<{ item: PulsePersonalImpactItem }> = ({ item }) => {
+  const { t } = useTranslation()
+  return (
   <li className="flex items-center justify-between gap-2 text-[13px]" data-testid="pulse-impact-row">
     <span className="truncate font-medium text-foreground/80">{item.symbol}</span>
     <span className="flex items-center gap-3 tabular-nums">
-      <span className="text-foreground/64" title="Watchlist weight share">
+      <span className="text-foreground/64" title="{t('today.watchlistWeightShare')}">
         {formatExposure(item.watchlistExposurePercent)}
       </span>
       {item.portfolioExposurePercent !== undefined && (
-        <span className="text-foreground/64" title="Portfolio exposure">
+        <span className="text-foreground/64" title="{t('today.portfolioExposure')}">
           {formatExposure(item.portfolioExposurePercent)}
         </span>
       )}
-      <span className={`text-[12px] ${impactColor(item.impact)}`}>{impactLabel(item.impact)}</span>
+      <span className={`text-[12px] ${impactColor(item.impact)}`}>{impactLabel(item.impact, t)}</span>
     </span>
   </li>
-)
+  )
+}
 
 export const MarketPulse: React.FC = () => {
+  const { t } = useTranslation()
   const client = useFinagentClient()
   const { snapshot, loading, error } = useAtomValue(pulseCacheAtom)
   const loadPulse = useSetAtom(loadPulseAtom)
@@ -153,7 +158,7 @@ export const MarketPulse: React.FC = () => {
   const temperature = snapshot?.temperature ?? null
 
   return (
-    <TodaySection title="Market Pulse">
+    <TodaySection title={t('today.marketPulse')}>
       {loading ? (
         <SectionState kind="loading" />
       ) : error && !snapshot ? (
@@ -164,14 +169,14 @@ export const MarketPulse: React.FC = () => {
             {snapshot && snapshot.indices.length > 0 ? (
               snapshot.indices.map((index) => <IndexLine key={index.symbol} index={index} />)
             ) : (
-              <span className="text-[13px] text-foreground/42">Index quotes unavailable</span>
+              <span className="text-[13px] text-foreground/42">{t('today.indexQuotesUnavailable')}</span>
             )}
           </div>
 
           {snapshot && statuses.length > 0 ? (
             <StatusLine statuses={statuses} />
           ) : (
-            <p className="text-[13px] text-foreground/42">Market status unavailable</p>
+            <p className="text-[13px] text-foreground/42">{t('today.marketStatusUnavailable')}</p>
           )}
 
           {snapshot && temperature ? (
@@ -181,17 +186,17 @@ export const MarketPulse: React.FC = () => {
               market={temperature.market}
             />
           ) : (
-            <p className="text-[13px] text-foreground/42">Market temperature unavailable</p>
+            <p className="text-[13px] text-foreground/42">{t('today.marketTemperatureUnavailable')}</p>
           )}
 
           <div className="grid grid-cols-2 gap-3" data-testid="pulse-movers">
-            <MoverColumn title="Top gainers" movers={movers.gainers} />
-            <MoverColumn title="Top losers" movers={movers.losers} />
+            <MoverColumn title={t('today.topGainers')} empty={t('today.noColumnMovers')} movers={movers.gainers} />
+            <MoverColumn title={t('today.topLosers')} empty={t('today.noColumnMovers')} movers={movers.losers} />
           </div>
 
           <div data-testid="pulse-personal-impact">
             <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
-              What matters to me
+              {t('today.whatMattersToMe')}
             </h4>
             {snapshot?.personalImpact && snapshot.personalImpact.items.length > 0 ? (
               <ul className="space-y-1">
@@ -200,13 +205,13 @@ export const MarketPulse: React.FC = () => {
                 ))}
               </ul>
             ) : (
-              <p className="py-1 text-[13px] text-foreground/42">No movers in your watchlist</p>
+              <p className="py-1 text-[13px] text-foreground/42">{t('today.noWatchlistMovers')}</p>
             )}
           </div>
 
           {snapshot && snapshot.failures.length > 0 && (
             <p className="pt-1 text-[12px] text-foreground/42" data-testid="pulse-failures-note">
-              Some market data unavailable
+              {t('today.someDataUnavailable')}
             </p>
           )}
         </div>

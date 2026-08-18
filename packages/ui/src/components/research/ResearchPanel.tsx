@@ -1,5 +1,6 @@
 import React, { useEffect, useState } from 'react';
 import { useAtom, useAtomValue } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import type { ResearchRunSummary, ResearchReport, StrategyId } from '@finagent/core';
 import { activeSymbolAtom } from '../../atoms';
 import { pendingResearchStrategyAtom } from '../../atoms/discoverAtoms';
@@ -22,6 +23,7 @@ const POLL_MS = 900;
 
 /** Deep Research entry: run history for the focused symbol + start/cancel + report. */
 export const ResearchPanel: React.FC = () => {
+  const { t } = useTranslation();
   const symbol = useAtomValue(activeSymbolAtom);
   const [runs, setRuns] = useAtom(researchRunsAtom);
   const [reports, setReports] = useState<ResearchReport[]>([]);
@@ -95,7 +97,7 @@ export const ResearchPanel: React.FC = () => {
       if (started) {
         setRuns((current) => [started, ...current.filter((run) => run.id !== started.id)]);
       } else {
-        setError('Deep Research is not available yet.');
+        setError(t('research.notAvailable'));
       }
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : String(caught));
@@ -115,11 +117,11 @@ export const ResearchPanel: React.FC = () => {
     <div className="flex h-full flex-col" data-testid="research-panel">
       <div className="flex items-center justify-between border-b mac-section-divider px-4 py-3">
         <div>
-          <h2 className="text-[15px] font-semibold text-foreground">Deep Research</h2>
+          <h2 className="text-[15px] font-semibold text-foreground">{t('research.deepResearch')}</h2>
           <p className="mt-0.5 text-[11.5px] text-text-muted">
             {symbol
-              ? `Structured research for ${symbol} — facts from the capability layer, synthesis by the agent.`
-              : 'Open a symbol from the watchlist to start research.'}
+              ? t('research.subtitleFor', { symbol })
+              : t('research.subtitleEmpty')}
           </p>
         </div>
         {symbol && (
@@ -129,7 +131,7 @@ export const ResearchPanel: React.FC = () => {
                 onClick={() => void handleCancel()}
                 className="mac-secondary-button rounded-[8px] px-3 py-1.5 text-[12px] font-semibold"
               >
-                Stop
+                {t('research.stop')}
               </button>
             )}
             <button
@@ -137,7 +139,7 @@ export const ResearchPanel: React.FC = () => {
               disabled={!symbol || loading || Boolean(activeRun)}
               className="mac-primary-button rounded-[8px] px-3 py-1.5 text-[12px] font-semibold disabled:opacity-45"
             >
-              {loading ? 'Starting…' : 'Deep Research'}
+              {loading ? t('research.starting') : t('research.deepResearch')}
             </button>
           </div>
         )}
@@ -177,6 +179,7 @@ export const ResearchPanel: React.FC = () => {
 };
 
 const RunProgressCard: React.FC<{ run: ResearchRunSummary }> = ({ run }) => {
+  const { t } = useTranslation();
   const planned = run.plannedCapabilities.length;
   const done = run.completedCapabilities.length;
   const failed = run.failedCapabilities.length;
@@ -184,11 +187,11 @@ const RunProgressCard: React.FC<{ run: ResearchRunSummary }> = ({ run }) => {
     <div className="mb-3 rounded-[10px] border mac-list-row p-3">
       <div className="flex items-center justify-between">
         <span className="text-[12.5px] font-semibold text-foreground">
-          {run.status === 'fetching' ? 'Fetching market data…' : 'Synthesizing report…'}
+          {run.status === 'fetching' ? t('research.fetching') : t('research.synthesizing')}
         </span>
         <span className="tnum text-[11px] text-text-muted">
-          {done}/{planned} capabilities
-          {failed > 0 ? ` (${failed} failed)` : ''}
+          {t('research.capabilitiesCount', { done, planned })}
+          {failed > 0 ? ` ${t('research.failedCount', { failed })}` : ''}
         </span>
       </div>
       <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-foreground/10">
@@ -225,6 +228,7 @@ const RunHistory: React.FC<{
   runs: ResearchRunSummary[];
   onSelect: (reportId: string) => void;
 }> = ({ runs, onSelect }) => {
+  const { t } = useTranslation();
   if (runs.length === 0) return <EmptyState />;
   return (
     <div className="flex flex-col gap-1.5">
@@ -238,7 +242,7 @@ const RunHistory: React.FC<{
         >
           <span className="text-[12.5px] font-semibold text-foreground">{run.symbol}</span>
           <span className="tnum text-[11px] text-text-muted">
-            {run.status}
+            {t(`research.runStatus.${run.status}`)}
             {run.finishedAt ? ` · ${new Date(run.finishedAt).toLocaleTimeString()}` : ''}
           </span>
         </button>
@@ -247,8 +251,11 @@ const RunHistory: React.FC<{
   );
 };
 
-const EmptyState: React.FC = () => (
-  <div className="py-10 text-center text-[12px] text-text-muted">
-    No research yet. Pick a symbol and start Deep Research.
-  </div>
-);
+const EmptyState: React.FC = () => {
+  const { t } = useTranslation();
+  return (
+    <div className="py-10 text-center text-[12px] text-text-muted">
+      {t('research.empty')}
+    </div>
+  );
+};
