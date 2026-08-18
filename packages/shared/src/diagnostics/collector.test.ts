@@ -43,6 +43,15 @@ function baseInput(): DiagnosticsInput {
     skillsLoadedCount: 18,
     capabilities: createCapabilityRegistry([makeCap('market.quote'), makeCap('market.kline')]),
     resources: { dev: true, root: '/repo' },
+    evaluation: {
+      backend: 'none',
+      tracingEnabled: false,
+      privacyLevel: 'standard',
+      project: 'folio-agent',
+      connected: null,
+      traceStatus: 'disabled',
+      datasets: ['folio-agent-v1'],
+    },
     errors: [],
   };
 }

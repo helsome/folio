@@ -25,6 +25,15 @@ function makeBundle(): DiagnosticsBundle {
     skills: { loaded: 3 },
     capabilities: { available: ['market.quote'] },
     resources: { dev: true, root: '/repo' },
+    evaluation: {
+      backend: 'none',
+      tracingEnabled: false,
+      privacyLevel: 'standard',
+      project: 'folio-agent',
+      connected: null,
+      traceStatus: 'disabled',
+      datasets: ['folio-agent-v1'],
+    },
     errors: [
       // A secret smuggled into an error message must be stripped on export.
       { at: 1, source: 'main', message: 'request failed with key sk-abcdef1234567890', stack: null },

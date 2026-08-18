@@ -130,6 +130,7 @@ import {
   EvaluationRedactor,
   PiRuntimeAdapter,
   sanitizeSettings,
+  embeddedDatasets,
   isRecord,
   type EvaluationBackend,
   type EvaluationBackendKind,
@@ -1213,8 +1214,40 @@ export class AgentKernelHost {
       skillsLoadedCount: this.skillHub.listSkills().length,
       capabilities: this.registry,
       resources: { dev: !app.isPackaged, root: getRuntimeRoot() },
+      evaluation: {
+        backend: this.evaluationBackend.kind,
+        tracingEnabled: this.evaluationSettings.tracingEnabled,
+        privacyLevel: this.evaluationSettings.privacyLevel,
+        project: this.evaluationSettings.langsmithProject,
+        // Connection liveness is probed on demand (testEvaluationConnection);
+        // the bundle only records configured/disabled state (spec §86).
+        connected: null,
+        traceStatus: this.evaluationSettings.tracingEnabled ? 'configured' : 'disabled',
+        datasets: this.evaluationStore
+          ? await this.listEvaluationDatasetIds()
+          : [],
+      },
       errors: mainErrorLog.recent(20),
     });
+  }
+
+  /** Embedded + user dataset ids for diagnostics (spec §86). */
+  private async listEvaluationDatasetIds(): Promise<string[]> {
+    const ids: string[] = [];
+    for (const entry of embeddedDatasets) {
+      try {
+        ids.push(entry.load().id);
+      } catch {
+        // A broken embedded dataset must not break diagnostics.
+      }
+    }
+    try {
+      const user = await this.evaluationStore.listDatasets();
+      ids.push(...user.map((dataset) => dataset.id));
+    } catch {
+      // Store failures are already logged elsewhere.
+    }
+    return [...new Set(ids)];
   }
 
   // -------------------------------------------------------------------------

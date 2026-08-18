@@ -51,6 +51,16 @@ export interface DiagnosticsInput {
     dev: boolean;
     root: string;
   };
+  /** V7 evaluation/observability status (spec §86) — never a secret. */
+  evaluation: {
+    backend: 'langsmith' | 'local' | 'none' | null;
+    tracingEnabled: boolean;
+    privacyLevel: string | null;
+    project: string | null;
+    connected: boolean | null;
+    traceStatus: string | null;
+    datasets: string[];
+  };
   errors: ErrorLogEntry[];
 }
 
@@ -92,6 +102,16 @@ export interface DiagnosticsBundle {
   resources: {
     dev: boolean;
     root: string;
+  };
+  /** V7 evaluation/observability status (spec §86) — state only, never secrets. */
+  evaluation: {
+    backend: 'langsmith' | 'local' | 'none' | null;
+    tracingEnabled: boolean;
+    privacyLevel: string | null;
+    project: string | null;
+    connected: boolean | null;
+    traceStatus: string | null;
+    datasets: string[];
   };
   errors: ErrorLogEntry[];
   redaction: {

@@ -73,6 +73,15 @@ export async function collectDiagnostics(
     capabilities: {
       available: input.capabilities ? input.capabilities.list().map((cap) => cap.id) : [],
     },
+    evaluation: {
+      backend: input.evaluation.backend,
+      tracingEnabled: input.evaluation.tracingEnabled,
+      privacyLevel: input.evaluation.privacyLevel,
+      project: input.evaluation.project,
+      connected: input.evaluation.connected,
+      traceStatus: input.evaluation.traceStatus,
+      datasets: [...input.evaluation.datasets],
+    },
     resources: {
       dev: input.resources.dev,
       root: input.resources.root,
