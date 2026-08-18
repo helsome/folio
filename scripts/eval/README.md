@@ -46,3 +46,62 @@ Without an LLM credential (`ANTHROPIC_API_KEY` or any key listed in
 `FINAGENT_LLM_ENV_KEYS`) the script prints `skipped: no LLM credential` and
 exits 0; without `LANGSMITH_PI_API_KEY` the prompt still runs but the LangSmith
 query step is skipped.
+
+## `run.ts` — experiment runner CLI (spec §70-71, §79)
+
+Runs the benchmark experiment through the `ExperimentService` and prints a
+per-case table, summary aggregates and (when gated) the regression gate.
+
+```sh
+bun run eval:smoke                # regression+golden subset (~15 cases), fixture mode
+bun run eval:full                 # entire dataset, fixture mode
+bun run eval:smoke -- --mode live --model anthropic/claude-sonnet-4-5
+bun run eval:full  -- --baseline <id>
+bun run eval:smoke -- --save-baseline release-candidate --out ./eval.json
+```
+
+Flags:
+
+| Flag | Meaning |
+|---|---|
+| `--dataset <id>` | Embedded dataset id (default `folio-agent-v1`) |
+| `--mode fixture\|live` | Runtime mode (default `fixture`) |
+| `--model <id>` | Agent model under test (e.g. `anthropic/claude-sonnet-4-5`); a `provider/model` value implies the provider |
+| `--provider <id>` | Agent provider override |
+| `--strategy <id>` | Strategy/skill id loaded into the runtime |
+| `--judge-provider <id>` | Judge provider (`anthropic` \| `openai-compatible`) |
+| `--judge-model <id>` | Judge model, separate from the agent under test |
+| `--judge-api-key <key>` | Judge API key |
+| `--max-cases <n>` | Run only the first n cases (deterministic) |
+| `--timeout-ms <n>` | Per-run wall-clock budget (default 120000) |
+| `--baseline <id>` | Gate the run against a stored baseline |
+| `--save-baseline <name>` | Store the run's aggregates as a new baseline |
+| `--out <path>` | Write the full JSON artifact to `<path>` |
+| `--store <path>` | Eval store dir (default `~/.finagent/eval`) |
+
+**Modes.** `fixture` uses the deterministic local runtime (`LocalRuntimeAdapter`)
+with canned per-symbol market data — no LLM credentials, no network, CI-safe
+(spec §106). `live` uses the Pi runtime with real providers; credentials come
+from env (`ANTHROPIC_API_KEY` or `FINAGENT_PROVIDER_OVERRIDES`).
+
+**Judges.** Configure the judge separately with
+`FINAGENT_JUDGE_PROVIDER` / `FINAGENT_JUDGE_MODEL` / `FINAGENT_JUDGE_API_KEY`
+(or the `--judge-*` flags). Without a judge the run uses deterministic
+evaluators only (a notice is printed).
+
+**Exit codes.** `0` = gate passed (or no baseline configured) with no infra
+errors; `1` = gate regression, experiment cancelled, or a runtime error.
+
+**Cost guardrails (spec §79).** Use `--max-cases` for a small first pass and
+`--timeout-ms` to bound each run before spending on a full live run.
+
+### Env vars
+
+| Variable | Meaning |
+|---|---|
+| `FINAGENT_JUDGE_PROVIDER` / `FINAGENT_JUDGE_MODEL` / `FINAGENT_JUDGE_API_KEY` | Judge credentials (CLI); see also `--judge-*` flags |
+| `TRACE_TO_LANGSMITH` | `true`/`1` enables LangSmith tracing (live mode) |
+| `LANGSMITH_PI_API_KEY` | LangSmith API key (falls back to `LANGSMITH_API_KEY`) |
+| `LANGSMITH_PI_PROJECT` / `LANGSMITH_PI_ENDPOINT` | LangSmith project / endpoint overrides |
+| `ANTHROPIC_API_KEY` / `FINAGENT_PROVIDER_OVERRIDES` | Live agent provider credentials |
+| `FINAGENT_PI_VERSION` | Recorded as `metadata.piVersion` |

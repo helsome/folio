@@ -16,6 +16,8 @@
     "lint": "bun run --filter './**' lint",
     "test:unit": "bun test --isolate",
     "test:integration": "bun test --isolate && bun run typecheck",
+    "eval:smoke": "bun scripts/eval/run.ts --smoke",
+    "eval:full": "bun scripts/eval/run.ts",
     "test:ui": "bun test packages/ui",
     "test:e2e": "cd apps/electron && bun run test:e2e",
     "test:e2e:visible": "cd apps/electron && FINAGENT_E2E_VISIBLE=1 bun run test:e2e",
