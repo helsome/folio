@@ -45,6 +45,7 @@ export const NAVIGATION_COMMANDS: Array<{ section: NavSection; label: string }> 
   { section: 'compare', label: 'Compare' },
   { section: 'alerts', label: 'Alerts' },
   { section: 'skills', label: 'Skills' },
+  { section: 'evaluation', label: 'Evaluation' },
   { section: 'settings', label: 'Settings' },
 ]
 

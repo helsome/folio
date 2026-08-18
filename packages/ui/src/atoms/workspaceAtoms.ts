@@ -35,14 +35,24 @@ export type NavSection =
   // Folio V4 "Today" dashboard (spec §31–32) — mounted by the Lead.
   | 'today'
   // Folio V5 "Discover" (spec §4–5) — mounted by the Lead.
-  | 'discover';
+  | 'discover'
+  // Folio V7 Evaluation Center (spec §61–68) — mounted by the Evaluation UI agent.
+  | 'evaluation';
 
 export const navSectionAtom = atom<NavSection>('sessions');
 
 /** Whether the Agent Panel is visible (collapse/expand in the shell). */
 export const agentPanelVisibleAtom = atom<boolean>(true);
 /** Active tab within the Settings section. */
-export type SettingsTab = 'general' | 'llm' | 'connections' | 'skills' | 'diagnostics' | 'performance';
+export type SettingsTab =
+  | 'general'
+  | 'llm'
+  | 'connections'
+  | 'skills'
+  | 'diagnostics'
+  | 'performance'
+  // Folio V7 agent evaluation settings (spec §61–63).
+  | 'evaluation';
 
 /** Which Settings tab is selected (drives SettingsView and the ErrorBoundary fallback). */
 export const settingsTabAtom = atom<SettingsTab>('general');

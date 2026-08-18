@@ -16,6 +16,7 @@ import { ThesisPanel } from '../thesis/ThesisPanel';
 import { CompareWorkspace } from '../compare/CompareWorkspace';
 import { TodayView } from '../today/TodayView';
 import { DiscoverView } from '../discover/DiscoverView';
+import { EvaluationCenter } from '../evaluation/EvaluationCenter';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 const WORKSPACE_TABS: { value: WorkspaceView; label: string }[] = [
   { value: 'overview', label: 'Overview' },
@@ -57,6 +58,9 @@ export const FinanceWorkspace: React.FC = () => {
       break;
     case 'compare':
       content = <CompareWorkspace />;
+      break;
+    case 'evaluation':
+      content = <EvaluationCenter />;
       break;
     case 'sessions':
     case 'watchlist':

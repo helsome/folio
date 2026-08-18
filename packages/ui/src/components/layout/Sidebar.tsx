@@ -10,6 +10,7 @@ import {
   CirclePlus,
   Compass,
   FileText,
+  FlaskConical,
   Gauge,
   GitCompareArrows,
   LayoutDashboard,
@@ -47,6 +48,9 @@ const RAIL_ITEMS: Array<{ key: NavSection; label: string; icon: IconType }> = [
   { key: 'research', label: 'Research', icon: BookOpen },
   { key: 'thesis', label: 'Thesis', icon: FileText },
   { key: 'skills', label: 'Skills', icon: Zap },
+  // Folio V7 Evaluation Center (spec §61–68) — internal/advanced, after the
+  // skill management entry so it reads as an agent-engineering tool.
+  { key: 'evaluation', label: 'Evaluation', icon: FlaskConical },
 ];
 
 const IconRailButton: React.FC<{
@@ -160,7 +164,7 @@ export const Sidebar: React.FC = () => {
         {navSection === 'settings' && (
           <div className="border-b border-border px-2 py-3">
             <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/42">Settings</p>
-            {['general', 'llm', 'connections', 'skills', 'performance', 'diagnostics'].map((tab) => <SettingsNavButton key={tab} tab={tab} />)}
+            {['general', 'llm', 'connections', 'skills', 'performance', 'diagnostics', 'evaluation'].map((tab) => <SettingsNavButton key={tab} tab={tab} />)}
           </div>
         )}
 

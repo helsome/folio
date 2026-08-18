@@ -7,6 +7,7 @@ import { ModelsTab } from './ModelsTab';
 import { ConnectionsCenter } from './ConnectionsCenter';
 import { SkillsView } from './SkillsView';
 import { DiagnosticsTab } from './DiagnosticsTab';
+import { EvaluationSettingsTab } from './EvaluationSettingsTab';
 import { PerformanceView } from '../performance/PerformanceView';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 
@@ -18,6 +19,8 @@ const TABS: Array<{ id: SettingsTab; label: string }> = [
   { id: 'diagnostics', label: 'Diagnostics' },
   // Performance tab (V5 spec §36–38) — aggregates opinion outcomes.
   { id: 'performance', label: 'Performance' },
+  // Agent evaluation (V7 spec §61–63) — LangSmith connection + tracing.
+  { id: 'evaluation', label: 'Evaluation' },
 ];
 
 export const SettingsView: React.FC = () => {
@@ -43,6 +46,7 @@ export const SettingsView: React.FC = () => {
         {tab === 'skills' && <SkillsView />}
         {tab === 'diagnostics' && <DiagnosticsTab />}
         {tab === ('performance') && <PerformanceView />}
+        {tab === 'evaluation' && <EvaluationSettingsTab />}
       </div>
     </main>
   );
