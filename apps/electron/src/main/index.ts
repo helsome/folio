@@ -307,6 +307,51 @@ ipcMain.handle('skills:readResource', async (_event, skillId: unknown, relativeP
   toIpcResult(() => agentKernelHost.readSkillResource(skillId, relativePath))
 );
 
+// V7 Evaluation & observability (spec §61-68)
+ipcMain.handle('evaluation:getSettings', async () =>
+  toIpcResult(() => agentKernelHost.getEvaluationSettings())
+);
+
+ipcMain.handle('evaluation:setSettings', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.setEvaluationSettings(input))
+);
+
+ipcMain.handle('evaluation:setCredential', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.setEvaluationCredential(input))
+);
+
+ipcMain.handle('evaluation:removeCredential', async () =>
+  toIpcResult(() => agentKernelHost.removeEvaluationCredential())
+);
+
+ipcMain.handle('evaluation:testConnection', async () =>
+  toIpcResult(() => agentKernelHost.testEvaluationConnection())
+);
+
+ipcMain.handle('evaluation:listExperiments', async () =>
+  toIpcResult(() => agentKernelHost.listEvaluationExperiments())
+);
+
+ipcMain.handle('evaluation:getExperiment', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.getEvaluationExperiment(input))
+);
+
+ipcMain.handle('evaluation:listBaselines', async () =>
+  toIpcResult(() => agentKernelHost.listEvaluationBaselines())
+);
+
+ipcMain.handle('evaluation:submitFeedback', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.submitEvaluationFeedback(input))
+);
+
+ipcMain.handle('evaluation:listFeedback', async () =>
+  toIpcResult(() => agentKernelHost.listEvaluationFeedback())
+);
+
+ipcMain.handle('evaluation:status', async () =>
+  toIpcResult(() => agentKernelHost.getEvaluationStatus())
+);
+
 // Diagnostics (spec §35–36)
 ipcMain.handle('diagnostics:collect', async () =>
   toIpcResult(() => agentKernelHost.collectDiagnostics())

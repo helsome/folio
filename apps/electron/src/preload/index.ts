@@ -152,6 +152,19 @@ export interface ElectronAPI {
     markdown: (input: { reportId: string }) => Promise<unknown>;
     shareCard: (input: { reportId: string }) => Promise<unknown>;
   };
+  evaluation: {
+    getSettings: () => Promise<unknown>;
+    setSettings: (input: unknown) => Promise<unknown>;
+    setCredential: (input: { apiKey: string }) => Promise<unknown>;
+    removeCredential: () => Promise<unknown>;
+    testConnection: () => Promise<unknown>;
+    listExperiments: () => Promise<unknown>;
+    getExperiment: (input: { id: string }) => Promise<unknown>;
+    listBaselines: () => Promise<unknown>;
+    submitFeedback: (input: { caseId: string; verdict: 'good' | 'bad'; note?: string }) => Promise<unknown>;
+    listFeedback: () => Promise<unknown>;
+    status: () => Promise<unknown>;
+  };
 }
 
 const electronAPI: ElectronAPI = {
@@ -339,6 +352,19 @@ const electronAPI: ElectronAPI = {
   export: {
     markdown: (input: { reportId: string }) => ipcRenderer.invoke('export:markdown', input),
     shareCard: (input: { reportId: string }) => ipcRenderer.invoke('export:shareCard', input),
+  },
+  evaluation: {
+    getSettings: () => ipcRenderer.invoke('evaluation:getSettings'),
+    setSettings: (input) => ipcRenderer.invoke('evaluation:setSettings', input),
+    setCredential: (input) => ipcRenderer.invoke('evaluation:setCredential', input),
+    removeCredential: () => ipcRenderer.invoke('evaluation:removeCredential'),
+    testConnection: () => ipcRenderer.invoke('evaluation:testConnection'),
+    listExperiments: () => ipcRenderer.invoke('evaluation:listExperiments'),
+    getExperiment: (input) => ipcRenderer.invoke('evaluation:getExperiment', input),
+    listBaselines: () => ipcRenderer.invoke('evaluation:listBaselines'),
+    submitFeedback: (input) => ipcRenderer.invoke('evaluation:submitFeedback', input),
+    listFeedback: () => ipcRenderer.invoke('evaluation:listFeedback'),
+    status: () => ipcRenderer.invoke('evaluation:status'),
   },
 };
 

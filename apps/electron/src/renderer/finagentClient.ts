@@ -166,6 +166,19 @@ function createElectronClient(): FinagentClient {
       listRuns: () => ipcResult(window.electronAPI.automation.listRuns()),
       buildBrief: () => ipcResult(window.electronAPI.automation.buildBrief()),
     },
+    evaluation: {
+      getSettings: () => ipcResult(window.electronAPI.evaluation.getSettings()),
+      setSettings: (input) => ipcResult(window.electronAPI.evaluation.setSettings(input)),
+      setCredential: (apiKey) => ipcResult(window.electronAPI.evaluation.setCredential({ apiKey })),
+      removeCredential: () => ipcResult(window.electronAPI.evaluation.removeCredential()),
+      testConnection: () => ipcResult(window.electronAPI.evaluation.testConnection()),
+      listExperiments: () => ipcResult(window.electronAPI.evaluation.listExperiments()),
+      getExperiment: (id) => ipcResult(window.electronAPI.evaluation.getExperiment({ id })),
+      listBaselines: () => ipcResult(window.electronAPI.evaluation.listBaselines()),
+      submitFeedback: (input) => ipcResult(window.electronAPI.evaluation.submitFeedback(input)),
+      listFeedback: () => ipcResult(window.electronAPI.evaluation.listFeedback()),
+      status: () => ipcResult(window.electronAPI.evaluation.status()),
+    },
   };
 }
 

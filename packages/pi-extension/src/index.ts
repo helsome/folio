@@ -37,6 +37,7 @@ interface AgentApi {
 }
 
 import { createCapabilityTools as buildCapabilityTools, fullCapabilities } from '@finagent/shared/capabilities';
+import { isPortfolioToolName } from '@finagent/shared';
 import type { PrivacyLevel } from '@finagent/core';
 import { listSkillResourcesTool, readSkillResourceTool } from './tools/skillResources.ts';
 
@@ -70,10 +71,10 @@ export function wrapToolsWithPrivacy(
 ): Tool[] {
   if (level === undefined || level === 'full') return [...tools];
   // Portfolio tools carry account data (holdings, positions, cash, account
-  // ids); identify them by capability-id convention /^portfolio\./ or by
-  // tool names that embed the word (get_portfolio, …).
+  // ids): capability ids (portfolio.summary), agent-facing names
+  // (get_portfolio, get_positions, get_assets, get_cash_flow) and legacy ids.
   return tools.map((tool) =>
-    /^portfolio\./.test(tool.name) || tool.name.includes('portfolio')
+    isPortfolioToolName(tool.name)
       ? { ...tool, execute: wrapPortfolioExecute(tool.execute, level) }
       : tool
   );

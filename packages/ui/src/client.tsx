@@ -8,9 +8,15 @@ import type {
   Comparison,
   CredentialInfo,
   CustomProviderConfig,
+  EvaluationBaseline,
+  EvaluationExperiment,
+  EvaluationResultRecord,
+  EvaluationRun,
+  EvaluationSettings,
   InvestmentThesis,
   Kline,
   KlineRequest,
+  LangSmithConnectionStatus,
   LlmModel,
   LlmRuntimeState,
   LlmTestResult,
@@ -96,6 +102,51 @@ export interface SkillResourceItem {
   path: string;
   kind: 'skill' | 'reference' | 'script' | 'asset' | 'other';
   size?: number;
+}
+
+/** Renderer-facing evaluation DTOs (spec §62-69). Never carries secrets. */
+export interface EvaluationFeedbackItem {
+  id: string;
+  caseId: string;
+  runId?: string;
+  verdict: 'good' | 'bad';
+  note?: string;
+  createdAt: number;
+}
+
+export interface EvaluationExperimentDetail {
+  experiment: EvaluationExperiment;
+  runs: EvaluationRun[];
+  results: EvaluationResultRecord[];
+}
+
+export interface EvaluationChannel {
+  getSettings: () => Promise<ApiResult<{ settings: EvaluationSettings; connection: LangSmithConnectionStatus }>>;
+  /** Diagnostics view: backend/tracing/privacy without credentials (spec §86). */
+  status: () => Promise<
+    ApiResult<{
+      backend: 'langsmith' | 'local' | 'none';
+      tracingEnabled: boolean;
+      privacyLevel: EvaluationSettings['privacyLevel'];
+      project: string;
+    }>
+  >;
+  setSettings: (
+    input: Partial<
+      Pick<
+        EvaluationSettings,
+        'tracingEnabled' | 'langsmithProject' | 'langsmithEndpoint' | 'privacyLevel' | 'onlineEvaluationEnabled'
+      >
+    >
+  ) => Promise<ApiResult<EvaluationSettings>>;
+  setCredential: (apiKey: string) => Promise<ApiResult<void>>;
+  removeCredential: () => Promise<ApiResult<void>>;
+  testConnection: () => Promise<ApiResult<LangSmithConnectionStatus>>;
+  listExperiments: () => Promise<ApiResult<EvaluationExperiment[]>>;
+  getExperiment: (id: string) => Promise<ApiResult<EvaluationExperimentDetail | undefined>>;
+  listBaselines: () => Promise<ApiResult<EvaluationBaseline[]>>;
+  submitFeedback: (input: { caseId: string; verdict: 'good' | 'bad'; note?: string }) => Promise<ApiResult<void>>;
+  listFeedback: () => Promise<ApiResult<EvaluationFeedbackItem[]>>;
 }
 
 export interface FinagentClient {
@@ -212,6 +263,7 @@ export interface FinagentClient {
   };
   connections?: ConnectionsChannel;
   health?: HealthChannel;
+  evaluation?: EvaluationChannel;
   openExternal?: (url: string) => Promise<ApiResult<void>>;
 }
 
@@ -326,6 +378,19 @@ export const fallbackClient: FinagentClient = {
   },
   health: {
     check: missingClient('health.check'),
+  },
+  evaluation: {
+    getSettings: missingClient('evaluation.getSettings'),
+    setSettings: missingClient('evaluation.setSettings'),
+    setCredential: missingClient('evaluation.setCredential'),
+    removeCredential: missingClient('evaluation.removeCredential'),
+    testConnection: missingClient('evaluation.testConnection'),
+    listExperiments: missingClient('evaluation.listExperiments'),
+    getExperiment: missingClient('evaluation.getExperiment'),
+    listBaselines: missingClient('evaluation.listBaselines'),
+    submitFeedback: missingClient('evaluation.submitFeedback'),
+    listFeedback: missingClient('evaluation.listFeedback'),
+    status: missingClient('evaluation.status'),
   },
 };
 

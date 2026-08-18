@@ -52,6 +52,18 @@ import type {
   ToolDefinition,
   WorkspaceContext,
   StrategyId,
+  AgentEventPayload,
+  ApiError,
+  EvaluationBaseline,
+  EvaluationExperiment,
+  EvaluationResultRecord,
+  EvaluationRun,
+  EvaluationRunStatus,
+  EvaluationSettings,
+  LangSmithConnectionStatus,
+  PrivacyLevel,
+  ToolCall,
+  ToolCallRecord,
 } from '@finagent/core';
 import { STRATEGY_IDS } from '@finagent/core';
 import {
@@ -112,8 +124,17 @@ import {
   redactForShare,
   computeSkillCalibrations,
   computeStrategyCalibrations,
+  EvaluationStore,
+  TraceCorrelationService,
+  resolveBackend,
+  EvaluationRedactor,
+  PiRuntimeAdapter,
+  sanitizeSettings,
   isRecord,
+  type EvaluationBackend,
+  type EvaluationBackendKind,
   type HistoryFetcher,
+  type HumanFeedback,
   type DailyBrief,
   type BriefPortfolioSummary,
   type MarketPulseSnapshot,
@@ -130,7 +151,14 @@ import {
   type SpawnFn,
 } from '@finagent/shared/providers/longbridge';
 import { SkillHub, skillCapabilityMap } from '@finagent/skill-hub';
-import { getPiCwd, getPiExtensionEntry, getRuntimeRoot, getSkillsDir } from '@finagent/shared/resources';
+import {
+  getPiCwd,
+  getPiExtensionEntry,
+  getLangSmithExtensionEntry,
+  getRuntimeRoot,
+  getSkillsDir,
+  listBundledPiExtensions,
+} from '@finagent/shared/resources';
 import {
   collectDiagnostics,
   ErrorLog,
@@ -180,6 +208,17 @@ interface StartRunRequest {
   workspaceContext?: WorkspaceContext;
 }
 
+/** Experiment id for runs observed outside explicit evaluation experiments. */
+const OBSERVABILITY_EXPERIMENT_ID = '__observability__';
+
+interface PendingEvalRun {
+  sessionId: string;
+  startedAt: number;
+  toolCalls: ToolCall[];
+  answer: string;
+  error?: ApiError;
+}
+
 /**
  * Main-process bridge between the renderer and the agent kernel.
  *
@@ -220,6 +259,15 @@ export class AgentKernelHost {
   private unsubscribe: (() => void) | null = null;
   private connectionsUnsubscribe: (() => void) | null = null;
   private window: BrowserWindow | null = null;
+
+  // V7 evaluation & observability (spec §15, §52-55, §62-63).
+  private readonly evaluationStore: EvaluationStore;
+  private evaluationSettings: EvaluationSettings;
+  private evaluationBackend: EvaluationBackend;
+  private evaluationRedactor: EvaluationRedactor;
+  private traceCorrelation: TraceCorrelationService;
+  private readonly evalRuns = new Map<string, PendingEvalRun>();
+  private unsubscribeEval: (() => void) | null = null;
 
   constructor() {
     // Resource paths come from ResourceLocator: the repo root in dev, the app
@@ -336,6 +384,21 @@ export class AgentKernelHost {
         env: () => this.buildRuntimeEnv(),
       },
     });
+
+    // V7 evaluation & observability: settings load synchronously so the Pi
+    // extension list is correct before the first runtime spawn; tracing is
+    // off by default (spec §11, §58).
+    this.evaluationStore = new EvaluationStore(new JsonFileStore(userData));
+    this.evaluationSettings = this.evaluationStore.getSettingsSync();
+    this.evaluationBackend = resolveBackend(this.evaluationSettings, undefined);
+    this.evaluationRedactor = new EvaluationRedactor(this.evaluationSettings.privacyLevel);
+    this.traceCorrelation = new TraceCorrelationService({
+      backend: this.evaluationBackend,
+      store: this.evaluationStore,
+    });
+    this.applyRuntimeExtensions();
+    this.unsubscribeEval = this.kernel.runs.subscribe((event) => void this.observeRunEvent(event));
+    void this.refreshEvaluationBackend();
     void this.skillHub.loadSkills();
     this.alertEngine.start();
     void this.outcomeService.evaluateDue(undefined, this.fetchOutcomeHistory);
@@ -880,6 +943,244 @@ export class AgentKernelHost {
       requireString(request.modelId, 'modelId')
     );
   }
+  // -------------------------------------------------------------------------
+  // Evaluation & observability (V7 spec §15, §52-63)
+  // -------------------------------------------------------------------------
+
+  /** Renderer-safe settings + live connection state (never the API key). */
+  async getEvaluationSettings(): Promise<{
+    settings: EvaluationSettings;
+    connection: LangSmithConnectionStatus;
+  }> {
+    return { settings: this.evaluationSettings, connection: await this.testEvaluationConnection() };
+  }
+
+  async setEvaluationSettings(input: unknown): Promise<EvaluationSettings> {
+    const request = requireObject(input);
+    const sanitized = sanitizeSettings({ ...this.evaluationSettings, ...request });
+    const changed =
+      sanitized.tracingEnabled !== this.evaluationSettings.tracingEnabled ||
+      sanitized.langsmithProject !== this.evaluationSettings.langsmithProject ||
+      sanitized.langsmithEndpoint !== this.evaluationSettings.langsmithEndpoint ||
+      sanitized.privacyLevel !== this.evaluationSettings.privacyLevel;
+    this.evaluationSettings = sanitized;
+    await this.evaluationStore.saveSettings(sanitized);
+    if (changed) {
+      this.evaluationRedactor = new EvaluationRedactor(sanitized.privacyLevel);
+      this.applyRuntimeExtensions();
+      await this.refreshEvaluationBackend();
+      // Env changes (tracing vars, privacy level) apply at the next Pi spawn.
+      if (this.kernel.getLlmApi()) {
+        await this.kernel.getLlmApi()!.restart();
+      }
+    }
+    return sanitized;
+  }
+
+  /** Store the LangSmith API key via safeStorage; renderer never reads it back. */
+  async setEvaluationCredential(input: unknown): Promise<void> {
+    const request = requireObject(input);
+    const apiKey = requireString(request.apiKey, 'apiKey');
+    await this.credentials.setCredential('langsmith', apiKey);
+    this.evaluationSettings = { ...this.evaluationSettings, apiKeyConfigured: true, updatedAt: Date.now() };
+    await this.evaluationStore.saveSettings(this.evaluationSettings);
+    await this.refreshEvaluationBackend();
+  }
+
+  async removeEvaluationCredential(): Promise<void> {
+    await this.credentials.removeCredential('langsmith');
+    this.evaluationSettings = { ...this.evaluationSettings, apiKeyConfigured: false, updatedAt: Date.now() };
+    await this.evaluationStore.saveSettings(this.evaluationSettings);
+    await this.refreshEvaluationBackend();
+  }
+
+  async testEvaluationConnection(): Promise<LangSmithConnectionStatus> {
+    const key = await this.credentials.getCredential('langsmith');
+    const backend = resolveBackend(this.evaluationSettings, key);
+    const status = await backend.status();
+    return {
+      connected: status.available,
+      configured: Boolean(key && this.evaluationSettings.tracingEnabled),
+      project: this.evaluationSettings.langsmithProject,
+      endpoint: status.endpoint,
+      error: status.available ? undefined : status.message,
+      message: status.message,
+    };
+  }
+
+  async listEvaluationExperiments(): Promise<EvaluationExperiment[]> {
+    return this.evaluationStore.listExperiments();
+  }
+
+  async getEvaluationExperiment(
+    input: unknown
+  ): Promise<
+    | {
+        experiment: EvaluationExperiment;
+        runs: EvaluationRun[];
+        results: EvaluationResultRecord[];
+      }
+    | undefined
+  > {
+    const request = requireObject(input);
+    const id = requireString(request.id, 'id');
+    const experiment = await this.evaluationStore.getExperiment(id);
+    if (!experiment) return undefined;
+    return {
+      experiment,
+      runs: await this.evaluationStore.listRuns(id),
+      results: await this.evaluationStore.listResults(id),
+    };
+  }
+
+  async listEvaluationBaselines(): Promise<EvaluationBaseline[]> {
+    return this.evaluationStore.listBaselines();
+  }
+
+  async submitEvaluationFeedback(input: unknown): Promise<void> {
+    const request = requireObject(input);
+    const caseId = requireString(request.caseId, 'caseId');
+    await this.evaluationStore.addFeedback({
+      id: `feedback-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`,
+      caseId,
+      runId: typeof request.runId === 'string' ? request.runId : undefined,
+      verdict: request.verdict === 'bad' ? 'bad' : 'good',
+      note: typeof request.note === 'string' ? request.note : undefined,
+      createdAt: Date.now(),
+    });
+  }
+
+  async listEvaluationFeedback(): Promise<HumanFeedback[]> {
+    return this.evaluationStore.listFeedback();
+  }
+
+  /** Diagnostics: extension/trace/backend availability without secrets (spec §86). */
+  async getEvaluationStatus(): Promise<{
+    backend: EvaluationBackendKind;
+    tracingEnabled: boolean;
+    privacyLevel: PrivacyLevel;
+    project: string;
+  }> {
+    return {
+      backend: this.evaluationBackend.kind,
+      tracingEnabled: this.evaluationSettings.tracingEnabled,
+      privacyLevel: this.evaluationSettings.privacyLevel,
+      project: this.evaluationSettings.langsmithProject,
+    };
+  }
+
+  // -------------------------------------------------------------------------
+  // V7 internals
+  // -------------------------------------------------------------------------
+
+  /** Keep the runtime extension list in sync with evaluation settings. */
+  private applyRuntimeExtensions(): void {
+    if (!(this.kernel.runtime instanceof PiRuntimeAdapter)) return;
+    const extra: string[] = [];
+    if (this.evaluationSettings.tracingEnabled) {
+      extra.push(getLangSmithExtensionEntry());
+    }
+    this.kernel.runtime.setExtensions(listBundledPiExtensions(extra));
+  }
+
+  /** Reload the LangSmith credential so the backend reflects storage changes. */
+  private async refreshEvaluationBackend(): Promise<void> {
+    const key = await this.credentials.getCredential('langsmith');
+    const backend = resolveBackend(this.evaluationSettings, key);
+    this.evaluationBackend = backend;
+    this.traceCorrelation = new TraceCorrelationService({
+      backend,
+      store: this.evaluationStore,
+    });
+    void backend.status().catch(() => undefined);
+  }
+
+  /** Observe run lifecycle events and persist redacted evaluation records. */
+  private observeRunEvent(event: AgentEvent): void {
+    if (event.type === 'run_started') {
+      this.evalRuns.set(event.runId, {
+        sessionId: event.sessionId,
+        startedAt: event.timestamp,
+        toolCalls: [],
+        answer: '',
+      });
+      return;
+    }
+    const pending = this.evalRuns.get(event.runId);
+    if (!pending) return;
+    if (event.type === 'tool_started') {
+      pending.toolCalls.push(event.payload.toolCall);
+    } else if (event.type === 'message_completed') {
+      pending.answer = event.payload.answer;
+    } else if (event.type === 'run_completed' || event.type === 'run_failed') {
+      const completed = event.type === 'run_completed';
+      void this.settleEvaluationRun(event.runId, event.sessionId, completed, event.timestamp);
+    }
+  }
+
+  private async settleEvaluationRun(
+    runId: string,
+    sessionId: string,
+    completed: boolean,
+    endedAt: number
+  ): Promise<void> {
+    const pending = this.evalRuns.get(runId);
+    this.evalRuns.delete(runId);
+    if (!pending) return;
+    const status: EvaluationRunStatus = completed ? 'completed' : 'failed';
+    const toolCalls: ToolCallRecord[] = pending.toolCalls.map((toolCall) => ({
+      id: toolCall.id,
+      toolName: toolCall.toolName,
+      args: toolCall.args,
+      startedAt: toolCall.startedAt,
+      completedAt: toolCall.completedAt,
+      status: toolCall.status === 'success' ? 'success' : 'error',
+      error: toolCall.error,
+      result: toolCall.result,
+    }));
+    const run: EvaluationRun = {
+      id: runId,
+      experimentId: OBSERVABILITY_EXPERIMENT_ID,
+      caseId: '',
+      datasetId: '',
+      status,
+      startedAt: pending.startedAt,
+      completedAt: endedAt,
+      latencyMs: Math.max(0, endedAt - pending.startedAt),
+      answer: this.evaluationRedactor.redactAnswer(pending.answer),
+      toolCalls: toolCalls.map((toolCall) => this.evaluationRedactor.redactToolCall(toolCall)),
+      failureModes: [],
+      error: pending.error,
+    };
+    try {
+      await this.evaluationStore.addRun(run);
+    } catch (error) {
+      mainErrorLog.push({
+        at: Date.now(),
+        source: 'main',
+        message: `Evaluation store write failed: ${error instanceof Error ? error.message : String(error)}`,
+        stack: null,
+      });
+    }
+    const session = await this.kernel.sessions.getSession(sessionId).catch(() => undefined);
+    const threadId = session?.runtimeSessionId;
+    const ref = await this.traceCorrelation.recordRun({
+      folioRunId: runId,
+      folioSessionId: sessionId,
+      threadId,
+      startedAt: pending.startedAt,
+      completedAt: endedAt,
+    });
+    if (ref.backend === 'none' && this.evaluationSettings.tracingEnabled) {
+      mainErrorLog.push({
+        at: Date.now(),
+        source: 'main',
+        message: 'Trace correlation: no LangSmith trace matched the finished run.',
+        stack: null,
+      });
+    }
+  }
+
   // -------------------------------------------------------------------------
   // Diagnostics (spec §35–36)
   // -------------------------------------------------------------------------
@@ -1658,16 +1959,42 @@ export class AgentKernelHost {
       if (!apiKey) continue;
       overrides.push({ provider: info.provider, apiKey });
     }
-    return {
+    const env: NodeJS.ProcessEnv = {
       FINAGENT_SKILLS_DIR: getSkillsDir(),
       FINAGENT_PROVIDER_OVERRIDES: overrides.length > 0 ? JSON.stringify(overrides) : '',
+      // V7: the Finagent extension enforces tool-output privacy from this flag
+      // (spec §60) — always set so the level is unambiguous.
+      FINAGENT_PRIVACY_LEVEL: this.evaluationSettings.privacyLevel,
     };
+    // V7: LangSmith tracing env (spec §13). Config comes from safeStorage-backed
+    // settings; the extension reads these at Pi process start, so toggling
+    // tracing restarts the runtime (see setEvaluationSettings). Trace metadata
+    // is app-level only — run-level data flows through TraceCorrelationService.
+    if (this.evaluationSettings.tracingEnabled) {
+      const key = await this.credentials.getCredential('langsmith');
+      if (key) {
+        env.TRACE_TO_LANGSMITH = 'true';
+        env.LANGSMITH_PI_API_KEY = key;
+        env.LANGSMITH_PI_PROJECT = this.evaluationSettings.langsmithProject;
+        if (this.evaluationSettings.langsmithEndpoint) {
+          env.LANGSMITH_PI_ENDPOINT = this.evaluationSettings.langsmithEndpoint;
+        }
+        env.LANGSMITH_PI_METADATA = JSON.stringify({
+          app: 'folio',
+          environment: 'production',
+          privacyLevel: this.evaluationSettings.privacyLevel,
+        });
+      }
+    }
+    return env;
   }
 
   async dispose() {
     this.alertEngine.stop();
     this.unsubscribe?.();
     this.unsubscribe = null;
+    this.unsubscribeEval?.();
+    this.unsubscribeEval = null;
     this.window = null;
     await this.kernel.dispose();
   }
