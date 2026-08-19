@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { Search } from 'lucide-react';
 import type { Holding } from '@finagent/core';
 import {
   formatCurrency,
@@ -11,9 +12,10 @@ import {
 interface HoldingRowProps {
   holding: Holding;
   onClick?: () => void;
+  onResearch?: () => void;
 }
 
-export const HoldingRow: React.FC<HoldingRowProps> = ({ holding, onClick }) => {
+export const HoldingRow: React.FC<HoldingRowProps> = ({ holding, onClick, onResearch }) => {
   const { t } = useTranslation();
   const pnl = holding.unrealizedPnL;
   const isPositive = (pnl ?? 0) >= 0;
@@ -55,6 +57,22 @@ export const HoldingRow: React.FC<HoldingRowProps> = ({ holding, onClick }) => {
         </div>
         <div className="text-xs text-[oklch(var(--text-secondary))]">{t('portfolio.last')}</div>
       </div>
+
+      {/* V9: the position's primary contextual action is Research (spec §51). */}
+      {onResearch && (
+        <button
+          type="button"
+          onClick={(event) => {
+            event.stopPropagation();
+            onResearch();
+          }}
+          data-testid={`holding-research-${holding.symbol}`}
+          className="ml-3 flex shrink-0 items-center gap-1.5 rounded-[8px] bg-primary px-2.5 py-1.5 text-[11.5px] font-semibold text-primary-foreground transition-smooth hover:bg-primary/88 active:scale-[0.98]"
+        >
+          <Search className="h-3 w-3" strokeWidth={1.9} />
+          {t('research.symbolEntry.startShort')}
+        </button>
+      )}
     </div>
   );
 };

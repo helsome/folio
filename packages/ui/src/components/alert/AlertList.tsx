@@ -16,7 +16,7 @@ import { AlertForm } from './AlertForm';
 import { Button } from '../primitives/Button';
 import { Dialog } from '../primitives/Dialog';
 
-export const AlertList: React.FC = () => {
+export const AlertList: React.FC<{ initialSymbol?: string }> = ({ initialSymbol = '' }) => {
   const { t } = useTranslation();
   const client = useFinagentClient();
   const [state] = useAtom(alertStateAtom);
@@ -26,6 +26,11 @@ export const AlertList: React.FC = () => {
   const addAlert = useSetAtom(addAlertAtom);
 
   const [showForm, setShowForm] = useState(false);
+  const [formSymbol, setFormSymbol] = useState(initialSymbol);
+
+  useEffect(() => {
+    setFormSymbol(initialSymbol);
+  }, [initialSymbol]);
 
   useEffect(() => {
     loadAlerts(client);
@@ -96,7 +101,12 @@ export const AlertList: React.FC = () => {
       </div>
 
       <Dialog open={showForm} onClose={() => setShowForm(false)}>
-        <AlertForm onSubmit={handleCreateAlert} onCancel={() => setShowForm(false)} />
+        <AlertForm
+          key={formSymbol || 'generic'}
+          symbol={formSymbol}
+          onSubmit={handleCreateAlert}
+          onCancel={() => setShowForm(false)}
+        />
       </Dialog>
     </div>
   );

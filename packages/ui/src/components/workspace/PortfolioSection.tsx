@@ -11,9 +11,11 @@ import {
   activeSymbolAtom,
   isManualAccountId,
   manualAccountId,
+  navSectionAtom,
 } from '../../atoms';
 import { manualPortfoliosAtom, refreshManualPortfoliosAtom } from '../../atoms/portfolioImportAtoms';
 import { portfolioRiskCacheAtom, analyzePortfolioRiskAtom } from '../../atoms/portfolioRiskAtoms';
+import { researchOriginAtom } from '../../atoms/discoverAtoms';
 import { useFinagentClient } from '../../client';
 import { PortfolioCard } from '../portfolio/PortfolioCard';
 import { HoldingRow } from '../portfolio/HoldingRow';
@@ -55,6 +57,8 @@ export const PortfolioSection: React.FC = () => {
   const [selectedAccount, setSelectedAccount] = useAtom(selectedAccountIdAtom);
   const setSelectedPosition = useSetAtom(selectedPositionAtom);
   const setActiveSymbol = useSetAtom(activeSymbolAtom);
+  const setNavSection = useSetAtom(navSectionAtom);
+  const setResearchOrigin = useSetAtom(researchOriginAtom);
   const riskCache = useAtomValue(portfolioRiskCacheAtom);
   const analyzeRisk = useSetAtom(analyzePortfolioRiskAtom);
   const manualState = useAtomValue(manualPortfoliosAtom);
@@ -133,6 +137,15 @@ export const PortfolioSection: React.FC = () => {
     setActiveSymbol(symbol);
   };
 
+  // V9: position → research continuity (spec §51). Carries position context so
+  // the agent and the research panel already know the symbol.
+  const handleResearch = (symbol: string) => {
+    setSelectedPosition(symbol);
+    setActiveSymbol(symbol);
+    setResearchOrigin({ from: 'portfolio', label: symbol });
+    setNavSection('research');
+  };
+
   const isPartial = cache.failure?.kind === 'partial';
   const showAccountSelector =
     view.accounts.length > 1 || manualState.portfolios.length > 0;
@@ -191,6 +204,7 @@ export const PortfolioSection: React.FC = () => {
               key={holding.symbol}
               holding={holding}
               onClick={() => handleSelect(holding.symbol)}
+              onResearch={() => handleResearch(holding.symbol)}
             />
           ))}
           {view.holdings.length === 0 && (

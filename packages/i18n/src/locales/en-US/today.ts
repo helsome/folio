@@ -75,4 +75,6 @@ export const today = {
     Alert: 'Alert',
     Automation: 'Automation',
   },
+  continueResearch: 'Continue',
+  continueLabel: 'Today',
 } satisfies Record<string, string | Record<string, string>>;

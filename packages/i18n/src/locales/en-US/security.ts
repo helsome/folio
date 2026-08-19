@@ -6,6 +6,11 @@ import type { NamespaceResource } from '../keys.ts';
  * identifiers (§11) and are never translated.
  */
 export const security = {
+  workspace: {
+    emptyTitle: 'Select a symbol',
+    emptySubtitle: 'Choose a security from the watchlist to inspect quotes, fundamentals, financials, and news.',
+    goDiscover: 'Find opportunities',
+  },
   header: {
     deepResearch: 'Deep Research',
     marketStatus: 'Market Status',

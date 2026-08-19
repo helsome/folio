@@ -20,6 +20,7 @@ import {
   screeningRunsAtom,
   screeningRunningStrategyAtom,
   pendingResearchStrategyAtom,
+  researchOriginAtom,
 } from '../../atoms/discoverAtoms'
 import { useFinagentClient } from '../../client'
 import { getScreeningRun, listScreeningRuns, runScreening } from '../../client/screening'
@@ -60,6 +61,7 @@ export const DiscoverView: React.FC = () => {
   const setNavSection = useSetAtom(navSectionAtom)
   const addToWatchlist = useSetAtom(addToWatchlistAtom)
   const setPendingStrategy = useSetAtom(pendingResearchStrategyAtom)
+  const setResearchOrigin = useSetAtom(researchOriginAtom)
   const setSettingsTab = useSetAtom(settingsTabAtom)
 
   const [runsLoading, setRunsLoading] = useState(true)
@@ -145,6 +147,7 @@ export const DiscoverView: React.FC = () => {
       setActiveSymbol(candidate.symbol)
       const strategy = lastRun ? RESEARCH_STRATEGY_BY_TASK[lastRun.strategy] : null
       setPendingStrategy(strategy)
+      setResearchOrigin({ from: 'discover', label: runTitle })
       setNavSection('research')
     },
     [addToWatchlist, setActiveSymbol, setCompareSymbols, setNavSection, setPendingStrategy, lastRun]

@@ -3,6 +3,11 @@ import type { security as enSecurity } from '../en-US/security.ts';
 
 /** 证券(工作台)界面 — 标的头部、图表、概览、财务、新闻(规格 §27–30)。 */
 export const security = {
+  workspace: {
+    emptyTitle: '选择一个标的',
+    emptySubtitle: '从自选列表中选择一只证券，查看报价、基本面、财务与新闻。',
+    goDiscover: '发现机会',
+  },
   header: {
     deepResearch: '深度研究',
     marketStatus: '市场状态',

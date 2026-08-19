@@ -16,6 +16,7 @@ import {
   portfolioViewAtom,
   watchlistAtom,
 } from '../../atoms'
+import { researchOriginAtom } from '../../atoms/discoverAtoms'
 import { watchlistMoversAtom, mapUpcomingEvents, thesesNeedingReview } from '../../atoms/todayAtoms'
 import { analyzePortfolioRiskAtom } from '../../atoms/portfolioRiskAtoms'
 import { loadSymbolReports } from '../../atoms/researchAtoms'
@@ -77,6 +78,7 @@ export const TodayView: React.FC = () => {
 
   const setActiveSymbol = useSetAtom(activeSymbolAtom)
   const setNavSection = useSetAtom(navSectionAtom)
+  const setResearchOrigin = useSetAtom(researchOriginAtom)
   const fetchPortfolio = useSetAtom(fetchPortfolioAtom)
   const fetchQuote = useSetAtom(fetchQuoteAtom)
   const loadAlerts = useSetAtom(loadAlertsAtom)
@@ -268,7 +270,18 @@ export const TodayView: React.FC = () => {
               </div>
               <div className="truncate text-[12px] text-foreground/54">{report.summary}</div>
             </div>
-            <span className="shrink-0 text-[11px] text-foreground/38">{formatWhen(report.generatedAt, t)}</span>
+            <button
+              type="button"
+              onClick={() => {
+                setActiveSymbol(report.symbol)
+                setResearchOrigin({ from: 'today', label: t('today.continueLabel') })
+                setNavSection('research')
+              }}
+              data-testid={`today-continue-${report.symbol}`}
+              className="shrink-0 rounded-[7px] border border-border px-2 py-1 text-[11.5px] font-medium text-foreground/64 transition-smooth hover:border-border-strong hover:text-foreground"
+            >
+              {t('today.continueResearch')}
+            </button>
           </li>
         ))}
       </ul>

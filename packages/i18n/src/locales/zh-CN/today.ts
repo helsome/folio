@@ -78,4 +78,6 @@ export const today = {
     Alert: '提醒',
     Automation: '自动化',
   },
+  continueResearch: '继续',
+  continueLabel: '今日',
 } satisfies SameKeysAs<typeof enToday>;

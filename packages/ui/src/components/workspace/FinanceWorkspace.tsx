@@ -1,5 +1,6 @@
 import React from 'react';
 import { useAtomValue, useSetAtom } from 'jotai';
+import { useTranslation } from 'react-i18next';
 import type { WorkspaceView } from '@finagent/core';
 import { navSectionAtom, activeSymbolAtom, activeViewAtom } from '../../atoms';
 import { SecurityHeader } from './SecurityHeader';
@@ -76,6 +77,7 @@ export const FinanceWorkspace: React.FC = () => {
 };
 
 const SecurityWorkspace: React.FC = () => {
+  const { t } = useTranslation();
   const activeSymbol = useAtomValue(activeSymbolAtom);
   const activeView = useAtomValue(activeViewAtom);
   const setActiveView = useSetAtom(activeViewAtom);
@@ -84,10 +86,10 @@ const SecurityWorkspace: React.FC = () => {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
         <div className="text-[15px] font-semibold text-foreground/72">
-          Select a symbol from the watchlist
+          {t('security.workspace.emptyTitle')}
         </div>
-        <div className="text-[12px] text-foreground/44">
-          Choose a security to inspect quotes, fundamentals, financials, and news.
+        <div className="max-w-sm text-[12px] text-foreground/44">
+          {t('security.workspace.emptySubtitle')}
         </div>
       </div>
     );

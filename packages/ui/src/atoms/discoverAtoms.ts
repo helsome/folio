@@ -102,4 +102,13 @@ export const screeningRunsAtom = atom<ScreeningRun[]>([])
  */
 export const pendingResearchStrategyAtom = atom<StrategyId | null>(null)
 
+/**
+ * Lightweight origin context (V9 §54): where the user entered Research from.
+ * ResearchPanel shows a contextual back chip and returns to that section,
+ * instead of leaving the user with no path back to their results.
+ */
+export type ResearchOrigin = { from: 'discover' | 'portfolio' | 'today'; label: string }
+
+export const researchOriginAtom = atom<ResearchOrigin | null>(null)
+
 
