@@ -52,4 +52,15 @@ export const diagnostics = {
   resourceModeDev: 'dev',
   resourceModePackaged: 'packaged',
   unknown: 'unknown',
+  // V8.1 §40: Pi runtime section
+  sectionPiRuntime: 'Pi Runtime',
+  piStatus: 'Status',
+  piCommand: 'Command',
+  piProvider: 'Provider',
+  piModel: 'Model',
+  piExtensions: 'Extensions',
+  piLastExit: 'Last exit',
+  piDegraded: 'Observability degraded',
+  restartRuntime: 'Restart Runtime',
+  restarting: 'Restarting…',
 } satisfies NamespaceResource;

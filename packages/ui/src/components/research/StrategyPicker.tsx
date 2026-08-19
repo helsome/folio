@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import * as RadioGroup from '@radix-ui/react-radio-group';
 import type { StrategyId } from '@finagent/core';
 
 /**
@@ -8,18 +9,21 @@ import type { StrategyId } from '@finagent/core';
  * renderer mirrors, so the UI never imports @finagent/shared (node/executor
  * code). Ids are validated main-side — the research:start handler rejects
  * unknown strategy ids, and the service throws RESEARCH_STRATEGY_INVALID.
- * Names/descriptions are localized; ids and focus chips stay ASCII (§11).
+ *
+ * Strategy ids stay ASCII; names/descriptions/focus chips are localised
+ * (V8 §31–33, §51–52). `focus` holds i18n keys into `research.focus.*`.
  */
 const STRATEGY_PRESETS: ReadonlyArray<{
   id: StrategyId;
   /** camelCase `key` used to build the i18n resource keys. */
   key: string;
+  /** i18n keys into `research.focus.<key>` for the focus chips. */
   focus: string[];
 }> = [
   {
     id: 'comprehensive',
     key: 'comprehensive',
-    focus: ['full plan', 'market', 'company', 'research'],
+    focus: ['fullPlan', 'market', 'company', 'research'],
   },
   {
     id: 'value',
@@ -29,17 +33,17 @@ const STRATEGY_PRESETS: ReadonlyArray<{
   {
     id: 'growth',
     key: 'growth',
-    focus: ['earnings growth', 'consensus', 'valuation'],
+    focus: ['earningsGrowth', 'consensus', 'valuation'],
   },
   {
     id: 'technical',
     key: 'technical',
-    focus: ['price action', 'trend', 'depth', 'trades'],
+    focus: ['priceAction', 'trend', 'depth', 'trades'],
   },
   {
     id: 'earnings',
     key: 'earnings',
-    focus: ['EPS forecasts', 'calendar', 'news'],
+    focus: ['epsForecasts', 'calendar', 'news'],
   },
   {
     id: 'event-driven',
@@ -65,7 +69,11 @@ export interface StrategyPickerProps {
   onChange: (id: StrategyId) => void;
 }
 
-/** Preset card strip for the Deep Research start flow. */
+/**
+ * Single-column full-width vertical strategy list for the Deep Research start
+ * flow. Each row is an accessible radio item (Radix RadioGroup): fully
+ * keyboard-selectable (arrows + selection) with correct `aria-checked`.
+ */
 export const StrategyPicker: React.FC<StrategyPickerProps> = ({ value, onChange }) => {
   const { t } = useTranslation();
   return (
@@ -73,40 +81,53 @@ export const StrategyPicker: React.FC<StrategyPickerProps> = ({ value, onChange 
       <div className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-wider text-text-muted">
         {t('research.researchStrategy')}
       </div>
-      <div className="flex gap-2 overflow-x-auto pb-1">
+      <RadioGroup.Root
+        value={value}
+        onValueChange={(next) => onChange(next as StrategyId)}
+        className="flex w-full flex-col gap-1.5"
+        aria-label={t('research.researchStrategy')}
+      >
         {STRATEGY_PRESETS.map((preset) => {
           const selected = preset.id === value;
           return (
-            <button
+            <RadioGroup.Item
               key={preset.id}
-              type="button"
+              value={preset.id}
               data-testid={`strategy-card-${preset.id}`}
-              aria-pressed={selected}
-              onClick={() => onChange(preset.id)}
-              className={`min-w-[190px] max-w-[220px] shrink-0 rounded-[10px] border p-2.5 text-left transition-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 ${
-                selected ? 'border-accent bg-accent/10' : 'mac-list-row'
+              className={`flex w-full items-start gap-2.5 rounded-[10px] border px-3 py-2.5 text-left transition-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/35 cursor-pointer ${
+                selected ? 'border-accent bg-accent/5' : 'border-transparent mac-list-row'
               }`}
             >
-              <span className="block text-[12px] font-semibold text-foreground">
-                {t(`research.strategies.${preset.key}Name`)}
+              <span
+                aria-hidden="true"
+                className={`mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full border-2 transition-smooth ${
+                  selected ? 'border-accent' : 'border-text-muted/40'
+                }`}
+              >
+                {selected && <span className="h-2 w-2 rounded-full bg-accent" />}
               </span>
-              <span className="mt-0.5 block text-[10.5px] leading-snug text-text-muted">
-                {t(`research.strategies.${preset.key}Description`)}
+              <span className="min-w-0 flex-1">
+                <span className="block text-[12px] font-semibold text-foreground">
+                  {t(`research.strategies.${preset.key}Name`)}
+                </span>
+                <span className="mt-0.5 block text-[10.5px] leading-snug text-text-muted">
+                  {t(`research.strategies.${preset.key}Description`)}
+                </span>
+                <span className="mt-1.5 flex flex-wrap gap-1">
+                  {preset.focus.map((chipKey) => (
+                    <span
+                      key={chipKey}
+                      className="rounded-[5px] bg-foreground/8 px-1.5 py-0.5 text-[9.5px] font-medium text-text-muted"
+                    >
+                      {t(`research.focus.${chipKey}`)}
+                    </span>
+                  ))}
+                </span>
               </span>
-              <span className="mt-1.5 flex flex-wrap gap-1">
-                {preset.focus.map((chip) => (
-                  <span
-                    key={chip}
-                    className="rounded-[5px] bg-foreground/8 px-1.5 py-0.5 text-[9.5px] font-medium text-text-muted"
-                  >
-                    {chip}
-                  </span>
-                ))}
-              </span>
-            </button>
+            </RadioGroup.Item>
           );
         })}
-      </div>
+      </RadioGroup.Root>
     </div>
   );
 };

@@ -53,4 +53,15 @@ export const diagnostics = {
   resourceModeDev: '开发',
   resourceModePackaged: '打包',
   unknown: '未知',
+  // V8.1 §40: Pi runtime section
+  sectionPiRuntime: 'Pi 运行时',
+  piStatus: '状态',
+  piCommand: '命令',
+  piProvider: '提供方',
+  piModel: '模型',
+  piExtensions: '扩展',
+  piLastExit: '上次退出',
+  piDegraded: '观测降级',
+  restartRuntime: '重启运行时',
+  restarting: '重启中…',
 } satisfies SameKeysAs<typeof enDiagnostics>;
