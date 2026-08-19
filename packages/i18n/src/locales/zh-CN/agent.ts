@@ -50,6 +50,18 @@ export const agent = {
     statusRunning: '运行中',
     label: '工具：{{name}}',
     calls: '工具调用',
+    names: {
+      getQuote: '获取最新行情',
+      getPortfolio: '获取持仓概况',
+      getFinancials: '查看财务表现',
+      getValuation: '分析估值',
+      getNews: '检查最新新闻',
+      getKline: '获取K线图',
+      getEarnings: '检查财报信息',
+      getProfile: '查看公司概况',
+      analyze: '分析中',
+      other: '获取数据',
+    },
   },
   quote: {
     title: '行情',
@@ -71,5 +83,38 @@ export const agent = {
   },
   chat: {
     noMessages: '还没有消息，开始对话吧！',
+  },
+  suggestions: {
+    title: '试试问',
+    research: [
+      '为什么得出这个结论？',
+      '最大的风险是什么？',
+      '哪条证据最关键？',
+    ],
+    portfolio: [
+      '我最大的风险是什么？',
+      '哪些持仓集中度过高？',
+      '今天哪些持仓值得关注？',
+    ],
+    discover: [
+      '研究排名靠前的候选',
+      '比较前两名候选',
+    ],
+    compare: [
+      '对我的目标来说哪个更强？',
+      '关键差异是什么？',
+    ],
+    thesis: [
+      '这个投资逻辑还成立吗？',
+      '什么会推翻它？',
+    ],
+    watchlist: [
+      '今天什么在驱动行情？',
+      '今天哪只标的有看点？',
+    ],
+    default: [
+      '今天应该关注什么？',
+      '总结一下今天的市场。',
+    ],
   },
 } satisfies SameKeysAs<typeof enAgent>;

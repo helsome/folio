@@ -1,6 +1,6 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowUp, ChevronLeft, Square } from 'lucide-react';
+import { ArrowUp, ChevronLeft, Square, Sparkles } from 'lucide-react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { ApiError, PortfolioSnapshot, Quote, ToolCall } from '@finagent/core';
 import {
@@ -13,6 +13,7 @@ import {
   runViewAtom,
   settingsTabAtom,
   workspaceContextAtom,
+  type NavSection,
 } from '../../atoms';
 import { useFinagentClient } from '../../client';
 import { MessageList } from '../chat/MessageList';
@@ -205,6 +206,14 @@ export const AgentPanel: React.FC = () => {
           <ToolActivity toolCalls={toolCalls} />
           {quote && <QuoteCard quote={quote} />}
           {portfolio && <PortfolioRiskCard portfolio={portfolio} />}
+          {messages.length === 0 && !isRunning && (
+            <SuggestionChips
+              onPick={(text) => {
+                setInput(text);
+                void handleSend();
+              }}
+            />
+          )}
           <MessageList messages={messages} isLoading={isRunning} />
           {isRunning && <StreamingBlock answer={runView?.answer ?? ''} />}
           <div ref={bodyEndRef} />
@@ -248,6 +257,48 @@ export const AgentPanel: React.FC = () => {
         </div>
       </div>
     </aside>
+  );
+};
+
+/**
+ * Contextual starter prompts (V9 §25). The empty-state suggestions follow the
+ * current section instead of the same three prompts everywhere.
+ */
+const SUGGESTION_GROUP: Partial<Record<NavSection, string>> = {
+  research: 'agent.suggestions.research',
+  portfolio: 'agent.suggestions.portfolio',
+  discover: 'agent.suggestions.discover',
+  compare: 'agent.suggestions.compare',
+  thesis: 'agent.suggestions.thesis',
+  watchlist: 'agent.suggestions.watchlist',
+  sessions: 'agent.suggestions.watchlist',
+};
+
+const SuggestionChips: React.FC<{ onPick: (text: string) => void }> = ({ onPick }) => {
+  const { t } = useTranslation();
+  const [navSection] = useAtom(navSectionAtom);
+  const groupKey = SUGGESTION_GROUP[navSection] ?? 'agent.suggestions.default';
+  const prompts = (t(groupKey, { returnObjects: true }) as string[]) ?? [];
+  if (prompts.length === 0) return null;
+  return (
+    <div className="px-3 pb-1" data-testid="agent-suggestions">
+      <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/36">
+        <Sparkles className="h-3 w-3" strokeWidth={1.8} />
+        {t('agent.suggestions.title')}
+      </div>
+      <div className="mt-1.5 flex flex-wrap gap-1.5">
+        {prompts.slice(0, 3).map((prompt) => (
+          <button
+            key={prompt}
+            type="button"
+            onClick={() => onPick(prompt)}
+            className="max-w-full truncate rounded-full border border-border bg-surface px-2.5 py-1 text-[11px] text-foreground/62 transition-smooth hover:border-border-strong hover:text-foreground"
+          >
+            {prompt}
+          </button>
+        ))}
+      </div>
+    </div>
   );
 };
 

@@ -50,6 +50,18 @@ export const agent = {
     statusRunning: 'running',
     label: 'Tool: {{name}}',
     calls: 'Tool calls',
+    names: {
+      getQuote: 'Fetch quote',
+      getPortfolio: 'Fetch portfolio',
+      getFinancials: 'Review financials',
+      getValuation: 'Analyze valuation',
+      getNews: 'Check news',
+      getKline: 'Fetch price chart',
+      getEarnings: 'Check earnings',
+      getProfile: 'Company profile',
+      analyze: 'Analyze',
+      other: 'Gather data',
+    },
   },
   quote: {
     title: 'Quote',
@@ -71,5 +83,38 @@ export const agent = {
   },
   chat: {
     noMessages: 'No messages yet. Start the conversation!',
+  },
+  suggestions: {
+    title: 'Try asking',
+    research: [
+      'Why did you reach this conclusion?',
+      'What is the biggest risk here?',
+      'Which evidence matters most?',
+    ],
+    portfolio: [
+      'What is my biggest risk?',
+      'Which positions are too concentrated?',
+      'Which holdings need attention today?',
+    ],
+    discover: [
+      'Research the top candidates',
+      'Compare the top two candidates',
+    ],
+    compare: [
+      'Which one is stronger for my goals?',
+      'What are the key differences?',
+    ],
+    thesis: [
+      'Is this thesis still valid?',
+      'What could invalidate it?',
+    ],
+    watchlist: [
+      'What is driving today\'s moves?',
+      'Which symbol looks interesting today?',
+    ],
+    default: [
+      'What should I watch today?',
+      'Summarize today\'s market.',
+    ],
   },
 } satisfies NamespaceResource;
