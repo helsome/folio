@@ -22,9 +22,15 @@ import { ResearchReportView } from './ResearchReportView';
 import { DEFAULT_STRATEGY_ID, StrategyPicker } from './StrategyPicker';
 import { NextAction } from '../primitives/NextAction';
 import { capabilityLabelKey } from '../../lib/capabilityLabels';
+import { readPersisted, writePersisted } from '../../lib/persistedPrefs';
 
 const POLL_MS = 900;
 const SYMBOL_REGEX = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
+
+/** localStorage key for the last strategy chosen for a symbol (V9 §20). */
+function lastStrategyKey(symbol: string): string {
+  return `lastStrategy.${symbol}`;
+}
 
 /** Deep Research entry: run history for the focused symbol + start/cancel + report. */
 export const ResearchPanel: React.FC = () => {
@@ -51,8 +57,15 @@ export const ResearchPanel: React.FC = () => {
       setStrategyId(pendingStrategy);
       setRecommendedStrategy(pendingStrategy);
       setPendingStrategy(null);
+      return;
     }
-  }, [pendingStrategy, setPendingStrategy]);
+    // No recommendation: reuse the last strategy the user ran for this
+    // symbol, so repeated research doesn't force a re-selection (V9 §20).
+    if (symbol) {
+      const last = readPersisted<StrategyId | null>(lastStrategyKey(symbol), null);
+      if (last) setStrategyId(last);
+    }
+  }, [pendingStrategy, setPendingStrategy, symbol]);
 
   useEffect(() => {
     void loadResearchRuns().then(setRuns);
@@ -111,6 +124,8 @@ export const ResearchPanel: React.FC = () => {
       const started = await startResearch({ symbol: targetSymbol, strategyId });
       if (started) {
         setRuns((current) => [started, ...current.filter((run) => run.id !== started.id)]);
+        // Remember this strategy for the symbol so the next run defaults to it.
+        writePersisted(lastStrategyKey(targetSymbol), strategyId);
       } else {
         setError(t('research.notAvailable'));
       }
@@ -119,6 +134,11 @@ export const ResearchPanel: React.FC = () => {
     } finally {
       setLoading(false);
     }
+  };
+
+  const handleStrategyChange = (next: StrategyId): void => {
+    setStrategyId(next);
+    if (symbol) writePersisted(lastStrategyKey(symbol), next);
   };
 
   /** V9: start research directly from the no-symbol entry point. */
@@ -220,7 +240,7 @@ export const ResearchPanel: React.FC = () => {
 
       {symbol && !activeRun && (
         <div className="px-4 pt-3">
-          <StrategyPicker value={strategyId} onChange={setStrategyId} recommendedId={recommendedStrategy} />
+          <StrategyPicker value={strategyId} onChange={handleStrategyChange} recommendedId={recommendedStrategy} />
         </div>
       )}
 
