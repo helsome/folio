@@ -1,6 +1,7 @@
 import { compareSymbolsAtom } from './compareAtoms';
 import { atom } from 'jotai';
 import type { WorkspaceContext, WorkspaceView } from '@finagent/core';
+import { persistedAtom } from '../lib/persistedPrefs';
 
 // ---------------------------------------------------------------------------
 // Workspace context: the current financial-object focus of the UI.
@@ -39,10 +40,10 @@ export type NavSection =
   // Folio V7 Evaluation Center (spec §61–68) — mounted by the Evaluation UI agent.
   | 'evaluation';
 
-export const navSectionAtom = atom<NavSection>('sessions');
+export const navSectionAtom = persistedAtom<NavSection>('navSection', 'sessions');
 
 /** Whether the Agent Panel is visible (collapse/expand in the shell). */
-export const agentPanelVisibleAtom = atom<boolean>(true);
+export const agentPanelVisibleAtom = persistedAtom<boolean>('agentPanelVisible', true);
 /** Active tab within the Settings section. */
 export type SettingsTab =
   | 'general'
