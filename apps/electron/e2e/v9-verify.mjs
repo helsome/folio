@@ -81,6 +81,20 @@ async function main() {
     await check('research-with-symbol shows strategy picker', async () => {
       await page.locator('[data-testid="strategy-picker"]').waitFor({ timeout: 5000 });
     });
+    // Strategy memory: pick Growth, leave, come back → Growth stays selected.
+    await page.locator('[data-testid="strategy-card-growth"]').click();
+    await page.getByRole('button', { name: 'Today', exact: true }).first().click();
+    await page.locator('[data-testid="today-view"]').waitFor({ timeout: 10_000 });
+    await page.getByRole('button', { name: 'Research', exact: true }).first().click();
+    await page.locator('[data-testid="research-panel"]').waitFor({ timeout: 10_000 });
+    await check('strategy memory keeps last choice for symbol', async () => {
+      const growth = page.locator('[data-testid="strategy-card-growth"]');
+      await growth.waitFor({ timeout: 5000 });
+      const attrs = await growth.evaluate((el) => { const a = {}; for (const n of el.attributes) a[n.name] = n.value; return a; });
+      const stored = await page.evaluate(() => localStorage.getItem('folio.prefs.lastStrategy.NVDA.US'));
+      if (!stored) throw new Error('no persisted strategy, attrs=' + JSON.stringify(attrs));
+      if (!/growth/.test(stored)) throw new Error('persisted wrong strategy: ' + stored);
+    });
     await check('context chip shows Research · NVDA.US', async () => {
       const chip = page.locator('[data-testid="context-chip"]');
       await chip.waitFor({ timeout: 5000 });
