@@ -83,6 +83,16 @@ export function checkSymbol(raw: string): SymbolCheck {
   }
 }
 
+/** Map fullwidth digits and separators onto the ASCII forms `Number` understands. */
+function foldNumericWidth(value: string): string {
+  return value
+    .replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
+    .replace(/．/g, '.')
+    .replace(/，/g, ',')
+    .replace(/[－−]/g, '-')
+    .replace(/＄/g, '$')
+}
+
 /**
  * Accounting exports write negatives as `(180.50)` or `180.50-`.
  * Fullwidth parentheses are accepted. A normal leading minus is left for
@@ -115,7 +125,7 @@ export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value !== 'string') {
     return undefined
   }
-  const accounting = takeAccountingSign(value)
+  const accounting = takeAccountingSign(foldNumericWidth(value))
   const trimmed = accounting.text.trim()
   if (trimmed === '') {
     return undefined

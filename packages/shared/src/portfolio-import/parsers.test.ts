@@ -90,6 +90,14 @@ describe('toFiniteNumber', () => {
     expect(toFiniteNumber('-45.2')).toBe(-45.2)
   })
 
+  it('folds fullwidth digits and separators before parsing', () => {
+    expect(toFiniteNumber('１，２３４．５６')).toBe(1234.56)
+    expect(toFiniteNumber('＄１８０．５０')).toBe(180.5)
+    expect(toFiniteNumber('（１８０．５０）')).toBe(-180.5)
+    expect(toFiniteNumber('－４５．２')).toBe(-45.2)
+    expect(toFiniteNumber('，，，')).toBeUndefined()
+  })
+
   it('returns undefined for null, empty, and junk', () => {
     expect(toFiniteNumber(null)).toBeUndefined()
     expect(toFiniteNumber(undefined)).toBeUndefined()
@@ -141,6 +149,11 @@ describe('parseCsv', () => {
     expect(row).toMatchObject({ name: 'Apple, Inc.', quantity: 1000, costPrice: 180.5, issues: [] })
     const [mapped] = parseCsv('Ticker\tUnits\tAvg Cost\nAAPL.US\t1,000\t180.5', { symbol: 'Ticker', quantity: 'Units', cost: 'Avg Cost' })
     expect(mapped).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, issues: [] })
+  })
+
+  it('parses fullwidth quantity and cost cells', () => {
+    const [row] = parseCsv('代码,数量,成本\n600519.SH,１０,１，６００．５０')
+    expect(row).toMatchObject({ symbol: '600519.SH', quantity: 10, costPrice: 1600.5, confidence: 1, issues: [] })
   })
 
   it('parses parenthesized cost cells as negative amounts', () => {
