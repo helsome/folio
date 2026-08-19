@@ -22,6 +22,13 @@ export const thesis = {
     bearish: '看空',
     neutral: '中性',
   },
+  empty: {
+    title: '跟踪你的投资逻辑',
+    subtitle: '先对一只股票做深度研究，再把结论保存到这里。',
+    goResearch: '开始研究',
+  },
+  monitor: '跟踪',
+  monitoredHint: '重要变化发生时我们会提醒你。',
   editor: {
     stance: '立场',
     coreThesis: '核心逻辑',

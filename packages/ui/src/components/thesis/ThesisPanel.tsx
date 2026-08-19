@@ -1,8 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
-import { useAtom, useAtomValue } from 'jotai';
+import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import type { InvestmentThesis, ThesisStance } from '@finagent/core';
-import { activeSymbolAtom } from '../../atoms';
+import { activeSymbolAtom, navSectionAtom } from '../../atoms';
 import {
   getImpactsForSymbol,
   getThesesForSymbol,
@@ -18,6 +18,7 @@ import {
   saveThesisFromReport,
 } from '../../client/thesis';
 import { Button } from '../primitives/Button';
+import { NextAction } from '../primitives/NextAction';
 import { ThesisEditor } from './ThesisEditor';
 import { ThesisImpactList } from './ThesisImpactList';
 
@@ -91,12 +92,14 @@ const PointList: React.FC<{ title: string; points: string[]; tone: string }> = (
 export const ThesisPanel: React.FC = () => {
   const { t } = useTranslation();
   const symbol = useAtomValue(activeSymbolAtom);
+  const setNavSection = useSetAtom(navSectionAtom);
   const [theses, setTheses] = useAtom(thesesAtom);
   const [impacts, setImpacts] = useAtom(thesisImpactsAtom);
   const [report, setReport] = useAtom(researchReportAtomFamily(symbol ?? ''));
   const [loading, setLoading] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [lastImpact, setLastImpact] = useState<string | null>(null);
+  const [justSaved, setJustSaved] = useState(false);
 
   const refresh = useCallback(async () => {
     if (!symbol) return;
@@ -114,12 +117,19 @@ export const ThesisPanel: React.FC = () => {
 
   useEffect(() => {
     refresh();
+    setJustSaved(false);
   }, [refresh]);
 
   if (!symbol) {
     return (
-      <div className="flex h-full items-center justify-center p-4 text-[13px] text-foreground/44">
-        {t('thesis.selectSymbol')}
+      <div data-testid="thesis-panel" className="flex h-full items-center justify-center p-4">
+        <div className="mx-auto w-full max-w-sm rounded-[12px] border border-border bg-surface p-5 text-center">
+          <div className="text-[15px] font-semibold text-foreground">{t('thesis.empty.title')}</div>
+          <p className="mt-1 text-[12px] text-foreground/54">{t('thesis.empty.subtitle')}</p>
+          <Button size="sm" className="mt-3" onClick={() => setNavSection('research')}>
+            {t('thesis.empty.goResearch')}
+          </Button>
+        </div>
       </div>
     );
   }
@@ -128,7 +138,10 @@ export const ThesisPanel: React.FC = () => {
 
   const handleSaveFromReport = async () => {
     const created = await saveThesisFromReport(symbol);
-    if (created) setTheses((current) => [created, ...current.filter((t) => t.id !== created.id)]);
+    if (created) {
+      setTheses((current) => [created, ...current.filter((t) => t.id !== created.id)]);
+      setJustSaved(true);
+    }
   };
 
   const handleReEvaluate = async (thesis: InvestmentThesis) => {
@@ -193,6 +206,17 @@ export const ThesisPanel: React.FC = () => {
       {lastImpact && (
         <div className="mt-3 rounded-[10px] bg-foreground/6 p-3 text-[12px] text-foreground/70">
           {t('thesis.reEvaluateComplete')}
+        </div>
+      )}
+
+      {justSaved && (
+        <div className="mt-3">
+          <NextAction
+            testId="thesis-next-action"
+            primaryLabel={t('thesis.monitor')}
+            onPrimary={() => setNavSection('alerts')}
+            hint={t('thesis.monitoredHint')}
+          />
         </div>
       )}
 

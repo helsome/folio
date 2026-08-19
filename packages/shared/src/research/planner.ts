@@ -25,13 +25,20 @@ export const CAPABILITY_TITLES: Record<string, string> = {
   'company.profile': 'Company Profile',
   'market.quote': 'Price Momentum',
   'market.kline': 'Price Trend',
+  'market.intraday': 'Intraday Trend',
+  'market.depth': 'Order Book',
+  'market.trades': 'Recent Trades',
+  'market.status': 'Market Status',
   'company.valuation': 'Valuation',
   'company.financials': 'Financials',
   'company.earnings': 'Earnings',
+  'company.dividends': 'Dividends',
   'company.ratings': 'Analyst Ratings',
   'research.news': 'News',
+  'research.events': 'Upcoming Events',
   'market.capitalFlow': 'Capital Flow',
   'portfolio.positions': 'Portfolio Position',
+  'portfolio.summary': 'Portfolio Summary',
 };
 
 export interface PlannedCapability {

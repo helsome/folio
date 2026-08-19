@@ -67,6 +67,8 @@ export const DEFAULT_STRATEGY_ID: StrategyId = 'comprehensive';
 export interface StrategyPickerProps {
   value: StrategyId;
   onChange: (id: StrategyId) => void;
+  /** Strategy id recommended by the entry context (e.g. a Discover task). */
+  recommendedId?: StrategyId | null;
 }
 
 /**
@@ -74,7 +76,7 @@ export interface StrategyPickerProps {
  * flow. Each row is an accessible radio item (Radix RadioGroup): fully
  * keyboard-selectable (arrows + selection) with correct `aria-checked`.
  */
-export const StrategyPicker: React.FC<StrategyPickerProps> = ({ value, onChange }) => {
+export const StrategyPicker: React.FC<StrategyPickerProps> = ({ value, onChange, recommendedId }) => {
   const { t } = useTranslation();
   return (
     <div className="mb-3" data-testid="strategy-picker">
@@ -89,6 +91,7 @@ export const StrategyPicker: React.FC<StrategyPickerProps> = ({ value, onChange 
       >
         {STRATEGY_PRESETS.map((preset) => {
           const selected = preset.id === value;
+          const recommended = recommendedId === preset.id;
           return (
             <RadioGroup.Item
               key={preset.id}
@@ -107,8 +110,18 @@ export const StrategyPicker: React.FC<StrategyPickerProps> = ({ value, onChange 
                 {selected && <span className="h-2 w-2 rounded-full bg-accent" />}
               </span>
               <span className="min-w-0 flex-1">
-                <span className="block text-[12px] font-semibold text-foreground">
-                  {t(`research.strategies.${preset.key}Name`)}
+                <span className="flex items-center gap-1.5">
+                  <span className="block text-[12px] font-semibold text-foreground">
+                    {t(`research.strategies.${preset.key}Name`)}
+                  </span>
+                  {recommended && (
+                    <span
+                      data-testid={`strategy-recommended-${preset.id}`}
+                      className="rounded-[4px] bg-accent/12 px-1.5 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-accent"
+                    >
+                      {t('research.recommended')}
+                    </span>
+                  )}
                 </span>
                 <span className="mt-0.5 block text-[10.5px] leading-snug text-text-muted">
                   {t(`research.strategies.${preset.key}Description`)}

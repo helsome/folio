@@ -25,6 +25,13 @@ export const thesis = {
     bearish: 'Bearish',
     neutral: 'Neutral',
   },
+  empty: {
+    title: 'Track your investment logic',
+    subtitle: 'Run Deep Research on a stock, then save the conclusion here.',
+    goResearch: 'Start Research',
+  },
+  monitor: 'Monitor',
+  monitoredHint: 'You will be notified when important things change.',
   editor: {
     stance: 'Stance',
     coreThesis: 'Core thesis',
