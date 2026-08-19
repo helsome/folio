@@ -74,7 +74,11 @@ function isSecretField(path: string): boolean {
 }
 
 export class EvaluationRedactor {
-  constructor(private readonly privacyLevel: PrivacyLevel) {}
+  private readonly privacyLevel: PrivacyLevel;
+
+  constructor(privacyLevel: PrivacyLevel) {
+    this.privacyLevel = privacyLevel;
+  }
 
   /**
    * Deep-redact an arbitrary JSON value; returns a structurally safe copy.

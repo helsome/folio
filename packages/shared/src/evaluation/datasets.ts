@@ -19,7 +19,11 @@ export interface EmbeddedDataset {
 }
 
 export class EmbeddedDatasetCatalog implements DatasetCatalog {
-  constructor(private readonly embedded: EmbeddedDataset[]) {}
+  private readonly embedded: EmbeddedDataset[];
+
+  constructor(embedded: EmbeddedDataset[]) {
+    this.embedded = embedded;
+  }
 
   async list(): Promise<EvaluationDataset[]> {
     return this.embedded.map((entry) => entry.load());
@@ -33,7 +37,11 @@ export class EmbeddedDatasetCatalog implements DatasetCatalog {
 
 /** User-authored datasets persisted under the eval store (privacy-cleaned). */
 export class UserDatasetCatalog implements DatasetCatalog {
-  constructor(private readonly store: JsonFileStore) {}
+  private readonly store: JsonFileStore;
+
+  constructor(store: JsonFileStore) {
+    this.store = store;
+  }
 
   async list(): Promise<EvaluationDataset[]> {
     return this.store.read<EvaluationDataset[]>('evaluation/datasets.json', []);
@@ -58,10 +66,16 @@ export class UserDatasetCatalog implements DatasetCatalog {
 
 /** Composite catalog: embedded first (same id wins), then user datasets. */
 export class CompositeDatasetCatalog implements DatasetCatalog {
+  private readonly embedded: EmbeddedDatasetCatalog;
+  private readonly user: UserDatasetCatalog;
+
   constructor(
-    private readonly embedded: EmbeddedDatasetCatalog,
-    private readonly user: UserDatasetCatalog,
-  ) {}
+    embedded: EmbeddedDatasetCatalog,
+    user: UserDatasetCatalog,
+  ) {
+    this.embedded = embedded;
+    this.user = user;
+  }
 
   async list(): Promise<EvaluationDataset[]> {
     const embedded = await this.embedded.list();
