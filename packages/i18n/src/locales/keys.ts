@@ -9,7 +9,10 @@
  * extras is enforced by `i18n:check` at CI.
  */
 
-export type NsValue = string | Record<string, string | Record<string, string>>;
+export type NsValue =
+  | string
+  | readonly string[]
+  | Record<string, string | readonly string[] | Record<string, string | readonly string[]>>;
 
 export type NamespaceResource = Record<string, NsValue>;
 

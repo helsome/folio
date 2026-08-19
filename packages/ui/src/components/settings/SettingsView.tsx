@@ -16,12 +16,17 @@ const TABS: Array<{ id: SettingsTab; labelKey: string }> = [
   { id: 'general', labelKey: 'settings.tabs.general' },
   { id: 'llm', labelKey: 'settings.tabs.llm' },
   { id: 'connections', labelKey: 'settings.tabs.connections' },
+];
+
+// V9 §71: advanced/developer surfaces are grouped, never equal-weight with the
+// everyday settings a normal user touches.
+const ADVANCED_TABS: Array<{ id: SettingsTab; labelKey: string }> = [
   { id: 'skills', labelKey: 'settings.tabs.skills' },
-  { id: 'diagnostics', labelKey: 'settings.tabs.diagnostics' },
   // Performance tab (V5 spec §36–38) — aggregates opinion outcomes.
   { id: 'performance', labelKey: 'settings.tabs.performance' },
   // Agent evaluation (V7 spec §61–63) — LangSmith connection + tracing.
   { id: 'evaluation', labelKey: 'settings.tabs.evaluation' },
+  { id: 'diagnostics', labelKey: 'settings.tabs.diagnostics' },
 ];
 
 export const SettingsView: React.FC = () => {
@@ -38,6 +43,10 @@ export const SettingsView: React.FC = () => {
         <Tabs value={tab} onValueChange={(value) => setTab(value as SettingsTab)} className="mt-3">
           <TabsList>
             {TABS.map((tabDef) => <TabsTrigger key={tabDef.id} value={tabDef.id}>{t(tabDef.labelKey)}</TabsTrigger>)}
+            <span className="mx-1 flex items-center text-[9.5px] font-semibold uppercase tracking-[.14em] text-foreground/30">
+              {t('settings.tabs.advanced')}
+            </span>
+            {ADVANCED_TABS.map((tabDef) => <TabsTrigger key={tabDef.id} value={tabDef.id}>{t(tabDef.labelKey)}</TabsTrigger>)}
           </TabsList>
         </Tabs>
       </header>

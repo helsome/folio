@@ -38,6 +38,7 @@ for (const [locale, bundle] of Object.entries(resources)) {
     for (const [k, v] of Object.entries(node)) {
       const path = prefix === '' ? `${ns}.${k}` : `${prefix}.${k}`;
       if (typeof v === 'string') continue;
+      if (Array.isArray(v)) continue;
       if (v !== null && typeof v === 'object') {
         walk(ns, path, v as Record<string, unknown>);
       } else {

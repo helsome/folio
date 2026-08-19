@@ -43,6 +43,7 @@ export const settings = {
     diagnostics: 'Diagnostics',
     performance: 'Performance',
     evaluation: 'Evaluation',
+    advanced: 'Advanced',
   },
   model: {
     runtimeDefaultModel: 'Runtime & default model',

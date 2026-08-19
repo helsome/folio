@@ -37,6 +37,7 @@ export const settings = {
     diagnostics: '诊断',
     performance: '性能',
     evaluation: '评测',
+    advanced: '高级',
   },
   model: {
     runtimeDefaultModel: '运行时与默认模型',

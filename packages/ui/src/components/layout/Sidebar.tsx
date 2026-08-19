@@ -168,7 +168,9 @@ export const Sidebar: React.FC = () => {
         {navSection === 'settings' && (
           <div className="border-b border-border px-2 py-3">
             <p className="px-2 pb-2 text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/42">{t('navigation.settings')}</p>
-            {['general', 'llm', 'connections', 'skills', 'performance', 'diagnostics', 'evaluation'].map((tab) => <SettingsNavButton key={tab} tab={tab} />)}
+            {['general', 'llm', 'connections'].map((tab) => <SettingsNavButton key={tab} tab={tab} />)}
+            <p className="px-2 pb-1 pt-2.5 text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/30">{t('settings.tabs.advanced')}</p>
+            {['skills', 'performance', 'evaluation', 'diagnostics'].map((tab) => <SettingsNavButton key={tab} tab={tab} />)}
           </div>
         )}
 

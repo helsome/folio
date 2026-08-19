@@ -48,6 +48,7 @@ function walk(prefix: string, table: Record<string, unknown>, out: Record<string
   for (const [key, value] of Object.entries(table)) {
     const full = prefix === '' ? key : `${prefix}.${key}`;
     if (typeof value === 'string') out[full] = value;
+    else if (Array.isArray(value)) out[full] = JSON.stringify(value);
     else if (value !== null && typeof value === 'object') walk(full, value as Record<string, unknown>, out);
   }
 }
