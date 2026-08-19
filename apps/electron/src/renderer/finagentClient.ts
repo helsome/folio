@@ -115,6 +115,7 @@ function createElectronClient(): FinagentClient {
     diagnostics: {
       collect: () => ipcResult(window.electronAPI.diagnostics.collect()),
       export: () => ipcResult(window.electronAPI.diagnostics.export()),
+      restartRuntime: () => ipcResult(window.electronAPI.diagnostics.restartRuntime()),
     },
     health: {
       check: () => ipcResult(window.electronAPI.health.check()),

@@ -34,6 +34,18 @@ function makeBundle(): DiagnosticsBundle {
       traceStatus: 'disabled',
       datasets: ['folio-agent-v1'],
     },
+    pi: {
+      status: 'idle',
+      command: null,
+      cwd: null,
+      extensions: [],
+      providersConfigured: [],
+      model: null,
+      lastExitCode: null,
+      lastExitSignal: null,
+      stderrTail: null,
+      observabilityDegraded: null,
+    },
     errors: [
       // A secret smuggled into an error message must be stripped on export.
       { at: 1, source: 'main', message: 'request failed with key sk-abcdef1234567890', stack: null },

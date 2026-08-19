@@ -270,6 +270,8 @@ export interface FinagentClient {
   diagnostics?: {
     collect: () => Promise<ApiResult<DiagnosticsBundle>>;
     export: () => Promise<ApiResult<{ canceled?: boolean; filePath?: string }>>;
+    /** V8.1 §40: restart the Pi runtime from Diagnostics. Best-effort. */
+    restartRuntime: () => Promise<ApiResult<void>>;
   };
   connections?: ConnectionsChannel;
   health?: HealthChannel;

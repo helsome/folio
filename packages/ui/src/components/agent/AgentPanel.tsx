@@ -2,14 +2,16 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowUp, ChevronLeft, Square } from 'lucide-react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import type { PortfolioSnapshot, Quote, ToolCall } from '@finagent/core';
+import type { ApiError, PortfolioSnapshot, Quote, ToolCall } from '@finagent/core';
 import {
   activeMessagesAtom,
   activeSessionIdAtom,
   agentPanelVisibleAtom,
   cancelRunAtom,
   createSessionAtom,
+  navSectionAtom,
   runViewAtom,
+  settingsTabAtom,
   workspaceContextAtom,
 } from '../../atoms';
 import { useFinagentClient } from '../../client';
@@ -92,7 +94,7 @@ export const AgentPanel: React.FC = () => {
   const [sendError, setSendError] = useState<string | null>(null);
   const bodyEndRef = useRef<HTMLDivElement>(null);
 
-  const isRunning = runView !== null;
+  const isRunning = runView !== null && runView.infraError === undefined;
 
   useEffect(() => {
     bodyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -108,6 +110,17 @@ export const AgentPanel: React.FC = () => {
     if (!result.ok) {
       setSendError(result.error.message);
       setInput(text);
+    }
+  };
+
+  /** V8.1 §38: retry the last user message after an infra failure. */
+  const handleRetry = async () => {
+    const lastUser = [...messages].reverse().find((message) => message.role === 'user');
+    if (!lastUser || !activeSessionId) return;
+    setSendError(null);
+    const result = await client.kernel.startRun(activeSessionId, lastUser.content, workspaceContext);
+    if (!result.ok) {
+      setSendError(result.error.message);
     }
   };
 
@@ -183,6 +196,12 @@ export const AgentPanel: React.FC = () => {
       {/* Scrollable body: tool activity, structured results, messages, live answer */}
       <div className="flex-1 overflow-y-auto scrollbar-hover">
         <div className="flex flex-col gap-3 p-3">
+          {runView?.infraError && (
+            <RuntimeInfraBanner
+              error={runView.infraError}
+              onRetry={() => void handleRetry()}
+            />
+          )}
           <ToolActivity toolCalls={toolCalls} />
           {quote && <QuoteCard quote={quote} />}
           {portfolio && <PortfolioRiskCard portfolio={portfolio} />}
@@ -246,6 +265,74 @@ const StreamingBlock: React.FC<{ answer: string }> = ({ answer }) => {
       ) : (
         <div className="text-[13px] italic text-foreground/40">{t('agent.panel.thinking')}</div>
       )}
+    </div>
+  );
+};
+
+/** Map a runtime infra code to a user-facing reason key (V8.1 §38). */
+function runtimeReasonKey(code: string | undefined): string {
+  switch (code) {
+    case 'PI_LLM_ENV_MISSING':
+      return 'agent.runtime.reasonEnvMissing';
+    case 'PI_RUNTIME_NOT_FOUND':
+      return 'agent.runtime.reasonCommand';
+    default:
+      return 'agent.runtime.reasonUnknown';
+  }
+}
+
+/**
+ * V8.1 §38–39 — persistent route for *infrastructure* failures. Rendered
+ * instead of an assistant-style chat message: distinct styling, an actionable
+ * reason, Retry, and a Diagnostics shortcut. A successful retry clears it via
+ * the run_started event (runAtoms clears infraError).
+ */
+const RuntimeInfraBanner: React.FC<{ error: ApiError; onRetry: () => void }> = ({
+  error,
+  onRetry,
+}) => {
+  const { t } = useTranslation();
+  const setNavSection = useSetAtom(navSectionAtom);
+  const setSettingsTab = useSetAtom(settingsTabAtom);
+  const openDiagnostics = (): void => {
+    setSettingsTab('diagnostics');
+    setNavSection('settings');
+  };
+
+  return (
+    <div
+      data-testid="runtime-infra-banner"
+      role="alert"
+      className="rounded-[14px] border border-destructive/26 bg-destructive/6 px-3.5 py-3 text-[13px]"
+    >
+      <div className="mb-1 flex items-center gap-2">
+        <span className="h-1.5 w-1.5 rounded-full bg-destructive" />
+        <span className="font-semibold text-foreground">{t('agent.runtime.unavailable')}</span>
+      </div>
+      <p className="text-foreground/76">{t('agent.runtime.failedToStart')}</p>
+      <p className="mt-1 text-foreground/56">{t(runtimeReasonKey(error.code))}</p>
+      {error.action && (
+        <p className="mt-1 text-[12px] text-foreground/46">{error.action}</p>
+      )}
+      <p className="mt-2 text-[11px] select-text break-words text-foreground/38">
+        {t('agent.runtime.detailsLabel')}: {error.message}
+      </p>
+      <div className="mt-2.5 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={onRetry}
+          className="mac-primary-button h-8 rounded-[9px] px-3 text-[12px] font-semibold transition-smooth active:scale-[0.985]"
+        >
+          {t('agent.runtime.retry')}
+        </button>
+        <button
+          type="button"
+          onClick={openDiagnostics}
+          className="h-8 rounded-[9px] border mac-section-divider px-3 text-[12px] font-medium text-foreground/72 transition-smooth hover:bg-foreground/6"
+        >
+          {t('agent.runtime.openDiagnostics')}
+        </button>
+      </div>
     </div>
   );
 };

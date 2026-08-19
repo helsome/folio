@@ -39,7 +39,8 @@
     "tailwind-merge": "^2.5.4",
     "@finagent/i18n": "workspace:*",
     "react-i18next": "^15.0.0",
-    "i18next": "^24.2.0"
+    "i18next": "^24.2.0",
+    "@finagent/core": "workspace:*"
   },
   "devDependencies": {
     "@types/react": "^18.3.0",

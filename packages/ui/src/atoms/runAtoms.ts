@@ -1,5 +1,6 @@
 import { atom } from 'jotai';
 import type { AgentEvent, ApiError, Message, ToolCall } from '@finagent/core';
+import { isRuntimeInfraCode } from '@finagent/core';
 import type { FinagentClient } from '../client';
 import { activeSessionIdAtom, messagesAtomFamily, sessionsAtom } from './sessionAtoms';
 
@@ -10,6 +11,10 @@ export interface RunView {
   answer: string;
   toolCalls: ToolCall[];
   error?: ApiError;
+  /** V8.1 §38: set when the run terminated as a runtime infrastructure failure
+   * (Pi process unavailable). The panel shows a dedicated banner instead of a
+   * chat message; cleared on the next run. */
+  infraError?: ApiError;
 }
 
 export const runViewAtom = atom<RunView | null>(null);
@@ -42,6 +47,7 @@ export const applyAgentEventAtom = atom(
         sessionId,
         answer: '',
         toolCalls: [],
+        infraError: undefined,
       });
       return;
     }
@@ -109,12 +115,26 @@ export const applyAgentEventAtom = atom(
 
     if (event.type === 'run_failed') {
       const cancelled = event.payload.error.code === 'RUN_CANCELLED';
+      set(sessionsAtom, (sessions) => sessions.map((session) =>
+        session.id === sessionId ? { ...session, status: 'idle' as const } : session
+      ));
+
+      // V8.1 §38–39: infrastructure failure (Pi process failed to start/stay
+      // up) is not an answer — no assistant message, keep runView so the panel
+      // renders a dedicated runtime banner with Retry + Diagnostics. Real
+      // failures (tool errors, task failures) keep the existing message flow.
+      const error = event.payload.error;
+      if (isRuntimeInfraCode(error.code)) {
+        set(runViewAtom, { ...run, infraError: error });
+        return;
+      }
+
       const assistantMessage: Message = {
         id: `assistant-${event.runId}`,
         role: 'assistant',
         content: cancelled
           ? (run.answer || '(run stopped)')
-          : `Error: ${event.payload.error.message}`,
+          : `Error: ${error.message}`,
         timestamp: event.timestamp,
         toolCalls: run.toolCalls.map((toolCall) => ({
           id: toolCall.id,
@@ -129,7 +149,9 @@ export const applyAgentEventAtom = atom(
       };
       set(messages, [...get(messages), assistantMessage]);
       set(sessionsAtom, (sessions) => sessions.map((session) =>
-        session.id === sessionId ? { ...session, status: 'idle' as const, messageCount: session.messageCount + 1 } : session
+        session.id === sessionId
+          ? { ...session, status: 'idle' as const, messageCount: session.messageCount + 1 }
+          : session
       ));
       set(runViewAtom, null);
       return;

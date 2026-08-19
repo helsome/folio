@@ -52,6 +52,18 @@ function baseInput(): DiagnosticsInput {
       traceStatus: 'disabled',
       datasets: ['folio-agent-v1'],
     },
+    pi: {
+      status: 'running',
+      command: 'bunx pi --mode rpc',
+      cwd: '/repo',
+      extensions: ['.pi/extensions/finagent/index.ts'],
+      providersConfigured: ['anthropic'],
+      model: 'claude-3-5-sonnet-20241022',
+      lastExitCode: null,
+      lastExitSignal: null,
+      stderrTail: null,
+      observabilityDegraded: false,
+    },
     errors: [],
   };
 }

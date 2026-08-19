@@ -11,6 +11,19 @@ export const agent = {
     agentRunning: 'Agent running',
     thinking: 'Thinking…',
   },
+  runtime: {
+    // V8.1 §38–39: distinct infra-failure banner instead of chat spam.
+    unavailable: 'Agent unavailable',
+    failedToStart: 'Pi runtime failed to start.',
+    reasonNoModel: 'No model configured.',
+    reasonEnvMissing: 'Provider credential is missing.',
+    reasonExtension: 'A runtime extension failed to load.',
+    reasonCommand: 'Runtime command was not found.',
+    reasonUnknown: 'The agent runtime is unavailable.',
+    retry: 'Retry',
+    openDiagnostics: 'Open Diagnostics',
+    detailsLabel: 'Advanced details',
+  },
   empty: {
     body: 'Start a new session to explore markets with your agent.',
     createSession: 'Create New Session',

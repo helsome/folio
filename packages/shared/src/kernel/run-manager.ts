@@ -14,7 +14,7 @@ import type {
 } from '@finagent/core';
 import type { RunRepository } from '../storage/index.ts';
 import type { SessionManager } from './session-manager.ts';
-import { createCodeError, toApiError } from '../agent/errors.ts';
+import { createCodeError, isRuntimeInfraCode, toApiError } from '../agent/errors.ts';
 
 export interface RunManagerOptions {
   sessions: SessionManager;
@@ -198,14 +198,21 @@ export class RunManager {
 
     await this.runs.update(run);
 
-    const assistantMessage: Message = {
-      id: randomUUID(),
-      role: 'assistant',
-      content: answer || (run.status === 'failed' ? run.error?.message ?? 'Run failed.' : ''),
-      timestamp: now,
-      toolCalls: toolCalls.map(toRecord),
-    };
-    await this.sessions.appendMessage(run.sessionId, assistantMessage);
+    // V8.1 §38–39: an *infrastructure* failure (Pi process failed to start /
+    // stay up) is not an answer — do not persist an assistant-style message
+    // that would spam the conversation. The renderer shows a dedicated banner
+    // instead. Real failures (tool errors, task failures) keep the message.
+    const isInfraFailure = run.status === 'failed' && isRuntimeInfraCode(run.error?.code);
+    if (!isInfraFailure) {
+      const assistantMessage: Message = {
+        id: randomUUID(),
+        role: 'assistant',
+        content: answer || (run.status === 'failed' ? run.error?.message ?? 'Run failed.' : ''),
+        timestamp: now,
+        toolCalls: toolCalls.map(toRecord),
+      };
+      await this.sessions.appendMessage(run.sessionId, assistantMessage);
+    }
     await this.sessions.updateSession(run.sessionId, {
       status: 'idle',
       recentSymbols: collectSymbols(toolCalls),

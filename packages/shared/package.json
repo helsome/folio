@@ -21,7 +21,8 @@
     "@finagent/core": "workspace:*",
     "@finagent/longbridge-tools": "workspace:*",
     "@sinclair/typebox": "^0.34.0",
-    "zod": "^3.23.0"
+    "zod": "^3.23.0",
+    "@finagent/i18n": "workspace:*"
   },
   "scripts": {
     "test": "bun test",

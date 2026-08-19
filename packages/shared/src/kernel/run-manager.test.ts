@@ -155,7 +155,7 @@ describe('RunManager', () => {
     ]);
   });
 
-  it('persists failed runs with the error', async () => {
+  it('persists failed runs with the error (infra failures skip the chat message, V8.1 §38–39)', async () => {
     const { sessions, runs } = makeKernel(async function* (input) {
       yield event(input.sessionId, input.runId, 'run_failed', {
         error: { code: 'PI_RUNTIME_EXITED', message: 'Pi runtime exited with code 1.' },
@@ -170,8 +170,25 @@ describe('RunManager', () => {
     expect(persistedRun?.status).toBe('failed');
     expect(persistedRun?.error?.code).toBe('PI_RUNTIME_EXITED');
 
+    // A runtime infrastructure failure is NOT an answer: it must not spam the
+    // conversation with an assistant-style "Pi runtime exited" message. Only
+    // the user message lives on; the panel renders a dedicated banner instead.
     const messages = await sessions.listMessages(session.id);
-    expect(messages[1].content).toContain('Pi runtime exited');
+    expect(messages.map((m) => m.role)).toEqual(['user']);
+  });
+
+  it('still persists an assistant message for non-infrastructure failures', async () => {
+    const { sessions, runs } = makeKernel(async function* (input) {
+      yield event(input.sessionId, input.runId, 'run_failed', {
+        error: { code: 'TOOL_EXECUTION_ERROR', message: 'get_quote failed: rate limited.' },
+      });
+    });
+    const session = await sessions.createSession('A');
+    await runs.startRun(session.id, 'check NVDA');
+    await waitFor(async () => !runs.isRunning());
+    const messages = await sessions.listMessages(session.id);
+    expect(messages.map((m) => m.role)).toEqual(['user', 'assistant']);
+    expect(messages[1].content).toContain('get_quote failed');
   });
 
   it('cancels a running run and marks it cancelled', async () => {

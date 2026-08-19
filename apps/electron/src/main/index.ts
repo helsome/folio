@@ -361,6 +361,10 @@ ipcMain.handle('diagnostics:collect', async () =>
   toIpcResult(() => agentKernelHost.collectDiagnostics())
 );
 
+ipcMain.handle('runtime:restart', async () =>
+  toIpcResult(() => agentKernelHost.restartRuntime())
+);
+
 ipcMain.handle('diagnostics:export', async () =>
   toIpcResult(async () => {
     const bundle = await agentKernelHost.collectDiagnostics();

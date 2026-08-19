@@ -82,6 +82,18 @@ export async function collectDiagnostics(
       traceStatus: input.evaluation.traceStatus,
       datasets: [...input.evaluation.datasets],
     },
+    pi: {
+      status: input.pi.status,
+      command: input.pi.command,
+      cwd: input.pi.cwd,
+      extensions: [...input.pi.extensions],
+      providersConfigured: [...input.pi.providersConfigured],
+      model: input.pi.model,
+      lastExitCode: input.pi.lastExitCode,
+      lastExitSignal: input.pi.lastExitSignal,
+      stderrTail: input.pi.stderrTail,
+      observabilityDegraded: input.pi.observabilityDegraded,
+    },
     resources: {
       dev: input.resources.dev,
       root: input.resources.root,

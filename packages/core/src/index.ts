@@ -271,6 +271,31 @@ export interface ApiError {
   action?: string;
 }
 
+/**
+ * Runtime *infrastructure* failure codes (V8.1 §38–39): the Pi process itself
+ * failed to start / stay up / speak — not a failed computation. Renderers
+ * surface these as a dedicated runtime banner instead of assistant-style chat
+ * messages, and the run manager skips persisting a fake assistant reply.
+ */
+const RUNTIME_INFRA_CODES = new Set([
+  'PI_RUNTIME_NOT_FOUND',
+  'PI_RUNTIME_EXITED',
+  'PI_RUNTIME_ERROR',
+  'PI_RUNTIME_STOPPED',
+  'PI_PROTOCOL_ERROR',
+  'PI_REQUEST_TIMEOUT',
+  'PI_HEALTH_TIMEOUT',
+  'PI_LLM_ENV_MISSING',
+] as const);
+
+export function isRuntimeInfraCode(code: string | undefined): boolean {
+  if (typeof code !== 'string') return false;
+  for (const candidate of RUNTIME_INFRA_CODES) {
+    if (candidate === code) return true;
+  }
+  return false;
+}
+
 export type ApiResult<T> =
   | { ok: true; data: T }
   | { ok: false; error: ApiError };

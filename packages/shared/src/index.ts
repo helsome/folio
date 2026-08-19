@@ -103,7 +103,7 @@ export {
 export type { PiPromptStream, PiPromptResult, PiState, PiStreamEvent } from './agent/pi-rpc-client.ts';
 
 // Core error helpers used across services & the main process.
-export { createCodeError, toApiError } from './agent/errors.ts';
+export { createCodeError, isRuntimeInfraCode, toApiError } from './agent/errors.ts';
 
 // ── Folio V3 modules ───────────────────────────────────────────────────────
 export * from './capabilities/index.ts';

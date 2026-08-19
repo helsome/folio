@@ -117,6 +117,8 @@ export class PiRpcClient {
   private stdoutBuffer = '';
   private stderrBuffer = '';
   private exited = false;
+  /** Last process termination (V8.1 §35, §40): exit code/signal for diagnostics. */
+  private lastExitInfo: { code: number | null; signal: string | null } | null = null;
   private pendingPrompts = new Map<string, PendingPrompt>();
   private pendingControls = new Map<string, PendingControl>();
 
@@ -188,6 +190,44 @@ export class PiRpcClient {
   /** Set the thinking level. The runtime coerces to the nearest supported level. */
   async setThinkingLevel(level: string): Promise<void> {
     await this.sendControl<unknown>({ type: 'set_thinking_level', level }, this.controlTimeoutMs);
+  }
+
+  /** Sanitized last-exit info for Diagnostics (V8.1 §40). Null before any exit. */
+  getLastExitInfo(): { code: number | null; signal: string | null } | null {
+    return this.lastExitInfo;
+  }
+
+  /** Whether a runtime process is currently alive. */
+  isRuntimeAlive(): boolean {
+    return this.process !== null && !this.exited;
+  }
+
+  /**
+   * Sanitized launch facts for Diagnostics (V8.1 §40): no secrets, extension
+   * paths derived from the `--extension` args.
+   */
+  getLaunchInfo(): {
+    command: string;
+    args: string[];
+    cwd: string;
+    extensions: string[];
+  } {
+    const extensions: string[] = [];
+    for (let i = 0; i < this.args.length - 1; i += 1) {
+      if (this.args[i] === '--extension') extensions.push(this.args[i + 1]);
+    }
+    return {
+      command: this.command,
+      args: [...this.args],
+      cwd: this.cwd ?? process.cwd(),
+      extensions,
+    };
+  }
+
+  /** Recent stderr tail (capped) for Diagnostics — never has live prompt text. */
+  getRecentStderr(maxBytes = 6000): string {
+    if (this.stderrBuffer.length <= maxBytes) return this.stderrBuffer;
+    return this.stderrBuffer.slice(this.stderrBuffer.length - maxBytes);
   }
 
   /**
@@ -429,6 +469,7 @@ export class PiRpcClient {
     }
 
     this.exited = false;
+    this.lastExitInfo = null;
     let proc: SpawnProcess;
     try {
       proc = this.spawnProcess(this.command, [...this.args], {
@@ -448,6 +489,7 @@ export class PiRpcClient {
     proc.stderr.on('data', (chunk) => this.consumeStderr(String(chunk)));
     proc.on('error', (error) => this.handleExit(normalizeSpawnError(error, this.command)));
     proc.on('exit', (code, signal) => {
+      this.lastExitInfo = { code, signal };
       this.handleExit(createCodeError(
         'PI_RUNTIME_EXITED',
         `Pi runtime exited${code === null ? '' : ` with code ${code}`}${signal ? ` and signal ${signal}` : ''}.`

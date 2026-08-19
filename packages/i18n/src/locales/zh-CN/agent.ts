@@ -12,6 +12,18 @@ export const agent = {
     agentRunning: 'Agent 运行中',
     thinking: '思考中…',
   },
+  runtime: {
+    unavailable: 'Agent 不可用',
+    failedToStart: 'Pi 运行时启动失败。',
+    reasonNoModel: '未配置模型。',
+    reasonEnvMissing: '缺少提供方凭据。',
+    reasonExtension: '运行时扩展加载失败。',
+    reasonCommand: '找不到运行时命令。',
+    reasonUnknown: 'Agent 运行时不可用。',
+    retry: '重试',
+    openDiagnostics: '打开诊断',
+    detailsLabel: '高级详情',
+  },
   empty: {
     body: '开始新会话，让 Agent 为你探索市场。',
     createSession: '创建新会话',

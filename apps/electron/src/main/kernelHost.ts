@@ -1233,6 +1233,26 @@ export class AgentKernelHost {
     } catch {
       // Local provider (no Pi runtime) — llm fields stay null.
     }
+    // V8.1 §40: Pi runtime facts (sanitized). Local backend → all nulls.
+    let piDiag = {
+      status: 'unknown' as 'idle' | 'running' | 'exited' | 'unknown',
+      command: null as string | null,
+      cwd: null as string | null,
+      extensions: [] as string[],
+      providersConfigured: [] as string[],
+      model: null as string | null,
+      lastExitCode: null as number | null,
+      lastExitSignal: null as string | null,
+      stderrTail: null as string | null,
+      observabilityDegraded: null as boolean | null,
+    };
+    if (this.kernel.runtime instanceof PiRuntimeAdapter) {
+      try {
+        piDiag = await this.kernel.runtime.getRuntimeDiagnostics(llmState);
+      } catch {
+        // Diagnostics must never fail because the runtime object slipped.
+      }
+    }
     let providerSummaries: FinancialProviderSummary[] = [];
     try {
       providerSummaries = this.listFinancialProviders();
@@ -1268,7 +1288,25 @@ export class AgentKernelHost {
           : [],
       },
       errors: mainErrorLog.recent(20),
+      pi: {
+        status: piDiag.status,
+        command: piDiag.command,
+        cwd: piDiag.cwd,
+        extensions: piDiag.extensions,
+        providersConfigured: piDiag.providersConfigured,
+        model: piDiag.model,
+        lastExitCode: piDiag.lastExitCode,
+        lastExitSignal: piDiag.lastExitSignal,
+        stderrTail: piDiag.stderrTail,
+        observabilityDegraded: piDiag.observabilityDegraded,
+      },
     });
+  }
+
+  /** V8.1 §40: restart the Pi runtime from Diagnostics. Best-effort. */
+  async restartRuntime(): Promise<void> {
+    if (!(this.kernel.runtime instanceof PiRuntimeAdapter)) return;
+    await this.kernel.runtime.restart();
   }
 
   /** Embedded + user dataset ids for diagnostics (spec §86). */

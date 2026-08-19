@@ -96,6 +96,7 @@ export interface ElectronAPI {
   diagnostics: {
     collect: () => Promise<unknown>;
     export: () => Promise<unknown>;
+    restartRuntime: () => Promise<unknown>;
   };
   health: {
     check: () => Promise<unknown>;
@@ -288,6 +289,7 @@ const electronAPI: ElectronAPI = {
   diagnostics: {
     collect: () => ipcRenderer.invoke('diagnostics:collect'),
     export: () => ipcRenderer.invoke('diagnostics:export'),
+    restartRuntime: () => ipcRenderer.invoke('runtime:restart'),
   },
   health: {
     check: () => ipcRenderer.invoke('health:check'),

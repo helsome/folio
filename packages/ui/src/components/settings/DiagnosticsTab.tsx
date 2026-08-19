@@ -35,6 +35,8 @@ export const DiagnosticsTab: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [exporting, setExporting] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [restarting, setRestarting] = useState(false);
+
 
   const refresh = useCallback(async () => {
     setError(null);
@@ -59,6 +61,16 @@ export const DiagnosticsTab: React.FC = () => {
       setExporting(false);
     }
   }, [client]);
+
+  const onRestartRuntime = useCallback(async () => {
+    setRestarting(true);
+    try {
+      await client.diagnostics?.restartRuntime?.();
+      await refresh();
+    } finally {
+      setRestarting(false);
+    }
+  }, [client, refresh]);
 
   const onCopySummary = useCallback(async () => {
     if (!bundle) return;
@@ -146,6 +158,26 @@ export const DiagnosticsTab: React.FC = () => {
           <Section title={t('diagnostics.sectionResources')}>
             <Row label={t('diagnostics.mode')} value={bundle.resources.dev ? t('diagnostics.development') : t('diagnostics.packaged')} />
             <Row label={t('diagnostics.runtimeRoot')} value={bundle.resources.root} />
+          </Section>
+
+          <Section title={t('diagnostics.sectionPiRuntime')}>
+            <Row label={t('diagnostics.piStatus')} value={bundle.pi.status ?? '—'} />
+            <Row label={t('diagnostics.piCommand')} value={bundle.pi.command ?? '—'} />
+            <Row label={t('diagnostics.piProvider')} value={bundle.pi.providersConfigured.join(', ') || '—'} />
+            <Row label={t('diagnostics.piModel')} value={bundle.pi.model ?? '—'} />
+            <Row label={t('diagnostics.piExtensions')} value={bundle.pi.extensions.join(', ') || '—'} />
+            <Row label={t('diagnostics.piLastExit')} value={`${bundle.pi.lastExitCode ?? '—'} ${bundle.pi.lastExitSignal ?? ''}`.trim()} />
+            <Row label={t('diagnostics.piDegraded')} value={bundle.pi.observabilityDegraded == null ? '—' : bundle.pi.observabilityDegraded ? t('diagnostics.yes') : t('diagnostics.no')} />
+            {bundle.pi.stderrTail && (
+              <pre className="mt-1 max-h-28 overflow-auto rounded-[8px] bg-muted/40 p-2 font-mono text-[10.5px] leading-relaxed text-foreground/60">
+                {bundle.pi.stderrTail}
+              </pre>
+            )}
+            <div className="pt-1">
+              <Button variant="outline" size="sm" onClick={() => void onRestartRuntime()} disabled={restarting}>
+                {restarting ? t('diagnostics.restarting') : t('diagnostics.restartRuntime')}
+              </Button>
+            </div>
           </Section>
 
           <Section title={t('diagnostics.sectionLastErrors')}>

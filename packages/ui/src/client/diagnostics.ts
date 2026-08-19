@@ -63,6 +63,19 @@ export interface DiagnosticsBundle {
     dev: boolean;
     root: string;
   };
+  /** V8.1 §40: Pi runtime facts (sanitized). */
+  pi: {
+    status: 'idle' | 'running' | 'exited' | 'unknown';
+    command: string | null;
+    cwd: string | null;
+    extensions: string[];
+    providersConfigured: string[];
+    model: string | null;
+    lastExitCode: number | null;
+    lastExitSignal: string | null;
+    stderrTail: string | null;
+    observabilityDegraded: boolean | null;
+  };
   errors: DiagnosticsErrorEntry[];
   redaction: {
     policy: string;
@@ -79,6 +92,7 @@ export interface DiagnosticsExportResult {
 export interface DiagnosticsChannel {
   collect: () => Promise<ApiResult<DiagnosticsBundle>>;
   export: () => Promise<ApiResult<DiagnosticsExportResult>>;
+  restartRuntime: () => Promise<ApiResult<void>>;
 }
 
 function channel(client: FinagentClient): Partial<DiagnosticsChannel> {

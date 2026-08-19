@@ -61,6 +61,19 @@ export interface DiagnosticsInput {
     traceStatus: string | null;
     datasets: string[];
   };
+  /** V8.1 §40: Pi runtime facts (sanitized — no secrets, capped stderr). */
+  pi: {
+    status: 'idle' | 'running' | 'exited' | 'restarting' | 'unknown';
+    command: string | null;
+    cwd: string | null;
+    extensions: string[];
+    providersConfigured: string[];
+    model: string | null;
+    lastExitCode: number | null;
+    lastExitSignal: string | null;
+    stderrTail: string | null;
+    observabilityDegraded: boolean | null;
+  };
   errors: ErrorLogEntry[];
 }
 
@@ -112,6 +125,19 @@ export interface DiagnosticsBundle {
     connected: boolean | null;
     traceStatus: string | null;
     datasets: string[];
+  };
+  /** V8.1 §40: Pi runtime facts (sanitized — no secrets, capped stderr). */
+  pi: {
+    status: 'idle' | 'running' | 'exited' | 'restarting' | 'unknown';
+    command: string | null;
+    cwd: string | null;
+    extensions: string[];
+    providersConfigured: string[];
+    model: string | null;
+    lastExitCode: number | null;
+    lastExitSignal: string | null;
+    stderrTail: string | null;
+    observabilityDegraded: boolean | null;
   };
   errors: ErrorLogEntry[];
   redaction: {

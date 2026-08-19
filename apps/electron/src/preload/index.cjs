@@ -136,7 +136,8 @@ var electronAPI = {
   },
   diagnostics: {
     collect: () => import_electron.ipcRenderer.invoke("diagnostics:collect"),
-    export: () => import_electron.ipcRenderer.invoke("diagnostics:export")
+    export: () => import_electron.ipcRenderer.invoke("diagnostics:export"),
+    restartRuntime: () => import_electron.ipcRenderer.invoke("runtime:restart")
   },
   health: {
     check: () => import_electron.ipcRenderer.invoke("health:check")

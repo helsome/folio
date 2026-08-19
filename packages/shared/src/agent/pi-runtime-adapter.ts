@@ -5,6 +5,7 @@ import type {
   AgentEvent,
   AgentRunInput,
   AgentRuntime,
+  ApiError,
   ApiResult,
   LlmModel,
   LlmRuntimeState,
@@ -22,7 +23,7 @@ import { createPhaseOneRegistry } from '../capabilities/index.ts';
 import { MarketDataService } from './market-data-service.ts';
 import { PiRpcClient, type PiRpcClientOptions, type PiState } from './pi-rpc-client.ts';
 import { PiEventAdapter } from './pi-event-adapter.ts';
-import { createCodeError } from './errors.ts';
+import { createCodeError, toApiError } from './errors.ts';
 
 /** Response-language names fed to the Pi runtime (English instruction). */
 const RUNTIME_LOCALE_NAMES: Record<SupportedLocale, string> = {
@@ -85,8 +86,13 @@ export class PiRuntimeAdapter implements AgentRuntime {
   private readonly readinessProvider?: (skillId: string) => SkillReadiness | undefined;
   private readonly now: () => number;
   private readonly sessions = new Map<string, RuntimeSessionState>();
-  /** Session file currently loaded in the Pi runtime. */
+  /** Active session file in the runtime. */
   private activePath: string | null = null;
+  /** Last configured Pi extension list + the Finagent-core-only subset. */
+  private extensions: string[] = [];
+  private coreExtensions: string[] = [];
+  /** True once optional extensions were dropped for reliability (Diagnostics). */
+  private degraded = false;
   /** Cache of the last known runtime state (model/thinking level). */
   private cachedState: LlmRuntimeState | null = null;
 
@@ -110,6 +116,11 @@ export class PiRuntimeAdapter implements AgentRuntime {
    * configuration changes.
    */
   setExtensions(extensions: string[]): void {
+    this.extensions = extensions;
+    // The Finagent extension is the first entry (V7 listBundledPiExtensions);
+    // everything after it is an optional observability extension. On failure
+    // this slice is what the retry degrades to (V8.1 §37).
+    this.coreExtensions = extensions.slice(0, 1).filter(Boolean);
     this.rpcClient.updateExtensions(extensions);
   }
 
@@ -138,13 +149,91 @@ export class PiRuntimeAdapter implements AgentRuntime {
     };
   }
 
+  /** 
+   * Run one prompt, with one retry at most. If the FIRST attempt dies at
+   * startup with an optional-extension load failure (V8.1 §37), the retry
+   * drops the optional extensions and respawns with the Finagent core only —
+   * observability can never block agent execution. The failed attempt's
+   * run_failed event is suppressed on the retry path so the conversation does
+   * not see a spurious infrastructure error.
+   */
   async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
+    for (let attempt = 0; attempt < 2; attempt += 1) {
+      const outcome: { error: ApiError | undefined; terminated: boolean } = {
+        error: undefined,
+        terminated: false,
+      };
+      yield* this.runAttempt(input, outcome, /*yieldInfraFailure=*/ attempt > 0);
+      if (outcome.terminated || attempt > 0) return;
+
+      // First attempt ended without a terminal event → an infrastructure
+      // startup failure attributable to an optional extension. Degrade once
+      // to the Finagent core extension and retry this same prompt.
+      this.rpcClient.updateExtensions(this.coreExtensions);
+      await this.rpcClient.restart().catch(() => undefined);
+      this.degraded = true;
+    }
+  }
+
+  /** Whether optional extensions were dropped for reliability (Diagnostics). */
+  isObservabilityDegraded(): boolean {
+    return this.degraded;
+  }
+
+  /**
+   * Sanitized Pi runtime facts for Diagnostics (V8.1 §40) — no secrets.
+   * `llmState` is optional; when omitted provider/model stay null.
+   */
+  async getRuntimeDiagnostics(llmState?: LlmRuntimeState | null): Promise<{
+    status: 'idle' | 'running' | 'exited' | 'unknown';
+    command: string | null;
+    cwd: string | null;
+    extensions: string[];
+    providersConfigured: string[];
+    model: string | null;
+    lastExitCode: number | null;
+    lastExitSignal: string | null;
+    stderrTail: string | null;
+    observabilityDegraded: boolean;
+  }> {
+    const launch = this.rpcClient.getLaunchInfo();
+    const exit = this.rpcClient.getLastExitInfo();
+    const stderr = this.rpcClient.getRecentStderr();
+    const model = llmState?.model ?? null;
+    return {
+      status: this.rpcClient.isRuntimeAlive() ? 'running' : exit ? 'exited' : 'idle',
+      command: `${launch.command} ${launch.args.join(' ')}`.slice(0, 400),
+      cwd: launch.cwd,
+      extensions: launch.extensions,
+      providersConfigured: model ? [model.provider] : [],
+      model: model?.id ?? null,
+      lastExitCode: exit?.code ?? null,
+      lastExitSignal: exit?.signal ?? null,
+      stderrTail: stderr.length > 0 ? stderr.slice(-2000) : null,
+      observabilityDegraded: this.degraded,
+    };
+  }
+
+  private async *runAttempt(
+    input: AgentRunInput,
+    outcome: { error: ApiError | undefined; terminated: boolean },
+    yieldInfraFailure: boolean
+  ): AsyncIterable<AgentEvent> {
     const state = this.getOrCreateState(input.sessionId, this.sessionPathFor(input.sessionId));
+    const now = this.now;
+    const fail = async function* (error: unknown, emit: boolean): AsyncIterable<AgentEvent> {
+      outcome.error = toApiError(error);
+      if (!emit) return;
+      outcome.terminated = true;
+      const adapter = new PiEventAdapter({ sessionId: input.sessionId, runId: input.runId, now });
+      yield* adapter.fail(error);
+    };
+
     try {
       await this.activate(state);
     } catch (error) {
-      const adapter = new PiEventAdapter({ sessionId: input.sessionId, runId: input.runId, now: this.now });
-      yield* adapter.fail(error);
+      const emit = yieldInfraFailure || !(await this.isOptionalExtensionFailure(error));
+      yield* fail(error, emit);
       return;
     }
 
@@ -153,6 +242,7 @@ export class PiRuntimeAdapter implements AgentRuntime {
       buildPrompt(input.content, state, input.workspaceContext, this.skillHub, this.readinessProvider, input.locale)
     );
     let aborted = false;
+    let runError: unknown;
 
     try {
       for await (const item of stream) {
@@ -166,13 +256,41 @@ export class PiRuntimeAdapter implements AgentRuntime {
         }
       }
     } catch (error) {
-      yield* adapter.fail(error);
+      runError = error;
+    }
+
+    if (runError !== undefined) {
+      const emitTerminal =
+        yieldInfraFailure || !(await this.isOptionalExtensionFailure(runError));
+      yield* fail(runError, emitTerminal);
       return;
     }
 
+    outcome.terminated = true;
     if (aborted) {
       yield* adapter.cancelled();
     }
+  }
+
+  /** True when the error signature points at a broken optional-extension load. */
+  private async isOptionalExtensionFailure(error: unknown): Promise<boolean> {
+    if (this.extensions.length <= this.coreExtensions.length) return false;
+    const code =
+      error !== null && typeof error === 'object' && 'code' in error
+        ? String((error as { code?: unknown }).code)
+        : '';
+    const isExitClass =
+      code === 'PI_RUNTIME_EXITED' ||
+      code === 'PI_RUNTIME_NOT_FOUND' ||
+      code === 'PI_RUNTIME_ERROR' ||
+      code === 'PI_RUNTIME_STOPPED';
+    if (!isExitClass) return false;
+    const stderr = await this.rpcDiagnosticsTail();
+    return /Failed to load extension|Cannot find module|Error loading extension/i.test(stderr);
+  }
+
+  private async rpcDiagnosticsTail(): Promise<string> {
+    return this.rpcClient.getRecentStderr();
   }
 
   async cancel(input: { sessionId: string; runId: string }): Promise<void> {
@@ -196,6 +314,11 @@ export class PiRuntimeAdapter implements AgentRuntime {
 
   async dispose(): Promise<void> {
     await this.rpcClient.dispose();
+  }
+
+  /** Restart the runtime process (Diagnostics / settings). Best-effort. */
+  async restart(): Promise<void> {
+    await this.rpcClient.restart();
   }
 
   private sessionPathFor(sessionId: string): string {
