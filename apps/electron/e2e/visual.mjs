@@ -2,6 +2,7 @@
 // from the V6 brief so screenshots can be inspected alongside E2E assertions.
 
 import { execSync, spawn } from 'node:child_process';
+import { seedLocale } from './seed-locale.mjs';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -59,6 +60,7 @@ async function main() {
   execSync('bunx vite build', { cwd: appRoot, stdio: 'pipe' });
   rmSync(userDataDir, { recursive: true, force: true });
   mkdirSync(userDataDir, { recursive: true });
+  seedLocale(userDataDir, 'en-US');
   mkdirSync(outputDir, { recursive: true });
 
   const electronProcess = spawn(

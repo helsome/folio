@@ -13,6 +13,7 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "test:e2e": "node e2e/run.mjs",
+    "test:product-flows": "node e2e/product-flows.mjs",
     "test:interactions": "node e2e/interactions.mjs",
     "test:skills-interactions": "node e2e/skills-interactions.mjs",
     "test:fresh-install": "node e2e/fresh-install.mjs",

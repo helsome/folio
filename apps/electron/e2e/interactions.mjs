@@ -12,6 +12,7 @@
 // appended here as those slices land (see docs/interaction-audit.md).
 
 import { execSync, spawn } from 'node:child_process';
+import { seedLocale } from './seed-locale.mjs';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -197,6 +198,7 @@ async function main() {
   const userDataDir = join(appRoot, 'e2e/.user-data-interactions');
   execSync(`rm -rf "${userDataDir}"`);
   execSync(`mkdir -p "${userDataDir}"`);
+  seedLocale(userDataDir, 'en-US');
   const electronProcess = spawn(
     electronBinary,
     [electronMain, `--remote-debugging-port=${CDP_PORT}`, '--no-sandbox'],
