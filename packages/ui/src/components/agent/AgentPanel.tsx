@@ -1,18 +1,20 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { ArrowUp, ChevronLeft, Square, Sparkles } from 'lucide-react';
+import { ArrowUp, ChevronLeft, ChevronRight, Square, Sparkles } from 'lucide-react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import type { ApiError, PortfolioSnapshot, Quote, ToolCall } from '@finagent/core';
+import type { ApiError, FolioTrace, PortfolioSnapshot, Quote, ToolCall } from '@finagent/core';
 import {
   activeMessagesAtom,
   activeSessionIdAtom,
   agentPanelVisibleAtom,
   cancelRunAtom,
   createSessionAtom,
+  lastRunSummaryAtom,
   navSectionAtom,
   runViewAtom,
   settingsTabAtom,
   workspaceContextAtom,
+  type LastRunSummary,
   type NavSection,
 } from '../../atoms';
 import { useFinagentClient } from '../../client';
@@ -22,6 +24,8 @@ import { ModelSelector } from './ModelSelector';
 import { ThinkingSelector } from './ThinkingSelector';
 import { ToolActivity } from './ToolActivity';
 import { ContextChip } from './ContextChip';
+import { TraceInspector } from '../trace/TraceInspector';
+import { loadSessionTraceSources, projectSessionTrace } from '../../lib/traceData';
 import { QuoteCard } from './structured/QuoteCard';
 import { PortfolioRiskCard } from './structured/PortfolioRiskCard';
 
@@ -89,10 +93,13 @@ export const AgentPanel: React.FC = () => {
   const setAgentPanelVisible = useSetAtom(agentPanelVisibleAtom);
   const createSession = useSetAtom(createSessionAtom);
   const cancelRun = useSetAtom(cancelRunAtom);
+  const [lastRun, setLastRun] = useAtom(lastRunSummaryAtom);
   const workspaceContext = useAtomValue(workspaceContextAtom);
 
   const [input, setInput] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
+  const [traceDialog, setTraceDialog] = useState<{ runId: string; trace: FolioTrace | null } | null>(null);
+  const [traceLoading, setTraceLoading] = useState(false);
   const bodyEndRef = useRef<HTMLDivElement>(null);
 
   const isRunning = runView !== null && runView.infraError === undefined;
@@ -107,11 +114,51 @@ export const AgentPanel: React.FC = () => {
 
     setInput('');
     setSendError(null);
+    // V9.1 §2: capture the ACTUAL context this live run starts with so the
+    // run footer's trace can show it as 'Live' — never guessed later.
+    setLastRun((previous) => ({
+      runId: previous?.runId ?? '',
+      sessionId: activeSessionId,
+      status: 'running',
+      startedAt: previous?.startedAt ?? Date.now(),
+      toolCount: 0,
+      workspaceContext,
+    }));
     const result = await client.kernel.startRun(activeSessionId, text, workspaceContext);
     if (!result.ok) {
       setSendError(result.error.message);
       setInput(text);
     }
+  };
+
+  /** V9.1 §8/§12: open the Trace Inspector for the last finished run. */
+  const handleOpenTrace = async () => {
+    if (!lastRun || !activeSessionId) return;
+    setTraceDialog({ runId: lastRun.runId, trace: null });
+    setTraceLoading(true);
+    try {
+      const source = await loadSessionTraceSources(client, activeSessionId, lastRun.runId);
+      if (!source) {
+        setTraceDialog({ runId: lastRun.runId, trace: null });
+        return;
+      }
+      // For a LIVE run the panel's captured context is the actual runtime
+      // context (source 'live'); for a finished run it stays honest: the
+      // projection only emits fields from persisted sources.
+      const isLive = lastRun.status === 'running';
+      const trace = projectSessionTrace({
+        ...source,
+        liveToolCalls: isLive ? runView?.toolCalls : undefined,
+        liveContext: isLive ? lastRun.workspaceContext : undefined,
+      });
+      setTraceDialog({ runId: lastRun.runId, trace });
+    } finally {
+      setTraceLoading(false);
+    }
+  };
+
+  const handleOpenLangSmith = (url: string): void => {
+    void client.openExternal?.(url);
   };
 
   /** V8.1 §38: retry the last user message after an infra failure. */
@@ -216,6 +263,11 @@ export const AgentPanel: React.FC = () => {
           )}
           <MessageList messages={messages} isLoading={isRunning} />
           {isRunning && <StreamingBlock answer={runView?.answer ?? ''} />}
+          <RunFooter
+            lastRun={lastRun}
+            activeSessionId={activeSessionId}
+            onOpenTrace={() => void handleOpenTrace()}
+          />
           <div ref={bodyEndRef} />
         </div>
       </div>
@@ -256,10 +308,57 @@ export const AgentPanel: React.FC = () => {
           )}
         </div>
       </div>
+      {/* Trace Inspector (progressive disclosure — only from the footer) */}
+      {traceDialog && (
+        <TraceInspector
+          trace={traceDialog.trace}
+          onClose={() => setTraceDialog(null)}
+          onOpenLangSmith={handleOpenLangSmith}
+        />
+      )}
     </aside>
   );
 };
 
+/**
+ * Completed/failed run footer with the secondary Trace affordance (V9.1 §12).
+ * The semantic activity above remains the primary experience.
+ */
+const RunFooter: React.FC<{
+  lastRun: LastRunSummary | null;
+  activeSessionId: string | null;
+  onOpenTrace: () => void;
+}> = ({ lastRun, activeSessionId, onOpenTrace }) => {
+  const { t } = useTranslation();
+  if (!lastRun || lastRun.status === 'running' || lastRun.sessionId !== activeSessionId) return null;
+  const durationSec =
+    lastRun.completedAt != null && lastRun.completedAt >= lastRun.startedAt
+      ? Math.max(0, Math.round((lastRun.completedAt - lastRun.startedAt) / 100) / 10)
+      : undefined;
+  const failed = lastRun.status === 'failed';
+  const summary = failed
+    ? t('trace.footer.failed', { tools: lastRun.toolCount })
+    : t('trace.footer.completed', { seconds: durationSec ?? 0, steps: lastRun.toolCount });
+  return (
+    <div
+      data-testid="run-footer"
+      className={`flex items-center justify-between gap-2 rounded-[9px] border px-3 py-2 ${
+        failed ? 'border-destructive/24 bg-destructive/5' : 'border-border bg-surface-muted'
+      }`}
+    >
+      <span className={`text-[11px] ${failed ? 'text-negative' : 'text-foreground/60'}`}>{summary}</span>
+      <button
+        type="button"
+        onClick={onOpenTrace}
+        data-testid="run-footer-trace"
+        className="flex items-center gap-1 rounded-[7px] border border-border px-2 py-1 text-[11px] font-medium text-foreground/64 transition-smooth hover:border-border-strong hover:text-foreground"
+      >
+        {t('trace.footer.trace')}
+        <ChevronRight className="h-3 w-3" strokeWidth={1.8} />
+      </button>
+    </div>
+  );
+};
 /**
  * Contextual starter prompts (V9 §25). The empty-state suggestions follow the
  * current section instead of the same three prompts everywhere.

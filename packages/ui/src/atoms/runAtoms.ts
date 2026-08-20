@@ -1,5 +1,5 @@
 import { atom } from 'jotai';
-import type { AgentEvent, ApiError, Message, ToolCall } from '@finagent/core';
+import type { AgentEvent, ApiError, Message, ToolCall, WorkspaceContext } from '@finagent/core';
 import { isRuntimeInfraCode } from '@finagent/core';
 import type { FinagentClient } from '../client';
 import { activeSessionIdAtom, messagesAtomFamily, sessionsAtom } from './sessionAtoms';
@@ -16,6 +16,24 @@ export interface RunView {
    * chat message; cleared on the next run. */
   infraError?: ApiError;
 }
+
+/**
+ * Summary of the most recent finished run (V9.1 §12). Powers the AgentPanel
+ * footer's Trace affordance. `workspaceContext` is captured at startRun for
+ * LIVE runs only (the actual context that run started with) — never
+ * reconstructed from current atoms for historical runs.
+ */
+export interface LastRunSummary {
+  runId: string;
+  sessionId: string;
+  status: 'running' | 'completed' | 'failed' | 'cancelled';
+  startedAt: number;
+  completedAt?: number;
+  toolCount: number;
+  workspaceContext?: WorkspaceContext;
+}
+
+export const lastRunSummaryAtom = atom<LastRunSummary | null>(null);
 
 export const runViewAtom = atom<RunView | null>(null);
 
@@ -48,6 +66,15 @@ export const applyAgentEventAtom = atom(
         answer: '',
         toolCalls: [],
         infraError: undefined,
+      });
+      set(lastRunSummaryAtom, {
+        runId: event.runId,
+        sessionId,
+        status: 'running',
+        startedAt: event.payload.run.startedAt,
+        toolCount: 0,
+        // Preserve the live context captured by the AgentPanel at startRun.
+        workspaceContext: get(lastRunSummaryAtom)?.workspaceContext,
       });
       return;
     }
@@ -109,6 +136,15 @@ export const applyAgentEventAtom = atom(
       set(sessionsAtom, (sessions) => sessions.map((session) =>
         session.id === sessionId ? { ...session, status: 'idle' as const, messageCount: session.messageCount + 1 } : session
       ));
+      set(lastRunSummaryAtom, (previous) => ({
+        runId: event.runId,
+        sessionId,
+        status: 'completed',
+        startedAt: previous?.startedAt ?? event.timestamp,
+        completedAt: event.timestamp,
+        toolCount: event.payload.toolCalls.length,
+        workspaceContext: previous?.workspaceContext,
+      }));
       set(runViewAtom, null);
       return;
     }
@@ -125,6 +161,15 @@ export const applyAgentEventAtom = atom(
       // failures (tool errors, task failures) keep the existing message flow.
       const error = event.payload.error;
       if (isRuntimeInfraCode(error.code)) {
+        set(lastRunSummaryAtom, (previous) => ({
+          runId: event.runId,
+          sessionId,
+          status: 'failed',
+          startedAt: previous?.startedAt ?? event.timestamp,
+          completedAt: event.timestamp,
+          toolCount: run.toolCalls.length,
+          workspaceContext: previous?.workspaceContext,
+        }));
         set(runViewAtom, { ...run, infraError: error });
         return;
       }
@@ -153,6 +198,15 @@ export const applyAgentEventAtom = atom(
           ? { ...session, status: 'idle' as const, messageCount: session.messageCount + 1 }
           : session
       ));
+      set(lastRunSummaryAtom, (previous) => ({
+        runId: event.runId,
+        sessionId,
+        status: cancelled ? 'cancelled' : 'failed',
+        startedAt: previous?.startedAt ?? event.timestamp,
+        completedAt: event.timestamp,
+        toolCount: run.toolCalls.length,
+        workspaceContext: previous?.workspaceContext,
+      }));
       set(runViewAtom, null);
       return;
     }
