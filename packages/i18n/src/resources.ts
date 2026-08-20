@@ -32,6 +32,7 @@ export const SUPPORTED_NAMESPACES: readonly string[] = [
   'alerts',
   'automation',
   'agent',
+  'trace',
   'skills',
   'performance',
   'settings',

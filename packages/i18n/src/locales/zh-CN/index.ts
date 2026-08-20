@@ -17,6 +17,7 @@ import { connections } from './connections.ts';
 import { onboarding } from './onboarding.ts';
 import { diagnostics } from './diagnostics.ts';
 import { agent } from './agent.ts';
+import { trace } from './trace.ts';
 
 /** zh-CN resource bundle — every namespace mirrors en-US key-for-key. */
 export const zhCnResources = {
@@ -39,4 +40,5 @@ export const zhCnResources = {
   onboarding,
   diagnostics,
   agent,
+  trace,
 };

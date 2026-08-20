@@ -199,6 +199,12 @@ export const evaluation = {
   tools: 'Tools',
   trace: 'Trace',
   langsmith: 'LangSmith',
+  // V9.1: debugging actions on a failing case (progressive disclosure).
+  viewTrace: 'View Trace',
+  openLangSmith: 'Open in LangSmith',
+  traceUnavailable: 'Trace unavailable',
+  traceRefMissing: 'No trace reference was recorded for this run.',
+  traceOpenError: 'Could not open the trace.',
 
   // Failure modes tab
   noExperimentsToInspect: 'No experiments to inspect.',

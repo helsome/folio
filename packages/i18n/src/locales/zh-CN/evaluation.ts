@@ -197,6 +197,12 @@ export const evaluation = {
   tools: '工具数',
   trace: 'Trace',
   langsmith: 'LangSmith',
+  // V9.1: 失败用例上的调试入口（渐进式披露）。
+  viewTrace: '查看追踪',
+  openLangSmith: '在 LangSmith 中打开',
+  traceUnavailable: '追踪不可用',
+  traceRefMissing: '本次运行未记录追踪引用。',
+  traceOpenError: '无法打开追踪。',
 
   // Failure modes tab
   noExperimentsToInspect: '没有可检查的实验。',
