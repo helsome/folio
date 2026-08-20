@@ -32,6 +32,7 @@ const SOURCE_BADGE: Record<string, string> = {
 const StepIcon: React.FC<{ step: TraceStep }> = ({ step }) => {
   if (step.kind === 'tool') {
     if (step.status === 'error') return <X className="h-3.5 w-3.5 shrink-0 text-negative" />;
+    if (step.status === 'running') return <LoaderCircle className="h-3.5 w-3.5 shrink-0 animate-spin text-accent" />;
     return <Check className="h-3.5 w-3.5 shrink-0 text-positive" />;
   }
   if (step.kind === 'user') return <Circle className="h-3 w-3 shrink-0 text-accent" />;
@@ -118,7 +119,11 @@ export const TraceInspector: React.FC<{
 
         {/* Status row */}
         <div className="flex flex-wrap items-center gap-2 text-[11.5px]">
-          <span className="font-medium text-foreground">{t(`trace.status.${trace.status === 'failed' ? 'error' : 'success'}`)}</span>
+          <span className="font-medium text-foreground">
+            {trace.status === 'running'
+              ? t('agent.tool.statusRunning')
+              : t(`trace.status.${trace.status === 'failed' ? 'error' : 'success'}`)}
+          </span>
           <span className="text-foreground/30">·</span>
           <span className="rounded-full border border-border bg-surface-muted px-2 py-0.5 font-medium text-foreground/60">
             {t(semanticCompletenessLabelKey(trace.completeness))}
@@ -215,19 +220,32 @@ const TimelineStep: React.FC<{ step: TraceStep }> = ({ step }) => {
   const [open, setOpen] = useState(false);
   const label =
     step.kind === 'tool' ? t(semanticToolLabelKey(step.tool?.toolName ?? step.label)) : step.label;
+  const isTool = step.kind === 'tool';
+  const body = (
+    <>
+      <StepIcon step={step} />
+      <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/80">{label}</span>
+      {isTool && step.status === 'running' && (
+        <span className="shrink-0 text-[10.5px] text-accent">{t('agent.tool.statusRunning')}</span>
+      )}
+      {isTool && step.tool?.durationMs != null && (
+        <span className="tnum shrink-0 text-[10.5px] text-foreground/40">{step.tool.durationMs}ms</span>
+      )}
+      {isTool && (
+        <ChevronDown className={`h-3 w-3 shrink-0 text-foreground/34 transition-transform ${open ? 'rotate-180' : ''}`} />
+      )}
+    </>
+  );
   return (
     <div className="rounded-[8px] border border-border/70 bg-surface-muted/50 px-3 py-2">
-      <button type="button" onClick={() => step.kind === 'tool' && setOpen((v) => !v)} className="flex w-full items-center gap-2 text-left">
-        <StepIcon step={step} />
-        <span className="min-w-0 flex-1 truncate text-[12px] font-medium text-foreground/80">{label}</span>
-        {step.kind === 'tool' && step.tool?.durationMs != null && (
-          <span className="tnum shrink-0 text-[10.5px] text-foreground/40">{step.tool.durationMs}ms</span>
-        )}
-        {step.kind === 'tool' && (
-          <ChevronDown className={`h-3 w-3 shrink-0 text-foreground/34 transition-transform ${open ? 'rotate-180' : ''}`} />
-        )}
-      </button>
-      {step.kind === 'tool' && open && step.tool && (
+      {isTool ? (
+        <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center gap-2 text-left">
+          {body}
+        </button>
+      ) : (
+        <div className="flex w-full items-center gap-2">{body}</div>
+      )}
+      {isTool && open && step.tool && (
         <div className="mt-2 space-y-1 border-t border-border pt-2 text-[11px] text-foreground/54">
           {step.tool.args && Object.keys(step.tool.args).length > 0 && (
             <div className="font-mono">{JSON.stringify(step.tool.args)}</div>

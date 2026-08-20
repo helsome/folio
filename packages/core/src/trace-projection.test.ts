@@ -210,4 +210,18 @@ describe('projectTrace (V9.1)', () => {
     expect(trace.sources).toContain('trace-event');
     expect(trace.steps.some((s) => s.kind === 'runtime' && s.detail === 'started synthesis')).toBe(true);
   });
+
+  it('preserves a running tool status — never projects running as success (V9.1 §40)', () => {
+    const live = {
+      id: 'live-run',
+      toolName: 'get_quote',
+      args: { symbol: 'NVDA.US' },
+      startedAt: 1500,
+      status: 'running' as const,
+    };
+    const trace = projectTrace(inputWith({ liveToolCalls: [live] }));
+    expect(trace.tools[0].status).toBe('running');
+    const toolStep = trace.steps.find((s) => s.kind === 'tool' && s.tool?.id === 'live-run');
+    expect(toolStep?.status).toBe('running');
+  });
 });

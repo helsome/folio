@@ -86,7 +86,9 @@ function toolExecFromCall(
   return {
     id: call.id,
     toolName: call.toolName,
-    status: call.status === 'running' ? 'success' : call.status,
+    // A tool whose actual status is 'running' must NEVER be projected as
+    // 'success' (V9.1 §40): the inspector shows live runs truthfully.
+    status: call.status,
     startedAt: call.startedAt,
     completedAt: call.completedAt,
     durationMs,
@@ -208,7 +210,7 @@ export function projectTrace(input: TraceProjectionInput): FolioTrace {
       label: tool.toolName,
       detail: tool.error,
       timestamp: tool.startedAt,
-      status: tool.status === 'error' ? 'error' : 'success',
+      status: tool.status === 'error' ? 'error' : tool.status === 'running' ? 'running' : 'success',
       tool,
       source: tool.source,
     });
