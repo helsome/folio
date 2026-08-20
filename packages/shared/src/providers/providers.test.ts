@@ -301,6 +301,23 @@ describe('ProviderRouter.execute', () => {
       expect(result.data.fetchedAt).toBe(1000);
     }
   });
+
+  it('reaches a registered broker even when it is not in the routing chain', async () => {
+    // The app routes primary=longbridge, fallback=massive — neither serves
+    // portfolio.*. A registered broker must still answer broker capabilities
+    // (this is what makes the agent's get_portfolio work).
+    const router = new ProviderRouter();
+    router.register(new FakeFinancialDataProvider('data', 'Data', ['market.quote']));
+    router.register(new FakeFinancialDataProvider('massive', 'Massive', ['market.quote']));
+    router.register(new FakeBrokerAccountProvider('broker', 'Broker'));
+    router.setRouting({ primary: 'data', fallback: 'massive' });
+
+    const result = await router.execute<PortfolioSnapshot>('portfolio.summary', {});
+    expect(result.ok).toBe(true);
+    if (result.ok) {
+      expect(result.provenance.providerId).toBe('broker');
+    }
+  });
 });
 
 describe('ProviderRouter.coverage + capabilityMapping', () => {

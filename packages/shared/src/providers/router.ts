@@ -89,8 +89,20 @@ export class ProviderRouter implements FinancialProviderRouter {
       (id): id is string => typeof id === 'string' && id.length > 0
     );
 
+    // Broker capabilities (portfolio.*) are served by broker providers which
+    // are NOT part of the primary/fallback chain. When the configured chain
+    // cannot cover a capability, fall back to any registered provider that
+    // supports it (stable registry order) instead of failing the call — this
+    // is what makes the agent's get_portfolio reach the broker.
+    const chain = [...order];
+    for (const provider of this.registry.list()) {
+      if (!chain.includes(provider.id) && supports(provider, capabilityId)) {
+        chain.push(provider.id);
+      }
+    }
+
     let lastError: ProviderError | undefined;
-    for (const id of order) {
+    for (const id of chain) {
       const provider = this.get(id);
       if (!provider || !supports(provider, capabilityId)) {
         continue;
