@@ -77,6 +77,14 @@ export const research = {
     unchanged: '未变化',
   },
   researchStrategy: '研究策略',
+  stages: {
+    label: '研究进度',
+    market: '获取行情',
+    financials: '查看财务',
+    valuation: '分析估值',
+    events: '检查事件',
+    synthesis: '形成结论',
+  },
   focus: {
     fullPlan: '综合',
     market: '市场',

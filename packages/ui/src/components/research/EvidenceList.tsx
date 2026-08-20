@@ -13,16 +13,16 @@ export const EvidenceList: React.FC<{ section: ResearchSection }> = ({ section }
   const { t } = useTranslation();
   if (section.evidence.length === 0) return null;
   return (
-    <div className="flex flex-col gap-1">
+    <div className="folio-pilot-evidence-list">
       {section.evidence.map((ref) => {
         const label = t(semanticCapabilityLabelKey(ref.capabilityId));
         return (
           <div
             key={ref.runId}
-            className="flex flex-col gap-0.5 rounded-[8px] bg-foreground/4 px-3 py-2"
+            className="folio-pilot-evidence-row"
           >
-            <span className="text-[12px] font-medium text-foreground/85">{ref.claim}</span>
-            <span className="tnum text-[10.5px] text-text-muted">
+            <span className="folio-pilot-evidence-claim">{ref.claim}</span>
+            <span className="folio-pilot-evidence-meta">
               {label} · {new Date(ref.fetchedAt).toLocaleTimeString()}
               {ref.summary ? ` · ${ref.summary}` : ''}
             </span>
