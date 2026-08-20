@@ -121,10 +121,10 @@ export const evaluation = {
     success: 'success',
   },
   verdicts: {
-    pass: 'pass',
-    fail: 'fail',
-    partial: 'partial',
-    notApplicable: 'n/a',
+    pass: 'Pass',
+    fail: 'Fail',
+    partial: 'Partial',
+    notApplicable: 'N/A',
   },
   noRun: 'no run',
 
