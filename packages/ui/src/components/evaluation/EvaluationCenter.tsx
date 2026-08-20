@@ -113,6 +113,14 @@ export const EvaluationCenter: React.FC = () => {
     [client, details]
   );
 
+  // All hooks must run before any conditional early return (React rules):
+  // `selectedCase`/`selectedExperimentId` swap this component between the
+  // list and the detail views, which must never change the hook count.
+  const latestCompleted = useMemo(
+    () => experiments.find((experiment) => experiment.status === 'completed'),
+    [experiments]
+  );
+
   if (selectedCase) {
     return (
       <CaseDetail
@@ -135,11 +143,6 @@ export const EvaluationCenter: React.FC = () => {
       />
     );
   }
-
-  const latestCompleted = useMemo(
-    () => experiments.find((experiment) => experiment.status === 'completed'),
-    [experiments]
-  );
 
   return (
     <div className="flex h-full flex-col" data-testid="evaluation-center">
