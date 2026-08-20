@@ -21,7 +21,7 @@ import { saveThesisFromReport } from '../../client/thesis';
 import { ResearchReportView } from './ResearchReportView';
 import { DEFAULT_STRATEGY_ID, StrategyPicker } from './StrategyPicker';
 import { NextAction } from '../primitives/NextAction';
-import { capabilityLabelKey } from '../../lib/capabilityLabels';
+import { semanticCapabilityLabelKey } from '../../lib/agentPresentation';
 import { readPersisted, writePersisted } from '../../lib/persistedPrefs';
 
 const POLL_MS = 900;
@@ -332,8 +332,7 @@ const RunProgressCard: React.FC<{ run: ResearchRunSummary }> = ({ run }) => {
   const done = run.completedCapabilities.length;
   const failed = run.failedCapabilities.length;
   const humanized = (id: string): string => {
-    const key = capabilityLabelKey(id);
-    return key ? t(key) : id;
+    return t(semanticCapabilityLabelKey(id));
   };
   return (
     <div className="mb-3 rounded-[10px] border mac-list-row p-3">

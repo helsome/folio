@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ResearchSection } from '@finagent/core';
-import { capabilityLabelKey } from '../../lib/capabilityLabels';
+import { semanticCapabilityLabelKey } from '../../lib/agentPresentation';
 
 /**
  * Evidence refs for one report section: claim → capability → fetch time.
@@ -15,8 +15,7 @@ export const EvidenceList: React.FC<{ section: ResearchSection }> = ({ section }
   return (
     <div className="flex flex-col gap-1">
       {section.evidence.map((ref) => {
-        const labelKey = capabilityLabelKey(ref.capabilityId);
-        const label = labelKey ? t(labelKey) : ref.capabilityId;
+        const label = t(semanticCapabilityLabelKey(ref.capabilityId));
         return (
           <div
             key={ref.runId}

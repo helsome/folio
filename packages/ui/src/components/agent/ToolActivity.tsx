@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Check, ChevronDown, LoaderCircle, X } from 'lucide-react';
 import type { ToolCall } from '@finagent/core';
+import { semanticToolLabelKey } from '../../lib/agentPresentation';
 
 interface ToolActivityProps { toolCalls: ToolCall[]; }
 
@@ -10,27 +11,6 @@ const StatusIcon: React.FC<{ status: ToolCall['status'] }> = ({ status }) => {
   if (status === 'success') return <Check className="h-3.5 w-3.5 shrink-0 text-positive" />;
   return <X className="h-3.5 w-3.5 shrink-0 text-negative" />;
 };
-
-/**
- * Map an agent tool name to a user-facing i18n key (V9 §26–27). Raw tool names
- * like `market.quote` must never be the default agent UX; the technical name
- * stays visible only inside the expanded detail row.
- */
-const TOOL_LABEL_KEY: Readonly<Record<string, string>> = {
-  get_quote: 'agent.tool.names.getQuote',
-  get_portfolio: 'agent.tool.names.getPortfolio',
-  get_financials: 'agent.tool.names.getFinancials',
-  get_valuation: 'agent.tool.names.getValuation',
-  get_news: 'agent.tool.names.getNews',
-  get_kline: 'agent.tool.names.getKline',
-  get_earnings: 'agent.tool.names.getEarnings',
-  get_profile: 'agent.tool.names.getProfile',
-  analyze: 'agent.tool.names.analyze',
-};
-
-function toolLabelKey(toolName: string): string {
-  return TOOL_LABEL_KEY[toolName] ?? 'agent.tool.names.other';
-}
 
 /** Compact, collapsible tool timeline for the current agent run. */
 export const ToolActivity: React.FC<ToolActivityProps> = ({ toolCalls }) => {
@@ -47,7 +27,7 @@ export const ToolActivity: React.FC<ToolActivityProps> = ({ toolCalls }) => {
     {expanded && <div className="mt-2 space-y-1.5 border-t border-border pt-2">
       {toolCalls.map((toolCall) => { const symbol = typeof toolCall.args?.symbol === 'string' ? toolCall.args.symbol : null; return <div key={toolCall.id} className="flex items-center gap-2 text-[11px]">
         <StatusIcon status={toolCall.status} />
-        <span className="truncate text-foreground/78">{t(toolLabelKey(toolCall.toolName))}</span>
+        <span className="truncate text-foreground/78">{t(semanticToolLabelKey(toolCall.toolName))}</span>
         {symbol && <span className="rounded-[5px] bg-foreground/5 px-1.5 py-0.5 font-mono text-[10px] text-foreground/52">{symbol}</span>}
         <span className="flex-1" />
         {toolCall.status === 'running' && <span className="text-foreground/38">{t('agent.tool.statusRunning')}</span>}
