@@ -152,6 +152,12 @@ export interface EvaluationChannel {
   listBaselines: () => Promise<ApiResult<EvaluationBaseline[]>>;
   submitFeedback: (input: { caseId: string; verdict: 'good' | 'bad'; note?: string }) => Promise<ApiResult<void>>;
   listFeedback: () => Promise<ApiResult<EvaluationFeedbackItem[]>>;
+  /** V9.1: persisted trace-link lookup for a folio run id (reuses the store). */
+  getTraceLink: (
+    input: { runId: string }
+  ) => Promise<
+    ApiResult<{ runId: string; traceRef?: import('@finagent/core').TraceReference; recordedAt?: number } | undefined>
+  >;
 }
 
 export interface FinagentClient {
@@ -403,6 +409,7 @@ export const fallbackClient: FinagentClient = {
     listBaselines: missingClient('evaluation.listBaselines'),
     submitFeedback: missingClient('evaluation.submitFeedback'),
     listFeedback: missingClient('evaluation.listFeedback'),
+    getTraceLink: missingClient('evaluation.getTraceLink'),
     status: missingClient('evaluation.status'),
   },
   prefs: {

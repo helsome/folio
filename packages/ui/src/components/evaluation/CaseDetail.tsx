@@ -1,9 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowLeft, ExternalLink, ThumbsDown, ThumbsUp } from 'lucide-react';
-import type { EvaluationCase, EvaluationResultRecord, EvaluationRun } from '@finagent/core';
+import type { EvaluationCase, EvaluationResultRecord, EvaluationRun, FolioTrace } from '@finagent/core';
 import { useFinagentClient, type EvaluationExperimentDetail } from '../../client';
 import { Button } from '../primitives/Button';
+import { TraceInspector } from '../trace/TraceInspector';
+import { projectEvaluationTrace } from '../../lib/traceData';
 import { failureModeLabel, metricKindLabel, metricLabel, scorePercent } from './format';
 import type { CaseRef } from './EvaluationCenter';
 
@@ -73,6 +75,7 @@ export const CaseDetail: React.FC<{
   const [submitting, setSubmitting] = useState(false);
   const [feedbackResult, setFeedbackResult] = useState<string | null>(null);
   const [feedbackError, setFeedbackError] = useState<string | null>(null);
+  const [traceDialog, setTraceDialog] = useState<{ loading: boolean; trace: FolioTrace | null } | null>(null);
 
   useEffect(() => {
     if (detail) return;
@@ -97,6 +100,27 @@ export const CaseDetail: React.FC<{
 
   const openTrace = (url: string): void => {
     void client.openExternal?.(url);
+  };
+
+  /** V9.1 §6/§13–14: View Trace — projection from authoritative persisted sources. */
+  const handleViewTrace = async (run: EvaluationRun, result?: EvaluationResultRecord): Promise<void> => {
+    setTraceDialog({ loading: true, trace: null });
+    let traceLink = run.traceRef;
+    // traceRef may be temporarily missing on the run record — fall back to the
+    // persisted TraceCorrelation lookup (reuses the store; no new algorithm).
+    if (!traceLink || traceLink.backend === 'none') {
+      const linkResult = await client.evaluation?.getTraceLink({ runId: run.id });
+      if (linkResult?.ok && linkResult.data?.traceRef) {
+        traceLink = linkResult.data.traceRef;
+      }
+    }
+    const trace = projectEvaluationTrace({
+      evaluationRun: run,
+      evaluationResult: result,
+      evaluationCase: caseDef ?? undefined,
+      traceLink,
+    });
+    setTraceDialog({ loading: false, trace });
   };
 
   const submitFeedback = async (verdict: 'good' | 'bad'): Promise<void> => {
@@ -193,6 +217,30 @@ export const CaseDetail: React.FC<{
           <span className="rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-[11px] text-foreground/64">
             {run ? t(RUN_STATUS_KEY[run.status] ?? run.status) : t('evaluation.noRun')}
           </span>
+          {/* V9.1 §13: on FAIL/PARTIAL the trace is a first-class debugging action. */}
+          {run && result && (result.verdict === 'fail' || result.verdict === 'partial') && (
+            <>
+              <button
+                type="button"
+                onClick={() => void handleViewTrace(run, result)}
+                data-testid="case-view-trace"
+                className="flex items-center gap-1.5 rounded-[8px] bg-accent px-2.5 py-1 text-[11.5px] font-semibold text-accent-foreground transition-smooth hover:bg-accent/88"
+              >
+                <ExternalLink className="h-3 w-3" />
+                {t('evaluation.viewTrace')}
+              </button>
+              {run.traceRef?.url && (
+                <button
+                  type="button"
+                  onClick={() => openTrace(run.traceRef!.url!)}
+                  data-testid="case-open-langsmith"
+                  className="flex items-center gap-1.5 rounded-[8px] border border-border px-2.5 py-1 text-[11.5px] font-medium text-foreground/68 transition-smooth hover:border-border-strong hover:text-foreground"
+                >
+                  {t('evaluation.openLangSmith')}
+                </button>
+              )}
+            </>
+          )}
         </div>
       </header>
 
@@ -412,6 +460,15 @@ export const CaseDetail: React.FC<{
           </div>
         </div>
       </div>
+
+      {/* V9.1 §8: Trace Inspector — progressive disclosure from a failing case. */}
+      {traceDialog && (
+        <TraceInspector
+          trace={traceDialog.loading ? null : traceDialog.trace}
+          onClose={() => setTraceDialog(null)}
+          onOpenLangSmith={openTrace}
+        />
+      )}
     </div>
   );
 };

@@ -183,6 +183,7 @@ function createElectronClient(): FinagentClient {
       listBaselines: () => ipcResult(window.electronAPI.evaluation.listBaselines()),
       submitFeedback: (input) => ipcResult(window.electronAPI.evaluation.submitFeedback(input)),
       listFeedback: () => ipcResult(window.electronAPI.evaluation.listFeedback()),
+      getTraceLink: (input) => ipcResult(window.electronAPI.evaluation.getTraceLink(input)),
       status: () => ipcResult(window.electronAPI.evaluation.status()),
     },
   };

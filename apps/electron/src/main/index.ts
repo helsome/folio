@@ -352,6 +352,10 @@ ipcMain.handle('evaluation:listFeedback', async () =>
   toIpcResult(() => agentKernelHost.listEvaluationFeedback())
 );
 
+ipcMain.handle('evaluation:getTraceLink', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.getEvaluationTraceLink(input))
+);
+
 ipcMain.handle('evaluation:status', async () =>
   toIpcResult(() => agentKernelHost.getEvaluationStatus())
 );

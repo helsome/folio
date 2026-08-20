@@ -67,6 +67,7 @@ import type {
   PrivacyLevel,
   ToolCall,
   ToolCallRecord,
+  TraceReference,
 } from '@finagent/core';
 import { STRATEGY_IDS } from '@finagent/core';
 import { isLocalePreference } from '@finagent/i18n';
@@ -1060,6 +1061,15 @@ export class AgentKernelHost {
 
   async listEvaluationBaselines(): Promise<EvaluationBaseline[]> {
     return this.evaluationStore.listBaselines();
+  }
+
+  /** V9.1: persisted trace-link lookup for a folio run id (reuses the store; no new correlation). */
+  async getEvaluationTraceLink(input: unknown): Promise<{ runId: string; traceRef?: TraceReference; recordedAt?: number } | undefined> {
+    const request = requireObject(input);
+    const runId = requireString(request.runId, 'runId');
+    const link = await this.evaluationStore.lookupTraceLink(runId);
+    if (!link) return undefined;
+    return { runId: link.runId, traceRef: link.traceRef, recordedAt: link.recordedAt };
   }
 
   async submitEvaluationFeedback(input: unknown): Promise<void> {

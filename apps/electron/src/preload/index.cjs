@@ -222,6 +222,7 @@ var electronAPI = {
     listBaselines: () => import_electron.ipcRenderer.invoke("evaluation:listBaselines"),
     submitFeedback: (input) => import_electron.ipcRenderer.invoke("evaluation:submitFeedback", input),
     listFeedback: () => import_electron.ipcRenderer.invoke("evaluation:listFeedback"),
+    getTraceLink: (input) => import_electron.ipcRenderer.invoke("evaluation:getTraceLink", input),
     status: () => import_electron.ipcRenderer.invoke("evaluation:status")
   }
 };

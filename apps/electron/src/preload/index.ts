@@ -169,6 +169,7 @@ export interface ElectronAPI {
     listBaselines: () => Promise<unknown>;
     submitFeedback: (input: { caseId: string; verdict: 'good' | 'bad'; note?: string }) => Promise<unknown>;
     listFeedback: () => Promise<unknown>;
+    getTraceLink: (input: { runId: string }) => Promise<unknown>;
     status: () => Promise<unknown>;
   };
 }
@@ -376,6 +377,7 @@ const electronAPI: ElectronAPI = {
     listBaselines: () => ipcRenderer.invoke('evaluation:listBaselines'),
     submitFeedback: (input) => ipcRenderer.invoke('evaluation:submitFeedback', input),
     listFeedback: () => ipcRenderer.invoke('evaluation:listFeedback'),
+    getTraceLink: (input) => ipcRenderer.invoke('evaluation:getTraceLink', input),
     status: () => ipcRenderer.invoke('evaluation:status'),
   },
 };
