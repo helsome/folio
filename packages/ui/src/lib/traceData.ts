@@ -67,6 +67,13 @@ export function projectEvaluationTrace(source: EvaluationTraceSource): FolioTrac
 }
 
 /** Load persisted session sources for one run (existing kernel IPC). */
+/**
+ * Load persisted session sources for one run (existing kernel IPC). Also
+ * resolves the persisted TraceCorrelation link (V9.1 §41): a normal Agent run
+ * whose trace was correlated gets its TraceReference back so the inspector can
+ * expose "Open in LangSmith" — reusing the existing store lookup, no new
+ * correlation algorithm.
+ */
 export async function loadSessionTraceSources(
   client: FinagentClient,
   sessionId: string,
@@ -84,5 +91,10 @@ export async function loadSessionTraceSources(
     : [];
   const run = runs.find((entry) => entry.id === runId) ?? null;
   if (!run) return null;
-  return { run, messages };
+  let traceRef: TraceReference | undefined;
+  const linkResult = await client.evaluation?.getTraceLink({ runId });
+  if (linkResult?.ok && linkResult.data?.traceRef) {
+    traceRef = linkResult.data.traceRef;
+  }
+  return { run, messages, traceRef };
 }
