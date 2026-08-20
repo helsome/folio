@@ -149,6 +149,35 @@ async function main() {
       if (!hasSemantic) throw new Error(`panel="${panelText.replace(/\s+/g,' ').slice(0,200)}"`);
     });
     await capture('v9-agent-activity');
+
+    // 9. Run footer → Trace Inspector (progressive disclosure)
+    await page.locator('[data-testid="run-footer"]').waitFor({ timeout: 60_000 }).catch(async () => {
+      // footer may already have appeared; if not, send another prompt
+      await page.locator('[data-testid="agent-input"]').first().fill('Quick summary please');
+      await page.locator('[data-testid="agent-input"]').first().press('Enter');
+      await page.locator('[data-testid="run-footer"]').waitFor({ timeout: 60_000 });
+    });
+    await check('run footer shows completed summary', async () => {
+      const text = await page.locator('[data-testid="run-footer"]').textContent();
+      if (!/Completed|Failed|Trace/i.test(text)) throw new Error('footer: ' + text);
+    });
+    await page.locator('[data-testid="run-footer-trace"]').click();
+    await check('trace inspector opens (overview tab)', async () => {
+      await page.locator('[data-testid="trace-inspector"]').waitFor({ timeout: 10_000 });
+    });
+    await check('trace shows Not recorded context for session run', async () => {
+      await page.getByRole('button', { name: 'Context' }).click();
+      const text = await page.locator('[data-testid="trace-context"]').textContent();
+      if (!/Not recorded/i.test(text)) throw new Error('context: ' + text);
+    });
+    await check('trace timeline uses semantic tool labels', async () => {
+      await page.getByRole('button', { name: 'Timeline' }).click();
+      const text = await page.locator('[data-testid="trace-timeline"]').textContent();
+      if (/get_quote|market\.quote/.test(text) && !/Quote|financials/i.test(text)) {
+        throw new Error('timeline leaked raw ids');
+      }
+    });
+    await page.getByRole('button', { name: /Close/i }).last().click().catch(() => {});
   } finally {
     await browser?.close().catch(() => undefined);
     proc.kill();
