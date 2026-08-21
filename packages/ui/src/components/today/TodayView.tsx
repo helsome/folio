@@ -311,8 +311,8 @@ export const TodayView: React.FC = () => {
   })()
 
   return (
-    <div className="h-full overflow-y-auto px-5 py-6" data-testid="today-view">
-      <section data-testid="today-hero" className="mb-5 rounded-[12px] border border-border bg-surface p-5">
+    <div className="folio-today-view h-full overflow-y-auto px-5 py-6" data-testid="today-view">
+      <section data-testid="today-hero" className="folio-today-hero mb-5 rounded-[12px] border border-border bg-surface p-5">
         <div className="flex flex-wrap items-start justify-between gap-5">
           <div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.14em] text-accent"><Sparkles className="h-3.5 w-3.5" />{t('today.quietWorkspace')}</div><h1 className="mt-2 text-[24px] font-semibold tracking-[-.02em] text-foreground">{t('today.greeting')}</h1><p className="mt-1 text-[13px] text-foreground/52">{t('today.heroSubtitle')}</p></div>
           <div className="flex min-w-[280px] flex-1 justify-end"><label className="relative block w-full max-w-md"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/34" /><input data-testid="today-search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={handleSearchKeyDown} placeholder={t('today.searchPlaceholder')} aria-label={t('today.searchAria')} className="h-10 w-full rounded-[9px] border border-input bg-background pl-9 pr-3 text-[13px] text-foreground placeholder:text-foreground/38 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring" /></label></div>
@@ -354,7 +354,7 @@ const QuickAction: React.FC<{
   tone: 'blue' | 'green' | 'violet'
   onClick: () => void
 }> = ({ icon: Icon, label, hint, tone, onClick }) => (
-  <button type="button" onClick={onClick} className={`group flex items-center gap-3 rounded-[9px] border border-border px-3 py-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-hover ${tone === 'blue' ? 'bg-accent/5' : tone === 'green' ? 'bg-positive/5' : 'bg-info/5'}`}>
+  <button type="button" onClick={onClick} className={`folio-quick-action group flex items-center gap-3 rounded-[9px] border border-border px-3 py-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-hover ${tone === 'blue' ? 'bg-accent/5' : tone === 'green' ? 'bg-positive/5' : 'bg-info/5'}`}>
     <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] ${tone === 'blue' ? 'bg-accent/10 text-accent' : tone === 'green' ? 'bg-positive/10 text-positive' : 'bg-info/10 text-info'}`}><Icon className="h-4 w-4" strokeWidth={1.8} /></span>
     <span className="min-w-0 flex-1"><span className="block text-[12px] font-semibold text-foreground">{label}</span><span className="mt-0.5 block truncate text-[11px] text-foreground/44">{hint}</span></span>
     <ArrowUpRight className="h-3.5 w-3.5 text-foreground/28 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />

@@ -6,8 +6,8 @@
    Keep the palette intentionally restrained: surfaces and spacing carry the
    hierarchy; blue is reserved for interaction and focus. */
 :root {
-  --font-sans-stack: "Avenir Next", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display-stack: "Avenir Next Demi Bold", "Avenir Next", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-sans-stack: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  --font-display-stack: "Avenir Next Demi Bold", "Avenir Next", "PingFang SC", "Hiragino Sans GB", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
   --font-numeric-stack: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
   --background: #f6f8fb;
   --surface: #ffffff;
@@ -135,12 +135,14 @@
 html, body, #root { width: 100%; height: 100%; }
 body {
   margin: 0;
-  font-family: var(--font-sans);
+  font-family: var(--font-sans-stack);
   -webkit-font-smoothing: antialiased;
   background: var(--background);
   color: var(--foreground);
   text-rendering: optimizeLegibility;
+  font-feature-settings: "kern" 1, "liga" 1;
 }
+h1, h2, h3, h4, h5, h6 { font-family: var(--font-display-stack); }
 button, input, textarea, select { font: inherit; }
 button { cursor: pointer; }
 button:disabled { cursor: not-allowed; }
@@ -493,3 +495,59 @@ button:disabled { cursor: not-allowed; }
   .folio-research-stat:nth-child(4) { border-left: 0; padding-left: 0; }
   .folio-research-decision-rail { padding: 1rem .85rem; }
 }
+
+/* Shared Coinbase-like dashboard language for non-Research surfaces. */
+.folio-finance-workspace { background: #f6f8fb; }
+.folio-today-view, .folio-discover-view, .folio-portfolio-view, .folio-compare-view { color: #101114; background: #f6f8fb; scrollbar-gutter: stable; }
+.folio-today-hero { position: relative; overflow: hidden; border-color: #dfe5ed !important; border-radius: 16px !important; background: #fff !important; box-shadow: 0 8px 24px rgba(16, 24, 40, .05), 0 1px 2px rgba(16, 24, 40, .04); }
+.folio-today-hero::before { position: absolute; inset: 0 0 auto; height: 3px; background: #0052ff; content: ''; }
+.folio-today-hero h1 { font-family: var(--font-display-stack); font-size: 1.75rem !important; letter-spacing: -.045em !important; }
+.folio-today-hero input { border-color: #dce3ed !important; border-radius: 999px !important; background: #f6f8fb !important; font-size: .75rem !important; }
+.folio-today-hero input:focus { border-color: #7ca5ff !important; background: #fff !important; box-shadow: 0 0 0 3px rgba(0, 82, 255, .10); }
+.folio-quick-action { min-height: 4rem; border-color: #e0e6ee !important; border-radius: 11px !important; background: #fbfcfe !important; padding: .78rem .85rem !important; transition: border-color .16s ease, background-color .16s ease, transform .16s ease, box-shadow .16s ease; }
+.folio-quick-action:hover { border-color: #b9cdfd !important; background: #f7faff !important; box-shadow: 0 4px 12px rgba(0, 82, 255, .06); transform: translateY(-1px); }
+.folio-quick-action:active { transform: scale(.985); }
+.folio-today-section { border: 1px solid #dfe5ed !important; border-top-width: 1px !important; border-radius: 13px; background: #fff; padding: 1rem !important; box-shadow: 0 1px 2px rgba(16, 24, 40, .025); }
+.folio-today-section header { margin-bottom: .8rem !important; }
+.folio-today-section header h3 { color: #7b8798 !important; font-size: .59rem !important; letter-spacing: .12em !important; }
+.folio-today-section li { border-top: 1px solid #eef1f5; padding: .62rem 0 !important; }
+.folio-today-section li:first-child { border-top: 0; padding-top: .1rem !important; }
+.folio-today-section .text-foreground { font-family: var(--font-sans-stack); }
+
+.folio-discover-view { padding: 1.1rem 1.2rem 2rem !important; }
+.folio-discover-view .folio-pilot-page-header { border: 1px solid #dfe5ed; border-radius: 14px; background: #fff; padding: 1.05rem 1.15rem .95rem; box-shadow: 0 4px 14px rgba(16, 24, 40, .035); }
+.folio-discover-view .folio-pilot-title { font-family: var(--font-display-stack); font-size: 1.55rem; letter-spacing: -.045em; }
+.folio-discover-view .folio-pilot-eyebrow, .folio-discover-view .folio-pilot-table-header, .folio-discover-view h2 { letter-spacing: .12em; }
+.folio-discover-view .folio-pilot-table { border-color: #dfe5ed; border-radius: 14px; box-shadow: 0 4px 16px rgba(16, 24, 40, .04); }
+.folio-discover-view .folio-pilot-table-header { background: #f7f9fc; color: #8792a3; }
+.folio-discover-view .folio-pilot-row { min-height: 5rem; border-bottom-color: #edf0f4; }
+.folio-discover-view .folio-pilot-row:hover { background: #f8fbff; }
+.folio-discover-view .folio-pilot-toolbar-button { border-color: #dce3ed; border-radius: 999px; background: #fff; }
+.folio-discover-view .folio-pilot-toolbar-button:hover { border-color: #a9bce1; background: #f4f7fc; }
+.folio-discover-view .folio-pilot-status { border-color: #dfe5ed; border-radius: 11px; background: #fff; }
+.folio-discover-view .folio-pilot-status--warning { border-color: #eed9aa; background: #fffaf0; }
+.folio-discover-view .folio-pilot-status--partial { border-color: #cfe0ff; background: #eef4ff; }
+.folio-discover-task { border-color: #dfe5ed !important; border-radius: 12px !important; background: #fff !important; padding: .9rem !important; box-shadow: 0 1px 2px rgba(16, 24, 40, .025); transition: border-color .16s ease, box-shadow .16s ease, transform .16s ease; }
+.folio-discover-task:hover { border-color: #b9cdfd !important; background: #fbfdff !important; box-shadow: 0 5px 14px rgba(0, 82, 255, .07); transform: translateY(-1px); }
+.folio-discover-task button { border-radius: 999px; }
+.folio-discover-view .folio-pilot-symbol, .folio-discover-view .folio-pilot-score, .folio-discover-view .folio-pilot-financial, .folio-discover-view .folio-pilot-change { font-family: var(--font-numeric-stack); }
+
+.folio-portfolio-view { padding: 1.1rem 1.2rem 2rem !important; }
+.folio-portfolio-view > div:first-child { gap: 1rem; }
+.folio-portfolio-view > div:first-child > div:first-child { font-family: var(--font-display-stack); font-size: 1.1rem; letter-spacing: -.025em; }
+.folio-portfolio-view .mac-stock-tile { border-color: #dfe5ed; border-radius: 13px; background: #fff; box-shadow: 0 2px 8px rgba(16, 24, 40, .035); }
+.folio-portfolio-view h3 { color: #7b8798 !important; font-size: .59rem !important; letter-spacing: .12em !important; }
+.folio-portfolio-view select, .folio-portfolio-view button { border-radius: 999px; }
+.folio-portfolio-view .border-t { border-color: #e2e7ef; }
+
+.folio-compare-view { padding: 1.1rem 1.2rem 2rem !important; }
+.folio-compare-view > div:first-child { margin-bottom: 1rem; border-bottom: 1px solid #dfe5ed; padding-bottom: .8rem; }
+.folio-compare-view > div:first-child h3 { font-family: var(--font-display-stack); color: #101114 !important; font-size: 1.1rem !important; letter-spacing: -.025em; text-transform: none; }
+.folio-compare-view input { min-height: 2.35rem; border-color: #dce3ed !important; border-radius: 999px !important; background: #fff !important; }
+.folio-compare-view input:focus { border-color: #7ca5ff !important; box-shadow: 0 0 0 3px rgba(0, 82, 255, .10); }
+.folio-compare-view > div:first-child + div > button { min-height: 2.35rem; border-radius: 999px; }
+.folio-compare-view table { border-collapse: separate; border-spacing: 0; background: #fff; font-variant-numeric: tabular-nums; }
+.folio-compare-view table thead { background: #f7f9fc; }
+.folio-compare-view table th { color: #8792a3; font-size: .58rem; letter-spacing: .1em; }
+.folio-compare-view table td, .folio-compare-view table th { border-bottom-color: #edf0f4 !important; padding: .72rem .85rem !important; }
+.folio-compare-view table tbody tr:hover { background: #f8fbff; }

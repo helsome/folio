@@ -154,7 +154,7 @@ export const PortfolioSection: React.FC = () => {
     : 'Longbridge';
 
   return (
-    <div className="space-y-3 overflow-y-auto p-4">
+    <div className="folio-portfolio-view space-y-3 overflow-y-auto p-4" data-testid="portfolio-view">
       <div className="flex items-center justify-between">
         <h2 className="text-[13px] font-semibold text-foreground">{t('portfolio.title')}</h2>
         <Button variant="secondary" size="sm" onClick={() => setImportOpen(true)}>

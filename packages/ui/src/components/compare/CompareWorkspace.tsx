@@ -43,7 +43,7 @@ export const CompareWorkspace: React.FC = () => {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto p-4" data-testid="compare-workspace">
+    <div className="folio-compare-view flex h-full flex-col overflow-y-auto p-4" data-testid="compare-workspace">
       <div className="mb-3 flex items-center justify-between">
         <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
           {t('compare.title')}

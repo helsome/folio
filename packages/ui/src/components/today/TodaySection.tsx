@@ -15,7 +15,7 @@ interface TodaySectionProps {
 }
 
 export const TodaySection: React.FC<TodaySectionProps> = ({ title, action, children }) => (
-  <section className="border-t border-border px-1 py-4 first:border-t-0">
+  <section className="folio-today-section border-t border-border px-1 py-4 first:border-t-0">
     <header className="mb-3 flex items-center justify-between gap-3">
       <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/48">{title}</h3>
       {action}
