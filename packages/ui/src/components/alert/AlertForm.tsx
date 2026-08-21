@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import type { AlertRuleType } from '@finagent/core';
 import { ALERT_RULE_TYPES } from '@finagent/core';
 import type { AlertRuleDraft } from '../../atoms';
-import { ALERT_TYPE_KEYS } from './AlertCard';
+import { ALERT_TYPE_ICONS, ALERT_TYPE_KEYS } from './AlertCard';
 import { Button } from '../primitives/Button';
 import { Input } from '../primitives/Input';
 
@@ -109,9 +109,14 @@ export const AlertForm: React.FC<AlertFormProps> = ({
   };
 
   return (
-    <form onSubmit={handleSubmit} className="space-y-4">
-      <div className="text-lg font-semibold text-[oklch(var(--text-primary))]">
-        {t('alerts.createAlert')}
+    <form onSubmit={handleSubmit} className="space-y-5">
+      <div className="border-b border-border pb-4">
+        <div className="text-[11px] font-semibold uppercase tracking-[.12em] text-accent">
+          {t('alerts.new')}
+        </div>
+        <div className="mt-1 text-[18px] font-semibold tracking-[-.02em] text-foreground">
+          {t('alerts.createAlert')}
+        </div>
       </div>
 
       {needsSymbol && (
@@ -125,21 +130,22 @@ export const AlertForm: React.FC<AlertFormProps> = ({
       )}
 
       <div className="space-y-2">
-        <label className="text-sm font-medium text-[oklch(var(--text-secondary))]">
+        <label className="text-[12px] font-medium text-foreground/70">
           {t('alerts.form.alertType')}
         </label>
-        <div className="grid grid-cols-2 gap-2">
+        <div className="grid grid-cols-2 gap-2.5">
           {ALERT_RULE_TYPES.map((tType) => (
             <button
               key={tType}
               type="button"
               onClick={() => setType(tType)}
-              className={`p-2 rounded-lg border text-sm transition-all ${
+              className={`flex min-h-10 items-center gap-2 rounded-[8px] border px-2.5 py-2 text-left text-[12px] transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
                 type === tType
-                  ? 'border-[oklch(var(--accent-primary))] bg-[oklch(var(--accent-primary))]/10 text-[oklch(var(--text-primary))]'
-                  : 'border-[oklch(var(--bg-primary))] text-[oklch(var(--text-secondary))] hover:border-[oklch(var(--accent-primary))]/50'
+                  ? 'border-accent bg-accent/10 font-medium text-foreground'
+                  : 'border-border bg-surface text-foreground/58 hover:border-accent/45 hover:text-foreground'
               }`}
             >
+              {React.createElement(ALERT_TYPE_ICONS[tType], { className: 'h-3.5 w-3.5 shrink-0 text-accent', 'aria-hidden': true })}
               {t(ALERT_TYPE_KEYS[tType])}
             </button>
           ))}
@@ -205,12 +211,12 @@ export const AlertForm: React.FC<AlertFormProps> = ({
         />
       )}
 
-      <div className="flex gap-2 pt-2">
+      <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row">
+        <Button type="button" variant="outline" onClick={onCancel} className="sm:min-w-24">
+          {t('common.cancel')}
+        </Button>
         <Button type="submit" className="flex-1">
           {t('alerts.form.create')}
-        </Button>
-        <Button type="button" variant="secondary" onClick={onCancel}>
-          {t('common.cancel')}
         </Button>
       </div>
     </form>

@@ -16,9 +16,9 @@ interface RowProps {
 }
 
 const Row: React.FC<RowProps> = ({ label, value }) => (
-  <tr className="border-b border-[var(--mac-border)] last:border-b-0">
-    <td className="py-2 pr-4 text-[12px] text-foreground/54">{label}</td>
-    <td className="py-2 text-right text-[13px] font-medium tabular-nums text-foreground">
+  <tr className="border-b border-[var(--mac-border)]/70 last:border-b-0">
+    <td className="h-10 py-2 pr-4 text-[12px] text-foreground/54">{label}</td>
+    <td className="h-10 py-2 text-right text-[13px] font-medium tabular-nums text-foreground">
       {value}
     </td>
   </tr>
@@ -57,12 +57,13 @@ export const FinancialsView: React.FC = () => {
 
   return (
     <div className="space-y-3 p-4">
-      <div className="rounded-[10px] border border-[var(--mac-border)] bg-[var(--mac-blue-soft)] px-4 py-3 text-[12px] text-foreground/70">
+      <div className="rounded-[12px] border border-[var(--mac-blue)]/15 bg-[var(--mac-blue-soft)] px-4 py-3 text-[12px] leading-5 text-foreground/70">
         {t('security.financials.banner')}
       </div>
 
-      <section className="mac-stock-tile rounded-[12px] p-4">
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
+      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
+      <section className="rounded-[14px] border border-[var(--mac-border)] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
+        <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.11em] text-foreground/48">
           {t('security.financials.valuationMetrics')}
         </h3>
         <table className="w-full">
@@ -99,8 +100,8 @@ export const FinancialsView: React.FC = () => {
         </table>
       </section>
 
-      <section className="mac-stock-tile rounded-[12px] p-4">
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
+      <section className="rounded-[14px] border border-[var(--mac-border)] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
+        <h3 className="mb-2 text-[10px] font-semibold uppercase tracking-[0.11em] text-foreground/48">
           {t('security.financials.staticInfo')}
         </h3>
         <table className="w-full">
@@ -142,6 +143,7 @@ export const FinancialsView: React.FC = () => {
           </tbody>
         </table>
       </section>
+      </div>
     </div>
   );
 };

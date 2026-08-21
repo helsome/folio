@@ -23,39 +23,39 @@ export const HoldingRow: React.FC<HoldingRowProps> = ({ holding, onClick, onRese
 
   return (
     <div
-      className="flex justify-between items-center p-3 bg-[oklch(var(--bg-secondary))] rounded-lg hover:opacity-80 cursor-pointer transition-opacity"
+      className="group grid cursor-pointer grid-cols-[minmax(0,1fr)_auto] items-center gap-x-4 gap-y-3 rounded-[13px] border border-[var(--mac-border)] bg-white p-3.5 transition-[border-color,box-shadow,transform] hover:-translate-y-px hover:border-[var(--mac-blue)]/35 hover:shadow-[0_4px_14px_rgba(15,23,42,0.06)] active:translate-y-0 sm:grid-cols-[minmax(0,1fr)_auto_auto_auto]"
       onClick={onClick}
     >
       <div className="flex-1">
         <div className="flex items-center gap-2">
-          <span className="font-semibold text-[oklch(var(--text-primary))]">
+          <span className="font-semibold text-[13px] text-foreground">
             {holding.symbol}
           </span>
-          <span className="text-sm text-[oklch(var(--text-secondary))]">
+          <span className="truncate text-[11px] text-foreground/48">
             {holding.name}
           </span>
         </div>
-        <div className="text-sm text-[oklch(var(--text-secondary))] mt-1">
+        <div className="mt-1 text-[11px] tabular-nums text-foreground/48">
           {formatNumber(holding.quantity, undefined, { maximumFractionDigits: 0 })} @{' '}
           {formatCurrency(holding.costPrice, holding.currency)}
         </div>
       </div>
 
       <div className="text-right">
-        <div className="font-semibold text-[oklch(var(--text-primary))]">
+        <div className="text-[13px] font-semibold tabular-nums text-foreground">
           {formatCurrency(holding.marketValue, holding.currency)}
         </div>
-        <div className={`text-sm ${pnlColor}`}>
+        <div className={`mt-1 text-[11px] tabular-nums ${pnlColor}`}>
           {formatSignedCurrency(holding.unrealizedPnL, holding.currency)}
           <span className="ml-1">({formatPercent(holding.unrealizedPnLPercent)})</span>
         </div>
       </div>
 
-      <div className="ml-4 text-right">
-        <div className="text-[oklch(var(--text-primary))]">
+      <div className="hidden text-right sm:block">
+        <div className="text-[12px] tabular-nums text-foreground">
           {formatCurrency(holding.marketPrice, holding.currency)}
         </div>
-        <div className="text-xs text-[oklch(var(--text-secondary))]">{t('portfolio.last')}</div>
+        <div className="mt-1 text-[10px] uppercase tracking-wide text-foreground/42">{t('portfolio.last')}</div>
       </div>
 
       {/* V9: the position's primary contextual action is Research (spec §51). */}
@@ -67,7 +67,7 @@ export const HoldingRow: React.FC<HoldingRowProps> = ({ holding, onClick, onRese
             onResearch();
           }}
           data-testid={`holding-research-${holding.symbol}`}
-          className="ml-3 flex shrink-0 items-center gap-1.5 rounded-[8px] bg-primary px-2.5 py-1.5 text-[11.5px] font-semibold text-primary-foreground transition-smooth hover:bg-primary/88 active:scale-[0.98]"
+          className="col-span-2 flex shrink-0 items-center justify-center gap-1.5 rounded-[8px] bg-[#0052ff] px-2.5 py-1.5 text-[11.5px] font-semibold text-white transition-colors hover:bg-[#0047d9] active:scale-[0.98] sm:col-span-1"
         >
           <Search className="h-3 w-3" strokeWidth={1.9} />
           {t('research.symbolEntry.startShort')}

@@ -20,11 +20,11 @@ interface StatCellProps {
 }
 
 const StatCell: React.FC<StatCellProps> = ({ label, value }) => (
-  <div className="min-w-[72px]">
-    <div className="text-[10px] font-semibold uppercase tracking-wide text-foreground/42">
+  <div className="min-w-0 border-l border-[var(--mac-border)] pl-3 first:border-l-0 first:pl-0">
+    <div className="truncate text-[10px] font-semibold uppercase tracking-[0.08em] text-foreground/42">
       {label}
     </div>
-    <div className="mt-0.5 text-[13px] tabular-nums text-foreground">{value}</div>
+    <div className="mt-1 truncate text-[12px] font-medium tabular-nums text-foreground/80">{value}</div>
   </div>
 );
 
@@ -105,9 +105,9 @@ export const SecurityHeader: React.FC = () => {
 
   if (error) {
     return (
-      <div className="border-b mac-section-divider px-4 py-3">
+      <div className="mx-4 mt-4 rounded-[16px] border border-[var(--mac-border)] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <div
-          className="text-[13px] font-bold uppercase text-foreground/72"
+          className="text-[13px] font-semibold uppercase tracking-wide text-foreground/72"
           data-testid="security-header-symbol"
         >
           {symbol}
@@ -121,7 +121,7 @@ export const SecurityHeader: React.FC = () => {
 
   if (loading || !quote) {
     return (
-      <div className="border-b mac-section-divider px-4 py-3">
+      <div className="mx-4 mt-4 rounded-[16px] border border-[var(--mac-border)] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
         <div className="flex items-center gap-2">
           <div className="h-4 w-24 animate-pulse rounded bg-foreground/10" />
           <div className="h-4 w-12 animate-pulse rounded bg-foreground/8" />
@@ -146,24 +146,27 @@ export const SecurityHeader: React.FC = () => {
   ];
 
   return (
-    <div className="border-b mac-section-divider px-4 py-3">
-      <div className="flex items-start justify-between gap-4">
+    <div className="mx-4 mt-4 rounded-[16px] border border-[var(--mac-border)] bg-white px-5 py-4 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
         <div className="min-w-0">
-          <div className="truncate text-[14px] font-semibold text-foreground">
-            {name}
+          <div className="flex items-center gap-2">
+            <div className="truncate text-[15px] font-semibold text-foreground">{name}</div>
+            <span
+              className="rounded-full bg-[var(--mac-blue-soft)] px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--mac-blue)]"
+              data-testid="security-header-symbol"
+            >
+              {quote.symbol}
+            </span>
           </div>
-          <div
-            className="text-[11px] font-semibold uppercase tracking-wide text-foreground/48"
-            data-testid="security-header-symbol"
-          >
-            {quote.symbol}
+          <div className="mt-1 text-[11px] font-semibold uppercase tracking-[0.12em] text-foreground/42">
+            {marketStatus ?? t('security.header.marketStatus')}
           </div>
         </div>
 
-        <div className="flex flex-col items-end">
+        <div className="flex items-end justify-between gap-5 lg:justify-end">
+          <div className="flex flex-col items-start lg:items-end">
           <div
-            className="text-[32px] font-semibold leading-none tracking-tight tabular-nums"
-            style={{ color: changeColor }}
+            className="text-[36px] font-semibold leading-none tracking-[-0.04em] tabular-nums text-foreground"
           >
             {formatPrice(quote.lastPrice)}
           </div>
@@ -178,18 +181,19 @@ export const SecurityHeader: React.FC = () => {
             updatedAtMs={quote.timestamp ? quote.timestamp * 1000 : undefined}
             className="mt-1.5"
           />
-        </div>
+          </div>
         <div className="flex items-center gap-2">
           <button
             onClick={() => setNavSection('research')}
-            className="mac-primary-button rounded-[8px] px-3 py-1.5 text-[12px] font-semibold"
+            className="rounded-[9px] bg-[#0052ff] px-3.5 py-2 text-[12px] font-semibold text-white transition-colors hover:bg-[#0047d9] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052ff]/40 active:scale-[0.98]"
             data-testid="deep-research-button"
           >
             {t('security.header.deepResearch')}
           </button>
         </div>
+        </div>
       </div>
-      <div className="mt-3 flex flex-wrap gap-x-6 gap-y-2 border-t mac-section-divider pt-3">
+      <div className="mt-4 grid grid-cols-2 gap-x-4 gap-y-3 border-t border-[var(--mac-border)] pt-3 sm:grid-cols-4 xl:grid-cols-7">
         {stats.map((stat) => (
           <StatCell key={stat.label} label={stat.label} value={stat.value} />
         ))}

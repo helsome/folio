@@ -43,64 +43,72 @@ export const CompareWorkspace: React.FC = () => {
   };
 
   return (
-    <div className="folio-compare-view flex h-full flex-col overflow-y-auto p-4" data-testid="compare-workspace">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
+    <div className="folio-compare-view flex h-full flex-col overflow-y-auto bg-surface-raised p-5" data-testid="compare-workspace">
+      <div className="flex items-start justify-between gap-4 border-b border-border pb-3">
+        <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">
           {t('compare.title')}
         </h3>
         <DataFreshness
           providerName="Longbridge"
           updatedAtMs={state.data?.generatedAt}
+          className="shrink-0 pt-0.5"
         />
       </div>
 
-      <div className="flex items-center gap-2">
-        <input
-          data-testid="compare-symbol-input"
-          value={input}
-          onChange={(event) => setInput(event.target.value)}
-          onKeyDown={(event) => {
-            if (event.key === 'Enter') add();
-          }}
-          placeholder={t('compare.symbolPlaceholder')}
-          className="mac-input flex-1 px-3 py-2 rounded-[10px] text-[13px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-accent/28 transition-smooth"
-        />
-        <Button size="sm" onClick={add} disabled={symbols.length >= 4}>
-          <span data-testid="compare-add">{t('common.add')}</span>
-        </Button>
-      </div>
-
-      {symbols.length > 0 && (
-        <div className="mt-2 flex flex-wrap gap-1.5">
-          {symbols.map((symbol) => (
-            <button
-              key={symbol}
-              type="button"
-              onClick={() => remove(symbol)}
-              className="flex items-center gap-1 rounded-full bg-foreground/8 px-3 py-1 text-[12px] text-foreground/70 hover:bg-foreground/14 transition-smooth"
-            >
-              {symbol}
-              <span className="text-foreground/44">×</span>
-            </button>
-          ))}
+      <div className="mt-4 rounded-[10px] border border-border bg-background/45 p-3">
+        <div className="flex items-center gap-2">
+          <input
+            data-testid="compare-symbol-input"
+            value={input}
+            onChange={(event) => setInput(event.target.value)}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') add();
+            }}
+            placeholder={t('compare.symbolPlaceholder')}
+            className="h-9 min-w-0 flex-1 rounded-[8px] border border-input bg-surface-raised px-3 text-[12.5px] text-foreground placeholder:text-foreground/38 transition-smooth hover:border-[var(--mac-border-strong)] focus:border-[var(--mac-blue)] focus:outline-none focus:ring-2 focus:ring-[var(--mac-blue)]/18"
+          />
+          <Button
+            size="sm"
+            onClick={add}
+            disabled={symbols.length >= 4}
+            className="h-9 shrink-0 rounded-[8px] bg-[var(--mac-blue)] px-3.5 text-[12px] text-white hover:bg-[var(--mac-blue-hover)]"
+          >
+            <span data-testid="compare-add">{t('common.add')}</span>
+          </Button>
         </div>
-      )}
 
-      <div className="mt-3 flex-1">
+        {symbols.length > 0 && (
+          <div className="mt-2.5 flex flex-wrap gap-1.5">
+            {symbols.map((symbol) => (
+              <button
+                key={symbol}
+                type="button"
+                onClick={() => remove(symbol)}
+                className="group inline-flex items-center gap-1 rounded-full border border-[rgba(var(--accent-rgb),0.22)] bg-[var(--mac-blue-soft)] px-2.5 py-1 text-[11.5px] font-medium text-[var(--mac-blue)] transition-smooth hover:border-[rgba(var(--accent-rgb),0.38)] hover:bg-[rgba(var(--accent-rgb),0.16)] focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-1 focus-visible:outline-[var(--mac-blue)]"
+              >
+                {symbol}
+                <span className="text-[var(--mac-blue)]/60 transition-colors group-hover:text-[var(--mac-blue)]">×</span>
+              </button>
+            ))}
+          </div>
+        )}
+      </div>
+
+      <div className="mt-4 min-h-0 flex-1">
         {state.loading ? (
-          <div className="h-32 animate-pulse rounded-[12px] bg-foreground/6" />
+          <div className="h-32 animate-pulse rounded-[10px] border border-border bg-surface-muted/55" />
         ) : state.error ? (
-          <div className="py-8 text-center text-[13px] text-foreground/44">{state.error}</div>
+          <div className="rounded-[10px] border border-dashed border-border px-4 py-8 text-center text-[12.5px] text-text-muted">{state.error}</div>
         ) : state.data ? (
           <CompareTable comparison={state.data} />
         ) : (
-          <div className="py-8 text-center text-[13px] text-foreground/44">
+          <div className="rounded-[10px] border border-dashed border-border px-4 py-8 text-center text-[12.5px] text-text-muted">
             {t('compare.addTwo')}
           </div>
         )}
       </div>
 
-      <div className="mt-3 text-[11px] text-foreground/44">
+      <div className="mt-4 border-t border-border pt-3 text-[10.5px] leading-relaxed text-text-muted">
         {t('compare.agentContext')}
       </div>
     </div>

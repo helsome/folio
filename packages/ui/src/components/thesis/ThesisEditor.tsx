@@ -22,13 +22,13 @@ interface ListFieldProps {
 
 const ListField: React.FC<ListFieldProps> = ({ label, value, onChange, placeholder }) => (
   <label className="flex flex-col gap-1.5">
-    <span className="text-sm font-medium text-foreground/70">{label}</span>
+    <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#68778c]">{label}</span>
     <textarea
       value={value}
       onChange={(event) => onChange(event.target.value)}
       placeholder={placeholder}
       rows={3}
-      className="mac-input px-3 py-2 rounded-[10px] text-[13px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-accent/28 transition-smooth"
+      className="resize-y rounded-[7px] border border-[#d8e0eb] bg-white px-3 py-2 text-[12px] leading-5 text-foreground placeholder:text-foreground/38 outline-none transition-smooth focus:border-[#0052ff] focus:ring-2 focus:ring-[#0052ff]/15"
     />
   </label>
 );
@@ -69,9 +69,9 @@ export const ThesisEditor: React.FC<{
   };
 
   return (
-    <div className="space-y-3 rounded-[10px] border border-foreground/8 p-3">
-      <div className="flex items-center gap-2">
-        <span className="text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
+    <div className="space-y-3 rounded-[12px] border border-[#bfd2ff] border-l-2 border-l-[#0052ff] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
+      <div className="flex flex-wrap items-center gap-2">
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#68778c]">
           {t('thesis.editor.stance')}
         </span>
         <div className="flex gap-1">
@@ -80,10 +80,10 @@ export const ThesisEditor: React.FC<{
               key={option}
               type="button"
               onClick={() => setStance(option)}
-              className={`rounded-full px-3 py-1 text-[12px] transition-smooth ${
+              className={`rounded-[6px] border px-2.5 py-1 text-[11px] font-semibold transition-smooth focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#0052ff]/25 ${
                 stance === option
-                  ? 'bg-[var(--mac-blue)] text-white'
-                  : 'bg-foreground/8 text-foreground/70 hover:bg-foreground/14'
+                  ? 'border-[#0052ff] bg-[#0052ff] text-white'
+                  : 'border-[#d8e0eb] bg-[#fbfcfe] text-foreground/70 hover:border-[#a9bce1] hover:bg-[#f4f7fc]'
               }`}
             >
               {t(`thesis.stance.${option}`)}
@@ -93,16 +93,16 @@ export const ThesisEditor: React.FC<{
       </div>
 
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-foreground/70">{t('thesis.editor.coreThesis')}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#68778c]">{t('thesis.editor.coreThesis')}</span>
         <textarea
           value={summary}
           onChange={(event) => setSummary(event.target.value)}
           rows={2}
-          className="mac-input px-3 py-2 rounded-[10px] text-[13px] text-foreground focus:outline-none focus:ring-2 focus:ring-accent/28 transition-smooth"
+          className="resize-y rounded-[7px] border border-[#d8e0eb] bg-white px-3 py-2 text-[12px] leading-5 text-foreground outline-none transition-smooth focus:border-[#0052ff] focus:ring-2 focus:ring-[#0052ff]/15"
         />
       </label>
 
-      <div className="grid grid-cols-2 gap-2">
+      <div className="grid grid-cols-1 gap-2 sm:grid-cols-2">
         <ListField label={t('thesis.editor.bullCase')} value={bullCase} onChange={setBullCase} placeholder={t('thesis.editor.onePointPerLine')} />
         <ListField label={t('thesis.editor.bearCase')} value={bearCase} onChange={setBearCase} placeholder={t('thesis.editor.onePointPerLine')} />
         <ListField label={t('thesis.editor.catalysts')} value={catalysts} onChange={setCatalysts} placeholder={t('thesis.editor.onePointPerLine')} />
@@ -110,13 +110,13 @@ export const ThesisEditor: React.FC<{
       </div>
 
       <label className="flex flex-col gap-1.5">
-        <span className="text-sm font-medium text-foreground/70">{t('thesis.editor.targetPriceOptional')}</span>
+        <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#68778c]">{t('thesis.editor.targetPriceOptional')}</span>
         <input
           value={targetPrice}
           onChange={(event) => setTargetPrice(event.target.value)}
           inputMode="decimal"
           placeholder={t('thesis.editor.targetPricePlaceholder')}
-          className="mac-input px-3 py-2 rounded-[10px] text-[13px] text-foreground focus:outline-none focus:ring-2 focus:ring-accent/28 transition-smooth"
+          className="rounded-[7px] border border-[#d8e0eb] bg-white px-3 py-2 font-mono text-[12px] tabular-nums text-foreground outline-none transition-smooth placeholder:text-foreground/38 focus:border-[#0052ff] focus:ring-2 focus:ring-[#0052ff]/15"
         />
       </label>
 
@@ -124,7 +124,12 @@ export const ThesisEditor: React.FC<{
         <Button variant="ghost" size="sm" onClick={onCancel} disabled={saving}>
           {t('common.cancel')}
         </Button>
-        <Button size="sm" onClick={handleSave} disabled={saving}>
+        <Button
+          size="sm"
+          onClick={handleSave}
+          disabled={saving}
+          className="bg-[#0052ff] text-white hover:bg-[#0045d8]"
+        >
           {saving ? t('thesis.editor.saving') : t('common.save')}
         </Button>
       </div>

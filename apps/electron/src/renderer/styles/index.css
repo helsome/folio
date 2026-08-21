@@ -6,9 +6,13 @@
    Keep the palette intentionally restrained: surfaces and spacing carry the
    hierarchy; blue is reserved for interaction and focus. */
 :root {
-  --font-sans-stack: "Avenir Next", "PingFang SC", "Hiragino Sans GB", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  --font-display-stack: "Avenir Next Demi Bold", "Avenir Next", "PingFang SC", "Hiragino Sans GB", "SF Pro Display", -apple-system, BlinkMacSystemFont, sans-serif;
-  --font-numeric-stack: "SF Mono", "JetBrains Mono", ui-monospace, monospace;
+  /* One bilingual type system across the app. SF Mono is the research/data
+     face users see in the market workspace; CJK fallbacks keep Chinese text
+     in the same deliberate, compact rhythm. */
+  --font-global-stack: "SF Mono", "JetBrains Mono", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", ui-monospace, monospace;
+  --font-sans-stack: var(--font-global-stack);
+  --font-display-stack: var(--font-global-stack);
+  --font-numeric-stack: var(--font-global-stack);
   --background: #f6f8fb;
   --surface: #ffffff;
   --surface-muted: #f2f4f7;
@@ -513,6 +517,37 @@ button:disabled { cursor: not-allowed; }
 .folio-today-section li { border-top: 1px solid #eef1f5; padding: .62rem 0 !important; }
 .folio-today-section li:first-child { border-top: 0; padding-top: .1rem !important; }
 .folio-today-section .text-foreground { font-family: var(--font-sans-stack); }
+
+/* Daily Brief — a compact attention feed, not a stack of repeated cards. */
+.folio-daily-brief-section { border-radius: 16px !important; padding: 1rem 1.05rem 1.05rem !important; box-shadow: 0 4px 14px rgba(16, 24, 40, .035) !important; }
+.folio-daily-brief-section > header { align-items: center; margin-bottom: .75rem !important; }
+.folio-daily-brief-section > header h3 { color: #526174 !important; font-size: .62rem !important; letter-spacing: .13em !important; }
+.folio-daily-brief-section > header button { min-height: 1.95rem; border-radius: 8px; font-size: .7rem; }
+.folio-daily-brief-overview { display: flex; align-items: center; justify-content: space-between; gap: 1rem; border: 1px solid #e2e8f0; border-radius: 11px; background: #f7f9fc; padding: .65rem .75rem; }
+.folio-daily-brief-count { display: inline-flex; height: 2.35rem; width: 2.35rem; align-items: center; justify-content: center; border-radius: 9px; background: #eaf1ff; color: #0052ff; font-family: var(--font-numeric-stack); font-size: 1.05rem; font-weight: 750; }
+.folio-daily-brief-overview-label { color: #334155; font-size: .72rem; font-weight: 750; }
+.folio-daily-brief-overview-copy { margin-top: .12rem; color: #8994a5; font-size: .63rem; }
+.folio-daily-brief-updated { display: inline-flex; align-items: center; gap: .35rem; color: #7b8798; font-size: .62rem; white-space: nowrap; }
+.folio-daily-brief-list { overflow: hidden; border-top: 1px solid #e7ebf1; }
+.folio-daily-brief-row { position: relative; display: grid; grid-template-columns: .2rem minmax(0, 1fr) auto; align-items: center; gap: .7rem; min-height: 3.65rem; border-top: 0 !important; border-bottom: 1px solid #edf0f4; padding: .68rem .15rem !important; transition: background-color .15s ease; }
+.folio-daily-brief-row:hover { background: #f8fbff; }
+.folio-daily-brief-row:first-child { padding-top: .68rem !important; }
+.folio-daily-brief-row:last-child { border-bottom: 0; }
+.folio-daily-brief-severity { align-self: stretch; min-height: 2.1rem; border-radius: 999px; }
+.folio-daily-brief-row .text-foreground { font-family: var(--font-sans-stack); }
+.folio-daily-brief-meta { display: flex; min-width: 5.2rem; flex-direction: column; align-items: flex-end; gap: .3rem; }
+.folio-daily-brief-source { border: 1px solid #dfe5ed; border-radius: 999px; background: #fff; padding: .18rem .45rem; color: #68778c; font-size: .58rem; font-weight: 700; white-space: nowrap; }
+.folio-daily-brief-details { color: #0052ff; font-size: .59rem; font-weight: 700; white-space: nowrap; }
+.folio-daily-brief-details:hover { text-decoration: underline; text-underline-offset: 2px; }
+.folio-daily-brief-quiet { display: flex; align-items: center; gap: .4rem; border-top: 1px solid #e7ebf1; padding: .7rem .15rem .05rem; color: #778398; font-size: .62rem; }
+.folio-daily-brief-quiet-dot { height: .38rem; width: .38rem; border: 1px solid #98a2b3; border-radius: 50%; }
+
+@media (max-width: 760px) {
+  .folio-daily-brief-overview { align-items: flex-start; flex-direction: column; gap: .55rem; }
+  .folio-daily-brief-updated { padding-left: 2.7rem; }
+  .folio-daily-brief-row { grid-template-columns: .2rem minmax(0, 1fr); }
+  .folio-daily-brief-meta { grid-column: 2; flex-direction: row; align-items: center; justify-content: space-between; min-width: 0; }
+}
 
 .folio-discover-view { padding: 1.1rem 1.2rem 2rem !important; }
 .folio-discover-view .folio-pilot-page-header { border: 1px solid #dfe5ed; border-radius: 14px; background: #fff; padding: 1.05rem 1.15rem .95rem; box-shadow: 0 4px 14px rgba(16, 24, 40, .035); }

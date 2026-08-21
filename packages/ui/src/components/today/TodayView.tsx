@@ -174,15 +174,15 @@ export const TodayView: React.FC = () => {
       )
     }
     return (
-      <ul className="space-y-1">
+      <ul className="divide-y divide-border">
         {movers.slice(0, MOVER_ROWS).map((mover) => (
-          <li key={mover.symbol} className="flex items-center justify-between py-1">
-            <span className="text-[13px] font-medium text-foreground">{mover.symbol}</span>
+          <li key={mover.symbol} className="flex items-center justify-between gap-3 py-2 first:pt-0 last:pb-0">
+            <span className="text-[12.5px] font-medium text-foreground">{mover.symbol}</span>
             <span className="flex items-center gap-4">
-              <span className="text-[13px] text-foreground/78">
+              <span className="tnum text-[12.5px] text-foreground/78">
                 {mover.lastPrice !== undefined ? formatMoney(mover.lastPrice, 'USD') : DASH}
               </span>
-              <span className={`w-16 text-right text-[13px] font-semibold ${(mover.changePercent ?? 0) >= 0 ? 'text-[var(--mac-green)]' : 'text-[var(--mac-red)]'}`}>
+              <span className={`tnum w-16 text-right text-[12.5px] font-semibold ${(mover.changePercent ?? 0) >= 0 ? 'text-[var(--mac-green)]' : 'text-[var(--mac-red)]'}`}>
                 {formatPercent(mover.changePercent)}
               </span>
             </span>
@@ -202,18 +202,18 @@ export const TodayView: React.FC = () => {
     if (alertState.loading && triggeredAlerts.length === 0) return <SectionState kind="loading" />
     if (triggeredAlerts.length === 0) return <SectionState kind="empty" message={t('today.noTriggeredAlerts')} />
     return (
-      <ul className="space-y-1">
+      <ul className="divide-y divide-border">
         {triggeredAlerts.map((event: AlertTriggerEvent) => (
-          <li key={event.id} className="flex items-start justify-between gap-3 py-1">
+          <li key={event.id} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
             <div className="min-w-0">
-              <div className="truncate text-[13px] font-medium text-foreground">
+              <div className="truncate text-[12.5px] font-medium text-foreground">
                 {event.symbol ? `${event.symbol} · ` : ''}{event.title}
               </div>
               {event.message && (
                 <div className="truncate text-[12px] text-foreground/54">{event.message}</div>
               )}
             </div>
-            <span className="shrink-0 text-[11px] text-foreground/38">{formatWhen(event.triggeredAt, t)}</span>
+            <span className="tnum shrink-0 text-[11px] text-foreground/38">{formatWhen(event.triggeredAt, t)}</span>
           </li>
         ))}
       </ul>
@@ -233,18 +233,18 @@ export const TodayView: React.FC = () => {
       )
     }
     return (
-      <ul className="space-y-1">
+      <ul className="divide-y divide-border">
         {upcomingItems.map((event) => (
-          <li key={event.id} className="flex items-start justify-between gap-3 py-1">
+          <li key={event.id} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
             <div className="min-w-0">
-              <div className="truncate text-[13px] font-medium text-foreground">
+              <div className="truncate text-[12.5px] font-medium text-foreground">
                 {event.symbol ? `${event.symbol} · ` : ''}{event.name ?? event.content ?? event.type}
               </div>
               {event.content && event.name && (
                 <div className="truncate text-[12px] text-foreground/54">{event.content}</div>
               )}
             </div>
-            <span className="shrink-0 text-[11px] text-foreground/38">{event.localDate ?? DASH}</span>
+            <span className="tnum shrink-0 text-[11px] text-foreground/38">{event.localDate ?? DASH}</span>
           </li>
         ))}
       </ul>
@@ -261,11 +261,11 @@ export const TodayView: React.FC = () => {
     if (reportsLoading && recentReports.length === 0) return <SectionState kind="loading" />
     if (recentReports.length === 0) return <SectionState kind="empty" message={t('today.noResearchReports')} />
     return (
-      <ul className="space-y-1">
+      <ul className="divide-y divide-border">
         {recentReports.map((report) => (
-          <li key={report.id} className="flex items-start justify-between gap-3 py-1">
+          <li key={report.id} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
             <div className="min-w-0">
-              <div className="truncate text-[13px] font-medium text-foreground">
+              <div className="truncate text-[12.5px] font-medium text-foreground">
                 {report.symbol} · <span className="capitalize">{report.stance}</span>
               </div>
               <div className="truncate text-[12px] text-foreground/54">{report.summary}</div>
@@ -278,7 +278,7 @@ export const TodayView: React.FC = () => {
                 setNavSection('research')
               }}
               data-testid={`today-continue-${report.symbol}`}
-              className="shrink-0 rounded-[7px] border border-border px-2 py-1 text-[11.5px] font-medium text-foreground/64 transition-smooth hover:border-border-strong hover:text-foreground"
+              className="shrink-0 rounded-[7px] border border-[var(--mac-blue)]/25 px-2 py-1 text-[11.5px] font-medium text-accent transition-smooth hover:border-[var(--mac-blue)]/50 hover:bg-[var(--mac-blue-soft)]"
             >
               {t('today.continueResearch')}
             </button>
@@ -294,16 +294,16 @@ export const TodayView: React.FC = () => {
     if (thesesLoading && needsReview.length === 0) return <SectionState kind="loading" />
     if (needsReview.length === 0) return <SectionState kind="empty" message={t('today.allThesesUpToDate')} />
     return (
-      <ul className="space-y-1">
+      <ul className="divide-y divide-border">
         {needsReview.map((thesis) => (
-          <li key={thesis.id} className="flex items-start justify-between gap-3 py-1">
+          <li key={thesis.id} className="flex items-start justify-between gap-3 py-2 first:pt-0 last:pb-0">
             <div className="min-w-0">
-              <div className="truncate text-[13px] font-medium text-foreground">
+              <div className="truncate text-[12.5px] font-medium text-foreground">
                 {thesis.symbol} · <span className="capitalize">{thesis.stance}</span>
               </div>
               <div className="truncate text-[12px] text-foreground/54">{thesis.summary}</div>
             </div>
-            <span className="shrink-0 text-[11px] text-foreground/38">{formatWhen(thesis.updatedAt, t)}</span>
+            <span className="tnum shrink-0 text-[11px] text-foreground/38">{formatWhen(thesis.updatedAt, t)}</span>
           </li>
         ))}
       </ul>
@@ -311,13 +311,13 @@ export const TodayView: React.FC = () => {
   })()
 
   return (
-    <div className="folio-today-view h-full overflow-y-auto px-5 py-6" data-testid="today-view">
-      <section data-testid="today-hero" className="folio-today-hero mb-5 rounded-[12px] border border-border bg-surface p-5">
-        <div className="flex flex-wrap items-start justify-between gap-5">
-          <div><div className="flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[.14em] text-accent"><Sparkles className="h-3.5 w-3.5" />{t('today.quietWorkspace')}</div><h1 className="mt-2 text-[24px] font-semibold tracking-[-.02em] text-foreground">{t('today.greeting')}</h1><p className="mt-1 text-[13px] text-foreground/52">{t('today.heroSubtitle')}</p></div>
-          <div className="flex min-w-[280px] flex-1 justify-end"><label className="relative block w-full max-w-md"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/34" /><input data-testid="today-search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={handleSearchKeyDown} placeholder={t('today.searchPlaceholder')} aria-label={t('today.searchAria')} className="h-10 w-full rounded-[9px] border border-input bg-background pl-9 pr-3 text-[13px] text-foreground placeholder:text-foreground/38 focus:border-transparent focus:outline-none focus:ring-2 focus:ring-ring" /></label></div>
+    <div className="folio-today-view h-full overflow-y-auto bg-background px-5 py-6" data-testid="today-view">
+      <section data-testid="today-hero" className="folio-today-hero mb-5 rounded-[14px] border border-border bg-surface-raised p-5 shadow-none">
+        <div className="flex flex-wrap items-start justify-between gap-6">
+          <div className="min-w-0"><div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[.15em] text-accent"><Sparkles className="h-3.5 w-3.5" />{t('today.quietWorkspace')}</div><h1 className="mt-2 text-[25px] font-semibold tracking-[-.03em] text-foreground">{t('today.greeting')}</h1><p className="mt-1 text-[13px] leading-relaxed text-foreground/52">{t('today.heroSubtitle')}</p></div>
+          <div className="flex min-w-[280px] flex-1 justify-end"><label className="relative block w-full max-w-lg"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/34" /><input data-testid="today-search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={handleSearchKeyDown} placeholder={t('today.searchPlaceholder')} aria-label={t('today.searchAria')} className="h-10 w-full rounded-[9px] border border-input bg-background pl-9 pr-3 text-[13px] text-foreground placeholder:text-foreground/38 transition-smooth focus:border-accent/45 focus:outline-none focus:ring-2 focus:ring-accent/15" /></label></div>
         </div>
-        <div className="mt-5 grid grid-cols-1 gap-2 sm:grid-cols-3">
+        <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-3">
           <QuickAction icon={Search} label={t('today.quickActionDeepResearch')} hint={t('today.quickActionDeepResearchHint')} onClick={handleResearchStock} tone="blue" />
           <QuickAction icon={BriefcaseBusiness} label={t('today.quickActionReviewPortfolio')} hint={t('today.quickActionReviewPortfolioHint')} onClick={handleAnalyzePortfolio} tone="green" />
           <QuickAction icon={GitCompareArrows} label={t('today.quickActionCompareStocks')} hint={t('today.quickActionCompareStocksHint')} onClick={handleCompare} tone="violet" />
@@ -354,9 +354,9 @@ const QuickAction: React.FC<{
   tone: 'blue' | 'green' | 'violet'
   onClick: () => void
 }> = ({ icon: Icon, label, hint, tone, onClick }) => (
-  <button type="button" onClick={onClick} className={`folio-quick-action group flex items-center gap-3 rounded-[9px] border border-border px-3 py-2.5 text-left transition-colors hover:border-border-strong hover:bg-surface-hover ${tone === 'blue' ? 'bg-accent/5' : tone === 'green' ? 'bg-positive/5' : 'bg-info/5'}`}>
+  <button type="button" onClick={onClick} className={`folio-quick-action group flex items-center gap-3 rounded-[9px] border border-border px-3 py-2.5 text-left transition-smooth hover:border-[var(--mac-blue)]/35 hover:bg-[var(--mac-blue-soft)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-accent/25 ${tone === 'blue' ? 'bg-accent/5' : tone === 'green' ? 'bg-positive/5' : 'bg-info/5'}`}>
     <span className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] ${tone === 'blue' ? 'bg-accent/10 text-accent' : tone === 'green' ? 'bg-positive/10 text-positive' : 'bg-info/10 text-info'}`}><Icon className="h-4 w-4" strokeWidth={1.8} /></span>
     <span className="min-w-0 flex-1"><span className="block text-[12px] font-semibold text-foreground">{label}</span><span className="mt-0.5 block truncate text-[11px] text-foreground/44">{hint}</span></span>
-    <ArrowUpRight className="h-3.5 w-3.5 text-foreground/28 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+    <ArrowUpRight className="h-3.5 w-3.5 text-accent/55 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
   </button>
 )

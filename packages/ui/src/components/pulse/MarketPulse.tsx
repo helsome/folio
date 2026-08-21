@@ -65,18 +65,18 @@ function impactColor(impact: PulseImpactSign): string {
 }
 
 const IndexLine: React.FC<{ index: PulseMarketIndex }> = ({ index }) => (
-  <span className="inline-flex items-baseline gap-1.5 text-[13px]" data-testid="pulse-index">
+  <div className="flex min-w-0 items-baseline gap-2 px-3 py-2.5 text-[13px]" data-testid="pulse-index">
     <span className="font-medium text-foreground/80">{index.name}</span>
     <span className="text-foreground/42">{index.symbol}</span>
-    <span className="tabular-nums text-foreground/64">{formatPrice(index.lastPrice)}</span>
-    <span className={`tabular-nums ${changeColor(index.changePercent)}`}>
+    <span className="ml-auto font-mono tabular-nums text-foreground/64">{formatPrice(index.lastPrice)}</span>
+    <span className={`font-mono tabular-nums ${changeColor(index.changePercent)}`}>
       {formatPercent(index.changePercent)}
     </span>
-  </span>
+  </div>
 )
 
 const StatusLine: React.FC<{ statuses: { market: string; status: string }[] }> = ({ statuses }) => (
-  <div className="text-[13px] text-foreground/64" data-testid="pulse-market-status">
+  <div className="flex flex-wrap gap-x-4 gap-y-1 text-[13px] text-foreground/64" data-testid="pulse-market-status">
     {statuses.map((status) => `${status.market} · ${status.status}`).join('  ')}
   </div>
 )
@@ -89,7 +89,7 @@ const TemperatureChip: React.FC<{ score?: number; label?: string; market?: strin
   const tone = score === undefined ? 'text-foreground/42' : score >= 60 ? 'text-[var(--mac-green)]' : score <= 40 ? 'text-[var(--mac-red)]' : 'text-foreground/64'
   return (
     <span className="inline-flex items-center gap-1.5" data-testid="pulse-temperature">
-      <span className={`rounded-full border border-foreground/10 px-2 py-0.5 text-[12px] tabular-nums ${tone}`}>
+      <span className={`rounded-[5px] border border-border bg-background px-2 py-0.5 text-[12px] font-mono tabular-nums ${tone}`}>
         {score === undefined ? DASH : `${score}/100`}
       </span>
       {label && <span className="text-[13px] text-foreground/64">{label}</span>}
@@ -101,16 +101,16 @@ const TemperatureChip: React.FC<{ score?: number; label?: string; market?: strin
 const MoverRow: React.FC<{ mover: ScreeningCandidate }> = ({ mover }) => {
   const changePercent = toFiniteNumber(mover.metrics.changePercent)
   return (
-    <li className="flex items-baseline justify-between gap-2 text-[13px]" data-testid="pulse-mover-row">
+    <li className="flex items-baseline justify-between gap-2 border-t border-border py-1.5 text-[13px] first:border-t-0" data-testid="pulse-mover-row">
       <span className="truncate font-medium text-foreground/80">{mover.symbol}</span>
-      <span className={`tabular-nums ${changeColor(changePercent)}`}>{formatPercent(changePercent)}</span>
+      <span className={`font-mono tabular-nums ${changeColor(changePercent)}`}>{formatPercent(changePercent)}</span>
     </li>
   )
 }
 
 const MoverColumn: React.FC<{ title: string; empty: string; movers: ScreeningCandidate[] }> = ({ title, empty, movers }) => (
-  <div>
-    <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">{title}</h4>
+  <div className="rounded-[8px] border border-border bg-surface-raised p-3">
+    <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">{title}</h4>
     {movers.length === 0 ? (
       <p className="py-1 text-[13px] text-foreground/42">{empty}</p>
     ) : (
@@ -126,14 +126,14 @@ const MoverColumn: React.FC<{ title: string; empty: string; movers: ScreeningCan
 const ImpactRow: React.FC<{ item: PulsePersonalImpactItem }> = ({ item }) => {
   const { t } = useTranslation()
   return (
-  <li className="flex items-center justify-between gap-2 text-[13px]" data-testid="pulse-impact-row">
+  <li className="flex items-center justify-between gap-2 border-t border-border py-1.5 text-[13px] first:border-t-0" data-testid="pulse-impact-row">
     <span className="truncate font-medium text-foreground/80">{item.symbol}</span>
     <span className="flex items-center gap-3 tabular-nums">
-      <span className="text-foreground/64" title="{t('today.watchlistWeightShare')}">
+      <span className="font-mono text-foreground/64" title="{t('today.watchlistWeightShare')}">
         {formatExposure(item.watchlistExposurePercent)}
       </span>
       {item.portfolioExposurePercent !== undefined && (
-        <span className="text-foreground/64" title="{t('today.portfolioExposure')}">
+        <span className="font-mono text-foreground/64" title="{t('today.portfolioExposure')}">
           {formatExposure(item.portfolioExposurePercent)}
         </span>
       )}
@@ -165,7 +165,7 @@ export const MarketPulse: React.FC = () => {
         <SectionState kind="error" message={error} />
       ) : (
         <div className="space-y-3" data-testid="pulse-snapshot">
-          <div className="flex flex-wrap gap-x-4 gap-y-1" data-testid="pulse-indices">
+          <div className="grid grid-cols-1 divide-y divide-border overflow-hidden rounded-[8px] border border-border bg-surface-raised sm:grid-cols-2 sm:divide-x sm:divide-y-0" data-testid="pulse-indices">
             {snapshot && snapshot.indices.length > 0 ? (
               snapshot.indices.map((index) => <IndexLine key={index.symbol} index={index} />)
             ) : (
@@ -174,17 +174,21 @@ export const MarketPulse: React.FC = () => {
           </div>
 
           {snapshot && statuses.length > 0 ? (
-            <StatusLine statuses={statuses} />
+            <div className="rounded-[8px] border border-border bg-background px-3 py-2.5">
+              <StatusLine statuses={statuses} />
+            </div>
           ) : (
             <p className="text-[13px] text-foreground/42">{t('today.marketStatusUnavailable')}</p>
           )}
 
           {snapshot && temperature ? (
-            <TemperatureChip
-              score={temperature.score}
-              label={temperature.label}
-              market={temperature.market}
-            />
+            <div className="flex items-center rounded-[8px] border border-border bg-surface-raised px-3 py-2.5">
+              <TemperatureChip
+                score={temperature.score}
+                label={temperature.label}
+                market={temperature.market}
+              />
+            </div>
           ) : (
             <p className="text-[13px] text-foreground/42">{t('today.marketTemperatureUnavailable')}</p>
           )}
@@ -194,8 +198,8 @@ export const MarketPulse: React.FC = () => {
             <MoverColumn title={t('today.topLosers')} empty={t('today.noColumnMovers')} movers={movers.losers} />
           </div>
 
-          <div data-testid="pulse-personal-impact">
-            <h4 className="mb-1 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
+          <div className="rounded-[8px] border border-border bg-surface-raised p-3" data-testid="pulse-personal-impact">
+            <h4 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
               {t('today.whatMattersToMe')}
             </h4>
             {snapshot?.personalImpact && snapshot.personalImpact.items.length > 0 ? (

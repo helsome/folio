@@ -21,7 +21,7 @@ import { ThinkingSelector } from '../agent/ThinkingSelector';
 
 const Section: React.FC<{ title: string; children: React.ReactNode }> = ({ title, children }) => (
   <section className="space-y-3">
-    <h2 className="text-[14px] font-semibold text-foreground">{title}</h2>
+    <h2 className="text-[15px] font-semibold text-foreground">{title}</h2>
     {children}
   </section>
 );
@@ -38,22 +38,22 @@ const statusBadge = (status: ProviderStatusKind): { labelKey: string; className:
     case 'connected':
       return {
         labelKey: 'settings.model.statusConnected',
-        className: 'border-[var(--mac-green)]/30 bg-[var(--mac-green)]/10 text-[var(--mac-green)]',
+        className: 'border-success/30 bg-success/10 text-success',
       };
     case 'missing_credential':
       return {
         labelKey: 'settings.model.statusMissingCredential',
-        className: 'border-[var(--mac-yellow)]/30 bg-[var(--mac-yellow)]/10 text-[var(--mac-yellow)]',
+        className: 'border-info/30 bg-info/10 text-info',
       };
     case 'unavailable':
       return {
         labelKey: 'settings.model.statusUnavailable',
-        className: 'border-[var(--mac-red)]/30 bg-[var(--mac-red)]/10 text-[var(--mac-red)]',
+        className: 'border-destructive/30 bg-destructive/10 text-destructive',
       };
     case 'runtime_error':
       return {
         labelKey: 'settings.model.statusRuntimeError',
-        className: 'border-[var(--mac-red)]/30 bg-[var(--mac-red)]/10 text-[var(--mac-red)]',
+        className: 'border-destructive/30 bg-destructive/10 text-destructive',
       };
   }
 };
@@ -207,9 +207,9 @@ export const ModelsTab: React.FC = () => {
   const currentModel = llmState.model;
 
   return (
-    <div className="max-w-2xl space-y-8">
+    <div className="max-w-4xl space-y-7">
       <Section title={t('settings.model.runtimeDefaultModel')}>
-        <div className="mac-stock-tile rounded-[14px] p-4">
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-[12px] text-foreground/54">{t('settings.model.agentRuntime')}</span>
             <span className="text-[12px] font-semibold text-foreground">{llmState.runtimeProvider}</span>
@@ -219,7 +219,7 @@ export const ModelsTab: React.FC = () => {
             <ThinkingSelector />
           </div>
           {currentModel && (
-            <div className="mt-3 border-t mac-section-divider pt-3 text-[12px] text-foreground/54">
+            <div className="mt-4 border-t border-border pt-3 text-[12px] text-foreground/54">
               {t('settings.model.activeModel')}: <span className="font-medium text-foreground">{currentModel.name || `${currentModel.provider}/${currentModel.id}`}</span>
             </div>
           )}
@@ -227,7 +227,8 @@ export const ModelsTab: React.FC = () => {
       </Section>
 
       <Section title={t('settings.model.providerStatus')}>
-        <div className="mac-stock-tile rounded-[14px] p-4">
+        <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+          <div className="p-5">
           <div className="mb-3 flex items-center justify-between">
             <span className="text-[12px] text-foreground/54">
               {loadingProviders ? t('settings.model.loadingProviders') : t('settings.model.providersCount', { count: providers.length })}
@@ -236,19 +237,20 @@ export const ModelsTab: React.FC = () => {
               type="button"
               onClick={() => void loadProviders()}
               disabled={loadingProviders}
-              className="mac-secondary-button flex h-8 items-center gap-1.5 rounded-[10px] px-3 text-[12px] font-medium text-foreground transition-smooth disabled:opacity-50"
+              className="flex h-8 items-center gap-1.5 rounded-[8px] border border-input bg-transparent px-3 text-[12px] font-medium text-foreground transition-smooth hover:bg-surface-hover disabled:opacity-50"
             >
               {loadingProviders ? <Spinner /> : null}
               {t('settings.model.refresh')}
             </button>
           </div>
           {providersError && <div className="mb-3 text-[12px] text-destructive">{providersError}</div>}
-          <div className="space-y-2">
+          </div>
+          <div className="divide-y divide-border border-t border-border">
             {!loadingProviders &&
               providers.map((provider) => {
                 const badge = statusBadge(provider.status);
                 return (
-                  <div key={provider.provider} className="flex items-center justify-between gap-3">
+                  <div key={provider.provider} className="flex items-center justify-between gap-3 px-5 py-3.5">
                     <div className="min-w-0">
                       <div className="truncate text-[13px] font-medium text-foreground">
                         {provider.displayName || provider.provider}
@@ -261,7 +263,7 @@ export const ModelsTab: React.FC = () => {
                       {provider.modelCount != null && (
                         <span className="text-[11px] text-foreground/42">{t('settings.model.modelsCount', { count: provider.modelCount })}</span>
                       )}
-                      <span className={`rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${badge.className}`}>
+                      <span className={`rounded-full border px-2 py-0.5 text-[10px] font-semibold ${badge.className}`}>
                         {t(badge.labelKey)}
                       </span>
                     </div>
@@ -276,11 +278,11 @@ export const ModelsTab: React.FC = () => {
       </Section>
 
       <Section title={t('settings.model.credentials')}>
-        <div className="mac-stock-tile rounded-[14px] p-4">
+        <div className="rounded-xl border border-border bg-surface p-5 shadow-sm">
           {providers.length === 0 && !loadingProviders ? (
             <div className="text-[12px] text-foreground/48">{t('settings.model.noProvidersAvailable')}</div>
           ) : (
-            <div className="space-y-4">
+            <div className="divide-y divide-border">
               {providers.map((provider) => {
                 const id = provider.provider;
                 const busy = credentialBusy[id] ?? false;
@@ -288,13 +290,13 @@ export const ModelsTab: React.FC = () => {
                 const testResult = testResults[id];
                 const modelId = testModelIdFor(id);
                 return (
-                  <div key={id} className="space-y-2">
-                    <div className="flex items-center justify-between">
+                  <div key={id} className="space-y-2.5 py-4 first:pt-0 last:pb-0">
+                    <div className="flex items-center justify-between gap-3">
                       <span className="text-[13px] font-medium text-foreground">
                         {provider.displayName || id}
                       </span>
                       {isCredentialConfigured(id) && (
-                        <span className="text-[11px] font-semibold text-[var(--mac-green)]">{t('settings.model.configured')}</span>
+                        <span className="rounded-full bg-success/10 px-2 py-0.5 text-[10px] font-semibold text-success">{t('settings.model.configured')}</span>
                       )}
                     </div>
                     <div className="flex items-center gap-2">
@@ -305,13 +307,13 @@ export const ModelsTab: React.FC = () => {
                           setCredentialInputs((i) => ({ ...i, [id]: e.target.value }))
                         }
                         placeholder={t('settings.model.apiKey')}
-                        className="mac-input h-8 flex-1 rounded-[10px] px-3 text-[12px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-accent/28"
+                        className="h-9 flex-1 rounded-[8px] border border-input bg-background px-3 text-[12px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-ring"
                       />
                       <button
                         type="button"
                         onClick={() => void saveCredential(id)}
                         disabled={busy || !(credentialInputs[id] ?? '').trim()}
-                        className="mac-primary-button h-8 rounded-[10px] px-3 text-[12px] font-semibold transition-smooth disabled:cursor-not-allowed disabled:opacity-45"
+                        className="h-9 rounded-[8px] bg-primary px-3 text-[12px] font-semibold text-primary-foreground transition-smooth hover:bg-primary/88 disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         {busy ? <Spinner /> : t('common.save')}
                       </button>
@@ -319,7 +321,7 @@ export const ModelsTab: React.FC = () => {
                         type="button"
                         onClick={() => void removeCredential(id)}
                         disabled={busy || !isCredentialConfigured(id)}
-                        className="mac-secondary-button h-8 rounded-[10px] px-3 text-[12px] font-medium text-foreground transition-smooth disabled:cursor-not-allowed disabled:opacity-45"
+                        className="h-9 rounded-[8px] border border-input bg-transparent px-3 text-[12px] font-medium text-foreground transition-smooth hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         {t('common.remove')}
                       </button>
@@ -327,7 +329,7 @@ export const ModelsTab: React.FC = () => {
                         type="button"
                         onClick={() => void testProvider(id)}
                         disabled={testing || !modelId}
-                        className="mac-secondary-button flex h-8 items-center gap-1.5 rounded-[10px] px-3 text-[12px] font-medium text-foreground transition-smooth disabled:cursor-not-allowed disabled:opacity-45"
+                        className="flex h-9 items-center gap-1.5 rounded-[8px] border border-input bg-transparent px-3 text-[12px] font-medium text-foreground transition-smooth hover:bg-surface-hover disabled:cursor-not-allowed disabled:opacity-45"
                       >
                         {testing ? <Spinner /> : null}
                         {t('settings.model.test')}
@@ -339,7 +341,7 @@ export const ModelsTab: React.FC = () => {
                     {testResult && (
                       <div
                         className={`text-[11px] ${
-                          testResult.ok ? 'text-[var(--mac-green)]' : 'text-destructive'
+                          testResult.ok ? 'text-success' : 'text-destructive'
                         }`}
                       >
                         {testResult.ok ? '✓' : '✗'} {testResult.message}
@@ -357,7 +359,7 @@ export const ModelsTab: React.FC = () => {
       </Section>
 
       <Section title={t('settings.model.customProviders')}>
-        <div className="mac-stock-tile space-y-3 rounded-[14px] p-4">
+        <div className="space-y-4 rounded-xl border border-border bg-surface p-5 shadow-sm">
           <div className="grid grid-cols-2 gap-3">
             <Field label={t('settings.model.name')} value={customForm.name} onChange={(v) => setCustomForm((f) => ({ ...f, name: v }))} placeholder="my-provider" />
             <Field label={t('settings.model.displayName')} value={customForm.displayName} onChange={(v) => setCustomForm((f) => ({ ...f, displayName: v }))} placeholder="My Provider" />
@@ -372,34 +374,34 @@ export const ModelsTab: React.FC = () => {
               type="checkbox"
               checked={customForm.reasoning}
               onChange={(e) => setCustomForm((f) => ({ ...f, reasoning: e.target.checked }))}
-              className="accent-[var(--mac-blue)]"
+              className="accent-accent"
             />
             {t('settings.model.reasoningModel')}
           </label>
           {customError && <div className="text-[11px] text-destructive">{customError}</div>}
-          {customSuccess && <div className="text-[11px] text-[var(--mac-green)]">{customSuccess}</div>}
+          {customSuccess && <div className="text-[11px] text-success">{customSuccess}</div>}
           <button
             type="button"
             onClick={() => void submitCustomProvider()}
             disabled={customBusy}
-            className="mac-primary-button flex h-9 items-center gap-2 rounded-[10px] px-4 text-[13px] font-semibold transition-smooth disabled:cursor-not-allowed disabled:opacity-45"
+            className="flex h-9 items-center gap-2 rounded-[8px] bg-primary px-4 text-[13px] font-semibold text-primary-foreground transition-smooth hover:bg-primary/88 disabled:cursor-not-allowed disabled:opacity-45"
           >
             {customBusy ? <Spinner /> : null}
             {t('settings.model.addCustomProvider')}
           </button>
 
           {customProviders.length > 0 && (
-            <div className="space-y-1.5 border-t mac-section-divider pt-3">
+            <div className="space-y-1.5 border-t border-border pt-4">
               <div className="text-[11px] font-semibold uppercase tracking-wider text-foreground/42">
                 {t('settings.model.existingCustomProviders')}
               </div>
               {customProviders.map((cred) => (
-                <div key={cred.provider} className="flex items-center justify-between gap-3">
+                <div key={cred.provider} className="flex items-center justify-between gap-3 rounded-lg px-2 py-2 hover:bg-surface-hover">
                   <span className="truncate text-[13px] text-foreground">{cred.provider}</span>
                   <button
                     type="button"
                     onClick={() => void removeCustomProvider(cred.provider)}
-                    className="mac-secondary-button h-8 rounded-[10px] px-3 text-[12px] font-medium text-foreground transition-smooth"
+                    className="h-8 rounded-[8px] border border-input bg-transparent px-3 text-[12px] font-medium text-foreground transition-smooth hover:bg-surface-hover"
                   >
                     {t('common.remove')}
                   </button>
@@ -423,14 +425,14 @@ interface FieldProps {
 }
 
 const Field: React.FC<FieldProps> = ({ label, value, onChange, type = 'text', placeholder, className }) => (
-  <label className={`flex flex-col gap-1 ${className ?? ''}`}>
+  <label className={`flex flex-col gap-1.5 ${className ?? ''}`}>
     <span className="text-[11px] font-medium text-foreground/54">{label}</span>
     <input
       type={type}
       value={value}
       onChange={(e) => onChange(e.target.value)}
       placeholder={placeholder}
-      className="mac-input h-8 rounded-[10px] px-3 text-[12px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-accent/28"
+      className="h-9 rounded-[8px] border border-input bg-background px-3 text-[12px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-ring"
     />
   </label>
 );

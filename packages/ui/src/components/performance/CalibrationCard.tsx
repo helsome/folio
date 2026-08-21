@@ -46,72 +46,74 @@ function formatSampleCount(samples: number): string {
 }
 
 const HEADER_CELL =
-  'px-2 py-1.5 text-left text-[10px] font-semibold uppercase tracking-wide text-foreground/52';
-const BODY_CELL = 'px-2 py-1.5 text-[12px] text-foreground/80';
+  'border-b border-[#e2e7ef] bg-[#f7f9fc] px-3 py-2 text-left text-[9.5px] font-semibold uppercase tracking-[0.08em] text-[#7f8b9d]';
+const BODY_CELL = 'border-t border-[#edf0f4] px-3 py-2 text-[12px] leading-5 text-foreground/80';
 
 /** Renders one calibration table card; `rows: []` shows the empty message. */
 export const CalibrationCard: React.FC<CalibrationCardProps> = ({ title, rows, emptyMessage }) => {
   const { t } = useTranslation();
   return (
     <section
-      className="rounded-[10px] border mac-list-row p-4"
+      className="overflow-hidden rounded-[10px] border border-[#dfe5ed] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.035)]"
       data-testid="calibration-card"
     >
-      <div className="flex items-baseline justify-between gap-2">
-        <h4 className="text-[11px] font-semibold uppercase tracking-wide text-foreground">{title}</h4>
-        <p className="text-[10px] text-text-muted">
+      <div className="flex items-baseline justify-between gap-3 border-b border-[#e2e7ef] bg-[#fbfcfe] px-4 py-3">
+        <h4 className="text-[11px] font-semibold uppercase tracking-[0.08em] text-foreground">{title}</h4>
+        <p className="text-right text-[10px] tabular-nums text-text-muted">
           {t('performance.finalWeightBounded', { min: WEIGHT_BOUNDS.min.toFixed(2), max: WEIGHT_BOUNDS.max.toFixed(2) })}
         </p>
       </div>
-      <p className="mt-0.5 text-[10px] text-text-muted">
+      <p className="border-b border-[#edf0f4] px-4 py-2 text-[10px] leading-4 text-text-muted">
         {t('performance.calibrationNote', { min: MIN_CALIBRATION_SAMPLES })}
       </p>
       {rows.length === 0 ? (
-        <p className="mt-3 text-[12px] text-text-muted">{emptyMessage}</p>
+        <p className="px-4 py-7 text-[12px] text-text-muted">{emptyMessage}</p>
       ) : (
-        <table className="mt-2.5 w-full border-separate border-spacing-0">
-          <thead>
+        <div className="overflow-x-auto">
+          <table className="w-full min-w-[640px] border-separate border-spacing-0">
+            <thead>
             <tr>
-              <th className={HEADER_CELL}>{t('performance.name')}</th>
-              <th className={`${HEADER_CELL} text-right`}>{t('performance.baseWeight')}</th>
-              <th className={`${HEADER_CELL} text-right`}>{t('performance.historicalAdjustment')}</th>
-              <th className={`${HEADER_CELL} text-right`}>{t('performance.finalBounded')}</th>
-              <th className={`${HEADER_CELL} text-right`}>{t('performance.samples')}</th>
-              <th className={`${HEADER_CELL} text-right`}>{t('performance.status')}</th>
+              <th scope="col" className={HEADER_CELL}>{t('performance.name')}</th>
+              <th scope="col" className={`${HEADER_CELL} text-right`}>{t('performance.baseWeight')}</th>
+              <th scope="col" className={`${HEADER_CELL} text-right`}>{t('performance.historicalAdjustment')}</th>
+              <th scope="col" className={`${HEADER_CELL} text-right`}>{t('performance.finalBounded')}</th>
+              <th scope="col" className={`${HEADER_CELL} text-right`}>{t('performance.samples')}</th>
+              <th scope="col" className={`${HEADER_CELL} text-right`}>{t('performance.status')}</th>
             </tr>
-          </thead>
-          <tbody>
-            {rows.map((row) => (
-              <tr
-                key={row.id}
-                className="border-t mac-section-divider"
-                data-testid={`calibration-row-${row.id}`}
-              >
-                <td className={`${BODY_CELL} font-medium text-foreground`}>{row.label}</td>
-                <td className={`${BODY_CELL} text-right font-mono`}>{row.baseWeight.toFixed(2)}</td>
-                <td className={`${BODY_CELL} text-right font-mono`}>
-                  {formatAdjustment(row.historicalAdjustment)}
-                </td>
-                <td className={`${BODY_CELL} text-right font-mono`}>
-                  {formatWeight(row.finalWeight)}
-                </td>
-                <td className={`${BODY_CELL} text-right font-mono`}>
-                  {formatSampleCount(row.samples)}
-                </td>
-                <td className="px-2 py-1.5 text-right">
-                  {row.insufficientData && (
-                    <span
-                      className="inline-flex items-center rounded-full border border-dashed border-[var(--mac-border)] px-2 py-0.5 text-[10px] text-foreground/56"
-                      data-testid="observational-badge"
-                    >
-                      {t('performance.observationalOnly')}
-                    </span>
-                  )}
-                </td>
-              </tr>
-            ))}
-          </tbody>
-        </table>
+            </thead>
+            <tbody>
+              {rows.map((row) => (
+                <tr
+                  key={row.id}
+                  className="group hover:bg-[#f8fbff]"
+                  data-testid={`calibration-row-${row.id}`}
+                >
+                  <td className={`${BODY_CELL} font-medium text-foreground`}>{row.label}</td>
+                  <td className={`${BODY_CELL} text-right font-mono tabular-nums`}>{row.baseWeight.toFixed(2)}</td>
+                  <td className={`${BODY_CELL} text-right font-mono tabular-nums`}>
+                    {formatAdjustment(row.historicalAdjustment)}
+                  </td>
+                  <td className={`${BODY_CELL} text-right font-mono tabular-nums`}>
+                    {formatWeight(row.finalWeight)}
+                  </td>
+                  <td className={`${BODY_CELL} text-right font-mono tabular-nums`}>
+                    {formatSampleCount(row.samples)}
+                  </td>
+                  <td className={`${BODY_CELL} text-right`}>
+                    {row.insufficientData && (
+                      <span
+                        className="inline-flex items-center rounded-[5px] border border-dashed border-[#b8c2d1] bg-[#f8fafc] px-1.5 py-0.5 text-[9.5px] font-medium text-[#66758a]"
+                        data-testid="observational-badge"
+                      >
+                        {t('performance.observationalOnly')}
+                      </span>
+                    )}
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
       )}
     </section>
   );

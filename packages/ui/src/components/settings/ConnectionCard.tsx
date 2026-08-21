@@ -28,11 +28,11 @@ const KIND_LABEL_KEY: Record<ConnectionKind, string> = {
 const STATUS_DOT: Record<FinancialProviderStatus, string> = {
   'not-installed': 'bg-foreground/30',
   'not-connected': 'bg-foreground/40',
-  connecting: 'bg-[var(--mac-yellow)] animate-pulse',
-  connected: 'bg-[var(--mac-green)]',
-  'permission-limited': 'bg-[var(--mac-yellow)]',
-  expired: 'bg-[var(--mac-yellow)]',
-  error: 'bg-[var(--mac-red)]',
+  connecting: 'bg-info animate-pulse',
+  connected: 'bg-success',
+  'permission-limited': 'bg-info',
+  expired: 'bg-info',
+  error: 'bg-destructive',
 };
 
 type BusyAction = 'connect' | 'disconnect' | 'test' | 'setConfig';
@@ -229,14 +229,14 @@ export const ConnectionCard: React.FC<{
 
   return (
     <div
-      className="mac-stock-tile rounded-[14px] p-4"
+      className="rounded-xl border border-border bg-surface p-5 shadow-sm"
       data-testid={`connection-card-${entry.providerId}`}
     >
       <div className="flex items-start justify-between gap-3">
         <div className="min-w-0">
           <div className="flex items-center gap-2">
             <h3 className="truncate text-[14px] font-semibold text-foreground">{entry.name}</h3>
-            <span className="shrink-0 rounded-full border mac-section-divider px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/54">
+            <span className="shrink-0 rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/54">
               {t(KIND_LABEL_KEY[entry.kind])}
             </span>
           </div>
@@ -246,7 +246,7 @@ export const ConnectionCard: React.FC<{
               aria-hidden="true"
               data-testid={`status-dot-${entry.providerId}`}
             />
-            <span className="text-[12px] text-foreground/66" data-testid={`status-${entry.providerId}`}>
+            <span className="rounded-full bg-surface-muted px-2 py-0.5 text-[11px] text-foreground/66" data-testid={`status-${entry.providerId}`}>
               {connectionStatusLabel(status)}
             </span>
           </div>
@@ -257,10 +257,10 @@ export const ConnectionCard: React.FC<{
       </div>
 
       {(accountLabel || quoteAccess || portfolioReady || lastCheck != null) && (
-        <div className="mt-3 flex flex-wrap items-center gap-x-4 gap-y-1 border-t mac-section-divider pt-2.5 text-[11px] text-foreground/54">
+        <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-[11px] text-foreground/54">
           {accountLabel && <span>{accountLabel}</span>}
           {quoteAccess && <span>{quoteAccess}</span>}
-          {portfolioReady && <span className="text-[var(--mac-green)]">{t('connections.portfolioReady')}</span>}
+          {portfolioReady && <span className="text-success">{t('connections.portfolioReady')}</span>}
           {lastCheck != null && (
             <span className="tabular-nums">{new Date(lastCheck).toLocaleString()}</span>
           )}
@@ -268,7 +268,7 @@ export const ConnectionCard: React.FC<{
       )}
 
       {waiting && (
-        <div className="mt-3 rounded-[10px] border border-[var(--mac-yellow)]/30 bg-[var(--mac-yellow)]/10 p-3">
+        <div className="mt-4 rounded-lg border border-info/30 bg-info/10 p-3">
           <div className="text-[12px] font-medium text-foreground">{t('connections.waitingAuthorization')}</div>
           {verificationUrl && (
             <ExternalLink url={verificationUrl} label={t('connections.openVerificationPage')} clientHasOpenExternal={hasOpenExternal(client)} onOpen={() => void openExternalUrl(client, verificationUrl)} />
@@ -280,7 +280,7 @@ export const ConnectionCard: React.FC<{
       )}
 
       {byok && showApiKey && (
-        <div className="mt-3 space-y-2 rounded-[10px] border mac-section-divider p-3">
+        <div className="mt-4 space-y-2 rounded-lg border border-border bg-background/50 p-3">
           <div className="text-[12px] font-medium text-foreground">{t('connections.enterApiKey')}</div>
           <Input
             type="password"
@@ -306,12 +306,12 @@ export const ConnectionCard: React.FC<{
       )}
 
       {testSummary && !error && (
-        <div className="mt-2 text-[11px] text-[var(--mac-green)]">✓ {testSummary}</div>
+        <div className="mt-3 text-[11px] text-success">✓ {testSummary}</div>
       )}
 
       {error && (
         <div
-          className="mt-3 rounded-[10px] border border-[var(--mac-red)]/30 bg-[var(--mac-red)]/10 px-3 py-2 text-[12px] text-[var(--mac-red)]"
+          className="mt-4 rounded-lg border border-destructive/30 bg-destructive/10 px-3 py-2.5 text-[12px] text-destructive"
           role="alert"
           data-testid={`connection-error-${entry.providerId}`}
         >

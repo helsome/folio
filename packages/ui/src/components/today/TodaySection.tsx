@@ -12,12 +12,13 @@ interface TodaySectionProps {
   title: string
   action?: React.ReactNode
   children: React.ReactNode
+  className?: string
 }
 
-export const TodaySection: React.FC<TodaySectionProps> = ({ title, action, children }) => (
-  <section className="folio-today-section border-t border-border px-1 py-4 first:border-t-0">
+export const TodaySection: React.FC<TodaySectionProps> = ({ title, action, children, className }) => (
+  <section className={`folio-today-section min-w-0 rounded-[12px] border border-border bg-surface-raised px-4 py-4 shadow-none ${className ?? ''}`}>
     <header className="mb-3 flex items-center justify-between gap-3">
-      <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/48">{title}</h3>
+      <h3 className="text-[10.5px] font-semibold uppercase tracking-[.12em] text-foreground/48">{title}</h3>
       {action}
     </header>
     {children}
@@ -28,16 +29,16 @@ export const TodaySection: React.FC<TodaySectionProps> = ({ title, action, child
 export const SectionState: React.FC<{ kind: 'loading' | 'error' | 'empty'; message?: string }> = ({ kind, message }) => {
   const { t } = useTranslation()
   if (kind === 'loading') {
-    return <div className="py-2 text-[13px] text-foreground/42">{t('today.sectionLoading')}</div>
+    return <div className="rounded-[8px] bg-background px-3 py-3 text-[12px] text-foreground/42">{t('today.sectionLoading')}</div>
   }
   if (kind === 'error') {
     return (
-      <div className="py-2 text-[13px] text-[var(--mac-red)]">
+      <div className="rounded-[8px] border border-[var(--mac-red)]/20 bg-[var(--mac-red)]/5 px-3 py-3 text-[12px] text-[var(--mac-red)]">
         {message ?? t('today.sectionError')}
       </div>
     )
   }
   return (
-    <div className="py-2 text-[13px] text-foreground/42">{message ?? t('today.sectionEmpty')}</div>
+    <div className="rounded-[8px] bg-background px-3 py-3 text-[12px] text-foreground/42">{message ?? t('today.sectionEmpty')}</div>
   )
 }

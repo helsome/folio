@@ -109,8 +109,8 @@ export function ChartView() {
   }
 
   return (
-    <div className="flex h-full min-h-0 flex-col">
-      <div className="flex items-center gap-1 border-b border-border px-2 py-1.5">
+    <div className="flex h-full min-h-0 flex-col gap-3 bg-[#f7f8fa] p-4">
+      <div className="flex items-center gap-1 rounded-[12px] border border-[var(--mac-border)] bg-white px-2 py-1.5 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
         {PERIODS.map((value) => (
           <button
             key={value}
@@ -118,8 +118,8 @@ export function ChartView() {
             aria-pressed={period === value}
             className={`h-6 rounded-[6px] px-2.5 text-[11.5px] font-medium tabular-nums transition-smooth ${
               period === value
-                ? 'bg-[var(--mac-blue-soft)] text-foreground'
-                : 'text-text-muted hover:bg-[var(--mac-sidebar-hover)] hover:text-foreground'
+                ? 'bg-[#0052ff] text-white'
+                : 'text-text-muted hover:bg-[#f0f2f5] hover:text-foreground'
             }`}
           >
             {value}
@@ -134,7 +134,7 @@ export function ChartView() {
           />
         </div>
       </div>
-      <div className="min-h-0 flex-1">{body}</div>
+      <div className="min-h-0 flex-1 overflow-hidden rounded-[14px] border border-[var(--mac-border)] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.035)]">{body}</div>
     </div>
   );
 }
