@@ -1,8 +1,9 @@
 // Folio V9 UX audit capture — exercises the app as a real first-time user and
 // captures every major state for visual review. Hidden by default.
-import { execSync, spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { seedLocale } from './seed-locale.mjs';
-import { existsSync, mkdirSync, rmSync } from 'node:fs';
+import { reserveCdpPort, spawnElectron, waitForCdp } from './electron-harness.mjs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -13,27 +14,8 @@ const { chromium } = require('playwright-core');
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, '..');
 const repoRoot = join(here, '../../..');
-const electronMain = join(appRoot, 'src/main/index.ts');
-const electronBinary = join(
-  repoRoot,
-  'node_modules/.bun/electron@39.8.9/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'
-);
-const cdpPort = 9361;
-const cdpUrl = `http://127.0.0.1:${cdpPort}`;
 const userDataDir = join(appRoot, 'e2e/.user-data-uxaudit');
 const outDir = process.env.UX_AUDIT_OUT || join(appRoot, 'e2e/artifacts/v9-audit');
-
-async function waitForCdp(timeoutMs) {
-  const deadline = Date.now() + timeoutMs;
-  while (Date.now() < deadline) {
-    try {
-      const r = await fetch(`${cdpUrl}/json/version`);
-      if (r.ok) return;
-    } catch {}
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error('CDP timeout');
-}
 
 async function waitForPage(context, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
@@ -46,35 +28,27 @@ async function waitForPage(context, timeoutMs) {
 }
 
 async function main() {
-  if (!existsSync(electronBinary)) throw new Error('Electron binary not found');
-  try { execSync(`pkill -f 'remote-debugging-port=${cdpPort}' || true`, { stdio: 'ignore' }); } catch {}
+  mkdirSync(outDir, { recursive: true });
+  const cdpPort = await reserveCdpPort();
+  const cdpUrl = `http://127.0.0.1:${cdpPort}`;
   execSync('bun run build:preload', { cwd: appRoot, stdio: 'pipe' });
+  execSync('bun run build:main', { cwd: appRoot, stdio: 'pipe' });
   execSync('bunx vite build', { cwd: appRoot, stdio: 'pipe' });
   rmSync(userDataDir, { recursive: true, force: true });
   mkdirSync(userDataDir, { recursive: true });
   seedLocale(userDataDir, 'en-US');
-  mkdirSync(outDir, { recursive: true });
-
-  const proc = spawn(
-    electronBinary,
-    [electronMain, `--remote-debugging-port=${cdpPort}`, '--no-sandbox'],
-    {
-      cwd: repoRoot,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        FINAGENT_AGENT_PROVIDER: 'local',
-        FINAGENT_FORCE_PROD_LOAD: '1',
-        FINAGENT_E2E: '1',
-        FINAGENT_E2E_HIDDEN: '1',
-        FINAGENT_USER_DATA_DIR: userDataDir,
-      },
-    }
-  );
+  const logPath = join(outDir, 'electron.log');
+  const { proc, log } = spawnElectron({
+    appRoot,
+    repoRoot,
+    port: cdpPort,
+    userDataDir,
+    logPath,
+  });
 
   let browser;
   try {
-    await waitForCdp(60_000);
+    await waitForCdp({ url: cdpUrl, timeoutMs: 60_000, proc, logPath });
     browser = await chromium.connectOverCDP(cdpUrl, { timeout: 30_000 });
     const page = await waitForPage(browser.contexts()[0], 30_000);
     await page.waitForLoadState('domcontentloaded');
@@ -177,7 +151,8 @@ async function main() {
     await capture('11-agent-context', 1440, 900);
   } finally {
     await browser?.close().catch(() => undefined);
-    proc.kill();
+    if (proc.exitCode == null && proc.signalCode == null) proc.kill();
+    log.end();
   }
   console.log('UX AUDIT DONE →', outDir);
 }
