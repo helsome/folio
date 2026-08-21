@@ -73,8 +73,8 @@ export const ExperimentDetail: React.FC<{
 
   if (loading || (detail === null && !error)) {
     return (
-      <div className="flex h-full flex-col" data-testid="experiment-detail">
-        <div className="border-b mac-section-divider px-4 py-3">
+      <div className="flex h-full flex-col bg-[#f6f8fb]" data-testid="experiment-detail">
+        <div className="border-b border-[var(--mac-border)] bg-white px-5 py-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
@@ -88,13 +88,13 @@ export const ExperimentDetail: React.FC<{
 
   if (!detail) {
     return (
-      <div className="flex h-full flex-col" data-testid="experiment-detail">
-        <div className="border-b mac-section-divider px-4 py-3">
+      <div className="flex h-full flex-col bg-[#f6f8fb]" data-testid="experiment-detail">
+        <div className="border-b border-[var(--mac-border)] bg-white px-5 py-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
         </div>
-        <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
+        <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-4 text-[12px] text-foreground/48 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
           {error ?? t('evaluation.experimentError', { id: experimentId })}
         </div>
       </div>
@@ -123,8 +123,8 @@ export const ExperimentDetail: React.FC<{
   ];
 
   return (
-    <div className="flex h-full flex-col" data-testid="experiment-detail">
-      <header className="flex items-center justify-between border-b mac-section-divider px-4 py-3">
+    <div className="flex h-full flex-col bg-[#f6f8fb]" data-testid="experiment-detail">
+      <header className="flex items-center justify-between border-b border-[var(--mac-border)] bg-white px-5 py-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
@@ -147,9 +147,9 @@ export const ExperimentDetail: React.FC<{
         </span>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="max-w-4xl space-y-4">
-          <div className="mac-stock-tile rounded-[14px] p-5">
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div className="max-w-5xl space-y-4">
+          <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
             <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.configuration')}</h3>
             <dl className="mt-3 grid grid-cols-2 gap-x-6 gap-y-2.5 sm:grid-cols-3">
               {metaRows.map((row) => (
@@ -162,17 +162,17 @@ export const ExperimentDetail: React.FC<{
           </div>
 
           {summary && (
-            <div className="mac-stock-tile rounded-[14px] p-5">
+            <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
               <div className="flex items-baseline justify-between">
                 <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.metricScores')}</h3>
                 <span className="text-[12px] font-semibold tabular-nums text-foreground">
                   {t('evaluation.compositeAndPassRate', { score: scorePercent(summary.compositeScore), rate: scorePercent(summary.passRate) })}
                 </span>
               </div>
-              <div className="mt-3 overflow-x-auto">
+              <div className="mt-3 overflow-x-auto rounded-[8px] border border-[var(--mac-border)]">
                 <table className="w-full border-collapse text-[12px]">
                   <thead>
-                    <tr className="border-b mac-section-divider">
+                    <tr className="border-b border-[var(--mac-border)] bg-[#f7f9fc]">
                       <th className="py-2 pr-3 text-left font-medium text-foreground/54">{t('evaluation.metric')}</th>
                       <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.kind')}</th>
                       <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.score')}</th>
@@ -181,7 +181,7 @@ export const ExperimentDetail: React.FC<{
                   </thead>
                   <tbody>
                     {summary.metricAggregates.map((aggregate) => (
-                      <tr key={aggregate.metric} className="border-b mac-section-divider last:border-0">
+                      <tr key={aggregate.metric} className="border-b border-[var(--mac-border)] last:border-0 hover:bg-[#f8fbff]">
                         <td className="py-2 pr-3 text-foreground">{t(metricLabel(aggregate.metric))}</td>
                         <td className="px-3 py-2 text-foreground/48">{metricKindLabel(aggregate.metric) !== null ? t(metricKindLabel(aggregate.metric) as string) : '—'}</td>
                         <td className="px-3 py-2 text-right font-medium tabular-nums text-foreground">
@@ -199,7 +199,7 @@ export const ExperimentDetail: React.FC<{
           )}
 
           {summary && summary.failureModes.length > 0 && (
-            <div className="mac-stock-tile rounded-[14px] p-5">
+            <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
               <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.failureModes')}</h3>
               <div className="mt-3 flex flex-wrap gap-2">
                 {[...summary.failureModes]
@@ -207,7 +207,7 @@ export const ExperimentDetail: React.FC<{
                   .map((entry) => (
                     <span
                       key={entry.mode}
-                      className="inline-flex items-center gap-1.5 rounded-full border border-border bg-surface-muted px-2.5 py-0.5 text-[11px] text-foreground/70"
+                      className="inline-flex items-center gap-1.5 rounded-full border border-[var(--mac-border)] bg-[#f7f9fc] px-2.5 py-0.5 text-[11px] text-foreground/70"
                     >
                       {t(failureModeLabel(entry.mode))} <span className="font-semibold tabular-nums text-foreground">{entry.count}</span>
                       <span className="text-foreground/36">/ {entry.sampleCount}</span>
@@ -217,12 +217,12 @@ export const ExperimentDetail: React.FC<{
             </div>
           )}
 
-          <div className="mac-stock-tile rounded-[14px] p-5">
+          <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
             <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.runsSection')}</h3>
-            <div className="mt-3 overflow-x-auto">
+            <div className="mt-3 overflow-x-auto rounded-[8px] border border-[var(--mac-border)]">
               <table className="w-full border-collapse text-[12px]" data-testid="runs-table">
                 <thead>
-                  <tr className="border-b mac-section-divider">
+                  <tr className="border-b border-[var(--mac-border)] bg-[#f7f9fc]">
                     <th className="py-2 pr-3 text-left font-medium text-foreground/54">{t('evaluation.caseColumn')}</th>
                     <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.status')}</th>
                     <th className="px-3 py-2 text-right font-medium text-foreground/54">{t('evaluation.verdict')}</th>
@@ -235,7 +235,7 @@ export const ExperimentDetail: React.FC<{
                   {runs.map((run) => {
                     const result = resultByRun.get(run.id) ?? resultByCase.get(run.caseId);
                     return (
-                      <tr key={run.id} className="border-b mac-section-divider last:border-0">
+                      <tr key={run.id} className="border-b border-[var(--mac-border)] last:border-0 hover:bg-[#f8fbff]">
                         <td className="py-2 pr-3">
                           <button
                             type="button"

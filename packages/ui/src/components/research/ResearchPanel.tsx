@@ -19,6 +19,7 @@ import {
 } from '../../atoms/researchAtoms';
 import { saveThesisFromReport } from '../../client/thesis';
 import { ResearchReportView } from './ResearchReportView';
+import { ResearchMarketWorkspace } from './ResearchMarketWorkspace';
 import { DEFAULT_STRATEGY_ID, StrategyPicker } from './StrategyPicker';
 import { NextAction } from '../primitives/NextAction';
 import { semanticCapabilityLabelKey } from '../../lib/agentPresentation';
@@ -182,6 +183,26 @@ export const ResearchPanel: React.FC = () => {
 
   return (
     <div className="folio-pilot-shell flex h-full flex-col" data-testid="research-panel">
+      <div className="folio-research-topbar">
+        <span className="folio-research-topbar-title">{t('research.workspace.title')}</span>
+        <label className="folio-research-command-search">
+          <Search className="h-3.5 w-3.5 shrink-0" />
+          <input
+            value={symbolInput}
+            onChange={(event) => {
+              setSymbolInput(event.target.value.toUpperCase());
+              setSymbolError(null);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === 'Enter') handleSymbolEntrySubmit();
+            }}
+            placeholder={t('research.workspace.searchPlaceholder')}
+            aria-label={t('research.workspace.searchPlaceholder')}
+          />
+          <span className="folio-research-command-hint">⌘ K</span>
+        </label>
+        <span className="folio-research-topbar-market">USD <span aria-hidden="true">⌄</span></span>
+      </div>
       <div className="folio-pilot-research-header">
         <div>
           <h2 className="folio-pilot-research-title">{t('research.deepResearch')}</h2>
@@ -238,23 +259,34 @@ export const ResearchPanel: React.FC = () => {
         </div>
       )}
 
-      {symbol && !activeRun && (!report || report.symbol !== symbol) && (
-        <div className="px-4 pt-3">
-          <StrategyPicker value={strategyId} onChange={handleStrategyChange} recommendedId={recommendedStrategy} />
-        </div>
-      )}
-
-      {symbol && !activeRun && report && report.symbol === symbol && (
-        <details className="folio-pilot-strategy-context">
-          <summary>{t('research.researchStrategy')}</summary>
-          <div className="pt-3">
-            <StrategyPicker value={strategyId} onChange={handleStrategyChange} recommendedId={recommendedStrategy} />
-          </div>
-        </details>
-      )}
-
       <div className="folio-pilot-research-content">
         {!symbol && <SymbolEntry error={symbolError} value={symbolInput} onChange={setSymbolInput} onSubmit={handleSymbolEntrySubmit} />}
+
+        {symbol && (
+          <ResearchMarketWorkspace
+            symbol={symbol}
+            report={report && report.symbol === symbol ? report : null}
+            activeRun={Boolean(activeRun)}
+            loading={loading}
+            onStart={() => void handleStart()}
+          />
+        )}
+
+        {symbol && !activeRun && (!report || report.symbol !== symbol) && (
+          <div className="folio-research-strategy-section">
+            <div className="folio-research-section-kicker">{t('research.researchStrategy')}</div>
+            <StrategyPicker value={strategyId} onChange={handleStrategyChange} recommendedId={recommendedStrategy} />
+          </div>
+        )}
+
+        {symbol && !activeRun && report && report.symbol === symbol && (
+          <details className="folio-pilot-strategy-context">
+            <summary>{t('research.researchStrategy')}</summary>
+            <div className="pt-3">
+              <StrategyPicker value={strategyId} onChange={handleStrategyChange} recommendedId={recommendedStrategy} />
+            </div>
+          </details>
+        )}
 
         {activeRun && (
           <RunProgressCard key={activeRun.id} run={activeRun} />

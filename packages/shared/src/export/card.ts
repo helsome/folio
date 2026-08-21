@@ -23,7 +23,7 @@ export interface ShareCard {
 const CARD_WIDTH = 640
 const CARD_HEIGHT = 460
 
-const FONT_FAMILY = "system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif"
+const FONT_FAMILY = "'SF Mono', 'JetBrains Mono', 'PingFang SC', 'Hiragino Sans GB', 'Noto Sans CJK SC', 'Microsoft YaHei', ui-monospace, monospace"
 
 const STANCE_LABEL: Record<ResearchStance, string> = {
   bullish: 'BULLISH',

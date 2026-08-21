@@ -40,8 +40,17 @@ Folio is local-first: sessions, credentials, and research state stay on the devi
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/discover.png" alt="Folio Discover screener" width="49%" />
   <img src="docs/screenshots/workspace.png" alt="Folio security workspace" width="49%" />
+  <img src="docs/screenshots/settings.png" alt="Folio settings center" width="49%" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/evaluation.png" alt="Folio Agent evaluation settings" width="49%" />
+  <img src="docs/screenshots/skills.png" alt="Folio skills center" width="49%" />
+</p>
+
+<p align="center">
+  <em>From a quiet research workspace to skill readiness, evaluation tracing, and experiment setup, Folio keeps Agent engineering in the same desktop workflow.</em>
 </p>
 
 ## Key Features
@@ -66,6 +75,14 @@ Folio is local-first: sessions, credentials, and research state stay on the devi
 - Model and thinking-level controls, stop/cancel, workspace context, and structured quote/portfolio cards.
 - Markdown answers render with headings, lists, tables, links, and code blocks.
 - Internal synthesis sessions stay out of the visible conversation history.
+
+### Agent Evaluation & Observability
+
+- An integrated Evaluation Center for experiments, baselines, model comparisons, failure modes, case details, and human feedback.
+- Coverage includes task completion, tool selection and arguments, evidence/provenance, latency, failure recovery, research completeness, and decision usefulness.
+- Supports local offline evaluation and optional LangSmith tracing; tracing is off by default, with privacy level and API-key controls in Settings.
+- The `folio-agent-v1` benchmark contains 86 golden, difficult, long-tail, tool-failure, regression, and adversarial cases; fixed bugs become regression gates.
+- Pull requests use a zero-cost deterministic smoke eval, while the full benchmark and model/strategy experiments run on demand or on a schedule.
 
 ### Skills & Capability Layer
 
@@ -115,6 +132,7 @@ The core boundary is deliberately small: providers return normalized data with p
 - **Agent runtime:** Pi runtime for configured LLM providers, with a deterministic local provider for development and offline golden paths.
 - **Desktop:** Electron with a macOS arm64 packaged build. The renderer, preload bridge, and main-process kernel are separated by context isolation and a whitelisted IPC surface.
 - **Skills:** Vendored `SKILL.md` resources with references, enable/disable state, triggers, and capability requirements.
+- **Agent evaluation:** Local or LangSmith-backed evaluation records traces, datasets, evaluators, experiments, and regression gates; engineering metrics can be linked to investment outcomes without claiming causation.
 
 ## Quick Start
 
@@ -158,6 +176,8 @@ FINAGENT_AGENT_PROVIDER=local bun run dev
 | `bun run typecheck` | Typecheck every workspace package |
 | `bun run build` | Build packages, renderer, preload, and main process |
 | `bun run test:e2e` | Run the Electron golden-path E2E suite |
+| `bun run eval:smoke` | Run the deterministic PR-level Agent regression eval |
+| `bun run eval:full` | Run the full Agent benchmark and experiment flow |
 | `bun run release:check` | Run the release gates |
 | `bun run release:package` | Build the macOS arm64 app, DMG, and SHA256 checksums |
 
@@ -170,11 +190,14 @@ The packaged artifacts are staged in `dist/release/`.
 - Longbridge commands use argv-safe execution, symbol validation, and read-only capability registration.
 - Skill resources are path-safe: traversal and symlink escapes are rejected.
 - Research reports distinguish unavailable data from negative evidence and never fabricate missing numbers.
+- Agent tracing is off by default; standard privacy redacts prompts, answers, arguments, and portfolio tool results, while full tracing requires explicit opt-in.
 - Unsigned local builds may trigger a macOS security prompt; signing and notarization are opt-in release steps.
 
 ## Project Status
 
 Folio is in beta. The current repository includes the V5 research, discovery, monitoring, outcome, and adaptive-calibration surfaces, plus the V6 quiet workspace visual system.
+
+Agent engineering evaluation (V7) is now wired into Settings and the Evaluation Center: LangSmith connection, privacy controls, benchmark experiments, failure-mode analysis, case-level traces, and human feedback are available as an advanced workflow.
 
 - Unit and integration tests: **912 passing**
 - Typecheck: **green**
@@ -206,6 +229,7 @@ Known limitations and release decisions are documented in [`docs/release-gates.m
 - [`docs/longbridge-auth.md`](docs/longbridge-auth.md) — Longbridge authentication · [简体中文](docs/longbridge-auth.zh-CN.md)
 - [`docs/longbridge-skill-setup.md`](docs/longbridge-skill-setup.md) — skill setup and capability coverage · [简体中文](docs/longbridge-skill-setup.zh-CN.md)
 - [`docs/release-gates.md`](docs/release-gates.md) — release validation checklist · [简体中文](docs/release-gates.zh-CN.md)
+- [`docs/EVALUATION.md`](docs/EVALUATION.md) — Agent evaluation, LangSmith observability, and experiment architecture · [CI strategy](docs/EVALUATION-CI.md) · [benchmark](docs/EVALUATION-BENCHMARK.md)
 
 ## Contributing
 

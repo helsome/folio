@@ -24,12 +24,12 @@ export const ProviderConnectStep: React.FC<ProviderConnectStepProps> = ({
 }) => {
   const { t } = useTranslation();
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
+    <div className="space-y-5 [&_[data-testid^='connection-card-']]:rounded-[8px] [&_[data-testid^='connection-card-']]:bg-surface-raised [&_[data-testid^='connection-card-']]:shadow-none">
+      <div className="space-y-1 border-b border-border pb-4">
         <div className="flex items-center gap-2">
           <h2 className="text-[18px] font-semibold text-foreground">{title}</h2>
           {recommended && (
-            <span className="rounded-full border border-[var(--mac-blue)]/30 bg-[var(--mac-blue)]/10 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-[var(--mac-blue)]">
+            <span className="rounded-[5px] border border-accent/25 bg-accent/8 px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-accent">
               {t('onboarding.providerStep.recommended')}
             </span>
           )}
@@ -40,7 +40,7 @@ export const ProviderConnectStep: React.FC<ProviderConnectStepProps> = ({
       {entry ? (
         <ConnectionCard entry={entry} onChanged={onChanged} />
       ) : (
-        <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
+        <div className="rounded-[8px] border border-border bg-surface-raised p-4 text-[12px] text-foreground/48">
           {t('onboarding.providerStep.notAvailable')}
         </div>
       )}

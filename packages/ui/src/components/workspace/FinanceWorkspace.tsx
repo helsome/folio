@@ -70,7 +70,7 @@ export const FinanceWorkspace: React.FC = () => {
   }
 
   return (
-    <div className="h-full" data-testid="finance-workspace">
+    <div className="folio-finance-workspace h-full" data-testid="finance-workspace">
       {content}
     </div>
   );
@@ -84,28 +84,30 @@ const SecurityWorkspace: React.FC = () => {
 
   if (!activeSymbol) {
     return (
-      <div className="flex h-full flex-col items-center justify-center gap-2 text-center">
-        <div className="text-[15px] font-semibold text-foreground/72">
+      <div className="flex h-full items-center justify-center bg-[#f7f8fa] p-6 text-center">
+        <div className="w-full max-w-md rounded-[16px] border border-[var(--mac-border)] bg-white px-8 py-10 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+          <div className="text-[15px] font-semibold text-foreground/80">
           {t('security.workspace.emptyTitle')}
-        </div>
-        <div className="max-w-sm text-[12px] text-foreground/44">
-          {t('security.workspace.emptySubtitle')}
+          </div>
+          <div className="mx-auto mt-2 max-w-sm text-[12px] leading-5 text-foreground/48">
+            {t('security.workspace.emptySubtitle')}
+          </div>
         </div>
       </div>
     );
   }
 
   return (
-    <div className="flex h-full flex-col">
+    <div className="folio-security-workspace flex h-full flex-col bg-[#f7f8fa]">
       <SecurityHeader />
-      <div className="border-b mac-section-divider px-3">
+      <div className="border-b border-[var(--mac-border)] bg-white px-4">
         <Tabs value={activeView} onValueChange={(value) => setActiveView(value as WorkspaceView)}>
-          <TabsList className="border-0">
+          <TabsList className="gap-0 border-0">
             {WORKSPACE_TABS.map((tab) => <TabsTrigger key={tab.value} value={tab.value}>{tab.label}</TabsTrigger>)}
           </TabsList>
         </Tabs>
       </div>
-      <div className="flex-1 overflow-y-auto">
+      <div className="min-h-0 flex-1 overflow-y-auto">
         <ActiveView view={activeView} />
       </div>
     </div>

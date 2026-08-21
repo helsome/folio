@@ -145,8 +145,8 @@ export const CaseDetail: React.FC<{
 
   if (loading || (detail === null && !error)) {
     return (
-      <div className="flex h-full flex-col" data-testid="case-detail">
-        <div className="border-b mac-section-divider px-4 py-3">
+      <div className="flex h-full flex-col bg-[#f6f8fb]" data-testid="case-detail">
+        <div className="border-b border-[var(--mac-border)] bg-white px-5 py-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
@@ -160,8 +160,8 @@ export const CaseDetail: React.FC<{
 
   if (!detail) {
     return (
-      <div className="flex h-full flex-col" data-testid="case-detail">
-        <div className="border-b mac-section-divider px-4 py-3">
+      <div className="flex h-full flex-col bg-[#f6f8fb]" data-testid="case-detail">
+        <div className="border-b border-[var(--mac-border)] bg-white px-5 py-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
@@ -179,8 +179,8 @@ export const CaseDetail: React.FC<{
   const result = results.find((entry) => entry.caseId === caseRef.caseId);
   if (!run && !result) {
     return (
-      <div className="flex h-full flex-col" data-testid="case-detail">
-        <div className="border-b mac-section-divider px-4 py-3">
+      <div className="flex h-full flex-col bg-[#f6f8fb]" data-testid="case-detail">
+        <div className="border-b border-[var(--mac-border)] bg-white px-5 py-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
@@ -193,8 +193,8 @@ export const CaseDetail: React.FC<{
   }
 
   return (
-    <div className="flex h-full flex-col" data-testid="case-detail">
-      <header className="flex items-center justify-between border-b mac-section-divider px-4 py-3">
+    <div className="flex h-full flex-col bg-[#f6f8fb]" data-testid="case-detail">
+      <header className="flex items-center justify-between border-b border-[var(--mac-border)] bg-white px-5 py-4">
         <div className="flex items-center gap-3">
           <Button variant="ghost" size="sm" onClick={onBack}>
             <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
@@ -244,9 +244,9 @@ export const CaseDetail: React.FC<{
         </div>
       </header>
 
-      <div className="min-h-0 flex-1 overflow-y-auto p-4">
-        <div className="max-w-4xl space-y-4">
-          <div className="mac-stock-tile rounded-[14px] p-5">
+      <div className="min-h-0 flex-1 overflow-y-auto p-5">
+        <div className="max-w-5xl space-y-4">
+          <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
             <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.caseDefinition')}</h3>
             {caseDef ? (
               <div className="mt-2 space-y-3 text-[12.5px]">
@@ -269,7 +269,7 @@ export const CaseDetail: React.FC<{
                     {t('evaluation.expectedBehavior')}
                   </p>
                   <div className="mt-1 flex flex-wrap gap-1.5">
-                    <span className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10.5px] text-foreground/64">
+                    <span className="rounded-full border border-[var(--mac-border)] bg-[#f7f9fc] px-2 py-0.5 text-[10.5px] text-foreground/64">
                       {caseDef.category} · {caseDef.difficulty}
                     </span>
                     {caseDef.expected.requiredCapabilities?.map((cap) => (
@@ -283,17 +283,17 @@ export const CaseDetail: React.FC<{
                       </span>
                     ))}
                     {caseDef.expected.maxToolCalls != null && (
-                      <span className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10.5px] text-foreground/64">
+                      <span className="rounded-full border border-[var(--mac-border)] bg-[#f7f9fc] px-2 py-0.5 text-[10.5px] text-foreground/64">
                         {t('evaluation.maxToolCalls', { count: caseDef.expected.maxToolCalls })}
                       </span>
                     )}
                     {caseDef.expected.mustHaveEvidence && (
-                      <span className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10.5px] text-foreground/64">
+                      <span className="rounded-full border border-[var(--mac-border)] bg-[#f7f9fc] px-2 py-0.5 text-[10.5px] text-foreground/64">
                         {t('evaluation.evidenceRequired')}
                       </span>
                     )}
                     {caseDef.expected.requiredResearchDimensions?.map((dimension) => (
-                      <span key={`dim-${dimension}`} className="rounded-full border border-border bg-surface-muted px-2 py-0.5 text-[10.5px] text-foreground/64">
+                      <span key={`dim-${dimension}`} className="rounded-full border border-[var(--mac-border)] bg-[#f7f9fc] px-2 py-0.5 text-[10.5px] text-foreground/64">
                         {dimension}
                       </span>
                     ))}
@@ -312,7 +312,7 @@ export const CaseDetail: React.FC<{
             )}
           </div>
 
-          <div className="mac-stock-tile rounded-[14px] p-5">
+          <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
             <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.agentAnswer')}</h3>
             <p className="mt-2 whitespace-pre-wrap text-[12.5px] leading-relaxed text-foreground/78">
               {run?.answer?.trim() ? run.answer : t('evaluation.noAnswer')}
@@ -322,16 +322,16 @@ export const CaseDetail: React.FC<{
             )}
           </div>
 
-          <div className="mac-stock-tile rounded-[14px] p-5">
+          <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
             <div className="flex items-center justify-between">
               <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.toolTimeline')}</h3>
               <span className="text-[11px] text-foreground/42">{t('evaluation.calls', { count: run?.toolCalls.length ?? 0 })}</span>
             </div>
             {run && run.toolCalls.length > 0 ? (
-              <div className="mt-3 overflow-x-auto">
+              <div className="mt-3 overflow-x-auto rounded-[8px] border border-[var(--mac-border)]">
                 <table className="w-full border-collapse text-[12px]" data-testid="tool-timeline">
                   <thead>
-                    <tr className="border-b mac-section-divider">
+                    <tr className="border-b border-[var(--mac-border)] bg-[#f7f9fc]">
                       <th className="py-2 pr-3 text-left font-medium text-foreground/54">#</th>
                       <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.tool')}</th>
                       <th className="px-3 py-2 text-left font-medium text-foreground/54">{t('evaluation.args')}</th>
@@ -342,7 +342,7 @@ export const CaseDetail: React.FC<{
                   </thead>
                   <tbody>
                     {run.toolCalls.map((toolCall, index) => (
-                      <tr key={toolCall.id} className="border-b mac-section-divider last:border-0">
+                      <tr key={toolCall.id} className="border-b border-[var(--mac-border)] last:border-0 hover:bg-[#f8fbff]">
                         <td className="py-2 pr-3 tabular-nums text-foreground/44">{index + 1}</td>
                         <td className="px-3 py-2 font-mono font-medium text-foreground">{toolCall.toolName}</td>
                         <td className="max-w-[220px] truncate px-3 py-2 font-mono text-foreground/54">
@@ -370,14 +370,14 @@ export const CaseDetail: React.FC<{
           </div>
 
           {result && (
-            <div className="mac-stock-tile rounded-[14px] p-5">
+            <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
               <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.evaluatorScores')}</h3>
               <div className="mt-3 space-y-2.5">
                 {result.scores.length === 0 && (
                   <p className="text-[12px] text-foreground/44">{t('evaluation.noScoresRecorded')}</p>
                 )}
                 {result.scores.map((score) => (
-                  <div key={score.metric} className="rounded-[9px] border border-border bg-surface-muted px-3 py-2">
+                  <div key={score.metric} className="rounded-[8px] border border-[var(--mac-border)] bg-[#f7f9fc] px-3 py-2">
                     <div className="flex items-center justify-between gap-3">
                       <div className="min-w-0">
                         <span className="text-[12.5px] font-medium text-foreground">{t(metricLabel(score.metric))}</span>
@@ -394,7 +394,7 @@ export const CaseDetail: React.FC<{
             </div>
           )}
 
-          <div className="mac-stock-tile rounded-[14px] p-5">
+          <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
             <div className="flex items-center justify-between">
               <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.failureModes')}</h3>
               {run?.traceRef?.url && (
@@ -419,7 +419,7 @@ export const CaseDetail: React.FC<{
             )}
           </div>
 
-          <div className="mac-stock-tile rounded-[14px] p-5">
+          <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
             <h3 className="text-[13px] font-semibold text-foreground">{t('evaluation.humanReview')}</h3>
             <p className="mt-1 text-[11.5px] text-foreground/48">
               {t('evaluation.humanReviewDescription')}
@@ -448,7 +448,7 @@ export const CaseDetail: React.FC<{
             {noteOpen && (
               <div className="mt-3 flex items-start gap-2">
                 <input
-                  className="mac-input h-9 flex-1 rounded-[10px] px-3 text-[12px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-accent/28"
+                  className="h-9 flex-1 rounded-[8px] border border-[var(--mac-border)] bg-white px-3 text-[12px] text-foreground placeholder:text-foreground/38 focus:border-[var(--mac-blue)] focus:outline-none focus:ring-2 focus:ring-[var(--mac-blue)]/18"
                   value={note}
                   onChange={(e) => setNote(e.target.value)}
                   placeholder={t('evaluation.notePlaceholder')}

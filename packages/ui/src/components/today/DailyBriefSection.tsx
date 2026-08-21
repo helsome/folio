@@ -1,9 +1,10 @@
 import React, { useEffect, useState } from 'react'
 import { useAtomValue, useSetAtom } from 'jotai'
 import { useTranslation } from 'react-i18next'
+import type { TFunction } from 'i18next'
 import { useFinagentClient } from '../../client'
 import { automationStateAtom, loadBriefAtom } from '../../atoms/automationAtoms'
-import type { BriefItem, BriefItemSource } from '../../client/automation'
+import type { BriefItem, BriefItemSource, BriefSeverity } from '../../client/automation'
 import { Button } from '../primitives/Button'
 import { SectionState, TodaySection } from './TodaySection'
 
@@ -18,6 +19,32 @@ const SOURCE_DOT: Record<BriefItemSource, string> = {
   Thesis: 'bg-[#a78bfa]',
   Alert: 'bg-[var(--mac-red)]',
   Automation: 'bg-foreground/40',
+}
+
+const SEVERITY_RAIL: Record<BriefSeverity, string> = {
+  critical: 'bg-[#d92d20]',
+  warning: 'bg-[#f79009]',
+  info: 'bg-[#98a2b3]',
+}
+
+function briefTitle(item: BriefItem, t: TFunction): string {
+  const title = item.symbol && !item.title.startsWith(item.symbol)
+    ? `${item.symbol} · ${item.title}`
+    : item.title
+  const exposure = /^(.*?)(?:\s·\s)?(\d+(?:\.\d+)?)%\s+of portfolio$/i.exec(title)
+  if (item.source === 'Portfolio' && exposure) {
+    const symbol = item.symbol ?? exposure[1].trim()
+    return `${symbol} · ${t('today.portfolioExposureDetail', { percent: exposure[2] })}`
+  }
+  return title
+}
+
+function briefMessage(item: BriefItem, t: TFunction): string {
+  if (item.source === 'Portfolio') {
+    const percent = /(\d+(?:\.\d+)?)%\s+of portfolio/i.exec(item.title)?.[1]
+    if (percent) return ''
+  }
+  return item.message
 }
 
 /** Today-section rendering of the Daily Brief (spec §27–28). */
@@ -41,9 +68,22 @@ export const DailyBriefSection: React.FC<DailyBriefSectionProps> = ({ onManage }
       return <SectionState kind="empty" message={t('today.nothingToReport')} />
     }
     return (
-      <div className="space-y-2">
-        <div className="text-[13px] font-medium text-foreground">{brief.summary}</div>
-        <ul className="space-y-1" data-testid="brief-items">
+      <div className="space-y-3">
+        <div className="folio-daily-brief-overview">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="folio-daily-brief-count">{brief.items.length}</span>
+            <div className="min-w-0">
+              <div className="folio-daily-brief-overview-label">{t('today.dailyBriefAttention')}</div>
+              <div className="folio-daily-brief-overview-copy">{t('today.dailyBriefCount', { count: brief.items.length })}</div>
+            </div>
+          </div>
+          <div className="folio-daily-brief-updated">
+            <span className="h-1.5 w-1.5 rounded-full bg-[#12b76a]" />
+            {t('today.dailyBriefUpdated')}
+          </div>
+          <span className="sr-only">{brief.summary}</span>
+        </div>
+        <ul className="folio-daily-brief-list" data-testid="brief-items">
           {brief.items.map((item) => (
             <BriefRow
               key={item.id}
@@ -56,8 +96,10 @@ export const DailyBriefSection: React.FC<DailyBriefSectionProps> = ({ onManage }
           ))}
         </ul>
         {brief.quiet.count > 0 && (
-          <div className="pt-1 text-[12px] text-foreground/42" data-testid="brief-quiet">
-            {brief.quiet.message}
+          <div className="folio-daily-brief-quiet" data-testid="brief-quiet">
+            <span className="folio-daily-brief-quiet-dot" />
+            <span>{t('today.dailyBriefQuietLabel')}</span>
+            <span className="text-foreground/45">{brief.quiet.message}</span>
           </div>
         )}
       </div>
@@ -67,6 +109,7 @@ export const DailyBriefSection: React.FC<DailyBriefSectionProps> = ({ onManage }
   return (
     <TodaySection
       title={t('today.dailyBrief')}
+      className="folio-daily-brief-section"
       action={
         <div className="flex items-center gap-2">
           <Button variant="outline" size="sm" onClick={onManage}>
@@ -91,37 +134,27 @@ interface BriefRowProps {
 
 const BriefRow: React.FC<BriefRowProps> = ({ item, expanded, onToggle }) => {
   const { t } = useTranslation()
+  const message = briefMessage(item, t)
   return (
-    <li className="rounded-[9px] border border-border bg-surface/60 px-3 py-2">
-      <div className="flex items-start justify-between gap-3">
-        <div className="min-w-0">
-          <div className="flex items-center gap-2">
-            <span
-              className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${SOURCE_DOT[item.source]}`}
-            />
-            <span className="truncate text-[13px] font-medium text-foreground">
-              {item.symbol ? `${item.symbol} · ` : ''}
-              {item.title}
-            </span>
-          </div>
-          <div className="mt-0.5 truncate text-[12px] text-foreground/54">{item.message}</div>
+    <li className="folio-daily-brief-row">
+      <span className={`folio-daily-brief-severity ${SEVERITY_RAIL[item.severity]}`} aria-hidden="true" />
+      <div className="min-w-0">
+        <div className="flex min-w-0 items-center gap-2">
+          <span className={`inline-block h-1.5 w-1.5 shrink-0 rounded-full ${SOURCE_DOT[item.source]}`} />
+          <span className="truncate text-[12.5px] font-medium text-foreground">{briefTitle(item, t)}</span>
         </div>
-        <span className="shrink-0 rounded-full bg-foreground/8 px-2 py-0.5 text-[10px] font-medium uppercase tracking-wide text-foreground/54">
-          {t(`today.source.${item.source}`)}
-        </span>
+        {message && <div className="mt-1 truncate text-[11.5px] text-foreground/54">{message}</div>}
       </div>
-      {item.payload !== undefined && (
-        <button
-          type="button"
-          onClick={onToggle}
-          className="mt-1.5 text-[11px] text-foreground/38 underline-offset-2 hover:text-foreground/60 hover:underline"
-          aria-expanded={expanded}
-        >
-          {expanded ? t('today.hide') : t('today.whySeeingThis')}
-        </button>
-      )}
+      <div className="folio-daily-brief-meta">
+        <span className="folio-daily-brief-source">{t(`today.source.${item.source}`)}</span>
+        {item.payload !== undefined && (
+          <button type="button" onClick={onToggle} className="folio-daily-brief-details" aria-expanded={expanded}>
+            {expanded ? t('today.hide') : t('today.whySeeingThis')}
+          </button>
+        )}
+      </div>
       {expanded && item.payload !== undefined && (
-        <pre className="mt-1.5 overflow-x-auto rounded-[8px] bg-foreground/5 p-2 text-[11px] leading-relaxed text-foreground/60">
+        <pre className="col-span-full mt-1.5 overflow-x-auto rounded-[8px] border border-border bg-surface-raised p-2 text-[11px] leading-relaxed text-foreground/60">
           {JSON.stringify(item.payload, null, 2)}
         </pre>
       )}
