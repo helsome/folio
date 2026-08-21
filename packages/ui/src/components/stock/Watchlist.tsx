@@ -93,8 +93,8 @@ export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = tru
   };
 
   return (
-    <div className="flex h-full flex-col">
-      <div className="border-b mac-section-divider px-3 py-3">
+    <div className="folio-watchlist flex h-full flex-col">
+      <div className="folio-watchlist-header border-b mac-section-divider px-3 py-3">
         {showHeader && (
           <div className="mb-2 flex min-w-0 flex-wrap items-center justify-between gap-x-2 gap-y-1 px-0.5">
             <span className="text-[11px] font-semibold uppercase text-foreground/42">
@@ -127,7 +127,7 @@ export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = tru
         </div>
       </div>
 
-      <div className="flex-1 overflow-y-auto p-1.5">
+      <div className="folio-watchlist-list flex-1 overflow-y-auto p-1.5">
         {watchlist.map((symbol) => (
           <WatchlistRow
             key={symbol}
@@ -199,9 +199,9 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({
           onSelect();
         }
       }}
-      className={`group relative flex cursor-pointer items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 transition-colors ${
+      className={`folio-watchlist-row group relative flex cursor-pointer items-center gap-1.5 rounded-[8px] px-2.5 py-1.5 transition-colors ${
         active
-          ? 'bg-[var(--mac-blue-soft)]'
+          ? 'folio-watchlist-row--active bg-[var(--mac-blue-soft)]'
           : 'hover:bg-[var(--mac-sidebar-hover)]'
       }`}
     >

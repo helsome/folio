@@ -22,6 +22,13 @@ export const WorkbenchShell: React.FC = () => {
     : DEFAULT_SIZES;
 
   const handleDragEnd = (next: number[]): void => {
+    // Allotment redistributes the hidden pane's width when Copilot is closed.
+    // Keep the user's sidebar preference while preserving the last Copilot
+    // width for the next time the third pane is restored.
+    if (next.length === 2) {
+      setSizes((current) => [next[0] ?? current[0], current[1], current[2]]);
+      return;
+    }
     setSizes(next);
     writePersisted(SIZES_KEY, next);
   };
@@ -31,8 +38,13 @@ export const WorkbenchShell: React.FC = () => {
 
   return (
     <div className="relative h-full flex-1 overflow-hidden">
-      <Allotment className="h-full" defaultSizes={normalized} onDragEnd={handleDragEnd}>
-        <Allotment.Pane minSize={200} preferredSize={normalized[0]}>
+      <Allotment
+        key={agentPanelVisible ? 'workbench-with-agent' : 'workbench-without-agent'}
+        className="h-full"
+        defaultSizes={agentPanelVisible ? normalized : [360, Math.max(720, normalized[1] + normalized[2])]}
+        onDragEnd={handleDragEnd}
+      >
+        <Allotment.Pane minSize={200} preferredSize={agentPanelVisible ? normalized[0] : 360}>
           <Sidebar />
         </Allotment.Pane>
         <Allotment.Pane minSize={500}>
@@ -40,16 +52,13 @@ export const WorkbenchShell: React.FC = () => {
             <FinanceWorkspace />
           </ErrorBoundary>
         </Allotment.Pane>
-        <Allotment.Pane
-          minSize={320}
-          preferredSize={normalized[2]}
-          snap
-          visible={agentPanelVisible}
-        >
-          <ErrorBoundary>
-            <AgentPanel />
-          </ErrorBoundary>
-        </Allotment.Pane>
+        {agentPanelVisible && (
+          <Allotment.Pane minSize={320} preferredSize={normalized[2]} snap>
+            <ErrorBoundary>
+              <AgentPanel />
+            </ErrorBoundary>
+          </Allotment.Pane>
+        )}
       </Allotment>
     </div>
   );
