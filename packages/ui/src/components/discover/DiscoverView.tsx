@@ -176,7 +176,7 @@ export const DiscoverView: React.FC = () => {
       type="button"
       onClick={handleBack}
       data-testid="discover-back"
-      className="shrink-0 rounded-[8px] border border-[var(--mac-border)] px-2.5 py-1 text-[12px] font-medium text-foreground/72 transition-smooth hover:border-[var(--mac-border-strong)] hover:text-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)]"
+      className="folio-pilot-toolbar-button shrink-0"
     >
       ← {t('discover.back')}
     </button>
@@ -201,9 +201,9 @@ export const DiscoverView: React.FC = () => {
   const resultList = (
     <>
       {results && results.length > 0 && (
-        <div className="overflow-hidden rounded-[10px] border border-border bg-surface">
+        <div className="folio-pilot-table">
           <div
-            className="grid grid-cols-[minmax(0,1.6fr)_92px_92px_52px_auto] gap-3 border-b border-border bg-surface-muted px-3 py-2 text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/38"
+            className="folio-pilot-table-header"
             data-testid="discover-results-header"
           >
             <span>{t('discover.security')}</span>
@@ -228,19 +228,22 @@ export const DiscoverView: React.FC = () => {
 
   // ── Render by mode ────────────────────────────────────────────────────────
   return (
-    <div ref={scrollRef} className="h-full overflow-y-auto p-4" data-testid="discover-view">
+    <div ref={scrollRef} className="folio-pilot-shell h-full overflow-y-auto p-4" data-testid="discover-view">
       {mode === 'browse' && (
         <>
-          <div className="mb-1">
-            <h1 className="text-[20px] font-semibold tracking-tight text-foreground">{t('discover.title')}</h1>
-            <p className="mt-0.5 text-[12.5px] text-foreground/54">{t('discover.subtitle', { scope })}</p>
+          <div className="folio-pilot-page-header mb-4">
+            <div>
+              <div className="folio-pilot-eyebrow">{t('discover.title')}</div>
+              <h1 className="folio-pilot-title">{t('discover.title')}</h1>
+              <p className="folio-pilot-subtitle">{t('discover.subtitle', { scope })}</p>
+            </div>
           </div>
 
           {error && (
             <div
               role="alert"
               data-testid="discover-error"
-              className="mb-3 rounded-[10px] border border-[var(--mac-red-soft)] bg-[var(--mac-red-soft)]/20 px-3 py-2 text-[12.5px] text-destructive"
+              className="folio-pilot-status mb-3 border-destructive/30 bg-destructive/6 text-destructive"
             >
               {error}
             </div>
@@ -275,7 +278,7 @@ export const DiscoverView: React.FC = () => {
             {runsLoading ? (
               <div className="py-4 text-center text-[12.5px] text-foreground/40">{t('common.loading')}</div>
             ) : runs.length === 0 ? (
-              <div className="rounded-[10px] border border-[var(--mac-border)] bg-background/40 px-3 py-4 text-center text-[12.5px] text-foreground/48">
+              <div className="folio-pilot-status py-4 text-center">
                 {t('discover.noRuns')}
               </div>
             ) : (
@@ -287,13 +290,13 @@ export const DiscoverView: React.FC = () => {
 
       {mode === 'running' && (
         <div data-testid="discover-running" className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-3">
+          <div className="folio-pilot-toolbar justify-between">
             {backButton}
             <div className="min-w-0 text-right">
               {rerunButton}
             </div>
           </div>
-          <div className="rounded-[10px] border border-border bg-surface p-4">
+          <div className="folio-pilot-status">
             <div className="flex items-center gap-3">
               <span
                 aria-hidden="true"
@@ -317,16 +320,16 @@ export const DiscoverView: React.FC = () => {
 
       {mode === 'results' && (
         <div data-testid="discover-results" aria-label={t('discover.resultsAria')} className="flex flex-col gap-4">
-          <div className="flex items-center justify-between gap-3">
+          <div className="folio-pilot-toolbar justify-between">
             {backButton}
-            <div className="flex items-center gap-2">
+            <div className="folio-pilot-toolbar">
               <button
                 type="button"
                 onClick={() => setHistoryOpen((value) => !value)}
                 aria-haspopup="true"
                 aria-expanded={historyOpen}
                 data-testid="discover-history-toggle"
-                className="shrink-0 rounded-[8px] border border-[var(--mac-border)] px-2.5 py-1 text-[12px] font-medium text-foreground/72 transition-smooth hover:border-[var(--mac-border-strong)] hover:text-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)]"
+                className="folio-pilot-toolbar-button shrink-0"
               >
                 {t('discover.previousRuns')}
               </button>
@@ -344,18 +347,21 @@ export const DiscoverView: React.FC = () => {
             </div>
           )}
 
-          <div>
-            <h1 className="text-[20px] font-semibold tracking-tight text-foreground">{runTitle}</h1>
-            <p className="mt-0.5 text-[12.5px] text-foreground/54">
-              {t('discover.candidates', { count: results?.length ?? 0 })} · {scope}
-            </p>
+          <div className="folio-pilot-page-header">
+            <div>
+              <div className="folio-pilot-eyebrow">{t('discover.resultsAria')}</div>
+              <h1 className="folio-pilot-title">{runTitle}</h1>
+              <p className="folio-pilot-subtitle">
+                {t('discover.candidates', { count: results?.length ?? 0 })} · {scope}
+              </p>
+            </div>
           </div>
 
           {error && (
             <div
               role="alert"
               data-testid="discover-error"
-              className="rounded-[10px] border border-[var(--mac-red-soft)] bg-[var(--mac-red-soft)]/20 px-3 py-2 text-[12.5px] text-destructive"
+              className="folio-pilot-status border-destructive/30 bg-destructive/6 text-destructive"
             >
               {error}
             </div>
@@ -366,7 +372,7 @@ export const DiscoverView: React.FC = () => {
             <div
               role="status"
               data-testid="discover-provider-warning"
-              className="rounded-[10px] border border-[var(--mac-border)] bg-background/40 px-3 py-2.5"
+              className="folio-pilot-status folio-pilot-status--warning"
             >
               <div className="flex items-center justify-between gap-3">
                 <div className="text-[12.5px] font-medium text-foreground">{t('discover.providerWarning')}</div>
@@ -374,7 +380,7 @@ export const DiscoverView: React.FC = () => {
                   type="button"
                   onClick={goToConnections}
                   data-testid="discover-goto-connections"
-                  className="shrink-0 rounded-[8px] border border-[var(--mac-border)] px-2.5 py-1 text-[12px] font-medium text-accent transition-smooth hover:border-[var(--mac-border-strong)] active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)]"
+                  className="folio-pilot-toolbar-button shrink-0 text-accent"
                 >
                   {t('discover.goToConnections')}
                 </button>
@@ -397,7 +403,7 @@ export const DiscoverView: React.FC = () => {
           {hasFailures && results && results.length > 0 && (
             <div
               data-testid="discover-failures"
-              className="rounded-[8px] border border-[var(--mac-border)] bg-background/40 px-3 py-1.5 text-[11.5px] text-foreground/48"
+              className="folio-pilot-status folio-pilot-status--partial py-1.5"
             >
               {t('discover.partialData')}
             </div>
@@ -406,7 +412,7 @@ export const DiscoverView: React.FC = () => {
           {results && results.length === 0 ? (
             <div
               data-testid="discover-empty"
-              className="rounded-[10px] border border-[var(--mac-border)] bg-background/40 px-3 py-6 text-center"
+              className="folio-pilot-status py-6 text-center"
             >
               <div className="text-[13px] font-medium text-foreground">{t('discover.noCandidates')}</div>
               <ul className="mx-auto mt-2 inline-block list-disc space-y-0.5 pl-5 text-left text-[12px] text-foreground/54">

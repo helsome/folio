@@ -23,7 +23,10 @@ const VERDICT_TONE: Record<ResearchSection['verdict'], string> = {
 };
 
 /** Full Deep Research report: stance, sections, cases, catalysts, risks, evidence. */
-export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ report }) => {
+export const ResearchReportView: React.FC<{
+  report: ResearchReport;
+  nextAction?: React.ReactNode;
+}> = ({ report, nextAction }) => {
   const { t } = useTranslation();
   const confidence = Math.round(report.confidence * 100);
   const [diffState, setDiffState] = useAtom(researchDiffAtom);
@@ -51,11 +54,11 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
   }, [report.symbol, report.id, setDiffState]);
 
   return (
-    <div className="flex flex-col gap-4" data-testid="research-report">
-      <div className="rounded-[10px] border mac-list-row p-4">
-        <div className="flex items-baseline justify-between">
+    <div className="folio-pilot-report" data-testid="research-report">
+      <div className="folio-pilot-verdict">
+        <div className="folio-pilot-verdict-top">
           <div>
-            <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+            <div className="folio-pilot-verdict-label">
               {t('research.reportFor', { symbol: report.symbol })}
             </div>
             <h3 className={`mt-1 text-[17px] font-bold ${STANCE_TONE[report.stance]}`}>
@@ -64,24 +67,25 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
           </div>
           <div className="flex items-start gap-3">
             <div className="text-right">
-              <div className="text-[11px] font-semibold uppercase tracking-wide text-text-muted">
+              <div className="folio-pilot-verdict-label">
                 {t('research.confidence')}
               </div>
-              <div className="tnum mt-0.5 text-[16px] font-semibold text-foreground">
+              <div className="folio-pilot-confidence">
                 {confidence}%
               </div>
             </div>
             <ExportMenu report={report} />
           </div>
         </div>
-        <MarkdownContent content={report.summary} className="mt-3 text-[13px] text-foreground/85" />
-        <div className="mt-2 text-[11px] text-text-muted">
+        <MarkdownContent content={report.summary} className="folio-pilot-summary" />
+        <div className="folio-pilot-report-meta">
           {report.runStatus === 'partial'
             ? t('research.partialRun')
             : t('research.allCompleted')}{' '}
           · {t('research.capabilityCalls', { count: report.capabilityRuns.length })} ·{' '}
           {new Date(report.generatedAt).toLocaleString()}
         </div>
+        {nextAction}
       </div>
 
       {diffState.diff && (
@@ -91,7 +95,7 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
         />
       )}
 
-      <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
+      <div className="folio-pilot-report-sections">
         {report.sections.map((section) => (
           <SectionCard key={section.key} section={section} />
         ))}
@@ -102,11 +106,11 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
       <CaseColumn title={t('research.catalysts')} points={report.catalysts} />
       <CaseColumn title={t('research.risks')} points={report.risks} />
 
-      <div className="rounded-[10px] border mac-list-row p-4">
-        <h4 className="text-[12px] font-semibold uppercase tracking-wide text-foreground">
+      <section className="folio-pilot-evidence">
+        <h4 className="folio-pilot-evidence-heading">
           {t('research.evidence')}
         </h4>
-        <p className="mt-1 text-[11.5px] text-text-muted">
+        <p className="folio-pilot-evidence-note">
           {t('research.evidenceNote')}
         </p>
         <div className="mt-3 flex flex-col gap-2">
@@ -114,7 +118,7 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
             <EvidenceList key={section.key} section={section} />
           ))}
         </div>
-      </div>
+      </section>
     </div>
   );
 };
@@ -122,14 +126,14 @@ export const ResearchReportView: React.FC<{ report: ResearchReport }> = ({ repor
 const SectionCard: React.FC<{ section: ResearchSection }> = ({ section }) => {
   const { t } = useTranslation();
   return (
-    <div className="rounded-[10px] border mac-list-row p-3">
+    <article className="folio-pilot-report-section">
       <div className="flex items-center justify-between">
         <span className="text-[12.5px] font-semibold text-foreground">{section.title}</span>
         <span className={`text-[11px] font-semibold ${VERDICT_TONE[section.verdict]}`}>
           {t(`research.verdict.${section.verdict}`)}
         </span>
       </div>
-      <MarkdownContent content={section.summary} className="mt-1.5 text-[12px] text-foreground/75" />
+      <MarkdownContent content={section.summary} className="folio-pilot-report-section-summary" />
       {section.evidence.length > 0 && (
         <div className="mt-1.5 text-[10.5px] text-text-muted">
           {t(
@@ -140,15 +144,15 @@ const SectionCard: React.FC<{ section: ResearchSection }> = ({ section }) => {
           )}
         </div>
       )}
-    </div>
+    </article>
   );
 };
 
 const CaseColumn: React.FC<{ title: string; points: string[] }> = ({ title, points }) => {
   if (points.length === 0) return null;
   return (
-    <div className="rounded-[10px] border mac-list-row p-4">
-      <h4 className="text-[12px] font-semibold uppercase tracking-wide text-foreground">
+    <section className="folio-pilot-case">
+      <h4>
         {title}
       </h4>
       <ul className="mt-2 flex flex-col gap-1.5">
@@ -159,6 +163,6 @@ const CaseColumn: React.FC<{ title: string; points: string[] }> = ({ title, poin
           </li>
         ))}
       </ul>
-    </div>
+    </section>
   );
 };

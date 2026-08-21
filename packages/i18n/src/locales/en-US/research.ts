@@ -83,6 +83,14 @@ export const research = {
     unchanged: 'UNCHANGED',
   },
   researchStrategy: 'Research strategy',
+  stages: {
+    label: 'Research progress',
+    market: 'Get market data',
+    financials: 'Review financials',
+    valuation: 'Analyze valuation',
+    events: 'Check events',
+    synthesis: 'Form conclusion',
+  },
   focus: {
     fullPlan: 'Full plan',
     market: 'Market',

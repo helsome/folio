@@ -181,11 +181,11 @@ export const ResearchPanel: React.FC = () => {
   const symbolRuns = runs.filter((run) => run.symbol === symbol);
 
   return (
-    <div className="flex h-full flex-col" data-testid="research-panel">
-      <div className="flex items-center justify-between border-b mac-section-divider px-4 py-3">
+    <div className="folio-pilot-shell flex h-full flex-col" data-testid="research-panel">
+      <div className="folio-pilot-research-header">
         <div>
-          <h2 className="text-[15px] font-semibold text-foreground">{t('research.deepResearch')}</h2>
-          <p className="mt-0.5 text-[11.5px] text-text-muted">
+          <h2 className="folio-pilot-research-title">{t('research.deepResearch')}</h2>
+          <p className="folio-pilot-subtitle">
             {symbol
               ? t('research.subtitleFor', { symbol })
               : t('research.subtitleEmpty')}
@@ -238,13 +238,22 @@ export const ResearchPanel: React.FC = () => {
         </div>
       )}
 
-      {symbol && !activeRun && (
+      {symbol && !activeRun && (!report || report.symbol !== symbol) && (
         <div className="px-4 pt-3">
           <StrategyPicker value={strategyId} onChange={handleStrategyChange} recommendedId={recommendedStrategy} />
         </div>
       )}
 
-      <div className="min-h-0 flex-1 overflow-y-auto px-4 py-3">
+      {symbol && !activeRun && report && report.symbol === symbol && (
+        <details className="folio-pilot-strategy-context">
+          <summary>{t('research.researchStrategy')}</summary>
+          <div className="pt-3">
+            <StrategyPicker value={strategyId} onChange={handleStrategyChange} recommendedId={recommendedStrategy} />
+          </div>
+        </details>
+      )}
+
+      <div className="folio-pilot-research-content">
         {!symbol && <SymbolEntry error={symbolError} value={symbolInput} onChange={setSymbolInput} onSubmit={handleSymbolEntrySubmit} />}
 
         {activeRun && (
@@ -252,23 +261,25 @@ export const ResearchPanel: React.FC = () => {
         )}
 
         {report && symbol && report.symbol === symbol && (
-          <div className="flex flex-col gap-3">
-            {thesisSaved ? (
-              <div data-testid="thesis-saved-banner" className="rounded-[10px] border border-positive/24 bg-positive/6 px-3.5 py-2.5 text-[12.5px] font-medium text-positive">
-                {t('research.next.thesisSaved')}
-              </div>
-            ) : (
-              <NextAction
-                testId="research-next-action"
-                primaryLabel={t('research.next.saveThesis')}
-                onPrimary={() => void handleSaveThesis()}
-                secondaryLabel={t('research.next.viewThesis')}
-                onSecondary={() => setNavSection('thesis')}
-                hint={t('research.next.saveThesisHint')}
-              />
-            )}
-            <ResearchReportView report={report} />
-          </div>
+          <ResearchReportView
+            report={report}
+            nextAction={
+              thesisSaved ? (
+                <div data-testid="thesis-saved-banner" className="folio-pilot-next-action text-[12.5px] font-medium text-positive">
+                  {t('research.next.thesisSaved')}
+                </div>
+              ) : (
+                <NextAction
+                  testId="research-next-action"
+                  primaryLabel={t('research.next.saveThesis')}
+                  onPrimary={() => void handleSaveThesis()}
+                  secondaryLabel={t('research.next.viewThesis')}
+                  onSecondary={() => setNavSection('thesis')}
+                  hint={t('research.next.saveThesisHint')}
+                />
+              )
+            }
+          />
         )}
 
         {symbol && !activeRun && !report && (
@@ -335,7 +346,7 @@ const RunProgressCard: React.FC<{ run: ResearchRunSummary }> = ({ run }) => {
     return t(semanticCapabilityLabelKey(id));
   };
   return (
-    <div className="mb-3 rounded-[10px] border mac-list-row p-3">
+    <div className="folio-pilot-progress mb-3">
       <div className="flex items-center justify-between">
         <span className="text-[12.5px] font-semibold text-foreground">
           {run.status === 'fetching' ? t('research.fetching') : t('research.synthesizing')}
@@ -345,13 +356,14 @@ const RunProgressCard: React.FC<{ run: ResearchRunSummary }> = ({ run }) => {
           {failed > 0 ? ` ${t('research.failedCount', { failed })}` : ''}
         </span>
       </div>
-      <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-foreground/10">
+      <div className="folio-pilot-progress-bar mt-2">
         <div
           className="h-full rounded-full bg-accent transition-all"
           style={{ width: `${planned === 0 ? 100 : Math.round((done / planned) * 100)}%` }}
         />
       </div>
-      <div className="mt-2 flex flex-wrap gap-1">
+      <SemanticStageList run={run} />
+      <div className="hidden" aria-hidden="true">
         {run.plannedCapabilities.map((capabilityId) => {
           const doneCap = run.completedCapabilities.includes(capabilityId);
           const failedCap = run.failedCapabilities.includes(capabilityId);
@@ -372,6 +384,68 @@ const RunProgressCard: React.FC<{ run: ResearchRunSummary }> = ({ run }) => {
           );
         })}
       </div>
+    </div>
+  );
+};
+
+type ResearchStageKey = 'market' | 'financials' | 'valuation' | 'events' | 'synthesis';
+type ResearchStageState = 'pending' | 'active' | 'done' | 'failed';
+
+const RESEARCH_STAGES: ReadonlyArray<{ key: ResearchStageKey }> = [
+  { key: 'market' },
+  { key: 'financials' },
+  { key: 'valuation' },
+  { key: 'events' },
+  { key: 'synthesis' },
+];
+
+function stageForCapability(capabilityId: string): ResearchStageKey {
+  if (capabilityId.startsWith('market.')) return 'market';
+  if (capabilityId === 'company.valuation') return 'valuation';
+  if (capabilityId.startsWith('company.')) return 'financials';
+  if (capabilityId.startsWith('research.')) return 'events';
+  return 'financials';
+}
+
+const SemanticStageList: React.FC<{ run: ResearchRunSummary }> = ({ run }) => {
+  const { t } = useTranslation();
+  const openStage = RESEARCH_STAGES.find((stage) => {
+    const capabilities = run.plannedCapabilities.filter(
+      (capabilityId) => stageForCapability(capabilityId) === stage.key
+    );
+    return capabilities.some(
+      (capabilityId) =>
+        !run.completedCapabilities.includes(capabilityId) &&
+        !run.failedCapabilities.includes(capabilityId)
+    );
+  })?.key;
+
+  const stateFor = (stage: ResearchStageKey): ResearchStageState => {
+    if (stage === 'synthesis' && run.status === 'synthesizing') return 'active';
+    const capabilities = run.plannedCapabilities.filter(
+      (capabilityId) => stageForCapability(capabilityId) === stage
+    );
+    if (capabilities.length > 0 && capabilities.every((capabilityId) => run.completedCapabilities.includes(capabilityId))) {
+      return 'done';
+    }
+    if (capabilities.some((capabilityId) => run.failedCapabilities.includes(capabilityId))) {
+      return 'failed';
+    }
+    return openStage === stage ? 'active' : 'pending';
+  };
+
+  return (
+    <div className="folio-pilot-stage-list" aria-label={t('research.stages.label')}>
+      {RESEARCH_STAGES.map((stage) => {
+        const state = stateFor(stage.key);
+        const marker = state === 'done' ? '✓' : state === 'failed' ? '!' : state === 'active' ? '•' : '·';
+        return (
+          <div key={stage.key} className={'folio-pilot-stage folio-pilot-stage--' + state}>
+            <span className="folio-pilot-stage-marker" aria-hidden="true">{marker}</span>
+            <span>{t('research.stages.' + stage.key)}</span>
+          </div>
+        );
+      })}
     </div>
   );
 };

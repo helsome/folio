@@ -74,17 +74,18 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({ candidate, onActio
   return (
     <div
       data-testid={`candidate-${candidate.symbol}`}
-      className="grid grid-cols-[minmax(0,1.6fr)_92px_92px_52px_auto] items-center gap-3 border-b border-border px-3 py-3 transition-colors last:border-b-0 hover:bg-surface-hover"
+      className="folio-pilot-row"
     >
       {/* Security */}
-      <div className="min-w-0">
-        <div className="flex items-baseline gap-2">
-          <span className="text-[13px] font-semibold text-foreground">{candidate.symbol}</span>
-          <span className="truncate text-[12px] text-foreground/48">{candidate.name}</span>
+      <div className="folio-pilot-identity">
+        <div className="folio-pilot-symbol-line">
+          <span className="folio-pilot-symbol">{candidate.symbol}</span>
+          <span className="folio-pilot-name">{candidate.name}</span>
         </div>
-        <div className="mt-1 flex flex-wrap items-center gap-1">
-          {candidate.reasons.slice(0, 2).map((reason) => (
-            <span key={reason} className="rounded-[5px] bg-foreground/5 px-1.5 py-0.5 text-[10px] text-foreground/56">
+        {candidate.reasons[0] && <div className="folio-pilot-reason">{candidate.reasons[0]}</div>}
+        <div className="folio-pilot-secondary">
+          {candidate.reasons.slice(1, 3).map((reason) => (
+            <span key={reason} className="folio-pilot-chip">
               {reason}
             </span>
           ))}
@@ -120,9 +121,9 @@ export const CandidateCard: React.FC<CandidateCardProps> = ({ candidate, onActio
       </div>
 
       {/* Action */}
-      <div className="flex shrink-0 items-center justify-end gap-1.5">
+      <div className="folio-pilot-action">
         <Button
-          variant="secondary"
+          variant="default"
           size="sm"
           onClick={() => onAction('research', candidate)}
           data-testid={`candidate-research-${candidate.symbol}`}
