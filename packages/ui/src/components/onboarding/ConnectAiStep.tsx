@@ -80,13 +80,13 @@ export const ConnectAiStep: React.FC = () => {
   const activeModel = state.model;
 
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
+    <div className="space-y-5">
+      <div className="space-y-1 border-b border-border pb-4">
         <h2 className="text-[18px] font-semibold text-foreground">{t('onboarding.connectAi.title')}</h2>
         <p className="text-[13px] text-foreground/66">{t('onboarding.connectAi.subtitle')}</p>
       </div>
 
-      <div className="rounded-[10px] border mac-section-divider p-3">
+      <div className="rounded-[8px] border border-border bg-surface-raised p-4">
         <div className="mb-2 flex items-center justify-between">
           <span className="text-[12px] font-semibold text-foreground">{t('onboarding.connectAi.model')}</span>
           {activeModel && (
@@ -103,12 +103,13 @@ export const ConnectAiStep: React.FC = () => {
         {providers.length === 0 ? (
           <div className="text-[12px] text-foreground/48">{t('onboarding.connectAi.loadingProviders')}</div>
         ) : (
-          providers.map((provider: ProviderStatus) => {
+          <div className="overflow-hidden rounded-[8px] border border-border bg-surface-raised">
+            {providers.map((provider: ProviderStatus) => {
             const id = provider.provider;
             const saving = busy[id] ?? false;
             const testResult = tests[id];
             return (
-              <div key={id} className="rounded-[10px] border mac-section-divider p-3">
+              <div key={id} className="border-b border-border p-3.5 last:border-b-0">
                 <div className="flex items-center justify-between">
                   <span className="text-[12px] font-medium text-foreground">
                     {provider.displayName || id}
@@ -141,7 +142,8 @@ export const ConnectAiStep: React.FC = () => {
                 )}
               </div>
             );
-          })
+            })}
+          </div>
         )}
       </div>
     </div>

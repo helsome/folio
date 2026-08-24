@@ -13,7 +13,8 @@
 // EvaluationStore record — authoritative persisted data, labeled as fixture
 // in the summary) to show the FAIL → View Trace → Evaluation Findings flow
 // deterministically. No production credentials are touched.
-import { execSync, spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
+import { reserveCdpPort, spawnElectron, waitForCdp } from './electron-harness.mjs';
 import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -25,13 +26,6 @@ const { chromium } = require('playwright-core');
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, '..');
 const repoRoot = join(here, '../../..');
-const electronMain = join(appRoot, 'src/main/index.ts');
-const electronBinary = join(
-  repoRoot,
-  'node_modules/.bun/electron@39.8.9/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'
-);
-const CDP_PORT = 9371;
-const CDP_URL = `http://127.0.0.1:${CDP_PORT}`;
 const userDataDir = join(appRoot, 'e2e/.user-data-trace-showcase');
 const outRoot = join(appRoot, 'e2e/artifacts/trace-showcase');
 
@@ -127,17 +121,6 @@ const SCENARIOS = [
 const SECRET_PATTERN =
   /(sk-[a-zA-Z0-9]{16,}|api[_-]?key|authorization|bearer\s+[a-zA-Z0-9]{10,}|LANGSMITH_API_KEY|client_secret|app_secret|access_token)/i;
 
-async function waitForCdp(t) {
-  const d = Date.now() + t;
-  while (Date.now() < d) {
-    try {
-      const r = await fetch(`${CDP_URL}/json/version`);
-      if (r.ok) return;
-    } catch {}
-    await new Promise((r) => setTimeout(r, 250));
-  }
-  throw new Error('cdp timeout');
-}
 async function waitForPage(ctx, t) {
   const d = Date.now() + t;
   while (Date.now() < d) {
@@ -289,10 +272,10 @@ async function main() {
     console.log('SUMMARY ONLY →', join(outRoot, 'summary.md'));
     return;
   }
-  try {
-    execSync(`pkill -f 'remote-debugging-port=${CDP_PORT}' || true`, { stdio: 'ignore' });
-  } catch {}
+  const cdpPort = await reserveCdpPort();
+  const cdpUrl = `http://127.0.0.1:${cdpPort}`;
   execSync('bun run build:preload', { cwd: appRoot, stdio: 'pipe' });
+  execSync('bun run build:main', { cwd: appRoot, stdio: 'pipe' });
   execSync('bunx vite build', { cwd: appRoot, stdio: 'pipe' });
   rmSync(userDataDir, { recursive: true, force: true });
   mkdirSync(userDataDir, { recursive: true });
@@ -301,28 +284,20 @@ async function main() {
   seedLocale(userDataDir, 'en-US');
   const seeded = seedEvalStore();
 
-  const proc = spawn(
-    electronBinary,
-    [electronMain, `--remote-debugging-port=${CDP_PORT}`, '--no-sandbox'],
-    {
-      cwd: repoRoot,
-      stdio: 'ignore',
-      env: {
-        ...process.env,
-        FINAGENT_AGENT_PROVIDER: 'local',
-        FINAGENT_FORCE_PROD_LOAD: '1',
-        FINAGENT_E2E: '1',
-        FINAGENT_E2E_HIDDEN: '1',
-        FINAGENT_USER_DATA_DIR: userDataDir,
-      },
-    }
-  );
+  const logPath = join(outRoot, 'electron.log');
+  const { proc, log } = spawnElectron({
+    appRoot,
+    repoRoot,
+    port: cdpPort,
+    userDataDir,
+    logPath,
+  });
 
   const results = [];
   let browser;
   try {
-    await waitForCdp(90_000);
-    browser = await chromium.connectOverCDP(CDP_URL, { timeout: 30_000 });
+    await waitForCdp({ url: cdpUrl, timeoutMs: 90_000, proc, logPath });
+    browser = await chromium.connectOverCDP(cdpUrl, { timeout: 30_000 });
     const page = await waitForPage(browser.contexts()[0], 30_000);
     await page.waitForLoadState('domcontentloaded');
     await page.locator('[data-testid="finance-workspace"]').waitFor({ timeout: 30_000 });
@@ -685,7 +660,8 @@ async function main() {
     }
   } finally {
     await browser?.close().catch(() => undefined);
-    proc.kill();
+    if (proc.exitCode == null && proc.signalCode == null) proc.kill();
+    log.end();
   }
 
   const correctPass = results.filter((r) => r.pass).length;

@@ -23,7 +23,7 @@ export const SkillList: React.FC<SkillListProps> = ({
   onToggle,
   onOpen,
 }) => (
-  <div className="space-y-2" data-testid="skill-list">
+  <div className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm" data-testid="skill-list">
     {skills.map((skill) => (
       <SkillRow
         key={skill.id}

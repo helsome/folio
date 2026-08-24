@@ -35,23 +35,24 @@ export const GeneralTab: React.FC = () => {
   };
 
   return (
-    <div className="max-w-2xl">
-      <div className="space-y-4">
-      <div className="mac-stock-tile rounded-[12px] p-5">
-        <h2 className="mb-4 text-[14px] font-semibold text-foreground">{t('settings.sections.application')}</h2>
-        <dl className="space-y-3">
+    <div className="max-w-3xl space-y-6">
+      <section className="overflow-hidden rounded-xl border border-border bg-surface shadow-sm">
+        <div className="border-b border-border px-5 py-4">
+          <h2 className="text-[15px] font-semibold text-foreground">{t('settings.sections.application')}</h2>
+        </div>
+        <dl className="divide-y divide-border">
           {rows.map((row) => (
-            <div key={row.label} className="flex items-center justify-between gap-4">
+            <div key={row.label} className="flex items-center justify-between gap-4 px-5 py-3.5">
               <dt className="text-[13px] text-foreground/54">{row.label}</dt>
               <dd className="text-right text-[13px] font-medium text-foreground">{row.value}</dd>
             </div>
           ))}
         </dl>
-      </div>
-      <div className="mac-stock-tile rounded-[12px] p-5">
+      </section>
+      <section className="overflow-hidden rounded-xl border border-border bg-surface p-5 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div><h2 className="text-[14px] font-semibold text-foreground">{t('settings.language')}</h2><p className="mt-1 text-[12px] text-foreground/48">{t('settings.languageDescription')}</p></div>
-          <div className="w-36">
+          <div className="w-40">
             <Select value={preference} onValueChange={(value) => void changeLanguagePreference(value as LocalePreference)}>
               <SelectTrigger aria-label={t('settings.language')}><SelectValue /></SelectTrigger>
               <SelectContent>
@@ -62,14 +63,13 @@ export const GeneralTab: React.FC = () => {
             </Select>
           </div>
         </div>
-      </div>
-      <div className="mac-stock-tile rounded-[12px] p-5">
+      </section>
+      <section className="rounded-xl border border-border bg-surface p-5 shadow-sm">
         <div className="flex items-center justify-between gap-4">
           <div><h2 className="text-[14px] font-semibold text-foreground">{t('settings.theme')}</h2><p className="mt-1 text-[12px] text-foreground/48">{t('settings.themeDescription')}</p></div>
-          <div className="w-36"><Select value={mode} onValueChange={(value) => setMode(value as ThemeMode)}><SelectTrigger aria-label={t('settings.theme')}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="light">{t('settings.themeLight')}</SelectItem><SelectItem value="dark">{t('settings.themeDark')}</SelectItem><SelectItem value="system">{t('settings.themeSystem')}</SelectItem></SelectContent></Select></div>
+          <div className="w-40"><Select value={mode} onValueChange={(value) => setMode(value as ThemeMode)}><SelectTrigger aria-label={t('settings.theme')}><SelectValue /></SelectTrigger><SelectContent><SelectItem value="light">{t('settings.themeLight')}</SelectItem><SelectItem value="dark">{t('settings.themeDark')}</SelectItem><SelectItem value="system">{t('settings.themeSystem')}</SelectItem></SelectContent></Select></div>
         </div>
-      </div>
-      </div>
+      </section>
     </div>
   );
 };

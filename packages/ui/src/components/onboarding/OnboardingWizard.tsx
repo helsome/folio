@@ -80,22 +80,30 @@ export const OnboardingWizard: React.FC<{ onComplete: () => void }> = ({ onCompl
 
   return (
     <div
-      className="flex h-full flex-col"
+      className="flex h-full flex-col bg-surface"
       role="dialog"
       aria-label={t('onboarding.setupAria')}
       data-testid="onboarding-wizard"
     >
-      <header className="flex items-center justify-between border-b mac-section-divider px-6 py-4">
-        <div className="flex items-center gap-3">
-          <span className="text-[15px] font-semibold text-foreground">{t('onboarding.setupTitle')}</span>
-          <span className="rounded-full border mac-section-divider px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/48">
-            {t('onboarding.stepPrefix', { index: index + 1, total: steps.length })}
-          </span>
+      <header className="border-b border-border bg-surface-raised px-6 py-4">
+        <div className="flex items-center justify-between gap-4">
+          <div className="flex min-w-0 items-center gap-3">
+            <span className="truncate text-[15px] font-semibold text-foreground">{t('onboarding.setupTitle')}</span>
+            <span className="shrink-0 rounded-[5px] border border-border bg-background px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-foreground/48">
+              {t('onboarding.stepPrefix', { index: index + 1, total: steps.length })}
+            </span>
+          </div>
+          <span className="shrink-0 text-[12px] text-foreground/48">{t(STEP_SHORT_KEY[current])}</span>
         </div>
-        <span className="text-[12px] text-foreground/48">{t(STEP_SHORT_KEY[current])}</span>
+        <div className="mt-4 h-1 overflow-hidden rounded-full bg-foreground/8" aria-hidden="true">
+          <div
+            className="h-full rounded-full bg-accent transition-all"
+            style={{ width: `${((index + 1) / steps.length) * 100}%` }}
+          />
+        </div>
       </header>
 
-      <div className="flex-1 overflow-y-auto px-6 py-5">
+      <div className="flex-1 overflow-y-auto bg-background px-6 py-5">
         {current === 'welcome' && <WelcomeStep />}
         {current === 'connect-ai' && <ConnectAiStep />}
         {current === 'connect-data' && (
@@ -118,7 +126,7 @@ export const OnboardingWizard: React.FC<{ onComplete: () => void }> = ({ onCompl
         {current === 'environment' && <EnvironmentStep report={report} loading={healthLoading} />}
       </div>
 
-      <footer className="flex items-center justify-between border-t mac-section-divider px-6 py-4">
+      <footer className="flex items-center justify-between border-t border-border bg-surface-raised px-6 py-4">
         <Button variant="ghost" size="sm" onClick={finish} data-testid="onboarding-skip">
           {t('onboarding.skip')}
         </Button>

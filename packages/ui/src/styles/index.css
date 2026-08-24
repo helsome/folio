@@ -2,6 +2,12 @@
 
 /* CRAFT AGENT THEME - Apple/macOS 6 Color System */
 :root {
+  /* Keep the package stylesheet aligned with the Electron renderer. */
+  --font-global-stack: "SF Mono", "JetBrains Mono", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", ui-monospace, monospace;
+  --font-sans-stack: var(--font-global-stack);
+  --font-display-stack: var(--font-global-stack);
+  --font-numeric-stack: var(--font-global-stack);
+
   /* === 6 BASE COLORS === */
   --background: oklch(0.985 0.002 260);
   --background-elevated: color-mix(in srgb, var(--foreground) 1.5%, var(--background));
@@ -138,6 +144,8 @@
 
 /* Theme integration via @theme inline */
 @theme inline {
+  --font-sans: var(--font-global-stack);
+  --font-mono: var(--font-global-stack);
   --color-background: var(--background);
   --color-foreground: var(--foreground);
   --color-accent: var(--accent);
@@ -155,7 +163,7 @@
 
 body {
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', 'SF Pro Text', 'Helvetica Neue', Helvetica, Arial, sans-serif;
+  font-family: var(--font-global-stack);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
   text-rendering: geometricPrecision;

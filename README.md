@@ -40,8 +40,17 @@ Folio 本地优先：会话、凭证与研究状态默认保存在设备本地�
 </p>
 
 <p align="center">
-  <img src="docs/screenshots/discover.png" alt="Folio Discover 筛选器" width="49%" />
   <img src="docs/screenshots/workspace.png" alt="Folio 证券工作区" width="49%" />
+  <img src="docs/screenshots/settings.png" alt="Folio 设置中心" width="49%" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/evaluation.png" alt="Folio Agent 评测设置" width="49%" />
+  <img src="docs/screenshots/skills.png" alt="Folio 技能中心" width="49%" />
+</p>
+
+<p align="center">
+  <em>从安静的研究工作区，到技能状态、评测追踪与实验配置，Folio 把 Agent 工程能力放进同一个桌面工作流。</em>
 </p>
 
 ## 核心功能
@@ -66,6 +75,14 @@ Folio 本地优先：会话、凭证与研究状态默认保存在设备本地�
 - 模型与思考级别控制、停止/取消、工作区上下文，以及结构化的行情/投资组合卡片。
 - Markdown 回答支持标题、列表、表格、链接与代码块。
 - 内部综合会话不会出现在可见的对话历史中。
+
+### Agent 评测与可观测性
+
+- 内置 Evaluation Center：查看实验、基线、模型对比、失败模式、案例详情与人工反馈。
+- 评测覆盖任务完成、工具选择与参数、证据/来源、时延、失败恢复、研究完整性与决策可用性。
+- 支持本地离线评测与可选 LangSmith 追踪；追踪默认关闭，隐私级别与 API 密钥在设置中单独管理。
+- `folio-agent-v1` 基准集包含 86 个黄金路径、困难、长尾、工具失败、回归与对抗案例；固定 bug 会沉淀为回归门槛。
+- PR 使用零成本、确定性的 smoke eval，完整 benchmark 与模型/策略实验按需或定时运行。
 
 ### 技能与能力层
 
@@ -115,6 +132,7 @@ Longbridge / Massive 提供商
 - **Agent 运行时：** 为已配置的 LLM 提供商提供 Pi 运行时，另有用于开发与离线黄金路径的确定性本地提供商。
 - **桌面端：** Electron，含 macOS arm64 打包构建。渲染进程、预加载桥与主进程内核通过上下文隔离与白名单化 IPC 接口面分离。
 - **技能：** 内置 `SKILL.md` 资源，含引用、启用/禁用状态、触发器与能力要求。
+- **Agent 评测：** 通过本地 Evaluation Backend 或 LangSmith 记录 trace、dataset、evaluator、experiment 与 regression gate；工程指标与投资结果保持可链接但不宣称因果关系。
 
 ## 快速开始
 
@@ -158,6 +176,8 @@ FINAGENT_AGENT_PROVIDER=local bun run dev
 | `bun run typecheck` | 对所有工作区包执行类型检查 |
 | `bun run build` | 构建包、渲染进程、预加载与主进程 |
 | `bun run test:e2e` | 运行 Electron 黄金路径 E2E 套件 |
+| `bun run eval:smoke` | 运行 PR 级确定性 Agent 回归评测 |
+| `bun run eval:full` | 运行完整 Agent benchmark 与实验流程 |
 | `bun run release:check` | 运行发布门槛检查 |
 | `bun run release:package` | 构建 macOS arm64 应用、DMG 与 SHA256 校验和 |
 
@@ -170,11 +190,14 @@ FINAGENT_AGENT_PROVIDER=local bun run dev
 - Longbridge 命令使用 argv 安全执行、标的校验与只读能力注册。
 - 技能资源路径安全：拒绝路径穿越与符号链接逃逸。
 - 研究报告区分“数据不可用”与“负面证据”，绝不编造缺失的数字。
+- Agent 追踪默认关闭；标准隐私级别会脱敏 prompt、答案、参数与组合工具结果，完整追踪必须显式启用。
 - 未签名的本地构建可能触发 macOS 安全提示；签名与公证是发布阶段的可选步骤。
 
 ## 项目状态
 
 Folio 处于测试版（beta）。当前仓库包含 V5 研究、发现、监控、结果与自适应校准相关功能面，以及 V6 安静工作区视觉系统。
+
+Agent 工程评测（V7）已接入设置与评测中心：支持 LangSmith 连接、隐私控制、基准实验、失败模式分析、案例级 trace 与人工反馈。
 
 - 单元与集成测试：**912 项通过**
 - 类型检查：**通过**
@@ -206,6 +229,7 @@ Folio 处于测试版（beta）。当前仓库包含 V5 研究、发现、监控
 - [`docs/longbridge-auth.zh-CN.md`](docs/longbridge-auth.zh-CN.md) — Longbridge 认证 · [English](docs/longbridge-auth.md)
 - [`docs/longbridge-skill-setup.zh-CN.md`](docs/longbridge-skill-setup.zh-CN.md) — 技能安装与能力覆盖 · [English](docs/longbridge-skill-setup.md)
 - [`docs/release-gates.zh-CN.md`](docs/release-gates.zh-CN.md) — 发布验证清单 · [English](docs/release-gates.md)
+- [`docs/EVALUATION.md`](docs/EVALUATION.md) — Agent 评测、LangSmith 可观测性与实验架构 · [CI 策略](docs/EVALUATION-CI.md) · [基准集](docs/EVALUATION-BENCHMARK.md)
 
 ## 参与贡献
 

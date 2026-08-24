@@ -14,28 +14,33 @@ export const ThesisImpactList: React.FC<{ impacts: ThesisImpact[] }> = ({ impact
   const { t } = useTranslation();
   if (impacts.length === 0) {
     return (
-      <div className="py-6 text-center text-[13px] text-foreground/44">{t('thesis.impact.noneYet')}</div>
+      <div className="rounded-[10px] border border-dashed border-[#dfe5ed] bg-white px-4 py-7 text-center text-[12px] text-foreground/44">
+        {t('thesis.impact.noneYet')}
+      </div>
     );
   }
 
   return (
-    <div className="space-y-2">
+    <div className="overflow-hidden rounded-[10px] border border-[#dfe5ed] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
       {impacts.map((impact) => {
         const badge = KIND_BADGE[impact.kind];
         return (
-          <div key={impact.id} className="rounded-[10px] border border-foreground/8 p-3">
-            <div className="flex items-center gap-2">
+          <div
+            key={impact.id}
+            className="border-b border-[#edf0f4] px-3 py-3 transition-smooth last:border-b-0 hover:bg-[#f8fbff]"
+          >
+            <div className="flex flex-wrap items-center gap-2">
               <span
-                className="text-[10px] font-semibold uppercase tracking-wide"
+                className="inline-flex items-center rounded-[5px] border border-[#dfe5ed] bg-[#f7f9fc] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em]"
                 style={{ color: badge.color }}
               >
                 {t(`thesis.impact.${impact.kind}`)}
               </span>
-              <span className="text-[11px] text-foreground/44">
+              <span className="font-mono text-[10px] tabular-nums text-[#8792a3]">
                 {new Date(impact.evaluatedAt).toLocaleDateString()}
               </span>
             </div>
-            <p className="mt-1 text-[12px] leading-relaxed text-foreground/70">{impact.summary}</p>
+            <p className="mt-2 text-[12px] leading-5 text-foreground/70">{impact.summary}</p>
           </div>
         );
       })}

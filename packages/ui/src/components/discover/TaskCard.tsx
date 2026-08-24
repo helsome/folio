@@ -14,7 +14,7 @@ interface TaskCardProps {
 export const TaskCard: React.FC<TaskCardProps> = ({ task, running, disabled, onRun }) => {
   const { t } = useTranslation()
   return (
-    <div className="flex items-start justify-between gap-3 rounded-[10px] border border-border bg-surface p-3 transition-colors hover:border-border-strong hover:bg-surface-hover">
+    <div className="folio-discover-task flex items-start justify-between gap-3 rounded-[10px] border border-border bg-surface p-3 transition-colors hover:border-border-strong hover:bg-surface-hover">
       <div className="min-w-0">
         <div className="text-[13px] font-semibold text-foreground">{t(`discover.strategy.${task.id}.title`)}</div>
         <div className="mt-0.5 text-[12px] leading-snug text-foreground/54">{t(`discover.strategy.${task.id}.description`)}</div>

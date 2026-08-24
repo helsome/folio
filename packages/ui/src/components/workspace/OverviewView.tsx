@@ -30,8 +30,8 @@ interface BlockProps {
 }
 
 const Block: React.FC<BlockProps> = ({ title, children }) => (
-  <section className="mac-stock-tile rounded-[12px] p-4">
-    <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
+  <section className="rounded-[14px] border border-[var(--mac-border)] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
+    <h3 className="mb-3 text-[10px] font-semibold uppercase tracking-[0.11em] text-foreground/48">
       {title}
     </h3>
     {children}
@@ -46,10 +46,10 @@ interface MetricProps {
 }
 
 const Metric: React.FC<MetricProps> = ({ label, value, color, mono = true }) => (
-  <div className="flex items-center justify-between gap-3 py-1">
+  <div className="flex min-h-8 items-center justify-between gap-3 border-b border-[var(--mac-border)]/70 py-1 last:border-b-0">
     <span className="text-[12px] text-foreground/54">{label}</span>
     <span
-      className={`text-[13px] font-medium text-foreground ${mono ? 'tabular-nums' : ''}`}
+      className={`text-right text-[13px] font-medium text-foreground ${mono ? 'tabular-nums' : ''}`}
       style={color ? { color } : undefined}
     >
       {value}

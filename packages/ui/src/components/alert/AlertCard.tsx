@@ -2,6 +2,17 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AlertRule, AlertRuleType } from '@finagent/core';
 import { formatCurrency } from '@finagent/i18n';
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  CalendarDays,
+  Coins,
+  Newspaper,
+  Scale,
+  ShieldAlert,
+  Star,
+  type LucideIcon,
+} from 'lucide-react';
 
 interface AlertCardProps {
   rule: AlertRule;
@@ -9,15 +20,15 @@ interface AlertCardProps {
   onRemove?: () => void;
 }
 
-const ALERT_TYPE_ICONS: Record<AlertRuleType, string> = {
-  price_above: '📈',
-  price_below: '📉',
-  new_news: '📰',
-  earnings: '📅',
-  rating_change: '⭐',
-  dividend: '💰',
-  position_weight: '⚖️',
-  portfolio_drawdown: '🛡️',
+export const ALERT_TYPE_ICONS: Record<AlertRuleType, LucideIcon> = {
+  price_above: ArrowUpRight,
+  price_below: ArrowDownRight,
+  new_news: Newspaper,
+  earnings: CalendarDays,
+  rating_change: Star,
+  dividend: Coins,
+  position_weight: Scale,
+  portfolio_drawdown: ShieldAlert,
 };
 
 /** Alert type id → translation key (ids are never translated). */
@@ -64,54 +75,68 @@ function summary(rule: AlertRule, t: TFunc): string {
 export const AlertCard: React.FC<AlertCardProps> = ({ rule, onToggle, onRemove }) => {
   const { t } = useTranslation();
   const displaySymbol = rule.type === 'portfolio_drawdown' ? t('portfolio.title') : rule.symbol;
+  const Icon = ALERT_TYPE_ICONS[rule.type];
 
   return (
     <div
-      className={`p-3 rounded-lg border transition-all ${
+      className={`rounded-[10px] border bg-surface-raised p-3.5 transition-colors ${
         rule.enabled
-          ? 'bg-[oklch(var(--bg-secondary))] border-[oklch(var(--bg-primary))]'
-          : 'bg-[oklch(var(--bg-secondary))]/50 border-[oklch(var(--bg-primary))] opacity-60'
+          ? 'border-border'
+          : 'border-border/70 bg-surface-muted/55'
       }`}
     >
-      <div className="flex items-start justify-between">
-        <div className="flex items-center gap-2">
-          <span className="text-lg">{ALERT_TYPE_ICONS[rule.type]}</span>
+      <div className="flex items-start justify-between gap-3">
+        <div className="flex min-w-0 items-start gap-3">
+          <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[8px] bg-accent/10 text-accent">
+            <Icon className="h-4 w-4" aria-hidden="true" />
+          </span>
           <div>
-            <div className="font-semibold text-[oklch(var(--text-primary))]">{displaySymbol}</div>
-            <div className="text-sm text-[oklch(var(--text-secondary))]">
-              {t(ALERT_TYPE_KEYS[rule.type])}: {summary(rule, t)}
+            <div className="flex flex-wrap items-center gap-x-2 gap-y-1">
+              <div className="font-semibold text-foreground">{displaySymbol}</div>
+              <span
+                className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${
+                  rule.enabled ? 'bg-positive/10 text-positive' : 'bg-foreground/7 text-foreground/48'
+                }`}
+              >
+                {rule.enabled ? t('alerts.status.active') : t('alerts.status.paused')}
+              </span>
+            </div>
+            <div className="mt-1 text-[12px] text-foreground/58">
+              <span className="font-medium text-foreground/72">{t(ALERT_TYPE_KEYS[rule.type])}</span>
+              <span className="mx-1.5 text-foreground/28">·</span>
+              {summary(rule, t)}
             </div>
           </div>
         </div>
 
-        <div className="flex items-center gap-2">
+        <div className="flex shrink-0 items-center gap-1.5">
           <button
             onClick={onToggle}
             aria-label={rule.enabled ? t('alerts.disableAlert') : t('alerts.enableAlert')}
-            className={`w-10 h-5 rounded-full transition-colors ${
-              rule.enabled ? 'bg-[oklch(var(--accent-primary))]' : 'bg-gray-600'
+            className={`h-5 w-9 rounded-full transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring ${
+              rule.enabled ? 'bg-primary' : 'bg-foreground/15'
             }`}
           >
             <div
-              className={`w-4 h-4 rounded-full bg-white transition-transform ${
-                rule.enabled ? 'translate-x-5' : 'translate-x-0.5'
+              className={`block h-4 w-4 rounded-full bg-white transition-transform ${
+                rule.enabled ? 'translate-x-[18px]' : 'translate-x-0.5'
               }`}
             />
           </button>
           <button
             onClick={onRemove}
             aria-label={t('alerts.removeAlert')}
-            className="text-[oklch(var(--text-secondary))] hover:text-red-500 transition-colors"
+            className="flex h-7 w-7 items-center justify-center rounded-[7px] text-lg leading-none text-foreground/35 transition-colors hover:bg-negative/10 hover:text-negative focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
           >
-            ×
+            <span aria-hidden="true">×</span>
           </button>
         </div>
       </div>
 
-      <div className="mt-2 text-xs text-[oklch(var(--text-secondary))]">
-        {t('alerts.created', { date: new Date(rule.createdAt).toLocaleDateString() })}
+      <div className="mt-3 flex flex-wrap gap-x-3 gap-y-1 border-t border-border/70 pt-2.5 text-[11px] text-foreground/42">
+        <span>{t('alerts.created', { date: new Date(rule.createdAt).toLocaleDateString() })}</span>
         {rule.lastTriggeredAt && (
-          <span className="ml-2">
+          <span>
             {t('alerts.lastTriggered', { date: new Date(rule.lastTriggeredAt).toLocaleString() })}
           </span>
         )}

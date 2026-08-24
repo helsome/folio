@@ -21,38 +21,38 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({ view }) => {
   const pnlColor = isPositive ? 'text-[var(--mac-green)]' : 'text-[var(--mac-red)]';
 
   return (
-    <div className="mac-stock-tile rounded-[14px] p-4">
-      <div className="flex justify-between items-start">
+    <div className="rounded-[16px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+      <div className="flex items-start justify-between gap-5">
         <div>
-          <div className="text-[13px] text-foreground/54">{t('portfolio.totalValue')}</div>
-          <div className="text-3xl font-semibold tracking-tight text-foreground">
+          <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-foreground/48">{t('portfolio.totalValue')}</div>
+          <div className="mt-2 text-[34px] font-semibold leading-none tracking-[-0.05em] tabular-nums text-foreground">
             {formatCurrency(view.totalAssets, view.baseCurrency)}
           </div>
         </div>
-        <div className="text-right">
-          <div className={`text-lg font-semibold ${pnlColor}`}>
+        <div className="flex flex-col items-end gap-1 text-right">
+          <div className={`rounded-full px-2.5 py-1 text-[12px] font-semibold tabular-nums ${isPositive ? 'bg-[var(--mac-green)]/10' : 'bg-[var(--mac-red)]/10'} ${pnlColor}`}>
             {formatSignedCurrency(view.totalPnL, view.baseCurrency)}
           </div>
-          <div className={`text-sm ${pnlColor}`}>{formatPercent(pnlPercent)}</div>
+          <div className={`text-[12px] tabular-nums ${pnlColor}`}>{formatPercent(pnlPercent)}</div>
         </div>
       </div>
 
-      <div className="mt-4 flex justify-between text-sm">
-        <div>
+      <div className="mt-5 grid grid-cols-1 gap-3 border-t border-[var(--mac-border)] pt-4 sm:grid-cols-3">
+        <div className="flex flex-col gap-1">
           <span className="text-foreground/54">{t('portfolio.cash')}: </span>
-          <span className="font-medium text-foreground">
+          <span className="text-[13px] font-medium tabular-nums text-foreground">
             {formatCurrency(view.cash, view.baseCurrency)}
           </span>
         </div>
-        <div>
+        <div className="flex flex-col gap-1 sm:border-l sm:border-[var(--mac-border)] sm:pl-3">
           <span className="text-foreground/54">{t('portfolio.today')}: </span>
-          <span className={`font-medium ${pnlColor}`}>
+          <span className={`text-[13px] font-medium tabular-nums ${pnlColor}`}>
             {formatSignedCurrency(view.todayPnL, view.baseCurrency)}
           </span>
         </div>
-        <div>
+        <div className="flex flex-col gap-1 sm:border-l sm:border-[var(--mac-border)] sm:pl-3">
           <span className="text-foreground/54">{t('portfolio.positions')}: </span>
-          <span className="font-medium text-foreground">{view.holdings.length}</span>
+          <span className="text-[13px] font-medium tabular-nums text-foreground">{view.holdings.length}</span>
         </div>
       </div>
     </div>

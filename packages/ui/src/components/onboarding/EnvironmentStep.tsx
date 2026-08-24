@@ -14,7 +14,7 @@ const ItemRow: React.FC<{ label: string; item: HealthCheckItem; t: (key: string)
   item,
   t,
 }) => (
-  <div className="flex items-center justify-between gap-4 rounded-[10px] border mac-section-divider px-3 py-2">
+  <div className="flex items-center justify-between gap-4 border-b border-border px-3 py-2.5 last:border-b-0">
     <span className="text-[13px] font-medium text-foreground">{label}</span>
     <span className="flex items-center gap-2 text-[12px]">
       {item.ok ? (
@@ -38,8 +38,8 @@ export const EnvironmentStep: React.FC<{
 }> = ({ report, loading }) => {
   const { t } = useTranslation();
   return (
-    <div className="space-y-4">
-      <div className="space-y-1">
+    <div className="space-y-5">
+      <div className="space-y-1 border-b border-border pb-4">
         <h2 className="text-[18px] font-semibold text-foreground">{t('onboarding.environment.title')}</h2>
         <p className="text-[13px] text-foreground/66">{t('onboarding.environment.subtitle')}</p>
       </div>
@@ -47,13 +47,13 @@ export const EnvironmentStep: React.FC<{
       {loading ? (
         <div className="text-[12px] text-foreground/48">{t('onboarding.environment.checking')}</div>
       ) : report ? (
-        <div className="space-y-2">
+        <div className="overflow-hidden rounded-[8px] border border-border bg-surface-raised">
           {ITEMS.map(({ key, labelKey }) => (
             <ItemRow key={key} label={t(labelKey)} item={report[key]} t={t} />
           ))}
         </div>
       ) : (
-        <div className="rounded-[10px] border mac-section-divider p-4 text-[12px] text-foreground/48">
+        <div className="rounded-[8px] border border-border bg-surface-raised p-4 text-[12px] text-foreground/48">
           {t('onboarding.environment.notAvailable')}
         </div>
       )}

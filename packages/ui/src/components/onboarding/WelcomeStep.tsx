@@ -34,8 +34,8 @@ export const WelcomeStep: React.FC = () => {
   const accept = useSetAtom(acceptDisclaimersAtom);
 
   return (
-    <div className="space-y-4">
-      <div className="flex items-start justify-between gap-4">
+    <div className="space-y-5">
+      <div className="flex items-start justify-between gap-4 border-b border-border pb-4">
         <div className="min-w-0 space-y-1">
           <h2 className="text-[18px] font-semibold text-foreground">{t('onboarding.welcome.title')}</h2>
           <p className="text-[13px] text-foreground/66">{t('onboarding.welcome.subtitle')}</p>
@@ -57,11 +57,11 @@ export const WelcomeStep: React.FC = () => {
         </div>
       </div>
 
-      <div className="space-y-2">
+      <div className="overflow-hidden rounded-[8px] border border-border bg-surface-raised">
         {DISCLAIMERS.map((disclaimer) => {
           const keys = DISCLAIMER_KEYS[disclaimer.id];
           return (
-            <div key={disclaimer.id} className="rounded-[10px] border mac-section-divider p-3">
+            <div key={disclaimer.id} className="border-b border-border p-3 last:border-b-0">
               <div className="text-[12px] font-semibold text-foreground">{t(keys.titleKey)}</div>
               <p className="mt-1 text-[12px] leading-relaxed text-foreground/60">{t(keys.bodyKey)}</p>
             </div>
@@ -69,7 +69,7 @@ export const WelcomeStep: React.FC = () => {
         })}
       </div>
 
-      <label className="flex items-center gap-2 rounded-[10px] border mac-section-divider p-3">
+      <label className="flex items-center gap-2 rounded-[8px] border border-border bg-surface-raised p-3">
         <input
           type="checkbox"
           checked={accepted}

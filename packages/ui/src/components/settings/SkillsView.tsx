@@ -78,34 +78,32 @@ export const SkillsView: React.FC = () => {
   );
 
   return (
-    <div className="max-w-3xl">
-      <div className="space-y-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <div className="relative min-w-0 flex-1">
-            <svg
-              width="14"
-              height="14"
-              viewBox="0 0 16 16"
-              fill="none"
-              aria-hidden="true"
-              className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/40"
-            >
-              <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4" />
-              <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
-            </svg>
-            <input
-              type="search"
-              value={query}
-              onChange={(event) => setQuery(event.target.value)}
-              placeholder={t('settings.skills.searchPlaceholder')}
-              aria-label={t('settings.skills.searchAria')}
-              data-testid="skills-search"
-              className="w-full rounded-[8px] border border-[var(--mac-border)] bg-background/60 py-1.5 pl-8 pr-3 text-[13px] text-foreground placeholder:text-foreground/40 transition-smooth hover:border-[var(--mac-border-strong)] focus:border-[var(--mac-blue)] focus:outline-none"
-            />
-          </div>
+    <div className="max-w-4xl">
+      <div className="rounded-xl border border-border bg-surface p-4 shadow-sm">
+        <div className="relative min-w-0">
+          <svg
+            width="14"
+            height="14"
+            viewBox="0 0 16 16"
+            fill="none"
+            aria-hidden="true"
+            className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-foreground/40"
+          >
+            <circle cx="7" cy="7" r="4.5" stroke="currentColor" strokeWidth="1.4" />
+            <path d="M10.5 10.5 14 14" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" />
+          </svg>
+          <input
+            type="search"
+            value={query}
+            onChange={(event) => setQuery(event.target.value)}
+            placeholder={t('settings.skills.searchPlaceholder')}
+            aria-label={t('settings.skills.searchAria')}
+            data-testid="skills-search"
+            className="h-9 w-full rounded-[8px] border border-input bg-background pl-8 pr-3 text-[13px] text-foreground placeholder:text-foreground/40 transition-smooth hover:border-border-strong focus:border-accent focus:outline-none focus:ring-2 focus:ring-ring"
+          />
         </div>
 
-        <div role="group" aria-label={t('settings.skills.filterGroupAria')} className="flex flex-wrap gap-1.5">
+        <div role="group" aria-label={t('settings.skills.filterGroupAria')} className="mt-3 flex flex-wrap gap-1.5 border-t border-border pt-3">
           {SKILL_STATUS_FILTERS.map((filter) => {
             const active = status === filter.value;
             return (
@@ -115,10 +113,10 @@ export const SkillsView: React.FC = () => {
                 aria-pressed={active}
                 data-testid={`skills-filter-${filter.value}`}
                 onClick={() => setStatus(filter.value)}
-                className={`rounded-full border px-3 py-1 text-[12px] font-medium transition-smooth focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)] ${
+                className={`rounded-full border px-3 py-1 text-[12px] font-medium transition-smooth focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent ${
                   active
-                    ? 'border-transparent bg-[var(--mac-blue)] text-white'
-                    : 'border-[var(--mac-border)] text-foreground/64 hover:border-[var(--mac-border-strong)] hover:text-foreground active:scale-95'
+                    ? 'border-accent bg-accent text-white'
+                    : 'border-border text-foreground/64 hover:border-border-strong hover:bg-surface-hover hover:text-foreground active:scale-95'
                 }`}
               >
                 {t(SKILL_FILTER_LABEL_KEY[filter.value])}
@@ -128,26 +126,26 @@ export const SkillsView: React.FC = () => {
         </div>
       </div>
 
-      <div className="mt-4">
+      <div className="mt-5">
         {loading ? (
-          <div className="py-10 text-center text-[13px] text-foreground/48">{t('settings.skills.loading')}</div>
+          <div className="rounded-xl border border-border bg-surface py-12 text-center text-[13px] text-foreground/48">{t('settings.skills.loading')}</div>
         ) : error ? (
-          <div className="py-10 text-center">
+          <div className="rounded-xl border border-border bg-surface py-12 text-center">
             <div role="alert" className="text-[13px] text-destructive">
               {error}
             </div>
             <button
               type="button"
               onClick={() => void loadSkills()}
-              className="mt-3 rounded-[8px] border border-[var(--mac-border)] px-3 py-1.5 text-[12px] font-medium text-foreground/72 transition-smooth hover:border-[var(--mac-border-strong)] hover:text-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mac-blue)]"
+              className="mt-3 rounded-[8px] border border-input px-3 py-1.5 text-[12px] font-medium text-foreground/72 transition-smooth hover:bg-surface-hover hover:text-foreground active:scale-95 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-accent"
             >
               {t('settings.skills.retry')}
             </button>
           </div>
         ) : skills.length === 0 ? (
-          <div className="py-10 text-center text-[13px] text-foreground/48">{t('settings.skills.noneInstalled')}</div>
+          <div className="rounded-xl border border-border bg-surface py-12 text-center text-[13px] text-foreground/48">{t('settings.skills.noneInstalled')}</div>
         ) : filtered.length === 0 ? (
-          <div className="py-10 text-center text-[13px] text-foreground/48">
+          <div className="rounded-xl border border-border bg-surface py-12 text-center text-[13px] text-foreground/48">
             {t('settings.skills.noMatch')}
           </div>
         ) : (

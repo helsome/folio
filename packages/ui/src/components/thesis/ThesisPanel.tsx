@@ -38,31 +38,47 @@ const ThesisCard: React.FC<ThesisCardProps> = ({ thesis, onReEvaluate, onEdit })
   const { t } = useTranslation();
   const badge = STANCE_BADGE[thesis.stance];
   return (
-    <div className="rounded-[10px] border border-foreground/8 p-3" data-testid="thesis-card">
+    <div
+      className="rounded-[12px] border border-[#dfe5ed] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]"
+      data-testid="thesis-card"
+    >
       <div className="flex items-center justify-between gap-2">
-        <span className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: badge.color }}>
+        <span
+          className="inline-flex items-center rounded-[5px] border border-[#dfe5ed] bg-[#f7f9fc] px-1.5 py-0.5 text-[9.5px] font-semibold uppercase tracking-[0.08em]"
+          style={{ color: badge.color }}
+        >
           {t(`thesis.stance.${thesis.stance}`)}
         </span>
         <div className="flex items-center gap-1">
-          <Button variant="ghost" size="sm" onClick={onEdit}>
+          <Button
+            variant="ghost"
+            size="sm"
+            onClick={onEdit}
+            className="text-[11px] text-[#68778c] hover:bg-[#f4f7fc] hover:text-foreground"
+          >
             {t('common.edit')}
           </Button>
-          <Button variant="outline" size="sm" onClick={onReEvaluate}>
+          <Button
+            variant="outline"
+            size="sm"
+            onClick={onReEvaluate}
+            className="border-[#d8e0eb] text-[11px] text-foreground/75 hover:border-[#a9bce1] hover:bg-[#f4f7fc]"
+          >
             {t('thesis.reEvaluate')}
           </Button>
         </div>
       </div>
 
-      <p className="mt-2 text-[13px] leading-relaxed text-foreground">{thesis.summary}</p>
+      <p className="mt-3 text-[13px] leading-6 text-foreground">{thesis.summary}</p>
 
-      <div className="mt-3 grid grid-cols-2 gap-2">
+      <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <PointList title={t('thesis.bull')} points={thesis.bullCase} tone="#22c55e" />
         <PointList title={t('thesis.bear')} points={thesis.bearCase} tone="#ef4444" />
         <PointList title={t('thesis.catalysts')} points={thesis.catalysts} tone="#3b82f6" />
         <PointList title={t('thesis.risks')} points={thesis.risks} tone="#f59e0b" />
       </div>
 
-      <div className="mt-3 text-[11px] text-foreground/44">
+      <div className="mt-4 border-t border-[#edf0f4] pt-2.5 text-[10px] tabular-nums text-[#8792a3]">
         {t('thesis.lastReviewed', { date: new Date(thesis.lastReviewedAt).toLocaleDateString() })}
       </div>
     </div>
@@ -70,16 +86,16 @@ const ThesisCard: React.FC<ThesisCardProps> = ({ thesis, onReEvaluate, onEdit })
 };
 
 const PointList: React.FC<{ title: string; points: string[]; tone: string }> = ({ title, points, tone }) => (
-  <div>
-    <div className="text-[10px] font-semibold uppercase tracking-wide" style={{ color: tone }}>
+  <div className="border-l-2 pl-2.5" style={{ borderLeftColor: tone }}>
+    <div className="text-[10px] font-semibold uppercase tracking-[0.08em]" style={{ color: tone }}>
       {title}
     </div>
     {points.length === 0 ? (
       <div className="mt-0.5 text-[12px] text-foreground/38">—</div>
     ) : (
-      <ul className="mt-0.5 list-inside list-disc space-y-0.5">
+      <ul className="mt-1 list-inside list-disc space-y-0.5">
         {points.map((point, index) => (
-          <li key={index} className="text-[12px] text-foreground/70">
+          <li key={index} className="text-[12px] leading-5 text-foreground/70">
             {point}
           </li>
         ))}
@@ -122,11 +138,15 @@ export const ThesisPanel: React.FC = () => {
 
   if (!symbol) {
     return (
-      <div data-testid="thesis-panel" className="flex h-full items-center justify-center p-4">
-        <div className="mx-auto w-full max-w-sm rounded-[12px] border border-border bg-surface p-5 text-center">
+      <div data-testid="thesis-panel" className="flex h-full items-center justify-center bg-[#f6f8fb] p-4">
+        <div className="mx-auto w-full max-w-sm rounded-[12px] border border-[#dfe5ed] bg-white p-5 text-center shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
           <div className="text-[15px] font-semibold text-foreground">{t('thesis.empty.title')}</div>
           <p className="mt-1 text-[12px] text-foreground/54">{t('thesis.empty.subtitle')}</p>
-          <Button size="sm" className="mt-3" onClick={() => setNavSection('research')}>
+          <Button
+            size="sm"
+            className="mt-3 bg-[#0052ff] text-white hover:bg-[#0045d8]"
+            onClick={() => setNavSection('research')}
+          >
             {t('thesis.empty.goResearch')}
           </Button>
         </div>
@@ -156,28 +176,35 @@ export const ThesisPanel: React.FC = () => {
   };
 
   return (
-    <div className="flex h-full flex-col overflow-y-auto p-4" data-testid="thesis-panel">
-      <div className="mb-3 flex items-center justify-between">
-        <h3 className="text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
+    <div className="flex h-full flex-col overflow-y-auto bg-[#f6f8fb] p-4" data-testid="thesis-panel">
+      <div className="mb-3 flex items-center justify-between gap-3 border-b border-[#dfe5ed] pb-3">
+        <h3 className="text-[10px] font-semibold uppercase tracking-[0.1em] text-[#7f8b9d]">
           {t('thesis.thesis')}
         </h3>
         {report && (
-          <Button size="sm" onClick={handleSaveFromReport} disabled={loading}>
+          <Button
+            size="sm"
+            onClick={handleSaveFromReport}
+            disabled={loading}
+            className="bg-[#0052ff] text-white hover:bg-[#0045d8]"
+          >
             {t('thesis.saveAsThesis')}
           </Button>
         )}
       </div>
 
       {!report && (
-        <div className="mb-3 rounded-[10px] border border-dashed border-foreground/12 p-3 text-[12px] text-foreground/54">
+        <div className="mb-3 rounded-[9px] border border-dashed border-[#cbd5e1] bg-white px-3 py-2.5 text-[12px] leading-5 text-foreground/54">
           {t('thesis.noReportFor', { symbol })}
         </div>
       )}
 
       {loading && symbolTheses.length === 0 ? (
-        <div className="h-24 animate-pulse rounded-[12px] bg-foreground/6" />
+        <div className="h-24 animate-pulse rounded-[10px] border border-[#dfe5ed] bg-white" />
       ) : symbolTheses.length === 0 ? (
-        <div className="py-8 text-center text-[13px] text-foreground/44">{t('thesis.noneSaved')}</div>
+        <div className="rounded-[10px] border border-dashed border-[#dfe5ed] bg-white py-8 text-center text-[13px] text-foreground/44">
+          {t('thesis.noneSaved')}
+        </div>
       ) : (
         <div className="space-y-3">
           {symbolTheses.map((thesis) =>
@@ -204,7 +231,7 @@ export const ThesisPanel: React.FC = () => {
       )}
 
       {lastImpact && (
-        <div className="mt-3 rounded-[10px] bg-foreground/6 p-3 text-[12px] text-foreground/70">
+        <div className="mt-3 rounded-[9px] border border-[#cfe0ff] bg-[#eef4ff] px-3 py-2.5 text-[12px] leading-5 text-foreground/75">
           {t('thesis.reEvaluateComplete')}
         </div>
       )}
@@ -220,8 +247,8 @@ export const ThesisPanel: React.FC = () => {
         </div>
       )}
 
-      <div className="mt-4">
-        <h3 className="mb-2 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
+      <div className="mt-5 border-t border-[#dfe5ed] pt-4">
+        <h3 className="mb-2.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-[#7f8b9d]">
           {t('thesis.reEvaluationHistory')}
         </h3>
         <ThesisImpactList impacts={symbolImpacts} />
