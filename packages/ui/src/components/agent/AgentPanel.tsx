@@ -28,6 +28,7 @@ import { TraceInspector } from '../trace/TraceInspector';
 import { loadSessionTraceSources, projectSessionTrace } from '../../lib/traceData';
 import { QuoteCard } from './structured/QuoteCard';
 import { PortfolioRiskCard } from './structured/PortfolioRiskCard';
+import { AgentAmbientField, type AgentMotionState } from '../motion/AgentAmbientField';
 
 const folioLogoUrl = new URL('../../assets/folio-logo.png', import.meta.url).href;
 
@@ -103,6 +104,15 @@ export const AgentPanel: React.FC = () => {
   const bodyEndRef = useRef<HTMLDivElement>(null);
 
   const isRunning = runView !== null && runView.infraError === undefined;
+  const agentMotionState: AgentMotionState = runView?.infraError
+    ? 'error'
+    : runView?.toolCalls.some((toolCall) => toolCall.status === 'running')
+      ? 'tool'
+      : runView?.answer
+        ? 'synthesizing'
+        : isRunning
+          ? 'thinking'
+          : 'idle';
 
   useEffect(() => {
     bodyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -250,7 +260,20 @@ export const AgentPanel: React.FC = () => {
               onRetry={() => void handleRetry()}
             />
           )}
-          <ToolActivity toolCalls={toolCalls} />
+          {isRunning ? (
+            <div className="folio-agent-activity-surface rounded-[9px] border border-border bg-surface-muted px-3 py-2" data-testid="agent-activity-surface">
+              <AgentAmbientField state={agentMotionState} />
+              <div className="relative flex items-center gap-2 text-[11px] text-foreground/64">
+                <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
+                <span className="font-medium">{runView?.toolCalls.some((toolCall) => toolCall.status === 'running') ? t('agent.tool.running') : t('agent.panel.agentRunning')}</span>
+              </div>
+              <div className="relative mt-2">
+                <ToolActivity toolCalls={toolCalls} />
+              </div>
+            </div>
+          ) : (
+            <ToolActivity toolCalls={toolCalls} />
+          )}
           {quote && <QuoteCard quote={quote} />}
           {portfolio && <PortfolioRiskCard portfolio={portfolio} />}
           {messages.length === 0 && !isRunning && (

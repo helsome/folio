@@ -39,6 +39,13 @@
   --negative-rgb: 190, 64, 54;
   --warning-rgb: 190, 128, 38;
 
+  /* Motion language: preserve the existing 160ms micro interaction rhythm. */
+  --motion-fast: 120ms;
+  --motion-base: 160ms;
+  --motion-content: 220ms;
+  --motion-slow: 600ms;
+  --motion-ambient: 11s;
+
   /* Compatibility aliases for feature slices that still use the old names. */
   --mac-window: var(--background);
   --mac-titlebar: var(--surface);
@@ -586,3 +593,235 @@ button:disabled { cursor: not-allowed; }
 .folio-compare-view table th { color: #8792a3; font-size: .58rem; letter-spacing: .1em; }
 .folio-compare-view table td, .folio-compare-view table th { border-bottom-color: #edf0f4 !important; padding: .72rem .85rem !important; }
 .folio-compare-view table tbody tr:hover { background: #f8fbff; }
+
+/* -------------------------------------------------------------------------
+   Motion foundation — decorative layers only. These layers are clipped by
+   their host surfaces, never capture input, and use CSS animation rather than
+   a React render loop. The blue/neutral palette keeps the UI financial.
+   ------------------------------------------------------------------------- */
+.folio-motion-ambient,
+.folio-motion-dot-field {
+  position: absolute;
+  inset: 0;
+  z-index: 0;
+  overflow: hidden;
+  pointer-events: none;
+  contain: layout paint;
+}
+
+.folio-motion-ambient {
+  opacity: 0;
+  transition: opacity var(--motion-slow) ease;
+}
+
+.folio-motion-state--thinking { opacity: .28; }
+.folio-motion-state--tool { opacity: .42; }
+.folio-motion-state--synthesizing { opacity: .5; }
+.folio-motion-state--complete { opacity: .14; }
+.folio-motion-state--partial { opacity: .25; }
+.folio-motion-state--idle,
+.folio-motion-state--error { opacity: 0; }
+
+.folio-motion-ambient__halo {
+  position: absolute;
+  inset: -35% 8% 12% 12%;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 48%, rgba(var(--accent-rgb), .12), transparent 66%);
+  filter: blur(16px);
+  opacity: .65;
+  animation: folio-motion-halo var(--motion-ambient) ease-in-out infinite alternate;
+}
+
+.folio-motion-ambient__particle {
+  position: absolute;
+  top: var(--particle-y);
+  left: var(--particle-x);
+  height: var(--particle-size);
+  width: var(--particle-size);
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: .28;
+  box-shadow: 0 0 8px rgba(var(--accent-rgb), .18);
+  animation: folio-motion-drift var(--particle-duration) ease-in-out var(--particle-delay) infinite alternate;
+}
+
+.folio-motion-state--thinking .folio-motion-ambient__particle { opacity: .16; }
+.folio-motion-state--tool .folio-motion-ambient__particle { opacity: .24; }
+.folio-motion-state--synthesizing .folio-motion-ambient__particle { opacity: .3; }
+.folio-motion-state--complete .folio-motion-ambient__particle { opacity: .12; animation-duration: 18s; }
+.folio-motion-state--partial .folio-motion-ambient__particle { opacity: .18; animation-duration: 16s; }
+
+.folio-motion-dot-field {
+  opacity: .42;
+  transition: opacity var(--motion-content) ease;
+}
+
+.folio-motion-dot-field__dot {
+  position: absolute;
+  top: var(--dot-y);
+  left: var(--dot-x);
+  height: 3px;
+  width: 3px;
+  border-radius: 50%;
+  background: var(--accent);
+  opacity: .12;
+  animation: folio-motion-dot-scan 4.8s ease-in-out var(--dot-delay) infinite;
+}
+
+.folio-motion-content-reveal {
+  animation: folio-motion-content-reveal var(--motion-content) ease both;
+}
+
+.folio-research-decision-status,
+.folio-agent-activity-surface {
+  position: relative;
+  overflow: hidden;
+  isolation: isolate;
+}
+
+.folio-research-decision-status > :not(.folio-motion-ambient),
+.folio-agent-activity-surface > :not(.folio-motion-ambient),
+.folio-agent-activity-surface > .relative {
+  position: relative;
+  z-index: 1;
+}
+
+.folio-research-decision-status .folio-motion-ambient,
+.folio-agent-activity-surface .folio-motion-ambient {
+  border-radius: inherit;
+}
+
+[data-paused='true'] * {
+  animation-play-state: paused !important;
+}
+
+@keyframes folio-motion-drift {
+  0% { transform: translate3d(-2px, 1px, 0) scale(.82); }
+  50% { transform: translate3d(3px, -3px, 0) scale(1); }
+  100% { transform: translate3d(1px, 3px, 0) scale(.88); }
+}
+
+@keyframes folio-motion-halo {
+  0% { transform: translate3d(-2%, 2%, 0) scale(.96); opacity: .36; }
+  100% { transform: translate3d(3%, -2%, 0) scale(1.02); opacity: .68; }
+}
+
+@keyframes folio-motion-dot-scan {
+  0%, 100% { opacity: .08; transform: scale(.8); }
+  45% { opacity: .24; transform: scale(1); }
+  60% { opacity: .11; transform: scale(.9); }
+}
+
+@keyframes folio-motion-content-reveal {
+  from { opacity: 0; transform: translate3d(0, 5px, 0); }
+  to { opacity: 1; transform: translate3d(0, 0, 0); }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .folio-motion-ambient,
+  .folio-motion-dot-field,
+  .folio-motion-ambient__particle,
+  .folio-motion-ambient__halo,
+  .folio-motion-dot-field__dot {
+    animation: none !important;
+    transition: none !important;
+  }
+
+  .folio-motion-ambient,
+  .folio-motion-dot-field { opacity: .08; }
+
+  .folio-motion-content-reveal {
+    animation: none !important;
+    opacity: 1;
+    transform: none;
+  }
+}
+
+[data-reduced-motion='true'].folio-motion-ambient,
+[data-reduced-motion='true'].folio-motion-dot-field {
+  animation: none !important;
+  opacity: .08;
+}
+
+[data-reduced-motion='true'] .folio-motion-ambient__particle,
+[data-reduced-motion='true'] .folio-motion-ambient__halo,
+[data-reduced-motion='true'] .folio-motion-dot-field__dot {
+  animation: none !important;
+  transition: none !important;
+}
+
+/* The refreshed finance surfaces below are authored as light-first overrides.
+   Keep their existing geometry in dark mode while restoring the renderer's
+   dark tokens for readable QA and normal use. */
+.dark .folio-today-view,
+.dark .folio-discover-view,
+.dark .folio-portfolio-view,
+.dark .folio-compare-view,
+.dark .folio-finance-workspace {
+  color: var(--foreground);
+  background: var(--background);
+}
+
+.dark .folio-today-hero,
+.dark .folio-today-section,
+.dark .folio-discover-view .folio-pilot-page-header,
+.dark .folio-discover-view .folio-pilot-status,
+.dark .folio-discover-view .folio-pilot-table,
+.dark .folio-discover-task,
+.dark .folio-portfolio-view .mac-stock-tile,
+.dark .folio-compare-view table {
+  border-color: var(--border) !important;
+  background: var(--surface) !important;
+  box-shadow: none;
+}
+
+.dark .folio-discover-view .folio-pilot-table-header,
+.dark .folio-compare-view table thead,
+.dark .folio-daily-brief-overview {
+  background: var(--surface-muted);
+}
+
+.dark .folio-discover-view .folio-pilot-row:hover,
+.dark .folio-daily-brief-row:hover,
+.dark .folio-compare-view table tbody tr:hover,
+.dark .folio-quick-action:hover {
+  background: var(--surface-hover) !important;
+}
+
+.dark .folio-quick-action {
+  border-color: var(--border) !important;
+  background: var(--surface-muted) !important;
+}
+
+.dark .folio-sidebar { background: var(--surface-muted); }
+.dark .folio-sidebar-rail { background: var(--background); border-right-color: var(--border); }
+.dark .folio-sidebar-logo { border-color: var(--border); box-shadow: none; }
+.dark .folio-sidebar-pane,
+.dark .folio-sidebar-pane-header,
+.dark .folio-sidebar .folio-watchlist-header { background: var(--surface); }
+.dark .folio-sidebar .folio-watchlist-row:hover { border-color: var(--border); background: var(--surface-hover); }
+.dark .folio-sidebar .folio-watchlist-row--active {
+  border-color: color-mix(in srgb, var(--accent) 42%, var(--border));
+  background: color-mix(in srgb, var(--accent) 13%, var(--surface)) !important;
+  box-shadow: inset 3px 0 0 var(--accent), 0 1px 2px rgba(var(--accent-rgb), .14);
+}
+.dark .folio-sidebar .folio-watchlist-row--active .text-foreground { color: var(--foreground); }
+
+.dark .folio-research-workspace,
+.dark .folio-research-market-main,
+.dark .folio-research-evidence-panel,
+.dark .folio-research-decision-rail,
+.dark .folio-research-decision-card,
+.dark .folio-research-chart-panel,
+.dark .folio-research-stat-strip {
+  border-color: var(--border);
+  background: var(--surface);
+  color: var(--foreground);
+}
+
+.dark .folio-research-decision-card,
+.dark .folio-research-decision--neutral .folio-research-decision-card,
+.dark .folio-research-decision--empty .folio-research-decision-card {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}

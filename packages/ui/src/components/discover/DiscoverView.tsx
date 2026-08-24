@@ -27,6 +27,8 @@ import { getScreeningRun, listScreeningRuns, runScreening } from '../../client/s
 import { Button } from '../primitives/Button'
 import { CandidateCard, type CandidateAction } from './CandidateCard'
 import { TaskCard } from './TaskCard'
+import { ContentReveal } from '../motion/ContentReveal'
+import { SubtleDotField } from '../motion/SubtleDotField'
 
 const RESULT_LIMIT = 8
 
@@ -296,7 +298,8 @@ export const DiscoverView: React.FC = () => {
               {rerunButton}
             </div>
           </div>
-          <div className="folio-pilot-status">
+          <div className="folio-pilot-status relative overflow-hidden">
+            <SubtleDotField />
             <div className="flex items-center gap-3">
               <span
                 aria-hidden="true"
@@ -319,7 +322,8 @@ export const DiscoverView: React.FC = () => {
       )}
 
       {mode === 'results' && (
-        <div data-testid="discover-results" aria-label={t('discover.resultsAria')} className="flex flex-col gap-4">
+        <ContentReveal testId="discover-results-reveal">
+          <div data-testid="discover-results" aria-label={t('discover.resultsAria')} className="flex flex-col gap-4">
           <div className="folio-pilot-toolbar justify-between">
             {backButton}
             <div className="folio-pilot-toolbar">
@@ -433,7 +437,8 @@ export const DiscoverView: React.FC = () => {
           ) : (
             resultList
           )}
-        </div>
+          </div>
+        </ContentReveal>
       )}
     </div>
   )

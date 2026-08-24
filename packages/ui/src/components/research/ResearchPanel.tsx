@@ -24,6 +24,7 @@ import { DEFAULT_STRATEGY_ID, StrategyPicker } from './StrategyPicker';
 import { NextAction } from '../primitives/NextAction';
 import { semanticCapabilityLabelKey } from '../../lib/agentPresentation';
 import { readPersisted, writePersisted } from '../../lib/persistedPrefs';
+import { ContentReveal } from '../motion/ContentReveal';
 
 const POLL_MS = 900;
 const SYMBOL_REGEX = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
@@ -266,7 +267,7 @@ export const ResearchPanel: React.FC = () => {
           <ResearchMarketWorkspace
             symbol={symbol}
             report={report && report.symbol === symbol ? report : null}
-            activeRun={Boolean(activeRun)}
+            activeRun={activeRun?.status ?? null}
             loading={loading}
             onStart={() => void handleStart()}
           />
@@ -293,25 +294,27 @@ export const ResearchPanel: React.FC = () => {
         )}
 
         {report && symbol && report.symbol === symbol && (
-          <ResearchReportView
-            report={report}
-            nextAction={
-              thesisSaved ? (
-                <div data-testid="thesis-saved-banner" className="folio-pilot-next-action text-[12.5px] font-medium text-positive">
-                  {t('research.next.thesisSaved')}
-                </div>
-              ) : (
-                <NextAction
-                  testId="research-next-action"
-                  primaryLabel={t('research.next.saveThesis')}
-                  onPrimary={() => void handleSaveThesis()}
-                  secondaryLabel={t('research.next.viewThesis')}
-                  onSecondary={() => setNavSection('thesis')}
-                  hint={t('research.next.saveThesisHint')}
-                />
-              )
-            }
-          />
+          <ContentReveal testId="research-report-reveal">
+            <ResearchReportView
+              report={report}
+              nextAction={
+                thesisSaved ? (
+                  <div data-testid="thesis-saved-banner" className="folio-pilot-next-action text-[12.5px] font-medium text-positive">
+                    {t('research.next.thesisSaved')}
+                  </div>
+                ) : (
+                  <NextAction
+                    testId="research-next-action"
+                    primaryLabel={t('research.next.saveThesis')}
+                    onPrimary={() => void handleSaveThesis()}
+                    secondaryLabel={t('research.next.viewThesis')}
+                    onSecondary={() => setNavSection('thesis')}
+                    hint={t('research.next.saveThesisHint')}
+                  />
+                )
+              }
+            />
+          </ContentReveal>
         )}
 
         {symbol && !activeRun && !report && (
