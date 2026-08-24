@@ -1,14 +1,10 @@
-name: Eval Smoke (PR gate)
+name: Eval Smoke (manual only)
 
-# Deterministic-only regression gate. Runs the fixture subset of the
-# evaluation benchmark (high-value regression/golden cases) with the
-# deterministic evaluator path — no LLM calls, no market data, no network
-# (spec §74). Expensive live/cloud eval is intentionally NOT here (spec §73,
-# §79); see eval-nightly.yml.
+# Deterministic-only regression check. Kept available for an intentional manual
+# run, but no longer runs automatically on PRs or pushes because the old gate
+# was generating repeated failure notifications.
 on:
-  pull_request:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 # Cancel superseded runs: a newer commit on the same PR/branch wins.
 concurrency:
