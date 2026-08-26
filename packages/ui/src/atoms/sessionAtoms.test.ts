@@ -91,6 +91,8 @@ function makeClient(): FinagentClient {
       listResources: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
       readResource: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
       readiness: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      installLocal: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      remove: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
     },
   };
 }

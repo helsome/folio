@@ -10,18 +10,38 @@
 // findSkillsByKeyword) is preserved; V2 adds metadata indexing, progressive
 // resource access with path safety, and keyword matching for the router.
 
-import { mkdir, readFile, readdir, realpath, stat, writeFile } from 'node:fs/promises';
+import {
+  cp,
+  lstat,
+  mkdir,
+  mkdtemp,
+  readFile,
+  readdir,
+  realpath,
+  rename,
+  rm,
+  stat,
+  writeFile,
+} from 'node:fs/promises';
 import type { Dirent } from 'node:fs';
 import { homedir } from 'node:os';
-import { join, relative, resolve, sep } from 'node:path';
+import { basename, join, relative, resolve, sep } from 'node:path';
 import type { Skill } from '@finagent/core';
 
+export type SkillSource = 'bundled' | 'user';
+
+export interface SkillDirectoryConfig {
+  path: string;
+  source: SkillSource;
+}
 
 export interface SkillHubConfig {
-  /** Directory scanned for `<name>/SKILL.md` skills. */
-  skillsDirectory: string;
+  /** Legacy single directory scanned for `<name>/SKILL.md` skills. */
+  skillsDirectory?: string;
+  /** Ordered skill roots. Earlier roots win when ids collide. */
+  skillsDirectories?: SkillDirectoryConfig[];
   /** Persisted enable/disable state (JSON map of skillId → boolean). */
-  stateFile: string;
+  stateFile?: string;
 }
 
 interface SkillState {
@@ -34,6 +54,7 @@ export interface SkillMetadata {
   name: string;
   description: string;
   keywords: string[];
+  source: SkillSource;
   license?: string;
   riskLevel?: string;
   requiresLogin?: boolean;
@@ -62,25 +83,45 @@ interface ParsedSkillMarkdown {
 interface SkillDirectoryEntry {
   id: string;
   directory: string;
+  source: SkillSource;
   metadata: SkillMetadata;
   markdown: string;
 }
 
+export interface SkillInstallResult {
+  skillId: string;
+  name: string;
+  source: 'user';
+}
+
+const MAX_SKILL_FILES = 1_000;
+const MAX_SKILL_BYTES = 50 * 1024 * 1024;
+const SKILL_ID_PATTERN = /^[a-z0-9](?:[a-z0-9-]{0,62}[a-z0-9])?$/;
+
 export class SkillHub {
   private readonly entries = new Map<string, SkillDirectoryEntry>();
   private skills: Map<string, Skill> = new Map();
-  private readonly config: SkillHubConfig;
+  private readonly directories: SkillDirectoryConfig[];
+  private readonly stateFile: string;
 
   constructor(config: Partial<SkillHubConfig> = {}) {
-    this.config = {
-      skillsDirectory:
-        config.skillsDirectory ?? join(homedir(), '.finagent', 'skills'),
-      stateFile: config.stateFile ?? join(homedir(), '.finagent', 'skills-state.json'),
-    };
+    const defaultUserDirectory = join(homedir(), '.finagent', 'skills');
+    this.directories = config.skillsDirectories?.map((entry) => ({
+      path: resolve(entry.path),
+      source: entry.source,
+    })) ?? [{
+      path: resolve(config.skillsDirectory ?? defaultUserDirectory),
+      source: config.skillsDirectory ? 'bundled' : 'user',
+    }];
+    this.stateFile = config.stateFile ?? join(homedir(), '.finagent', 'skills-state.json');
   }
 
   get skillsDirectory(): string {
-    return this.config.skillsDirectory;
+    return this.directories[0]?.path ?? join(homedir(), '.finagent', 'skills');
+  }
+
+  get skillsDirectories(): SkillDirectoryConfig[] {
+    return this.directories.map((entry) => ({ ...entry }));
   }
 
   /** Scan the skills directory and (re)load every `SKILL.md`. */
@@ -88,52 +129,60 @@ export class SkillHub {
     this.entries.clear();
     this.skills.clear();
 
-    const root = resolve(this.config.skillsDirectory);
-    let directories: Dirent[];
-    try {
-      directories = await readdir(root, { withFileTypes: true });
-    } catch {
-      return; // No skills directory yet — empty hub.
-    }
-
     const state = await this.loadState();
-    for (const dirent of directories) {
-      if (!dirent.isDirectory()) continue;
-      const directory = join(root, dirent.name);
+    for (const rootConfig of this.directories) {
+      let directories: Dirent[];
       try {
-        const markdown = await readFile(join(directory, 'SKILL.md'), 'utf8');
-        const parsed = parseSkillMarkdown(markdown);
-        const id = String(parsed.frontmatter.id ?? parsed.frontmatter.slug ?? dirent.name);
-        const name = String(parsed.frontmatter.name ?? dirent.name);
-        const description = toDescription(parsed.frontmatter);
-        const keywords = [
-          ...splitKeywords(parsed.frontmatter.keywords),
-          ...extractTriggerKeywords(parsed.frontmatter.description),
-        ];
-        const metadata = toMetadata(parsed.frontmatter);
-        metadata.id = id;
-        metadata.keywords = keywords;
-        if (!metadata.description) {
-          metadata.description = firstParagraph(parsed.body);
-        }
-
-        this.entries.set(id, { id, directory, metadata, markdown });
-        const enabled = state.enabled[id] ?? true;
-        this.skills.set(id, {
-          id,
-          name,
-          type: 'prompt',
-          trigger: { keywords },
-          prompt: { system: parsed.body },
-          metadata: {
-            enabled,
-            editable: false,
-            createdAt: 0,
-            updatedAt: 0,
-          },
-        });
+        directories = await readdir(rootConfig.path, { withFileTypes: true });
       } catch {
-        // Missing/invalid SKILL.md — skip this directory.
+        continue;
+      }
+      for (const dirent of directories) {
+        if (!dirent.isDirectory()) continue;
+        const directory = join(rootConfig.path, dirent.name);
+        try {
+          const markdown = await readFile(join(directory, 'SKILL.md'), 'utf8');
+          const parsed = parseSkillMarkdown(markdown);
+          const id = String(parsed.frontmatter.id ?? parsed.frontmatter.slug ?? dirent.name);
+          if (rootConfig.source === 'user' && !SKILL_ID_PATTERN.test(id)) continue;
+          if (this.entries.has(id)) continue;
+          const name = String(parsed.frontmatter.name ?? dirent.name);
+          const description = toDescription(parsed.frontmatter);
+          const keywords = [
+            ...splitKeywords(parsed.frontmatter.keywords),
+            ...extractTriggerKeywords(parsed.frontmatter.description),
+          ];
+          const metadata = toMetadata(parsed.frontmatter, rootConfig.source);
+          metadata.id = id;
+          metadata.keywords = keywords;
+          if (!metadata.description) {
+            metadata.description = firstParagraph(parsed.body);
+          }
+
+          this.entries.set(id, {
+            id,
+            directory,
+            source: rootConfig.source,
+            metadata,
+            markdown,
+          });
+          const enabled = state.enabled[id] ?? true;
+          this.skills.set(id, {
+            id,
+            name,
+            type: 'prompt',
+            trigger: { keywords },
+            prompt: { system: parsed.body },
+            metadata: {
+              enabled,
+              editable: false,
+              createdAt: 0,
+              updatedAt: 0,
+            },
+          });
+        } catch {
+          // Missing/invalid SKILL.md — skip this directory.
+        }
       }
     }
   }
@@ -170,6 +219,75 @@ export class SkillHub {
     return Array.from(this.entries.values())
       .filter((entry) => this.isEnabled(entry.id))
       .map((entry) => entry.metadata);
+  }
+
+  listAllSkillMetadata(): SkillMetadata[] {
+    return Array.from(this.entries.values()).map((entry) => entry.metadata);
+  }
+
+  /** Validate and atomically install a local skill package into the user root. */
+  async installSkillFromDirectory(sourceDirectory: string): Promise<SkillInstallResult> {
+    const userRoot = this.directories.find((entry) => entry.source === 'user')?.path;
+    if (!userRoot) {
+      throw new Error('User skill installation is not configured.');
+    }
+
+    const source = resolve(sourceDirectory);
+    const sourceStat = await lstat(source).catch(() => undefined);
+    if (!sourceStat?.isDirectory() || sourceStat.isSymbolicLink()) {
+      throw new Error('Selected skill package must be a real directory.');
+    }
+
+    const markdownPath = join(source, 'SKILL.md');
+    const markdown = await readFile(markdownPath, 'utf8').catch(() => undefined);
+    if (!markdown) {
+      throw new Error('Selected directory does not contain SKILL.md.');
+    }
+    const parsed = parseSkillMarkdown(markdown);
+    const id = String(parsed.frontmatter.id ?? parsed.frontmatter.slug ?? basename(source));
+    const name = parsed.frontmatter.name;
+    if (!SKILL_ID_PATTERN.test(id)) {
+      throw new Error('Skill id must use 1-64 lowercase letters, digits, or hyphens.');
+    }
+    if (typeof name !== 'string' || name.trim().length === 0) {
+      throw new Error('SKILL.md frontmatter must define a non-empty name.');
+    }
+    if (toDescription(parsed.frontmatter).length === 0) {
+      throw new Error('SKILL.md frontmatter must define a non-empty description.');
+    }
+
+    await validatePackageTree(source);
+    await mkdir(userRoot, { recursive: true });
+    const destination = join(userRoot, id);
+    if (this.entries.has(id) || await pathExists(destination)) {
+      throw new Error(`A skill with id "${id}" is already installed.`);
+    }
+
+    const stagingRoot = await mkdtemp(join(userRoot, '.install-'));
+    const stagingSkill = join(stagingRoot, id);
+    try {
+      await cp(source, stagingSkill, { recursive: true, errorOnExist: true, force: false });
+      await rename(stagingSkill, destination);
+    } finally {
+      await rm(stagingRoot, { recursive: true, force: true });
+    }
+
+    await this.loadSkills();
+    const installed = this.entries.get(id);
+    if (!installed || installed.source !== 'user') {
+      await rm(destination, { recursive: true, force: true });
+      await this.loadSkills();
+      throw new Error('Installed skill could not be loaded.');
+    }
+
+    return { skillId: id, name: name.trim(), source: 'user' };
+  }
+
+  userSkillDirectory(skillId: string): string {
+    const entry = this.entries.get(skillId);
+    if (!entry) throw new Error(`Skill not found: ${skillId}`);
+    if (entry.source !== 'user') throw new Error('Bundled skills cannot be removed.');
+    return entry.directory;
   }
 
   isEnabled(skillId: string): boolean {
@@ -315,7 +433,7 @@ export class SkillHub {
 
   private async loadState(): Promise<SkillState> {
     try {
-      const contents = await readFile(this.config.stateFile, 'utf8');
+      const contents = await readFile(this.stateFile, 'utf8');
       const parsed = JSON.parse(contents) as Partial<SkillState>;
       return { enabled: parsed.enabled ?? {} };
     } catch {
@@ -324,9 +442,43 @@ export class SkillHub {
   }
 
   private async saveState(state: SkillState): Promise<void> {
-    await mkdir(resolve(this.config.stateFile, '..'), { recursive: true });
-    await writeFile(this.config.stateFile, JSON.stringify(state, null, 2), 'utf8');
+    await mkdir(resolve(this.stateFile, '..'), { recursive: true });
+    await writeFile(this.stateFile, JSON.stringify(state, null, 2), 'utf8');
   }
+}
+
+async function pathExists(path: string): Promise<boolean> {
+  return lstat(path).then(() => true, () => false);
+}
+
+async function validatePackageTree(root: string): Promise<void> {
+  let files = 0;
+  let bytes = 0;
+  const walk = async (directory: string): Promise<void> => {
+    const entries = await readdir(directory, { withFileTypes: true });
+    for (const entry of entries) {
+      const full = join(directory, entry.name);
+      if (entry.isSymbolicLink()) {
+        throw new Error(`Skill packages cannot contain symbolic links: ${relative(root, full)}`);
+      }
+      if (entry.isDirectory()) {
+        await walk(full);
+        continue;
+      }
+      if (!entry.isFile()) {
+        throw new Error(`Skill packages can contain only files and directories: ${relative(root, full)}`);
+      }
+      files += 1;
+      bytes += (await stat(full)).size;
+      if (files > MAX_SKILL_FILES) {
+        throw new Error(`Skill package exceeds the ${MAX_SKILL_FILES}-file limit.`);
+      }
+      if (bytes > MAX_SKILL_BYTES) {
+        throw new Error('Skill package exceeds the 50 MB size limit.');
+      }
+    }
+  };
+  await walk(root);
 }
 
 export const skillHub = new SkillHub();
@@ -392,7 +544,7 @@ function toDescription(frontmatter: Record<string, unknown>): string {
   return value.replace(/\s+/g, ' ').trim();
 }
 
-function toMetadata(frontmatter: Record<string, unknown>): SkillMetadata {
+function toMetadata(frontmatter: Record<string, unknown>, source: SkillSource): SkillMetadata {
   const name = String(frontmatter.name ?? '');
   const nested = (frontmatter.metadata ?? {}) as Record<string, unknown>;
   return {
@@ -400,6 +552,7 @@ function toMetadata(frontmatter: Record<string, unknown>): SkillMetadata {
     name,
     description: toDescription(frontmatter),
     keywords: splitKeywords(frontmatter.keywords),
+    source,
     license: frontmatter.license === undefined ? undefined : String(frontmatter.license),
     riskLevel: nested.risk_level === undefined ? undefined : String(nested.risk_level),
     requiresLogin: nested.requires_login === undefined ? undefined : Boolean(nested.requires_login),

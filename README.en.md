@@ -131,7 +131,7 @@ The core boundary is deliberately small: providers return normalized data with p
 - **Market data:** Longbridge is the primary connector for US/HK/CN market data and brokerage portfolio access; Massive is available as a secondary US market-data provider.
 - **Agent runtime:** Pi runtime for configured LLM providers, with a deterministic local provider for development and offline golden paths.
 - **Desktop:** Electron with a macOS arm64 packaged build. The renderer, preload bridge, and main-process kernel are separated by context isolation and a whitelisted IPC surface.
-- **Skills:** Vendored `SKILL.md` resources with references, enable/disable state, triggers, and capability requirements.
+- **Skills:** Vendored `SKILL.md` resources with references, enable/disable state, triggers, and capability requirements, plus safe local user-skill installation from **Settings → Skills**.
 - **Agent evaluation:** Local or LangSmith-backed evaluation records traces, datasets, evaluators, experiments, and regression gates; engineering metrics can be linked to investment outcomes without claiming causation.
 
 ## Quick Start
@@ -143,6 +143,11 @@ Download the latest macOS build from the [Releases page](https://github.com/hels
 1. Configure an LLM provider in **Settings → Models**, or use the local provider for a deterministic demo.
 2. Connect Longbridge in **Settings → Connections** if you want live market data and portfolio access.
 3. Select a symbol from the Watchlist and open **Deep Research**.
+
+To extend the agent, open **Settings → Skills**, choose **Install from folder**,
+and select a skill package containing `SKILL.md`. User skills are stored under
+`~/.finagent/skills/`; bundled skills cannot be overwritten, and removing a
+user skill moves its package to the system Trash.
 
 Longbridge authentication can also be completed from the terminal:
 

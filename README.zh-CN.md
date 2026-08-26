@@ -131,7 +131,7 @@ Longbridge / Massive 提供商
 - **行情数据：** Longbridge 是美股/港股/内地市场数据与券商投资组合访问的主要连接器；Massive 是美股市场的备选数据提供商。
 - **Agent 运行时：** 为已配置的 LLM 提供商提供 Pi 运行时，另有用于开发与离线黄金路径的确定性本地提供商。
 - **桌面端：** Electron，含 macOS arm64 打包构建。渲染进程、预加载桥与主进程内核通过上下文隔离与白名单化 IPC 接口面分离。
-- **技能：** 内置 `SKILL.md` 资源，含引用、启用/禁用状态、触发器与能力要求。
+- **技能：** 内置 `SKILL.md` 资源，含引用、启用/禁用状态、触发器与能力要求；也可在 **设置 → 技能** 中从本地文件夹安全安装用户 Skill。
 - **Agent 评测：** 通过本地 Evaluation Backend 或 LangSmith 记录 trace、dataset、evaluator、experiment 与 regression gate；工程指标与投资结果保持可链接但不宣称因果关系。
 
 ## 快速开始
@@ -143,6 +143,8 @@ Longbridge / Massive 提供商
 1. 在 **设置 → 模型** 中配置 LLM 提供商，或使用本地提供商进行确定性演示。
 2. 如需实时行情数据与投资组合访问，在 **设置 → 连接** 中连接 Longbridge。
 3. 从自选清单中选择标的，打开**深度研究**。
+
+要扩展 Agent 能力，在 **设置 → 技能** 选择“从文件夹安装”，并选中一个包含 `SKILL.md` 的 Skill 目录。用户 Skill 保存在 `~/.finagent/skills/`；内置 Skill 不会被覆盖，删除用户 Skill 时会移入系统废纸篓。
 
 Longbridge 认证也可以在终端完成：
 

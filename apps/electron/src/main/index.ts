@@ -1,4 +1,4 @@
-import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell, type OpenDialogOptions } from 'electron';
 import { dirname, join } from 'path';
 import { fileURLToPath } from 'url';
 import { AgentKernelHost, toIpcResult } from './kernelHost.ts';
@@ -305,6 +305,27 @@ ipcMain.handle('skills:listResources', async (_event, skillId: unknown) =>
 
 ipcMain.handle('skills:readResource', async (_event, skillId: unknown, relativePath: unknown) =>
   toIpcResult(() => agentKernelHost.readSkillResource(skillId, relativePath))
+);
+
+ipcMain.handle('skills:installLocal', async () =>
+  toIpcResult(async () => {
+    const options: OpenDialogOptions = {
+      title: 'Install Folio skill',
+      properties: ['openDirectory'],
+    };
+    const selection = mainWindow
+      ? await dialog.showOpenDialog(mainWindow, options)
+      : await dialog.showOpenDialog(options);
+    if (selection.canceled || selection.filePaths.length === 0) {
+      return { canceled: true as const };
+    }
+    const installed = await agentKernelHost.installLocalSkillDirectory(selection.filePaths[0]);
+    return { canceled: false as const, ...installed };
+  })
+);
+
+ipcMain.handle('skills:remove', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.removeUserSkill(input))
 );
 
 // V7 Evaluation & observability (spec §61-68)
