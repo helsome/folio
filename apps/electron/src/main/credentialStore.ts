@@ -5,7 +5,7 @@
 // the renderer sends credentials in once and only ever receives metadata
 // (configured / updatedAt) back. All error paths redact secret material.
 
-import { mkdir, readFile, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { safeStorage } from 'electron';
 import type { CredentialInfo, CustomProviderConfig } from '@finagent/core';
@@ -25,7 +25,7 @@ interface CustomProviderRecord {
 
 interface StoreShape {
   version: 1;
-  credentials: Record<string, { encrypted: string }>;
+  credentials: Record<string, { encrypted: string; updatedAt?: number }>;
   customProviders: Record<string, CustomProviderRecord>;
 }
 
@@ -43,6 +43,7 @@ export function redactSecrets(message: string): string {
 export class CredentialStore {
   private readonly filePath: string;
   private cache: StoreShape | null = null;
+  private mutationQueue: Promise<void> = Promise.resolve();
 
   constructor(filePath: string) {
     this.filePath = filePath;
@@ -65,17 +66,18 @@ export class CredentialStore {
   }
 
   async setCredential(provider: string, apiKey: string): Promise<void> {
-    const store = await this.load();
-    store.credentials[provider] = {
-      encrypted: this.encrypt(apiKey),
-    };
-    await this.persist(store);
+    await this.mutate((store) => {
+      store.credentials[provider] = {
+        encrypted: this.encrypt(apiKey),
+        updatedAt: Date.now(),
+      };
+    });
   }
 
   async removeCredential(provider: string): Promise<void> {
-    const store = await this.load();
-    delete store.credentials[provider];
-    await this.persist(store);
+    await this.mutate((store) => {
+      delete store.credentials[provider];
+    });
   }
 
   /** Renderer-safe metadata: no secrets. */
@@ -85,7 +87,7 @@ export class CredentialStore {
       ([provider, entry]) => ({
         provider,
         configured: true,
-        updatedAt: this.readUpdatedAt(entry.encrypted),
+        updatedAt: entry.updatedAt,
         custom: false,
       })
     );
@@ -131,27 +133,29 @@ export class CredentialStore {
   }
 
   async setCustomProvider(config: CustomProviderConfig): Promise<void> {
-    const store = await this.load();
-    store.customProviders[config.name] = {
-      displayName: config.displayName,
-      baseUrl: config.baseUrl,
-      api: config.api ?? 'openai-completions',
-      models: config.models,
-      updatedAt: Date.now(),
-    };
-    if (config.apiKey !== undefined) {
-      store.credentials[`custom:${config.name}`] = {
-        encrypted: this.encrypt(config.apiKey),
+    await this.mutate((store) => {
+      const updatedAt = Date.now();
+      store.customProviders[config.name] = {
+        displayName: config.displayName,
+        baseUrl: config.baseUrl,
+        api: config.api ?? 'openai-completions',
+        models: config.models,
+        updatedAt,
       };
-    }
-    await this.persist(store);
+      if (config.apiKey !== undefined) {
+        store.credentials[`custom:${config.name}`] = {
+          encrypted: this.encrypt(config.apiKey),
+          updatedAt,
+        };
+      }
+    });
   }
 
   async removeCustomProvider(name: string): Promise<void> {
-    const store = await this.load();
-    delete store.customProviders[name];
-    delete store.credentials[`custom:${name}`];
-    await this.persist(store);
+    await this.mutate((store) => {
+      delete store.customProviders[name];
+      delete store.credentials[`custom:${name}`];
+    });
   }
 
   // -------------------------------------------------------------------------
@@ -175,26 +179,34 @@ export class CredentialStore {
   }
 
   private async persist(store: StoreShape): Promise<void> {
-    this.cache = store;
     await mkdir(dirname(this.filePath), { recursive: true });
-    // Atomic write: temp file + rename.
     const tempPath = `${this.filePath}.tmp`;
-    await writeFile(tempPath, JSON.stringify(store, null, 2), 'utf8');
-    await writeFile(this.filePath, JSON.stringify(store, null, 2), 'utf8');
     try {
-      await import('node:fs/promises').then(({ rename }) => rename(tempPath, this.filePath));
-    } catch {
-      // Fallback direct write above already landed; ignore rename errors.
+      await writeFile(tempPath, `${JSON.stringify(store, null, 2)}\n`, 'utf8');
+      await rename(tempPath, this.filePath);
+      this.cache = store;
+    } catch (error) {
+      await unlink(tempPath).catch(() => undefined);
+      throw error;
     }
+  }
+
+  /** Serialize mutations so concurrent credential updates cannot overwrite each other. */
+  private async mutate(update: (store: StoreShape) => void): Promise<void> {
+    const operation = this.mutationQueue.then(async () => {
+      const store = structuredClone(await this.load());
+      update(store);
+      await this.persist(store);
+    });
+    this.mutationQueue = operation.catch(() => undefined);
+    return operation;
   }
 
   private encrypt(plaintext: string): string {
     if (this.isEncryptionAvailable()) {
       return `v1:${safeStorage.encryptString(plaintext).toString('base64')}`;
     }
-    // No OS keychain available: keep plaintext off-disk surfaces out of reach
-    // is impossible; degrade to base64 obfuscation and mark the prefix.
-    return `plain:${Buffer.from(plaintext, 'utf8').toString('base64')}`;
+    throw new Error('Secure credential storage is unavailable on this system');
   }
 
   private decrypt(payload: string): string {
@@ -205,9 +217,4 @@ export class CredentialStore {
     return safeStorage.decryptString(Buffer.from(base64, 'base64'));
   }
 
-  private readUpdatedAt(encrypted: string): number | undefined {
-    // updatedAt is not stored per-credential in v1; return undefined.
-    void encrypted;
-    return undefined;
-  }
 }
