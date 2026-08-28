@@ -9,35 +9,35 @@
   /* One bilingual type system across the app. SF Mono is the research/data
      face users see in the market workspace; CJK fallbacks keep Chinese text
      in the same deliberate, compact rhythm. */
-  --font-global-stack: "SF Mono", "JetBrains Mono", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", ui-monospace, monospace;
+  --font-global-stack: "Inter", "PingFang SC", "Hiragino Sans GB", "Noto Sans CJK SC", "Microsoft YaHei", system-ui, sans-serif;
   --font-sans-stack: var(--font-global-stack);
-  --font-display-stack: var(--font-global-stack);
-  --font-numeric-stack: var(--font-global-stack);
-  --background: #f6f8fb;
+  --font-display-stack: "Geist", "Inter", "PingFang SC", "Hiragino Sans GB", system-ui, sans-serif;
+  --font-numeric-stack: "JetBrains Mono", "SF Mono", ui-monospace, monospace;
+  --background: #f8fafc;
   --surface: #ffffff;
-  --surface-muted: #f2f4f7;
-  --surface-hover: #eaf0f8;
-  --foreground: #101114;
-  --foreground-muted: #596273;
-  --foreground-subtle: #8b95a5;
-  --primary: #0052ff;
+  --surface-muted: #f2f4f6;
+  --surface-hover: #e9eef6;
+  --foreground: #0f172a;
+  --foreground-muted: #45464d;
+  --foreground-subtle: #76777d;
+  --primary: #0f172a;
   --primary-foreground: #ffffff;
-  --accent: #0052ff;
+  --accent: #0284c7;
   --accent-foreground: #ffffff;
-  --positive: #098551;
-  --negative: #cf202f;
-  --warning: #b7791f;
-  --info: #0052ff;
-  --border: rgba(16, 17, 20, .10);
-  --border-strong: rgba(16, 17, 20, .18);
-  --input: rgba(16, 17, 20, .14);
-  --ring: rgba(0, 82, 255, .45);
-  --radius: 10px;
-  --foreground-rgb: 32, 32, 38;
-  --accent-rgb: 57, 108, 204;
-  --positive-rgb: 42, 130, 72;
-  --negative-rgb: 190, 64, 54;
-  --warning-rgb: 190, 128, 38;
+  --positive: #10b981;
+  --negative: #ef4444;
+  --warning: #b45309;
+  --info: #0284c7;
+  --border: #e2e8f0;
+  --border-strong: #c6c6cd;
+  --input: #c6c6cd;
+  --ring: rgba(2, 132, 199, .4);
+  --radius: 4px;
+  --foreground-rgb: 15, 23, 42;
+  --accent-rgb: 2, 132, 199;
+  --positive-rgb: 16, 185, 129;
+  --negative-rgb: 239, 68, 68;
+  --warning-rgb: 180, 83, 9;
 
   /* Motion language: preserve the existing 160ms micro interaction rhythm. */
   --motion-fast: 120ms;
@@ -60,6 +60,7 @@
   --mac-blue: var(--accent);
   --mac-blue-hover: color-mix(in srgb, var(--accent) 88%, black);
   --mac-blue-soft: color-mix(in srgb, var(--accent) 12%, transparent);
+  --mac-accent: var(--accent);
   --mac-green: var(--positive);
   --mac-red: var(--negative);
   --mac-yellow: var(--warning);
@@ -108,6 +109,7 @@
 @theme inline {
   --color-background: var(--background);
   --color-surface: var(--surface);
+  --color-surface-raised: var(--surface);
   --color-surface-muted: var(--surface-muted);
   --color-surface-hover: var(--surface-hover);
   --color-foreground: var(--foreground);
@@ -270,8 +272,8 @@ button:disabled { cursor: not-allowed; }
 .folio-pilot-next-action { border: 1px solid color-mix(in srgb, var(--accent) 28%, var(--border)); border-radius: 8px; background: color-mix(in srgb, var(--accent) 5%, var(--surface)); padding: .75rem .85rem; }
 .folio-pilot-symbol-entry { max-width: 32rem; margin: 2rem auto 0; border-bottom: 1px solid var(--border); padding-bottom: 1.2rem; }
 
-/* Coinbase-inspired Research workspace. The layout stays Folio-native: quiet
-   surfaces, a single blue accent, real data states, and no logo changes. */
+/* Stitch research workspace. The layout stays Folio-native while using the
+   same restrained portfolio grammar as the reference screens. */
 .folio-research-topbar { display: flex; flex: 0 0 auto; align-items: center; gap: 1rem; min-height: 3rem; border-bottom: 1px solid var(--border); background: var(--surface); padding: .55rem 1rem; }
 .folio-research-topbar-title { min-width: 5.5rem; color: var(--foreground); font-size: .85rem; font-weight: 700; letter-spacing: -.01em; }
 .folio-research-command-search { display: flex; min-width: 12rem; max-width: 28rem; flex: 1; align-items: center; gap: .5rem; border: 1px solid var(--border); border-radius: 8px; background: var(--background); padding: .38rem .55rem; color: var(--foreground-subtle); }
@@ -390,32 +392,30 @@ button:disabled { cursor: not-allowed; }
   .folio-research-evidence-confidence { display: none; }
 }
 
-/* Coinbase pass — typography, hierarchy, and market-terminal rhythm. This is
-   intentionally layered after the pilot rules so the Research surface reads
-   as one cohesive product instead of a collection of generic cards. */
-.folio-sidebar { background: #f7f9fc; }
-.folio-sidebar-rail { background: #f4f6f9; border-right-color: #e1e6ee; }
-.folio-sidebar-logo { border: 1px solid #e0e6ee; box-shadow: 0 2px 8px rgba(16, 24, 40, .06); }
-.folio-sidebar-pane { background: #fbfcfe; }
-.folio-sidebar-pane-header { min-height: 3.5rem; background: rgba(255, 255, 255, .72); }
-.folio-sidebar .folio-watchlist-header { background: #fbfcfe; }
-.folio-sidebar .folio-watchlist-row { margin: .2rem .25rem; border: 1px solid transparent; border-radius: 10px !important; padding: .62rem .7rem !important; }
-.folio-sidebar .folio-watchlist-row:hover { border-color: #dbe3ef; background: #f1f5fa; }
-.folio-sidebar .folio-watchlist-row--active { border-color: #cbdcff; background: #eaf1ff !important; box-shadow: inset 3px 0 0 #0052ff, 0 1px 2px rgba(0, 82, 255, .08); }
-.folio-sidebar .folio-watchlist-row--active .text-foreground { color: #0e1b38; }
+/* Stitch pass — typography, hierarchy, and market-terminal rhythm. */
+.folio-sidebar { background: var(--surface); }
+.folio-sidebar-rail { background: var(--surface-muted); border-right-color: var(--border); }
+.folio-sidebar-logo { border: 1px solid var(--border); box-shadow: 0 1px 2px rgba(var(--foreground-rgb), .04); }
+.folio-sidebar-pane { background: var(--surface); }
+.folio-sidebar-pane-header { min-height: 3.5rem; background: var(--surface); }
+.folio-sidebar .folio-watchlist-header { background: var(--surface); }
+.folio-sidebar .folio-watchlist-row { margin: .2rem .25rem; border: 1px solid transparent; border-radius: var(--radius) !important; padding: .62rem .7rem !important; }
+.folio-sidebar .folio-watchlist-row:hover { border-color: var(--border); background: var(--surface-hover); }
+.folio-sidebar .folio-watchlist-row--active { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); background: color-mix(in srgb, var(--accent) 8%, var(--surface)) !important; box-shadow: inset 3px 0 0 var(--accent), 0 1px 2px rgba(var(--accent-rgb), .08); }
+.folio-sidebar .folio-watchlist-row--active .text-foreground { color: var(--foreground); }
 
-.folio-pilot-research-content { background: #f6f8fb; padding: .95rem 1.15rem 1.8rem; }
-.folio-research-topbar { min-height: 3.45rem; gap: 1.1rem; border-bottom-color: #e2e7ef; background: rgba(255, 255, 255, .92); padding: .62rem 1.15rem; box-shadow: 0 1px 0 rgba(16, 24, 40, .02); }
+.folio-pilot-research-content { background: var(--background); padding: .95rem 1.15rem 1.8rem; }
+.folio-research-topbar { min-height: 3.45rem; gap: 1.1rem; border-bottom-color: var(--border); background: var(--surface); padding: .62rem 1.15rem; box-shadow: 0 1px 0 rgba(var(--foreground-rgb), .02); }
 .folio-research-topbar-title { font-family: var(--font-display-stack); min-width: 4.4rem; font-size: .9rem; font-weight: 700; letter-spacing: -.025em; }
-.folio-research-command-search { min-height: 2.2rem; max-width: 34rem; border-color: #dfe5ed; border-radius: 999px; background: #f5f7fa; padding: .42rem .75rem; box-shadow: inset 0 1px 1px rgba(16, 24, 40, .025); }
-.folio-research-command-search:focus-within { border-color: #7ca5ff; background: #fff; box-shadow: 0 0 0 3px rgba(0, 82, 255, .10); }
+.folio-research-command-search { min-height: 2.2rem; max-width: 34rem; border-color: var(--border); border-radius: var(--radius); background: var(--surface-muted); padding: .42rem .75rem; box-shadow: inset 0 1px 1px rgba(var(--foreground-rgb), .025); }
+.folio-research-command-search:focus-within { border-color: var(--accent); background: var(--surface); box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .10); }
 .folio-research-command-search input { font-size: .76rem; letter-spacing: -.005em; }
-.folio-research-command-hint { border-color: #dfe5ed; border-radius: 999px; background: #fff; box-shadow: 0 1px 2px rgba(16, 24, 40, .04); padding: .13rem .42rem; }
-.folio-research-topbar-market { border: 1px solid #dfe5ed; border-radius: 999px; background: #fff; padding: .32rem .65rem; color: #566174; font-size: .68rem; letter-spacing: .04em; }
-.folio-research-workspace { border-color: #dfe5ed; border-radius: 15px; background: #fff; box-shadow: 0 8px 24px rgba(16, 24, 40, .05), 0 1px 2px rgba(16, 24, 40, .04); }
-.folio-research-market-main { background: #fff; }
-.folio-research-asset-header { position: relative; min-height: 7.4rem; border-bottom-color: #e2e7ef; padding: 1.12rem 1.3rem 1rem; }
-.folio-research-asset-header::before { position: absolute; inset: 0 auto auto 0; height: 3px; width: 100%; background: #0052ff; content: ''; }
+.folio-research-command-hint { border-color: var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: 0 1px 2px rgba(var(--foreground-rgb), .04); padding: .13rem .42rem; }
+.folio-research-topbar-market { border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface); padding: .32rem .65rem; color: var(--foreground-muted); font-size: .68rem; letter-spacing: .04em; }
+.folio-research-workspace { border-color: var(--border); border-radius: var(--radius); background: var(--surface); box-shadow: 0 2px 8px rgba(var(--foreground-rgb), .04); }
+.folio-research-market-main { background: var(--surface); }
+.folio-research-asset-header { position: relative; min-height: 7.4rem; border-bottom-color: var(--border); padding: 1.12rem 1.3rem 1rem; }
+.folio-research-asset-header::before { position: absolute; inset: 0 auto auto 0; height: 2px; width: 100%; background: var(--accent); content: ''; }
 .folio-research-asset-copy { padding-top: .05rem; }
 .folio-research-asset-overline { display: flex; align-items: center; gap: .38rem; margin-bottom: .35rem; color: #7b8798; font-size: .62rem; font-weight: 700; letter-spacing: .09em; text-transform: uppercase; }
 .folio-research-market-dot { height: .4rem; width: .4rem; border-radius: 50%; background: #0ba26b; box-shadow: 0 0 0 3px rgba(11, 162, 107, .12); }
@@ -429,65 +429,65 @@ button:disabled { cursor: not-allowed; }
 .folio-research-price-change.text-negative { background: #fff0f1; color: #ba1e2e; }
 .folio-research-market-meta { margin-top: .48rem; color: #8792a3; font-size: .64rem; }
 .folio-research-asset-actions { padding-top: .2rem; }
-.folio-research-outline-button, .folio-research-toolbar-control { min-height: 2.1rem; border-color: #dce3ed; border-radius: 999px; background: #fff; padding: .34rem .7rem; color: #586578; font-size: .68rem; font-weight: 700; }
-.folio-research-outline-button:hover, .folio-research-toolbar-control:hover { border-color: #a9bce1; background: #f4f7fc; color: #1644b9; }
-.folio-research-outline-button--active { border-color: #b9cdfd; background: #edf3ff; color: #0052ff; }
-.folio-research-icon-button { height: 2.1rem; width: 2.1rem; border-color: #dce3ed; border-radius: 50%; background: #fff; }
-.folio-research-icon-button:hover { border-color: #a9bce1; background: #f4f7fc; color: #0052ff; }
-.folio-research-tabs { gap: .45rem; border-bottom-color: #e2e7ef; padding: .45rem 1.05rem; }
-.folio-research-tab { min-height: 1.95rem; border: 0; border-radius: 999px; padding: 0 .72rem; color: #748095; font-size: .7rem; font-weight: 700; }
-.folio-research-tab:hover { background: #f2f5f9; color: #1d2735; }
-.folio-research-tab--active { border: 0; background: #eaf1ff; color: #0052ff; }
-.folio-research-chart-panel { border-bottom-color: #e2e7ef; }
+.folio-research-outline-button, .folio-research-toolbar-control { min-height: 2.1rem; border-color: var(--border); border-radius: var(--radius); background: var(--surface); padding: .34rem .7rem; color: var(--foreground-muted); font-size: .68rem; font-weight: 700; }
+.folio-research-outline-button:hover, .folio-research-toolbar-control:hover { border-color: var(--border-strong); background: var(--surface-hover); color: var(--foreground); }
+.folio-research-outline-button--active { border-color: color-mix(in srgb, var(--accent) 38%, var(--border)); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--accent); }
+.folio-research-icon-button { height: 2.1rem; width: 2.1rem; border-color: var(--border); border-radius: var(--radius); background: var(--surface); }
+.folio-research-icon-button:hover { border-color: var(--border-strong); background: var(--surface-hover); color: var(--accent); }
+.folio-research-tabs { gap: 0; border-bottom-color: var(--border); padding: .45rem 1.05rem; }
+.folio-research-tab { min-height: 1.95rem; border: 0; border-radius: var(--radius); padding: 0 .72rem; color: var(--foreground-muted); font-size: .7rem; font-weight: 700; }
+.folio-research-tab:hover { background: var(--surface-hover); color: var(--foreground); }
+.folio-research-tab--active { border: 0; background: var(--surface-muted); color: var(--accent); }
+.folio-research-chart-panel { border-bottom-color: var(--border); }
 .folio-research-chart-toolbar { min-height: 3.1rem; border-bottom: 1px solid #eef1f5; padding: .48rem 1.05rem; }
 .folio-research-chart-toolbar-left { display: flex; align-items: center; gap: .8rem; min-width: 0; }
 .folio-research-chart-mode { display: inline-flex; align-items: center; gap: .35rem; color: #536074; font-size: .66rem; font-weight: 700; white-space: nowrap; }
-.folio-research-periods { display: flex; align-items: center; gap: .12rem; border: 1px solid #dfe5ed; border-radius: 7px; background: #f7f9fc; padding: .16rem; }
+.folio-research-periods { display: flex; align-items: center; gap: .12rem; border: 1px solid var(--border); border-radius: var(--radius); background: var(--surface-muted); padding: .16rem; }
 .folio-research-period { min-height: 1.55rem; border-radius: 5px; padding: .18rem .48rem; color: #778398; font-size: .62rem; font-weight: 750; }
 .folio-research-period:hover { background: #e9eef6; color: #1d2735; }
-.folio-research-period--active { background: #0052ff; color: #fff; box-shadow: 0 1px 2px rgba(0, 82, 255, .2); }
+.folio-research-period--active { background: var(--primary); color: var(--primary-foreground); box-shadow: 0 1px 2px rgba(var(--foreground-rgb), .12); }
 .folio-research-chart-canvas { height: 19rem; padding: .25rem .55rem .45rem; }
 .folio-research-chart-empty { color: #8994a5; }
 .folio-research-chart-skeleton { border-top-color: rgba(0, 82, 255, .35); background: repeating-linear-gradient(165deg, transparent 0 1.9rem, rgba(0, 82, 255, .055) 2rem 2.05rem); }
-.folio-research-stat-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; border-top-color: #e2e7ef; background: #fbfcfe; padding: .72rem 1.05rem .82rem; }
+.folio-research-stat-strip { grid-template-columns: repeat(6, minmax(0, 1fr)); gap: 0; border-top-color: var(--border); background: var(--surface-muted); padding: .72rem 1.05rem .82rem; }
 .folio-research-stat { min-height: 2.1rem; border-left: 1px solid #e7ebf1; padding-left: .78rem; }
 .folio-research-stat:first-child { border-left: 0; padding-left: 0; }
 .folio-research-stat span { color: #8792a3; font-size: .58rem; letter-spacing: .08em; }
 .folio-research-stat strong { margin-top: .3rem; font-family: var(--font-numeric-stack); font-size: .7rem; font-weight: 650; }
-.folio-research-evidence-panel { background: #fff; }
+.folio-research-evidence-panel { background: var(--surface); }
 .folio-research-section-heading { padding: .95rem 1.05rem .78rem; }
 .folio-research-section-kicker { color: #7f8b9d; font-size: .6rem; letter-spacing: .12em; }
 .folio-research-section-heading h2 { font-family: var(--font-display-stack); font-size: .98rem; letter-spacing: -.02em; }
 .folio-research-section-heading h2 span { border: 1px solid #dce3ed; border-radius: 999px; background: #f5f7fa; padding: .1rem .4rem; }
-.folio-research-evidence-table { border-top-color: #e2e7ef; }
-.folio-research-evidence-head { min-height: 2.15rem; background: #f7f9fc; color: #8994a5; font-size: .57rem; letter-spacing: .1em; }
-.folio-research-evidence-table-row { min-height: 3.2rem; border-top-color: #edf0f4; font-size: .67rem; transition: background-color .15s ease; }
-.folio-research-evidence-table-row:hover { background: #f8fbff; }
-.folio-research-source-mark { height: 1.4rem; width: 1.4rem; border-radius: 50%; background: #eaf1ff; color: #0052ff; }
+.folio-research-evidence-table { border-top-color: var(--border); }
+.folio-research-evidence-head { min-height: 2.15rem; background: var(--surface-muted); color: var(--foreground-subtle); font-size: .57rem; letter-spacing: .1em; }
+.folio-research-evidence-table-row { min-height: 3.2rem; border-top-color: var(--border); font-size: .67rem; transition: background-color .15s ease; }
+.folio-research-evidence-table-row:hover { background: var(--surface-hover); }
+.folio-research-source-mark { height: 1.4rem; width: 1.4rem; border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 9%, var(--surface)); color: var(--accent); }
 .folio-research-evidence-source { font-weight: 700; }
 .folio-research-evidence-claim { font-size: .68rem; }
-.folio-research-decision-rail { border-left-color: #e2e7ef; background: #fbfcff; padding: 1.15rem 1.05rem; }
+.folio-research-decision-rail { border-left-color: var(--border); background: var(--surface-muted); padding: 1.15rem 1.05rem; }
 .folio-research-rail-heading { align-items: flex-start; }
 .folio-research-rail-heading > div { min-width: 0; }
 .folio-research-rail-kicker { display: block; margin-bottom: .28rem; color: #7f8b9d; font-size: .58rem; font-weight: 750; letter-spacing: .12em; text-transform: uppercase; }
 .folio-research-rail-heading h2 { font-family: var(--font-display-stack); font-size: 1.02rem; letter-spacing: -.025em; }
-.folio-research-decision-card { margin-top: .95rem; border-color: #cfe0ff; border-radius: 12px; background: #eef4ff; padding: .85rem; box-shadow: 0 2px 8px rgba(0, 82, 255, .06); }
-.folio-research-decision--negative .folio-research-decision-card { border-color: #ffd2d6; background: #fff3f3; }
-.folio-research-decision--neutral .folio-research-decision-card, .folio-research-decision--empty .folio-research-decision-card { border-color: #cfe0ff; background: #eef4ff; }
+.folio-research-decision-card { margin-top: .95rem; border-color: color-mix(in srgb, var(--accent) 30%, var(--border)); border-radius: var(--radius); background: color-mix(in srgb, var(--accent) 6%, var(--surface)); padding: .85rem; box-shadow: 0 1px 2px rgba(var(--foreground-rgb), .03); }
+.folio-research-decision--negative .folio-research-decision-card { border-color: color-mix(in srgb, var(--negative) 30%, var(--border)); background: color-mix(in srgb, var(--negative) 5%, var(--surface)); }
+.folio-research-decision--neutral .folio-research-decision-card, .folio-research-decision--empty .folio-research-decision-card { border-color: var(--border); background: var(--surface-muted); }
 .folio-research-decision-card strong { font-family: var(--font-display-stack); font-size: .86rem; letter-spacing: -.01em; }
 .folio-research-decision-card p { color: #617087; font-size: .66rem; }
 .folio-research-confidence-row { padding: 1rem 0; }
-.folio-research-confidence-ring { height: 3.55rem; width: 3.55rem; background: conic-gradient(#0052ff var(--confidence), #e2e9f3 0); }
-.folio-research-confidence-ring::before { height: 2.8rem; width: 2.8rem; background: #fbfcff; }
+.folio-research-confidence-ring { height: 3.55rem; width: 3.55rem; background: conic-gradient(var(--accent) var(--confidence), var(--border) 0); }
+.folio-research-confidence-ring::before { height: 2.8rem; width: 2.8rem; background: var(--surface-muted); }
 .folio-research-decision-row { min-height: 3rem; border-bottom-color: #e7ebf1; }
 .folio-research-decision-row span { color: #7a8799; font-size: .67rem; }
 .folio-research-decision-row strong { font-family: var(--font-numeric-stack); font-size: .7rem; }
 .folio-research-decision-row--multiline strong { font-family: var(--font-sans-stack); font-size: .67rem; }
 .folio-research-next-action-block { padding-top: 1rem; }
 .folio-research-next-action-label { color: #7f8b9d; font-size: .61rem; font-weight: 750; letter-spacing: .1em; text-transform: uppercase; }
-.folio-research-next-action-button { border-radius: 9px; background: #0052ff; padding: .72rem .78rem; box-shadow: 0 3px 8px rgba(0, 82, 255, .16); }
-.folio-research-next-action-button:hover { background: #0045d8; }
-.folio-research-source-count { border-top-color: #e2e7ef; margin-top: 1rem; padding-top: .82rem; }
+.folio-research-next-action-button { border-radius: var(--radius); background: var(--primary); padding: .72rem .78rem; box-shadow: 0 2px 6px rgba(var(--foreground-rgb), .1); }
+.folio-research-next-action-button:hover { background: color-mix(in srgb, var(--primary) 88%, black); }
+.folio-research-source-count { border-top-color: var(--border); margin-top: 1rem; padding-top: .82rem; }
 
 @media (max-width: 900px) {
   .folio-research-chart-canvas { height: 17rem; }
@@ -824,4 +824,766 @@ button:disabled { cursor: not-allowed; }
 .dark .folio-research-decision--empty .folio-research-decision-card {
   border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
   background: color-mix(in srgb, var(--accent) 12%, var(--surface));
+}
+
+/* Stitch Minimalist Personal Portfolio surfaces. These primitives intentionally
+   stay small and composable so the existing data-backed views can share the
+   same page chrome without introducing screenshot-specific markup. */
+.folio-page { color: var(--foreground); }
+.folio-page-header { background: var(--surface); }
+.folio-page-title { margin: .35rem 0 0; font-family: var(--font-display-stack); font-size: 1.5rem; font-weight: 650; letter-spacing: -.035em; line-height: 1.15; }
+.folio-page-subtitle { margin: .4rem 0 0; max-width: 48rem; color: var(--foreground-muted); font-size: .78rem; line-height: 1.5; }
+.folio-eyebrow { display: flex; align-items: center; gap: .35rem; color: var(--foreground-subtle); font-size: .62rem; font-weight: 750; letter-spacing: .1em; line-height: 1.3; text-transform: uppercase; }
+.folio-page-section { border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 1rem; }
+.folio-section-heading { display: flex; align-items: flex-start; justify-content: space-between; gap: .75rem; margin-bottom: .8rem; }
+.folio-section-heading h2 { margin: .25rem 0 0; font-family: var(--font-display-stack); font-size: .98rem; font-weight: 650; letter-spacing: -.02em; }
+.folio-count-badge { display: inline-flex; min-width: 1.35rem; align-items: center; justify-content: center; border: 1px solid var(--border); border-radius: 999px; background: var(--surface-muted); padding: .15rem .4rem; color: var(--foreground-muted); font-size: .65rem; font-variant-numeric: tabular-nums; }
+.folio-empty-state { border: 1px dashed var(--border-strong); border-radius: 6px; background: var(--background); padding: 1rem; color: var(--foreground-subtle); font-size: .75rem; line-height: 1.5; }
+.folio-skeleton-line { height: 2.8rem; border-radius: 6px; background: linear-gradient(90deg, var(--surface-muted), var(--surface-hover), var(--surface-muted)); background-size: 200% 100%; animation: folio-skeleton 1.2s ease-in-out infinite; }
+.folio-icon-action { display: inline-flex; height: 1.9rem; width: 1.9rem; align-items: center; justify-content: center; border: 1px solid transparent; border-radius: 50%; background: transparent; color: var(--foreground-subtle); transition: background-color var(--motion-base) ease, border-color var(--motion-base) ease, color var(--motion-base) ease; }
+.folio-icon-action:hover { border-color: var(--border); background: var(--surface-hover); color: var(--accent); }
+.folio-events-list { overflow: hidden; border: 1px solid var(--border); border-radius: 6px; }
+.folio-event-row { display: grid; grid-template-columns: 6.5rem minmax(0, 1fr) auto; align-items: center; gap: 1rem; min-height: 4.4rem; border-bottom: 1px solid var(--border); padding: .7rem .8rem; }
+.folio-event-row:last-child { border-bottom: 0; }
+.folio-event-row:hover { background: var(--surface-hover); }
+.folio-event-date { color: var(--foreground-muted); font-size: .68rem; }
+.folio-event-type, .folio-event-symbol { border-radius: 999px; background: color-mix(in srgb, var(--accent) 10%, var(--surface)); padding: .16rem .38rem; color: var(--accent); font-size: .6rem; font-weight: 700; letter-spacing: .04em; text-transform: uppercase; }
+.folio-event-symbol { background: var(--surface-muted); color: var(--foreground-muted); }
+.folio-event-row h3 { margin: .28rem 0 0; color: var(--foreground); font-size: .76rem; font-weight: 650; }
+.folio-event-row p { overflow: hidden; margin: .2rem 0 0; color: var(--foreground-muted); font-size: .7rem; line-height: 1.4; text-overflow: ellipsis; white-space: nowrap; }
+.folio-events-rail { background: var(--surface-muted); }
+.folio-events-rail h2 { font-family: var(--font-display-stack); font-size: .95rem; font-weight: 650; letter-spacing: -.02em; }
+.folio-profile-identity { background: var(--surface); }
+.folio-profile-avatar { display: inline-flex; height: 2.8rem; width: 2.8rem; flex: 0 0 2.8rem; align-items: center; justify-content: center; border-radius: 8px; background: var(--primary); color: var(--primary-foreground); }
+.folio-profile-identity h2, .folio-profile-view .folio-page-section > h2 { font-family: var(--font-display-stack); font-size: .98rem; font-weight: 650; letter-spacing: -.02em; }
+.folio-profile-identity p { margin-top: .3rem; color: var(--foreground-muted); font-size: .75rem; line-height: 1.45; }
+.folio-definition-grid { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: .7rem; border-top: 1px solid var(--border); padding-top: .8rem; }
+.folio-definition-grid dt { color: var(--foreground-subtle); font-size: .61rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; }
+.folio-definition-grid dd { margin: .2rem 0 0; color: var(--foreground); font-family: var(--font-numeric-stack); font-size: .7rem; }
+.folio-profile-list { overflow: hidden; border-top: 1px solid var(--border); }
+.folio-profile-list-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; border-bottom: 1px solid var(--border); padding: .75rem 0; font-size: .7rem; }
+.folio-profile-list-row:last-child { border-bottom: 0; }
+.folio-profile-list-row strong, .folio-profile-list-row span { display: block; }
+.folio-profile-list-row strong { color: var(--foreground); font-weight: 650; }
+.folio-profile-list-row > div:first-child span { margin-top: .2rem; color: var(--foreground-subtle); }
+.folio-profile-list-row > div:last-child { display: flex; align-items: center; gap: .35rem; color: var(--foreground-muted); text-transform: capitalize; }
+.folio-health-list { border-top: 1px solid var(--border); }
+.folio-health-row { display: grid; grid-template-columns: 1.1rem minmax(0, 1fr) auto; align-items: center; gap: .35rem; min-height: 2.55rem; border-bottom: 1px solid var(--border); color: var(--foreground-muted); font-size: .7rem; }
+.folio-health-row strong { color: var(--foreground); font-size: .64rem; font-weight: 650; }
+.folio-profile-link { display: inline-flex; align-items: center; gap: .35rem; color: var(--accent); font-size: .7rem; font-weight: 700; }
+.folio-profile-link:hover { color: color-mix(in srgb, var(--accent) 78%, black); }
+@keyframes folio-skeleton { 0% { background-position: 200% 0; } 100% { background-position: -200% 0; } }
+
+@media (max-width: 760px) {
+  .folio-page-header { padding: 1rem; }
+  .folio-page-title { font-size: 1.25rem; }
+  .folio-page-subtitle { font-size: .72rem; }
+  .folio-events-view > .grid, .folio-profile-view > .grid { grid-template-columns: 1fr; padding: 1rem; }
+  .folio-event-row { grid-template-columns: minmax(0, 1fr) auto; gap: .5rem; }
+  .folio-event-date { grid-column: 1 / -1; }
+  .folio-event-row p { white-space: normal; }
+  .folio-definition-grid { grid-template-columns: repeat(2, minmax(0, 1fr)); }
+}
+
+.dark .folio-page-section,
+.dark .folio-page-header { border-color: var(--border); background: var(--surface); }
+.dark .folio-events-rail { background: var(--surface-muted); }
+.dark .folio-profile-identity { background: var(--surface); }
+
+/* Final Stitch token pass: older feature slices keep their geometry, while
+   their surfaces and emphasis colors resolve through the shared semantic
+   palette above. */
+.folio-finance-workspace,
+.folio-today-view,
+.folio-discover-view,
+.folio-portfolio-view,
+.folio-compare-view,
+.folio-pilot-research-content { background: var(--background); color: var(--foreground); }
+.folio-sidebar,
+.folio-sidebar-rail { background: var(--surface-muted); border-color: var(--border); }
+.folio-sidebar-pane,
+.folio-sidebar-pane-header,
+.folio-sidebar .folio-watchlist-header { background: var(--surface); }
+.folio-sidebar-logo,
+.folio-sidebar .folio-watchlist-row:hover { border-color: var(--border); }
+.folio-sidebar .folio-watchlist-row:hover { background: var(--surface-hover); }
+.folio-sidebar .folio-watchlist-row--active {
+  border-color: color-mix(in srgb, var(--accent) 34%, var(--border));
+  background: color-mix(in srgb, var(--accent) 10%, var(--surface)) !important;
+  box-shadow: inset 3px 0 0 var(--accent), 0 1px 2px rgba(var(--accent-rgb), .08);
+}
+.folio-today-hero,
+.folio-today-section,
+.folio-quick-action,
+.folio-discover-view .folio-pilot-page-header,
+.folio-discover-view .folio-pilot-table,
+.folio-discover-view .folio-pilot-status,
+.folio-discover-task,
+.folio-portfolio-view .mac-stock-tile,
+.folio-compare-view table { border-color: var(--border) !important; background: var(--surface) !important; }
+.folio-quick-action:hover,
+.folio-discover-view .folio-pilot-row:hover,
+.folio-daily-brief-row:hover,
+.folio-compare-view table tbody tr:hover { background: var(--surface-hover) !important; }
+.folio-today-hero::before,
+.folio-research-asset-header::before { background: var(--accent); }
+.folio-daily-brief-overview,
+.folio-daily-brief-count,
+.folio-discover-view .folio-pilot-table-header,
+.folio-compare-view table thead,
+.folio-research-evidence-head,
+.folio-research-stat-strip { background: var(--surface-muted); }
+.folio-daily-brief-count { color: var(--accent); }
+.folio-research-topbar,
+.folio-research-market-main,
+.folio-research-evidence-panel,
+.folio-research-workspace,
+.folio-research-decision-rail,
+.folio-research-chart-panel,
+.folio-research-decision-card { border-color: var(--border); background: var(--surface); color: var(--foreground); }
+.folio-research-command-search,
+.folio-research-command-hint,
+.folio-research-topbar-market,
+.folio-research-outline-button,
+.folio-research-toolbar-control,
+.folio-research-icon-button,
+.folio-research-periods { border-color: var(--border); background: var(--surface-muted); }
+.folio-research-command-search:focus-within { border-color: var(--accent); box-shadow: 0 0 0 3px color-mix(in srgb, var(--accent) 14%, transparent); }
+.folio-research-outline-button--active,
+.folio-research-tab--active { border-color: color-mix(in srgb, var(--accent) 28%, var(--border)); background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent); }
+.folio-research-period--active,
+.folio-research-next-action-button { background: var(--primary); }
+.folio-research-confidence-ring { background: conic-gradient(var(--accent) var(--confidence), var(--border) 0); }
+.folio-research-confidence-ring::before { background: var(--surface); }
+.folio-research-source-mark { background: color-mix(in srgb, var(--accent) 10%, var(--surface)); color: var(--accent); }
+.folio-research-price-change.text-positive { background: color-mix(in srgb, var(--positive) 12%, var(--surface)); color: var(--positive); }
+.folio-research-price-change.text-negative { background: color-mix(in srgb, var(--negative) 12%, var(--surface)); color: var(--negative); }
+
+@media (max-width: 760px) {
+  .folio-sidebar-pane { display: none; }
+  .folio-sidebar-rail { width: 3.5rem; }
+  .folio-sidebar-rail > div.flex.flex-col.items-center.gap-1 { gap: .2rem; }
+  .folio-page-header { gap: .75rem; }
+}
+
+/* Stitch fixed-fluid-fixed shell geometry. */
+.folio-sidebar { position: relative; border-right: 1px solid var(--border); }
+.folio-sidebar-content { background: var(--surface); }
+.folio-sidebar-brand-name { color: var(--foreground); font-family: var(--font-display-stack); font-size: 1.85rem; font-weight: 700; letter-spacing: -.06em; line-height: 1; }
+.folio-sidebar-brand-kicker { margin-top: .35rem; color: var(--foreground-subtle); font-family: var(--font-numeric-stack); font-size: .49rem; font-weight: 500; letter-spacing: .12em; line-height: 1.3; text-transform: uppercase; }
+.folio-sidebar-new-analysis { background: var(--primary); color: var(--primary-foreground); transition: background-color var(--motion-base) ease; }
+.folio-sidebar-new-analysis:hover { background: color-mix(in srgb, var(--primary) 82%, var(--foreground-muted)); }
+.folio-sidebar-nav { min-height: 0; overflow-y: auto; }
+.folio-sidebar-nav-item { position: relative; display: flex; min-height: 2.15rem; flex: 0 0 auto; align-items: center; gap: .7rem; border-radius: 4px 0 0 4px; padding: .42rem .7rem; color: var(--foreground-muted); font-size: .76rem; font-weight: 450; text-align: left; transition: background-color var(--motion-base) ease, color var(--motion-base) ease; }
+.folio-sidebar-nav-item:hover { background: var(--surface-muted); color: var(--foreground); }
+.folio-sidebar-nav-item--active { border-right: 2px solid var(--primary); background: var(--surface-muted); color: var(--primary); font-weight: 650; }
+.folio-sidebar-alert-dot { margin-left: auto; height: .4rem; width: .4rem; border-radius: 999px; background: var(--negative); }
+.folio-sidebar-section-label { color: var(--foreground-subtle); font-size: .57rem; font-weight: 700; letter-spacing: .11em; text-transform: uppercase; }
+.folio-sidebar-context-heading { color: var(--foreground-muted); font-size: .68rem; }
+.folio-sidebar-context-heading:hover { color: var(--foreground); }
+.folio-sidebar-context { flex: 0 0 auto; max-height: 11rem; overflow: hidden; }
+.folio-sidebar-context > div { max-height: 3.5rem; }
+.folio-sidebar-settings-panel { left: 12px; top: auto; bottom: 74px; }
+.folio-sidebar-support { min-height: 2rem; }
+.folio-workspace-topbar { border-bottom-color: var(--border); }
+.folio-workspace-topbar-title { color: var(--foreground); font-family: var(--font-display-stack); font-size: 1rem; font-weight: 600; letter-spacing: -.025em; }
+.folio-workspace-topbar-tab { position: relative; height: 100%; color: var(--foreground-muted); font-size: .7rem; white-space: nowrap; }
+.folio-workspace-topbar-tab:hover { color: var(--foreground); }
+.folio-workspace-topbar-tab--active { color: var(--foreground); font-weight: 650; }
+.folio-workspace-topbar-tab--active::after { position: absolute; right: 0; bottom: 0; left: 0; height: 2px; background: var(--primary); content: ''; }
+.folio-workspace-status { display: inline-flex; align-items: center; gap: .35rem; color: var(--foreground-muted); font-family: var(--font-numeric-stack); font-size: .56rem; letter-spacing: .04em; text-transform: uppercase; }
+.folio-workspace-status span { height: .35rem; width: .35rem; border-radius: 999px; background: var(--accent); }
+.folio-agent-header { background: var(--surface); }
+.folio-agent-title { color: var(--foreground); font-family: var(--font-display-stack); font-size: .82rem; font-weight: 600; white-space: nowrap; }
+.folio-today-content { width: 100%; }
+.folio-today-heading h1 { margin: 0; font-size: 1.5rem; font-weight: 500; letter-spacing: -.025em; line-height: 1.3; }
+.folio-today-heading p { margin-top: .35rem; color: var(--foreground-muted); font-size: .8rem; line-height: 1.5; }
+.folio-stitch-card { min-width: 0; border: 1px solid var(--border); border-radius: 8px; background: var(--surface); padding: 1.25rem; box-shadow: 0 4px 24px rgba(var(--foreground-rgb), .03); }
+.folio-stitch-card-heading { display: flex; align-items: center; justify-content: space-between; gap: .75rem; margin-bottom: 1rem; }
+.folio-stitch-card-heading h2 { color: var(--foreground-muted); font-size: .61rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.folio-card-menu { color: var(--foreground-subtle); font-size: .7rem; letter-spacing: .1em; }
+.folio-stitch-card .folio-portfolio-summary-card { border: 0; padding: 0; box-shadow: none; }
+.folio-stitch-card .folio-portfolio-summary-card > div:first-child > div:first-child > div:last-child { font-size: 2rem; }
+.folio-today-mover-columns h3 { margin-bottom: .5rem; color: var(--foreground-subtle); font-size: .57rem; font-weight: 700; letter-spacing: .1em; text-transform: uppercase; }
+.folio-today-mini-row { display: flex; align-items: center; justify-content: space-between; gap: .75rem; padding: .22rem 0; color: var(--foreground); font-size: .72rem; }
+.folio-today-mini-row strong { font-family: var(--font-numeric-stack); font-size: .67rem; font-weight: 500; }
+.folio-today-muted { color: var(--foreground-subtle); font-family: var(--font-numeric-stack); font-size: .75rem; }
+.folio-stitch-secondary-button { min-height: 2rem; border: 1px solid var(--border); border-radius: 4px; color: var(--foreground); font-size: .7rem; font-weight: 500; }
+.folio-stitch-secondary-button:hover { background: var(--surface-muted); }
+.folio-stitch-text-button { color: var(--foreground); font-size: .68rem; font-weight: 600; }
+.folio-stitch-text-button:hover { text-decoration: underline; text-underline-offset: 3px; }
+.folio-today-secondary > .folio-today-section { min-width: 0; }
+
+@media (max-width: 899px) {
+  .folio-sidebar-content { align-items: center; padding: .7rem .35rem; }
+  .folio-sidebar-brand,
+  .folio-sidebar-nav-label,
+  .folio-sidebar-new-analysis span,
+  .folio-sidebar-support,
+  .folio-sidebar-context { display: none; }
+  .folio-sidebar-new-analysis { width: 2.25rem; margin: 0 0 1rem; padding: 0; }
+  .folio-sidebar-nav { width: 100%; flex: 1; }
+  .folio-sidebar-nav-item { justify-content: center; padding: .55rem 0; }
+  .folio-sidebar-alert-dot { position: absolute; top: .35rem; right: .35rem; margin: 0; }
+  .folio-sidebar-footer { width: 100%; }
+  .folio-sidebar-footer .folio-sidebar-nav-item { justify-content: center; }
+  .folio-sidebar-settings-panel { display: none; }
+  .folio-workspace-topbar { height: 3rem; padding-inline: .8rem; }
+  .folio-workspace-topbar-tabs { display: none; }
+  .folio-workspace-topbar-title { font-size: .88rem; }
+  .folio-today-view { padding: 1rem; }
+  .folio-stitch-card { padding: 1rem; }
+  .folio-today-actions { display: none; }
+}
+
+/* Full Stitch system pass: every feature slice consumes the same quiet
+   institutional primitives, including legacy screens that predate the shell. */
+.folio-finance-workspace,
+.folio-finance-workspace > *,
+.folio-pilot-shell,
+.folio-pilot-research-content,
+[data-testid='alerts-view'],
+[data-testid='settings-view'],
+[data-testid='portfolio-view'],
+[data-testid='compare-view'],
+[data-testid='thesis-panel'],
+[data-testid='performance-view'],
+[data-testid='evaluation-center'] {
+  background: var(--background) !important;
+  color: var(--foreground);
+}
+
+.folio-finance-workspace button:not([role='switch']),
+.folio-finance-workspace input,
+.folio-finance-workspace select,
+.folio-finance-workspace textarea,
+.folio-pilot-shell button:not(.rounded-full),
+.folio-pilot-shell input,
+.folio-pilot-shell select,
+.folio-pilot-shell textarea {
+  border-radius: var(--radius);
+}
+
+.folio-finance-workspace .mac-stock-tile,
+.folio-finance-workspace [class*='bg-white'],
+.folio-finance-workspace [class*='bg-surface-raised'],
+.folio-pilot-shell [class*='bg-white'],
+.folio-pilot-shell [class*='bg-surface-raised'] {
+  border-color: var(--border) !important;
+  background: var(--surface) !important;
+  box-shadow: 0 1px 2px rgba(var(--foreground-rgb), .03) !important;
+}
+
+.folio-finance-workspace [class*='border-[var(--mac-border)'],
+.folio-finance-workspace [class*='border-[#'],
+.folio-pilot-shell [class*='border-[#'] {
+  border-color: var(--border) !important;
+}
+
+.folio-finance-workspace [class*='bg-[#'],
+.folio-pilot-shell [class*='bg-[#'] {
+  background: var(--surface-muted) !important;
+}
+
+.folio-finance-workspace [class*='text-[#0052ff'],
+.folio-finance-workspace [class*='text-[var(--mac-blue)'],
+.folio-pilot-shell [class*='text-[#0052ff'],
+.folio-pilot-shell [class*='text-[var(--mac-blue)'] {
+  color: var(--accent) !important;
+}
+
+.folio-finance-workspace [class*='bg-[#0052ff'],
+.folio-pilot-shell [class*='bg-[#0052ff'] {
+  background: var(--accent) !important;
+}
+
+.folio-finance-workspace [class*='hover:bg-[#f'],
+.folio-pilot-shell [class*='hover:bg-[#f'] {
+  background: var(--surface-hover) !important;
+}
+
+.folio-finance-workspace table,
+.folio-pilot-shell table {
+  border-color: var(--border);
+  background: var(--surface);
+}
+
+.folio-finance-workspace th,
+.folio-pilot-shell th {
+  background: var(--surface-muted);
+  color: var(--foreground-subtle);
+  font-family: var(--font-numeric-stack);
+  font-size: .62rem;
+  font-weight: 600;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.folio-finance-workspace td,
+.folio-finance-workspace th,
+.folio-pilot-shell td,
+.folio-pilot-shell th {
+  border-color: var(--border) !important;
+}
+
+.folio-finance-workspace table tbody tr:hover,
+.folio-pilot-shell table tbody tr:hover {
+  background: var(--surface-hover) !important;
+}
+
+.folio-finance-workspace [class*='shadow-'],
+.folio-pilot-shell [class*='shadow-'] {
+  --tw-shadow: 0 1px 2px rgba(var(--foreground-rgb), .03) !important;
+  box-shadow: var(--tw-shadow) !important;
+}
+
+.folio-alerts-view,
+.folio-settings-view,
+.folio-compare-view,
+.folio-thesis-view,
+.folio-performance-view,
+.folio-evaluation-view {
+  min-width: 0;
+  background: var(--background);
+}
+
+.folio-alerts-view > header,
+.folio-settings-view > header,
+.folio-thesis-view > header,
+.folio-performance-view > header,
+.folio-evaluation-view > header {
+  border-color: var(--border) !important;
+  background: var(--surface) !important;
+}
+
+.folio-alert-card,
+.folio-settings-card,
+.folio-thesis-card,
+.folio-performance-card,
+.folio-evaluation-card {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  box-shadow: 0 1px 2px rgba(var(--foreground-rgb), .03);
+}
+
+.folio-alert-card:hover,
+.folio-settings-card:hover,
+.folio-thesis-card:hover,
+.folio-performance-card:hover,
+.folio-evaluation-card:hover {
+  border-color: var(--border-strong);
+}
+
+.folio-banner {
+  border-color: color-mix(in srgb, var(--info) 26%, transparent);
+  background: color-mix(in srgb, var(--info) 10%, var(--surface));
+  color: var(--foreground);
+  font-size: .7rem;
+  line-height: 1.35;
+}
+
+/* Final component contract. These rules deliberately come last so no legacy
+   feature-specific utility can reintroduce the pre-Stitch palette or geometry. */
+.folio-today-hero,
+.folio-today-section,
+.folio-quick-action,
+.folio-discover-view .folio-pilot-page-header,
+.folio-discover-view .folio-pilot-table,
+.folio-discover-task,
+.folio-portfolio-view .mac-stock-tile,
+.folio-compare-view table,
+.folio-compare-view > div:first-child + div {
+  border-color: var(--border) !important;
+  border-radius: var(--radius) !important;
+  background: var(--surface) !important;
+  box-shadow: 0 1px 2px rgba(var(--foreground-rgb), .03) !important;
+}
+
+.folio-today-hero::before,
+.folio-research-asset-header::before {
+  background: var(--accent) !important;
+}
+
+.folio-today-view,
+.folio-discover-view,
+.folio-portfolio-view,
+.folio-compare-view,
+.folio-finance-workspace,
+.folio-pilot-research-content {
+  background: var(--background) !important;
+}
+
+.folio-today-section header h3,
+.folio-discover-view .folio-pilot-eyebrow,
+.folio-discover-view .folio-pilot-table-header,
+.folio-portfolio-view h3,
+.folio-research-section-kicker,
+.folio-research-rail-kicker {
+  color: var(--foreground-subtle) !important;
+}
+
+.folio-today-section li,
+.folio-daily-brief-list,
+.folio-daily-brief-row,
+.folio-portfolio-view .border-t,
+.folio-compare-view > div:first-child,
+.folio-research-evidence-table-row {
+  border-color: var(--border) !important;
+}
+
+.folio-daily-brief-overview,
+.folio-discover-view .folio-pilot-table-header,
+.folio-discover-view .folio-pilot-status,
+.folio-compare-view table thead,
+.folio-research-stat-strip,
+.folio-research-evidence-head {
+  border-color: var(--border) !important;
+  background: var(--surface-muted) !important;
+}
+
+.folio-quick-action:hover,
+.folio-discover-view .folio-pilot-row:hover,
+.folio-discover-task:hover,
+.folio-daily-brief-row:hover,
+.folio-compare-view table tbody tr:hover,
+.folio-today-section li:hover {
+  border-color: var(--border-strong) !important;
+  background: var(--surface-hover) !important;
+  box-shadow: none !important;
+  transform: none !important;
+}
+
+.folio-today-hero input,
+.folio-today-view input,
+.folio-discover-view input,
+.folio-compare-view input,
+.folio-portfolio-view select,
+.folio-alerts-view input,
+.folio-alerts-view select {
+  border-color: var(--input) !important;
+  border-radius: var(--radius) !important;
+  background: var(--surface) !important;
+  color: var(--foreground) !important;
+}
+
+.folio-today-hero input:focus,
+.folio-today-view input:focus,
+.folio-discover-view input:focus,
+.folio-compare-view input:focus,
+.folio-portfolio-view select:focus,
+.folio-alerts-view input:focus,
+.folio-alerts-view select:focus {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 0 3px rgba(var(--accent-rgb), .12) !important;
+}
+
+.folio-research-topbar,
+.folio-research-workspace,
+.folio-research-market-main,
+.folio-research-evidence-panel,
+.folio-research-decision-rail,
+.folio-research-decision-card,
+.folio-research-chart-panel,
+.folio-research-stat-strip {
+  border-color: var(--border) !important;
+}
+
+.folio-research-outline-button,
+.folio-research-toolbar-control,
+.folio-research-icon-button,
+.folio-research-command-hint,
+.folio-research-topbar-market,
+.folio-research-periods {
+  border-color: var(--border) !important;
+  border-radius: var(--radius) !important;
+  background: var(--surface) !important;
+}
+
+.folio-research-tab--active,
+.folio-research-outline-button--active {
+  border-color: color-mix(in srgb, var(--accent) 38%, var(--border)) !important;
+  background: color-mix(in srgb, var(--accent) 9%, var(--surface)) !important;
+  color: var(--accent) !important;
+}
+
+.folio-research-period--active {
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+}
+
+.folio-research-next-action-button,
+.folio-pilot-action > button:first-child,
+.folio-pilot-toolbar-button[data-primary='true'] {
+  border-radius: var(--radius) !important;
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  box-shadow: none !important;
+}
+
+.folio-events-view,
+.folio-profile-view {
+  background: var(--background) !important;
+}
+
+.folio-events-view .folio-page-header,
+.folio-profile-view .folio-page-header,
+.folio-events-view .folio-page-section,
+.folio-profile-view .folio-page-section,
+.folio-events-list,
+.folio-profile-identity {
+  border-color: var(--border) !important;
+  border-radius: var(--radius) !important;
+  background: var(--surface) !important;
+  box-shadow: 0 1px 2px rgba(var(--foreground-rgb), .03) !important;
+}
+
+.folio-event-row:hover,
+.folio-profile-list-row:hover,
+.folio-health-row:hover {
+  background: var(--surface-hover);
+}
+
+.folio-agent-header,
+.folio-agent-activity-surface,
+.folio-agent-panel input,
+.folio-agent-panel textarea {
+  border-color: var(--border) !important;
+  background: var(--surface) !important;
+}
+
+.folio-agent-panel button:not([role='switch']) {
+  border-radius: var(--radius);
+}
+
+.dark .folio-finance-workspace,
+.dark .folio-today-view,
+.dark .folio-discover-view,
+.dark .folio-portfolio-view,
+.dark .folio-compare-view,
+.dark .folio-pilot-research-content,
+.dark .folio-events-view,
+.dark .folio-profile-view {
+  background: var(--background) !important;
+}
+
+/* Focused Stitch compositions for the remaining workbench surfaces. */
+.folio-thesis-view,
+.folio-compare-view,
+.folio-evaluation-view {
+  min-width: 0;
+  background: var(--background) !important;
+}
+
+.folio-thesis-header,
+.folio-compare-header,
+.folio-evaluation-header {
+  border-color: var(--border) !important;
+  background: transparent !important;
+}
+
+.folio-thesis-title,
+.folio-compare-title {
+  margin: .3rem 0 0;
+  color: var(--foreground);
+  font-family: var(--font-display-stack);
+  font-size: 1.45rem;
+  font-weight: 650;
+  letter-spacing: -.04em;
+  line-height: 1.15;
+}
+
+.folio-thesis-subtitle,
+.folio-compare-subtitle {
+  margin-top: .35rem;
+  max-width: 38rem;
+  color: var(--foreground-muted);
+  font-size: .72rem;
+  line-height: 1.45;
+}
+
+.folio-thesis-card,
+.folio-thesis-editor,
+.folio-thesis-impact-list,
+.folio-thesis-empty,
+.folio-compare-controls,
+.folio-compare-empty,
+.folio-evaluation-stat-card {
+  border-color: var(--border) !important;
+  border-radius: var(--radius) !important;
+  background: var(--surface) !important;
+  box-shadow: 0 1px 2px rgba(var(--foreground-rgb), .03) !important;
+}
+
+.folio-thesis-card,
+.folio-thesis-editor {
+  padding: 1.1rem !important;
+}
+
+.folio-thesis-editor {
+  border-left: 2px solid var(--accent) !important;
+}
+
+.folio-thesis-card textarea,
+.folio-thesis-editor textarea,
+.folio-thesis-editor input,
+.folio-compare-controls input {
+  border-color: var(--input) !important;
+  border-radius: var(--radius) !important;
+  background: var(--surface) !important;
+}
+
+.folio-thesis-card [class*='border-[#'],
+.folio-thesis-editor [class*='border-[#'],
+.folio-thesis-impact-list [class*='border-[#'] {
+  border-color: var(--border) !important;
+}
+
+.folio-thesis-card [class*='bg-[#'],
+.folio-thesis-editor [class*='bg-[#'],
+.folio-thesis-impact-list [class*='bg-[#'] {
+  background: var(--surface-muted) !important;
+}
+
+.folio-thesis-history {
+  border-color: var(--border) !important;
+}
+
+.folio-thesis-history > h3,
+.folio-thesis-header .folio-eyebrow,
+.folio-compare-header .folio-eyebrow {
+  color: var(--foreground-subtle) !important;
+}
+
+.folio-compare-controls {
+  padding: .8rem !important;
+}
+
+.folio-compare-empty {
+  min-height: 6rem;
+  border-style: dashed !important;
+  color: var(--foreground-muted) !important;
+}
+
+.folio-compare-view table,
+.folio-evaluation-view table {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  overflow: hidden;
+}
+
+.folio-evaluation-header h2,
+.folio-evaluation-view h3 {
+  font-family: var(--font-display-stack);
+  letter-spacing: -.025em;
+}
+
+.folio-evaluation-tabs {
+  gap: 0 !important;
+  border-color: var(--border) !important;
+}
+
+.folio-evaluation-tabs button {
+  border-radius: var(--radius) var(--radius) 0 0 !important;
+  padding: .65rem .85rem !important;
+  color: var(--foreground-muted) !important;
+}
+
+.folio-evaluation-tabs button:hover {
+  background: var(--surface-hover);
+  color: var(--foreground) !important;
+}
+
+.folio-evaluation-tabs button[class*='border-[var(--mac-blue)]'],
+.folio-evaluation-tabs button[class*='text-[var(--mac-blue)]'] {
+  border-color: var(--accent) !important;
+  color: var(--accent) !important;
+}
+
+.folio-agent-panel {
+  background: var(--surface-muted) !important;
+}
+
+.folio-agent-panel .folio-agent-header {
+  flex-wrap: nowrap;
+  min-height: 3.5rem;
+  padding: .65rem .85rem;
+  background: var(--surface) !important;
+}
+
+.folio-agent-panel .folio-agent-title {
+  flex: 0 0 auto;
+  font-size: .78rem;
+  letter-spacing: -.01em;
+}
+
+.folio-agent-panel .folio-agent-header > button:nth-child(2),
+.folio-agent-panel .folio-agent-header > button:nth-child(3) {
+  min-width: 0;
+  flex: 1 1 auto;
+  overflow: hidden;
+  padding-inline: .55rem;
+  font-size: .68rem;
+}
+
+.folio-agent-panel .folio-agent-header > button:nth-child(2) { max-width: 9.5rem; }
+.folio-agent-panel .folio-agent-header > button:nth-child(3) { max-width: 8rem; }
+.folio-agent-panel .folio-agent-header > div.flex-1 { display: none; }
+
+.folio-agent-panel .folio-agent-header > button:last-child {
+  flex: 0 0 1.85rem;
+}
+
+.folio-agent-context {
+  background: var(--surface) !important;
+  padding: .65rem .85rem;
+}
+
+.folio-agent-body {
+  background: var(--surface-muted);
+}
+
+.folio-agent-body > div {
+  padding: .85rem;
+}
+
+.folio-agent-suggestions {
+  border: 1px solid var(--border);
+  border-radius: var(--radius);
+  background: var(--surface);
+  padding: .75rem !important;
+}
+
+.folio-agent-suggestions button {
+  border-color: var(--border) !important;
+  background: var(--surface-muted) !important;
+  color: var(--foreground-muted) !important;
+  padding: .4rem .6rem !important;
+}
+
+.folio-agent-suggestions button:hover {
+  background: var(--surface-hover) !important;
+  color: var(--foreground) !important;
+}
+
+.folio-agent-composer {
+  background: var(--surface) !important;
+  padding: .75rem !important;
+}
+
+/* Composer textarea: 12px radius matching the panel's card language; the
+   inline circular send button overlays the bottom-right corner. */
+.folio-agent-composer .folio-agent-textarea {
+  min-height: 3.5rem;
+  border-color: var(--input) !important;
+  border-radius: 12px !important;
+  background: var(--surface) !important;
+  box-shadow: inset 0 1px 2px rgba(var(--foreground-rgb), .025);
+}
+
+.folio-agent-composer .folio-agent-send {
+  border-radius: 9999px !important;
+  background: var(--primary) !important;
+  color: var(--primary-foreground) !important;
+  box-shadow: 0 1px 3px rgba(var(--foreground-rgb), .18);
 }

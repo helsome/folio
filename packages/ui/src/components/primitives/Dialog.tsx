@@ -23,7 +23,7 @@ export const Dialog: React.FC<DialogProps> = ({
       <DialogPrimitive.Overlay className="fixed inset-0 z-(--z-index-modal) bg-black/32 backdrop-blur-[2px]" />
       <DialogPrimitive.Content
           className={cn(
-            'fixed left-1/2 top-1/2 z-(--z-index-modal) w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-[12px] border border-border bg-surface p-5 text-foreground shadow-[0_20px_60px_rgba(0,0,0,.18)]',
+            'fixed left-1/2 top-1/2 z-(--z-index-modal) w-[calc(100%-2rem)] max-w-lg -translate-x-1/2 -translate-y-1/2 rounded-[4px] border border-border bg-surface p-5 text-foreground shadow-[0_16px_40px_rgba(15,23,42,.14)]',
             'focus:outline-none',
             className
           )}

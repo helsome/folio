@@ -134,7 +134,7 @@ describe('DailyBriefSection', () => {
     container.remove()
   })
 
-  it('degrades to an empty state when the channel is missing', async () => {
+  it('falls back to the badged sample brief when the channel is missing', async () => {
     const { container, root } = render(fallbackClient)
 
     await act(async () => {
@@ -150,7 +150,11 @@ describe('DailyBriefSection', () => {
 
     const text = container.textContent ?? ''
     expect(text).toContain('Daily Brief')
-    expect(text).toContain('Daily Brief is not available yet.')
+    // Sample-data fallback instead of the empty state: demo items render and
+    // the DemoBadge marks the section as sample content.
+    expect(container.querySelector('[data-testid="demo-badge"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="brief-items"]')).not.toBeNull()
+    expect(text).toContain('AAPL regulatory risk may pressure Q4 margins')
 
     await act(async () => {
       root.unmount()

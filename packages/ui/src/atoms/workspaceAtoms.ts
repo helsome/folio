@@ -38,7 +38,10 @@ export type NavSection =
   // Folio V5 "Discover" (spec §4–5) — mounted by the Lead.
   | 'discover'
   // Folio V7 Evaluation Center (spec §61–68) — mounted by the Evaluation UI agent.
-  | 'evaluation';
+  | 'evaluation'
+  // Stitch portfolio surfaces: upcoming events and local profile/security.
+  | 'events'
+  | 'profile';
 
 export const navSectionAtom = persistedAtom<NavSection>('navSection', 'sessions');
 

@@ -3,6 +3,7 @@ import type { NamespaceResource } from '../keys.ts';
 /** Agent panel + chat chrome (spec §113). Lifetime values are runtime data, not chrome. */
 export const agent = {
   panel: {
+    title: 'Agent Copilot',
     collapsePanel: 'Collapse agent panel',
     inputPlaceholder: 'Ask the copilot…',
     inputRunningPlaceholder: 'Agent is running…',

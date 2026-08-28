@@ -33,7 +33,7 @@ export const QuoteCard: React.FC<QuoteCardProps> = ({ quote }) => {
   const tone = isPositive ? 'text-[var(--mac-green)]' : 'text-[var(--mac-red)]';
 
   return (
-    <div className="mac-stock-tile rounded-[14px] p-3.5">
+    <div className="mac-stock-tile rounded-[12px] p-3.5">
       <div className="flex items-start justify-between">
         <div className="min-w-0">
           <div className="text-[10px] font-semibold uppercase tracking-wider text-foreground/40">{t('agent.quote.title')}</div>

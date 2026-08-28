@@ -6,6 +6,7 @@ import {
   watchlistAtom,
   quoteCacheAtomFamily,
   watchlistLatestTimestampAtom,
+  watchlistQuotesAreDemoAtom,
   fetchQuoteAtom,
   addToWatchlistAtom,
   removeFromWatchlistAtom,
@@ -16,6 +17,7 @@ import { useFinagentClient } from '../../client';
 import { Input } from '../primitives/Input';
 import { Button } from '../primitives/Button';
 import { DataFreshness } from '../primitives/DataFreshness';
+import { DemoBadge } from '../primitives/DemoBadge';
 
 const SYMBOL_REGEX = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
 const DASH = '\u2014';
@@ -34,6 +36,7 @@ export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = tru
   const setActiveView = useSetAtom(activeViewAtom);
   const activeSymbol = useAtomValue(activeSymbolAtom);
   const latestTimestamp = useAtomValue(watchlistLatestTimestampAtom);
+  const quotesAreDemo = useAtomValue(watchlistQuotesAreDemoAtom);
 
   const [newSymbol, setNewSymbol] = React.useState('');
   const [error, setError] = React.useState('');
@@ -100,13 +103,16 @@ export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = tru
             <span className="text-[11px] font-semibold uppercase text-foreground/42">
               {t('navigation.watchlist')}
             </span>
-            <DataFreshness
-              providerName="Longbridge"
-              updatedAtMs={
-                latestTimestamp ? latestTimestamp * 1000 : undefined
-              }
-              className="min-w-0 text-right leading-tight"
-            />
+            <span className="flex min-w-0 items-center gap-2">
+              {quotesAreDemo && <DemoBadge />}
+              <DataFreshness
+                providerName="Longbridge"
+                updatedAtMs={
+                  latestTimestamp ? latestTimestamp * 1000 : undefined
+                }
+                className="min-w-0 text-right leading-tight"
+              />
+            </span>
           </div>
         )}
         <div className="flex gap-1.5">

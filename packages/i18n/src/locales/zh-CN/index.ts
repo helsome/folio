@@ -18,10 +18,14 @@ import { onboarding } from './onboarding.ts';
 import { diagnostics } from './diagnostics.ts';
 import { agent } from './agent.ts';
 import { trace } from './trace.ts';
+import { events } from './events.ts';
+import { profile } from './profile.ts';
+import { demo } from './demo.ts';
 
 /** zh-CN resource bundle — every namespace mirrors en-US key-for-key. */
 export const zhCnResources = {
   common,
+  demo,
   navigation,
   settings,
   errors,
@@ -41,4 +45,6 @@ export const zhCnResources = {
   diagnostics,
   agent,
   trace,
+  events,
+  profile,
 };

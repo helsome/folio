@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 import { atomFamily } from 'jotai/utils';
 import type { Quote } from '@finagent/core';
 import type { FinagentClient } from '../client';
+import { demoQuote, hasDemoQuote } from '../demo/demoData';
 
 const CACHE_TTL = 30 * 1000; // 30 seconds
 
@@ -10,6 +11,8 @@ interface QuoteCache {
   timestamp: number;
   loading: boolean;
   error: string | null;
+  /** True when `data` is built-in sample data (no live provider available). */
+  isDemo: boolean;
 }
 
 // Quote cache atom family
@@ -19,6 +22,7 @@ export const quoteCacheAtomFamily = atomFamily((symbol: string) =>
     timestamp: 0,
     loading: false,
     error: null,
+    isDemo: false,
   })
 );
 
@@ -80,13 +84,21 @@ export const fetchQuoteAtom = atom(
         timestamp: Date.now(),
         loading: false,
         error: null,
+        isDemo: false,
       });
 
       return quote;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch quote';
+      // No live provider available: fall back to built-in sample data when we
+      // have it, so the UI shows a populated (clearly badged) default instead
+      // of an empty state. Unknown symbols keep the honest error path.
+      const demo = hasDemoQuote(symbol) ? demoQuote(symbol) : null;
       set(quoteCacheAtomFamily(symbol), (cache) => ({
         ...cache,
+        data: demo,
+        isDemo: demo != null,
+        timestamp: demo != null ? Date.now() : cache.timestamp,
         loading: false,
         error: errorMessage,
       }));
@@ -103,3 +115,17 @@ export const isQuoteStaleAtom = atomFamily((symbol: string) =>
     return Date.now() - cache.timestamp > CACHE_TTL;
   })
 );
+
+/**
+ * True when every watchlist symbol currently renders sample data (the live
+ * provider was unavailable for all of them). Drives the `DemoBadge` on the
+ * watchlist/movers surfaces. Empty watchlist → false (nothing is demo).
+ */
+export const watchlistQuotesAreDemoAtom = atom<boolean>((get) => {
+  const watchlist = get(watchlistAtom);
+  if (watchlist.length === 0) return false;
+  return watchlist.every((symbol) => {
+    const cache = get(quoteCacheAtomFamily(symbol));
+    return cache.data != null && cache.isDemo;
+  });
+});

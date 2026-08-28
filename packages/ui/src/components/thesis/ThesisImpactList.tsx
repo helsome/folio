@@ -21,7 +21,7 @@ export const ThesisImpactList: React.FC<{ impacts: ThesisImpact[] }> = ({ impact
   }
 
   return (
-    <div className="overflow-hidden rounded-[10px] border border-[#dfe5ed] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
+    <div className="folio-thesis-impact-list overflow-hidden rounded-[10px] border border-[#dfe5ed] bg-white shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
       {impacts.map((impact) => {
         const badge = KIND_BADGE[impact.kind];
         return (

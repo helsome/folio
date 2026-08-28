@@ -53,13 +53,18 @@ export interface PaletteCommandInput {
 
 /** The app sections reachable from the palette, in sidebar order. */
 export const NAVIGATION_COMMANDS: Array<{ section: NavSection; label: string }> = [
+  { section: 'today', label: 'Today' },
+  { section: 'discover', label: 'Discover' },
+  { section: 'watchlist', label: 'Workspace' },
   { section: 'portfolio', label: 'Portfolio' },
+  { section: 'events', label: 'Events' },
   { section: 'research', label: 'Research' },
   { section: 'thesis', label: 'Thesis' },
   { section: 'compare', label: 'Compare' },
   { section: 'alerts', label: 'Alerts' },
   { section: 'skills', label: 'Skills' },
   { section: 'evaluation', label: 'Evaluation' },
+  { section: 'profile', label: 'Profile & Security' },
   { section: 'settings', label: 'Settings' },
 ]
 

@@ -18,6 +18,9 @@ import { today } from './today.ts';
 import { discover } from './discover.ts';
 import { agent } from './agent.ts';
 import { trace } from './trace.ts';
+import { events } from './events.ts';
+import { profile } from './profile.ts';
+import { demo } from './demo.ts';
 
 /**
  * en-US resource bundle. Feature slices add their own namespace here (today,
@@ -25,6 +28,7 @@ import { trace } from './trace.ts';
  */
 export const enUsResources = {
   common,
+  demo,
   navigation,
   settings,
   errors,
@@ -44,4 +48,6 @@ export const enUsResources = {
   discover,
   agent,
   trace,
+  events,
+  profile,
 };

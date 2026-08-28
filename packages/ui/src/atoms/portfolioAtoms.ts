@@ -3,6 +3,7 @@ import type { Holding, PortfolioAccount, PortfolioFailure, PortfolioSnapshot } f
 import type { FinagentClient } from '../client';
 import { portfolioFailureFromError, portfolioFailureFromSnapshot } from '../lib/portfolioFailure';
 import { manualPortfoliosAtom } from './portfolioImportAtoms';
+import { demoPortfolioSnapshot } from '../demo/demoData';
 
 const CACHE_TTL = 2 * 60 * 1000; // 2 minutes
 
@@ -13,6 +14,8 @@ interface PortfolioCache {
   timestamp: number;
   loading: boolean;
   error: string | null;
+  /** True when `data` is built-in sample data (no live provider available). */
+  isDemo: boolean;
 }
 
 export const portfolioCacheAtom = atom<PortfolioCache>({
@@ -21,6 +24,7 @@ export const portfolioCacheAtom = atom<PortfolioCache>({
   timestamp: 0,
   loading: false,
   error: null,
+  isDemo: false,
 });
 
 export const fetchPortfolioAtom = atom(
@@ -42,9 +46,26 @@ export const fetchPortfolioAtom = atom(
       }
 
       const snapshot = result.data;
+      const failure = portfolioFailureFromSnapshot(snapshot);
+      // A connected-but-empty snapshot renders the badged sample portfolio so
+      // the surface is never blank (spec: default display data); partial
+      // snapshots keep their real (incomplete) data.
+      if (failure?.kind === 'empty') {
+        const demo = demoPortfolioSnapshot();
+        set(portfolioCacheAtom, {
+          data: demo,
+          failure: null,
+          isDemo: true,
+          timestamp: Date.now(),
+          loading: false,
+          error: null,
+        });
+        return demo;
+      }
       set(portfolioCacheAtom, {
         data: snapshot,
-        failure: portfolioFailureFromSnapshot(snapshot) ?? null,
+        failure: failure ?? null,
+        isDemo: false,
         timestamp: Date.now(),
         loading: false,
         error: null,
@@ -52,8 +73,18 @@ export const fetchPortfolioAtom = atom(
       return snapshot;
     } catch (error) {
       const message = error instanceof Error ? error.message : 'Failed to fetch portfolio';
-      set(portfolioCacheAtom, (cache) => ({ ...cache, loading: false, error: message }));
-      throw error;
+      // Provider unavailable (not connected / offline): fall back to the
+      // badged sample portfolio instead of an empty state.
+      const demo = demoPortfolioSnapshot();
+      set(portfolioCacheAtom, {
+        data: demo,
+        failure: null,
+        isDemo: true,
+        timestamp: Date.now(),
+        loading: false,
+        error: message,
+      });
+      return demo;
     }
   }
 );

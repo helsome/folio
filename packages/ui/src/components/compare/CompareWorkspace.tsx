@@ -44,10 +44,12 @@ export const CompareWorkspace: React.FC = () => {
 
   return (
     <div className="folio-compare-view flex h-full flex-col overflow-y-auto bg-surface-raised p-5" data-testid="compare-workspace">
-      <div className="flex items-start justify-between gap-4 border-b border-border pb-3">
-        <h3 className="text-[15px] font-semibold tracking-[-0.01em] text-foreground">
-          {t('compare.title')}
-        </h3>
+      <div className="folio-compare-header flex items-end justify-between gap-4 border-b border-border pb-4">
+        <div>
+          <p className="folio-eyebrow">{t('compare.title')}</p>
+          <h2 className="folio-compare-title">{t('compare.title')}</h2>
+          <p className="folio-compare-subtitle">{t('compare.agentContext')}</p>
+        </div>
         <DataFreshness
           providerName="Longbridge"
           updatedAtMs={state.data?.generatedAt}
@@ -55,7 +57,7 @@ export const CompareWorkspace: React.FC = () => {
         />
       </div>
 
-      <div className="mt-4 rounded-[10px] border border-border bg-background/45 p-3">
+      <div className="folio-compare-controls mt-4 rounded-[10px] border border-border bg-background/45 p-3">
         <div className="flex items-center gap-2">
           <input
             data-testid="compare-symbol-input"
@@ -102,7 +104,7 @@ export const CompareWorkspace: React.FC = () => {
         ) : state.data ? (
           <CompareTable comparison={state.data} />
         ) : (
-          <div className="rounded-[10px] border border-dashed border-border px-4 py-8 text-center text-[12.5px] text-text-muted">
+          <div className="folio-compare-empty rounded-[10px] border border-dashed border-border px-4 py-8 text-center text-[12.5px] text-text-muted">
             {t('compare.addTwo')}
           </div>
         )}

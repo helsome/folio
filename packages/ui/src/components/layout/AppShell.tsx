@@ -73,7 +73,7 @@ const LongBridgeBanner: React.FC = () => {
   const title = status?.status === 'rate_limited' ? 'LongBridge paused: ' : 'LongBridge setup needed: ';
 
   return (
-    <div className="border-b border-[color-mix(in_srgb,var(--info)_26%,transparent)] bg-[color-mix(in_srgb,var(--info)_10%,transparent)] px-4 py-2 text-[13px] backdrop-blur-xl">
+    <div className="folio-banner border-b px-4 py-2">
       <span className="font-semibold text-foreground">{title}</span>
       <span className="text-foreground/78">{message}</span>
       <span className="ml-2 text-foreground/54">{action}</span>

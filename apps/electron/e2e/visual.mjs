@@ -86,6 +86,11 @@ async function main() {
     browser = await chromium.connectOverCDP(cdpUrl, { timeout: 30_000 });
     const page = await waitForPage(browser.contexts()[0], 30_000);
     await page.waitForLoadState('domcontentloaded');
+    const onboarding = page.locator('[data-testid="onboarding-overlay"]');
+    if (await onboarding.isVisible().catch(() => false)) {
+      await page.locator('[data-testid="onboarding-skip"]').click();
+      await onboarding.waitFor({ state: 'hidden', timeout: 15_000 });
+    }
     await page.getByRole('button', { name: 'New Session', exact: true }).waitFor({ timeout: 15_000 });
     await page.getByRole('button', { name: 'New Session', exact: true }).click();
     await page.locator('[data-testid="agent-input"]').waitFor({ timeout: 15_000 });
@@ -103,6 +108,10 @@ async function main() {
     await page.locator('[data-testid="today-view"]').waitFor({ timeout: 15_000 });
     await capture('today', 1440, 900);
 
+    await page.getByRole('button', { name: 'Portfolio', exact: true }).click();
+    await page.waitForTimeout(1200);
+    await capture('portfolio', 1440, 900);
+
     await page.getByRole('button', { name: /^Discover$/i }).first().click();
     await page.locator('[data-testid="discover-view"]').waitFor({ timeout: 15_000 });
     await capture('discover', 1280, 800);
@@ -113,9 +122,54 @@ async function main() {
     await page.locator('[data-testid="security-header-symbol"]').filter({ hasText: 'NVDA.US' }).waitFor({ timeout: 15_000 });
     await capture('security-workbench', 1440, 900);
 
+    await page.getByRole('button', { name: 'Research', exact: true }).click();
+    await page.locator('[data-testid="research-panel"]').waitFor({ timeout: 15_000 });
+    const startResearch = page.getByRole('button', { name: 'Deep Research', exact: true });
+    if (await startResearch.count()) {
+      await startResearch.click();
+      await page.waitForTimeout(500);
+    }
+    await capture('research', 1440, 900);
+
+    await page.getByRole('button', { name: 'Compare', exact: true }).click();
+    await page.locator('[data-testid="compare-workspace"]').waitFor({ timeout: 15_000 });
+    await capture('compare', 1280, 800);
+
+    await page.getByRole('button', { name: 'Thesis', exact: true }).click();
+    await page.locator('[data-testid="thesis-panel"]').waitFor({ timeout: 15_000 });
+    await capture('thesis', 1280, 800);
+
+    await page.getByRole('button', { name: 'Skills', exact: true }).click();
+    await page.getByText('Skills', { exact: true }).first().waitFor({ timeout: 15_000 });
+    await capture('skills', 1280, 800);
+
+    await page.getByRole('button', { name: 'Evaluation', exact: true }).click();
+    await page.locator('[data-testid="evaluation-center"]').waitFor({ timeout: 15_000 });
+    await capture('evaluation', 1280, 800);
+
+    await page.getByRole('button', { name: 'Alerts', exact: true }).click();
+    await page.getByRole('button', { name: '+ New', exact: true }).waitFor({ timeout: 15_000 });
+    await capture('alerts', 1280, 800);
+    await page.getByRole('button', { name: '+ New', exact: true }).click();
+    await page.getByRole('dialog').waitFor({ timeout: 15_000 });
+    await capture('alert-form', 1280, 800);
+    await page.getByRole('button', { name: 'Cancel', exact: true }).click();
+
     await page.getByRole('button', { name: 'Settings', exact: true }).click();
     await page.getByText('Preferences', { exact: true }).waitFor({ timeout: 15_000 });
     await capture('settings', 1280, 800);
+
+    await page.getByRole('button', { name: 'Events', exact: true }).click();
+    await page.locator('[data-testid="events-view"]').waitFor({ timeout: 15_000 });
+    await capture('events', 1440, 900);
+
+    await page.getByRole('button', { name: 'Profile & Security', exact: true }).click();
+    await page.locator('[data-testid="profile-view"]').waitFor({ timeout: 15_000 });
+    await capture('profile', 1280, 800);
+
+    await page.getByRole('button', { name: /^Today$/i }).first().click();
+    await page.locator('[data-testid="today-view"]').waitFor({ timeout: 15_000 });
+    await capture('today-narrow', 390, 884);
   } finally {
     await browser?.close().catch(() => undefined);
     electronProcess.kill();

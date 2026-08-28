@@ -12,6 +12,7 @@ import {
   type PulsePersonalImpactItem,
 } from '../../client/pulse'
 import { formatPercent } from '../../lib/money'
+import { DemoBadge } from '../primitives/DemoBadge'
 import { SectionState, TodaySection } from '../today/TodaySection'
 
 const DASH = '\u2014'
@@ -146,7 +147,7 @@ const ImpactRow: React.FC<{ item: PulsePersonalImpactItem }> = ({ item }) => {
 export const MarketPulse: React.FC = () => {
   const { t } = useTranslation()
   const client = useFinagentClient()
-  const { snapshot, loading, error } = useAtomValue(pulseCacheAtom)
+  const { snapshot, loading, error, isDemo } = useAtomValue(pulseCacheAtom)
   const loadPulse = useSetAtom(loadPulseAtom)
 
   useEffect(() => {
@@ -158,7 +159,10 @@ export const MarketPulse: React.FC = () => {
   const temperature = snapshot?.temperature ?? null
 
   return (
-    <TodaySection title={t('today.marketPulse')}>
+    <TodaySection
+      title={t('today.marketPulse')}
+      action={isDemo && !loading ? <DemoBadge /> : undefined}
+    >
       {loading ? (
         <SectionState kind="loading" />
       ) : error && !snapshot ? (

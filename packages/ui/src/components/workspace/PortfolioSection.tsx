@@ -194,7 +194,7 @@ export const PortfolioSection: React.FC = () => {
         </div>
       )}
 
-      <PortfolioCard view={view} />
+      <PortfolioCard view={view} isDemo={cache.isDemo} />
       <AssetPieChart view={view} />
 
       <div>

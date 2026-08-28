@@ -18,6 +18,8 @@ import { CompareWorkspace } from '../compare/CompareWorkspace';
 import { TodayView } from '../today/TodayView';
 import { DiscoverView } from '../discover/DiscoverView';
 import { EvaluationCenter } from '../evaluation/EvaluationCenter';
+import { EventsView } from '../events/EventsView';
+import { ProfileSecurityView } from '../profile/ProfileSecurityView';
 import { Tabs, TabsList, TabsTrigger } from '../ui/tabs';
 const WORKSPACE_TABS: { value: WorkspaceView; label: string }[] = [
   { value: 'overview', label: 'Overview' },
@@ -44,6 +46,12 @@ export const FinanceWorkspace: React.FC = () => {
       break;
     case 'alerts':
       content = <AlertsSection />;
+      break;
+    case 'events':
+      content = <EventsView />;
+      break;
+    case 'profile':
+      content = <ProfileSecurityView />;
       break;
     case 'skills':
       content = <SkillsView />;

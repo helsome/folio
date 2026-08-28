@@ -197,7 +197,7 @@ export const AgentPanel: React.FC = () => {
     return (
       <aside
         data-testid="agent-panel"
-        className="flex h-full w-full flex-col items-center justify-center border-l mac-section-divider bg-background"
+        className="folio-agent-panel flex h-full w-full flex-col items-center justify-center border-l mac-section-divider bg-background"
       >
         <div className="px-6 text-center">
           <img
@@ -206,7 +206,7 @@ export const AgentPanel: React.FC = () => {
             className="mx-auto mb-4 h-14 w-14 rounded-[16px] shadow-[0_14px_38px_rgba(var(--accent-rgb),0.18)]"
             draggable={false}
           />
-          <h2 className="mb-2 text-[19px] font-semibold tracking-tight text-foreground">Copilot</h2>
+          <h2 className="mb-2 text-[19px] font-semibold tracking-tight text-foreground">{t('agent.panel.title')}</h2>
           <p className="mb-5 text-[13px] leading-relaxed text-foreground/52">
             {t('agent.empty.body')}
           </p>
@@ -228,10 +228,11 @@ export const AgentPanel: React.FC = () => {
   return (
     <aside
       data-testid="agent-panel"
-      className="mac-sidebar flex h-full w-full flex-col border-l mac-section-divider"
+      className="folio-agent-panel mac-sidebar flex h-full w-full flex-col border-l mac-section-divider"
     >
       {/* Header: model + thinking selectors and collapse affordance */}
-      <div className="flex items-center gap-1.5 border-b mac-section-divider px-3 py-2.5">
+      <div className="folio-agent-header flex items-center gap-1.5 border-b mac-section-divider px-4 py-3">
+        <div className="folio-agent-title mr-auto">{t('agent.panel.title')}</div>
         <ModelSelector disabled={isRunning} />
         <ThinkingSelector disabled={isRunning} />
         <div className="flex-1" />
@@ -247,12 +248,12 @@ export const AgentPanel: React.FC = () => {
       </div>
 
       {/* Workspace context chip */}
-      <div className="border-b mac-section-divider px-3 py-2">
+      <div className="folio-agent-context border-b mac-section-divider px-3 py-2">
         <ContextChip />
       </div>
 
       {/* Scrollable body: tool activity, structured results, messages, live answer */}
-      <div className="flex-1 overflow-y-auto scrollbar-hover">
+      <div className="folio-agent-body flex-1 overflow-y-auto scrollbar-hover">
         <div className="flex flex-col gap-3 p-3">
           {runView?.infraError && (
             <RuntimeInfraBanner
@@ -261,7 +262,7 @@ export const AgentPanel: React.FC = () => {
             />
           )}
           {isRunning ? (
-            <div className="folio-agent-activity-surface rounded-[9px] border border-border bg-surface-muted px-3 py-2" data-testid="agent-activity-surface">
+            <div className="folio-agent-activity-surface rounded-[10px] border border-border bg-surface-muted px-3 py-2" data-testid="agent-activity-surface">
               <AgentAmbientField state={agentMotionState} />
               <div className="relative flex items-center gap-2 text-[11px] text-foreground/64">
                 <span className="h-1.5 w-1.5 rounded-full bg-accent" aria-hidden="true" />
@@ -295,21 +296,34 @@ export const AgentPanel: React.FC = () => {
         </div>
       </div>
 
-      {/* Input / send / stop */}
-      <div className="border-t mac-section-divider bg-surface px-3 py-3">
-        <textarea
-          data-testid="agent-input"
-          value={input}
-          onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
-          onKeyDown={handleKeyDown}
-          placeholder={isRunning ? t('agent.panel.inputRunningPlaceholder') : t('agent.panel.inputPlaceholder')}
-          disabled={isRunning}
-          rows={2}
-          className="mac-input w-full resize-none rounded-[14px] px-3 py-2.5 text-[13px] leading-relaxed text-foreground placeholder:text-foreground/38 focus:border-[rgba(var(--accent-rgb),0.34)] focus:outline-none focus:ring-2 focus:ring-accent/25 disabled:opacity-50"
-        />
+      {/* Input / send / stop — send lives inline in the composer (Stitch design) */}
+      <div className="folio-agent-composer border-t mac-section-divider bg-surface px-3 py-3">
+        <div className="relative">
+          <textarea
+            data-testid="agent-input"
+            value={input}
+            onChange={(e: React.ChangeEvent<HTMLTextAreaElement>) => setInput(e.target.value)}
+            onKeyDown={handleKeyDown}
+            placeholder={isRunning ? t('agent.panel.inputRunningPlaceholder') : t('agent.panel.inputPlaceholder')}
+            disabled={isRunning}
+            rows={2}
+            className="mac-input folio-agent-textarea w-full resize-none px-3 py-2.5 pr-11 text-[13px] leading-relaxed text-foreground placeholder:text-foreground/38 focus:border-[rgba(var(--accent-rgb),0.34)] focus:outline-none focus:ring-2 focus:ring-accent/25 disabled:opacity-50"
+          />
+          {!isRunning && (
+            <button
+              type="button"
+              onClick={() => void handleSend()}
+              disabled={!input.trim()}
+              className="mac-primary-button folio-agent-send absolute bottom-2 right-2 flex h-7 w-7 items-center justify-center rounded-full transition-smooth active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-45"
+              aria-label={t('agent.panel.sendMessage')}
+            >
+              <ArrowUp className="h-4 w-4" strokeWidth={1.8} />
+            </button>
+          )}
+        </div>
         {sendError && <div className="mt-1.5 text-[11px] text-destructive">{sendError}</div>}
-        <div className="mt-2 flex items-center justify-end gap-2">
-          {isRunning ? (
+        {isRunning && (
+          <div className="mt-2 flex justify-end">
             <button
               type="button"
               onClick={() => void handleStop()}
@@ -318,18 +332,8 @@ export const AgentPanel: React.FC = () => {
               <Square className="h-3 w-3 fill-current" />
               {t('agent.panel.stop')}
             </button>
-          ) : (
-            <button
-              type="button"
-              onClick={() => void handleSend()}
-              disabled={!input.trim()}
-              className="mac-primary-button flex h-9 w-9 items-center justify-center rounded-full transition-smooth active:scale-[0.985] disabled:cursor-not-allowed disabled:opacity-45"
-              aria-label={t('agent.panel.sendMessage')}
-            >
-              <ArrowUp className="h-4 w-4" strokeWidth={1.8} />
-            </button>
-          )}
-        </div>
+          </div>
+        )}
       </div>
       {/* Trace Inspector (progressive disclosure — only from the footer) */}
       {traceDialog && (
@@ -365,7 +369,7 @@ const RunFooter: React.FC<{
   return (
     <div
       data-testid="run-footer"
-      className={`flex items-center justify-between gap-2 rounded-[9px] border px-3 py-2 ${
+      className={`flex items-center justify-between gap-2 rounded-[10px] border px-3 py-2 ${
         failed ? 'border-destructive/24 bg-destructive/5' : 'border-border bg-surface-muted'
       }`}
     >
@@ -403,7 +407,7 @@ const SuggestionChips: React.FC<{ onPick: (text: string) => void }> = ({ onPick 
   const prompts = (t(groupKey, { returnObjects: true }) as string[]) ?? [];
   if (prompts.length === 0) return null;
   return (
-    <div className="px-3 pb-1" data-testid="agent-suggestions">
+    <div className="folio-agent-suggestions px-3 pb-1" data-testid="agent-suggestions">
       <div className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[.12em] text-foreground/36">
         <Sparkles className="h-3 w-3" strokeWidth={1.8} />
         {t('agent.suggestions.title')}
@@ -428,7 +432,7 @@ const SuggestionChips: React.FC<{ onPick: (text: string) => void }> = ({ onPick 
 const StreamingBlock: React.FC<{ answer: string }> = ({ answer }) => {
   const { t } = useTranslation();
   return (
-    <div data-testid="run-panel" className="rounded-[14px] border mac-section-divider bg-background/72 px-3.5 py-3 backdrop-blur-2xl">
+    <div data-testid="run-panel" className="rounded-[10px] border mac-section-divider bg-surface px-3.5 py-3">
       <div className="mb-2 flex items-center gap-2 text-[11px] font-semibold uppercase text-foreground/48">
         <span className="h-2 w-2 animate-pulse rounded-full bg-accent" />
         {t('agent.panel.agentRunning')}
@@ -476,7 +480,7 @@ const RuntimeInfraBanner: React.FC<{ error: ApiError; onRetry: () => void }> = (
     <div
       data-testid="runtime-infra-banner"
       role="alert"
-      className="rounded-[14px] border border-destructive/26 bg-destructive/6 px-3.5 py-3 text-[13px]"
+      className="rounded-[10px] border border-destructive/26 bg-destructive/6 px-3.5 py-3 text-[13px]"
     >
       <div className="mb-1 flex items-center gap-2">
         <span className="h-1.5 w-1.5 rounded-full bg-destructive" />

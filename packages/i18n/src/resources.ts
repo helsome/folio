@@ -41,6 +41,9 @@ export const SUPPORTED_NAMESPACES: readonly string[] = [
   'evaluation',
   'diagnostics',
   'errors',
+  'events',
+  'profile',
+  'demo',
 ];
 
 export const SUPPORTED_LOCALES_FOR_RESOURCES: readonly SupportedLocale[] = ['en-US', 'zh-CN'];

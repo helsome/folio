@@ -2,12 +2,15 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { PortfolioView } from '../../atoms/portfolioAtoms';
 import { formatCurrency, formatSignedCurrency, formatPercent } from '@finagent/i18n';
+import { DemoBadge } from '../primitives/DemoBadge';
 
 interface PortfolioCardProps {
   view: PortfolioView;
+  /** True when the snapshot is built-in sample data (no live provider). */
+  isDemo?: boolean;
 }
 
-export const PortfolioCard: React.FC<PortfolioCardProps> = ({ view }) => {
+export const PortfolioCard: React.FC<PortfolioCardProps> = ({ view, isDemo = false }) => {
   const { t } = useTranslation();
   const invested = view.totalAssets !== undefined && view.totalPnL !== undefined
     ? view.totalAssets - view.totalPnL
@@ -21,7 +24,7 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({ view }) => {
   const pnlColor = isPositive ? 'text-[var(--mac-green)]' : 'text-[var(--mac-red)]';
 
   return (
-    <div className="rounded-[16px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
+    <div className="folio-portfolio-summary-card rounded-[16px] border border-[var(--mac-border)] bg-white p-5 shadow-[0_1px_2px_rgba(15,23,42,0.04)]">
       <div className="flex items-start justify-between gap-5">
         <div>
           <div className="text-[11px] font-semibold uppercase tracking-[0.1em] text-foreground/48">{t('portfolio.totalValue')}</div>
@@ -30,6 +33,7 @@ export const PortfolioCard: React.FC<PortfolioCardProps> = ({ view }) => {
           </div>
         </div>
         <div className="flex flex-col items-end gap-1 text-right">
+          {isDemo && <DemoBadge />}
           <div className={`rounded-full px-2.5 py-1 text-[12px] font-semibold tabular-nums ${isPositive ? 'bg-[var(--mac-green)]/10' : 'bg-[var(--mac-red)]/10'} ${pnlColor}`}>
             {formatSignedCurrency(view.totalPnL, view.baseCurrency)}
           </div>

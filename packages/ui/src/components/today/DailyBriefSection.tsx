@@ -6,7 +6,9 @@ import { useFinagentClient } from '../../client'
 import { automationStateAtom, loadBriefAtom } from '../../atoms/automationAtoms'
 import type { BriefItem, BriefItemSource, BriefSeverity } from '../../client/automation'
 import { Button } from '../primitives/Button'
+import { DemoBadge } from '../primitives/DemoBadge'
 import { SectionState, TodaySection } from './TodaySection'
+import { demoDailyBrief } from '../../demo/demoData'
 
 interface DailyBriefSectionProps {
   /** Opens the automation management drawer (wired by TodayView). */
@@ -61,30 +63,34 @@ export const DailyBriefSection: React.FC<DailyBriefSectionProps> = ({ onManage }
 
   const content = (() => {
     if (brief === null && briefLoading) return <SectionState kind="loading" />
-    if (brief === null) {
+    // Brief unavailable (no automation/LLM runtime): render the badged sample
+    // brief so the dashboard shows a populated default instead of an empty state.
+    const briefIsDemo = brief === null && !briefLoading
+    const activeBrief = briefIsDemo ? demoDailyBrief(t) : brief
+    if (activeBrief === null) {
       return <SectionState kind="empty" message={t('today.dailyBriefUnavailable')} />
     }
-    if (brief.items.length === 0 && brief.quiet.count === 0) {
+    if (activeBrief.items.length === 0 && activeBrief.quiet.count === 0) {
       return <SectionState kind="empty" message={t('today.nothingToReport')} />
     }
     return (
       <div className="space-y-3">
         <div className="folio-daily-brief-overview">
           <div className="flex min-w-0 items-center gap-3">
-            <span className="folio-daily-brief-count">{brief.items.length}</span>
+            <span className="folio-daily-brief-count">{activeBrief.items.length}</span>
             <div className="min-w-0">
               <div className="folio-daily-brief-overview-label">{t('today.dailyBriefAttention')}</div>
-              <div className="folio-daily-brief-overview-copy">{t('today.dailyBriefCount', { count: brief.items.length })}</div>
+              <div className="folio-daily-brief-overview-copy">{t('today.dailyBriefCount', { count: activeBrief.items.length })}</div>
             </div>
           </div>
           <div className="folio-daily-brief-updated">
             <span className="h-1.5 w-1.5 rounded-full bg-[#12b76a]" />
             {t('today.dailyBriefUpdated')}
           </div>
-          <span className="sr-only">{brief.summary}</span>
+          <span className="sr-only">{activeBrief.summary}</span>
         </div>
         <ul className="folio-daily-brief-list" data-testid="brief-items">
-          {brief.items.map((item) => (
+          {activeBrief.items.map((item) => (
             <BriefRow
               key={item.id}
               item={item}
@@ -95,11 +101,11 @@ export const DailyBriefSection: React.FC<DailyBriefSectionProps> = ({ onManage }
             />
           ))}
         </ul>
-        {brief.quiet.count > 0 && (
+        {activeBrief.quiet.count > 0 && (
           <div className="folio-daily-brief-quiet" data-testid="brief-quiet">
             <span className="folio-daily-brief-quiet-dot" />
             <span>{t('today.dailyBriefQuietLabel')}</span>
-            <span className="text-foreground/45">{brief.quiet.message}</span>
+            <span className="text-foreground/45">{activeBrief.quiet.message}</span>
           </div>
         )}
       </div>
@@ -112,6 +118,7 @@ export const DailyBriefSection: React.FC<DailyBriefSectionProps> = ({ onManage }
       className="folio-daily-brief-section"
       action={
         <div className="flex items-center gap-2">
+          {brief === null && !briefLoading && <DemoBadge />}
           <Button variant="outline" size="sm" onClick={onManage}>
             {t('today.manage')}
           </Button>

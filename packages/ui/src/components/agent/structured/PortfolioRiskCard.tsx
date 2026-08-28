@@ -52,7 +52,7 @@ export const PortfolioRiskCard: React.FC<PortfolioRiskCardProps> = ({ portfolio 
         : 'text-[var(--mac-green)]';
 
   return (
-    <div className="mac-stock-tile rounded-[14px] p-3.5">
+    <div className="mac-stock-tile rounded-[12px] p-3.5">
       <div className="flex items-center justify-between">
         <span className="text-[10px] font-semibold uppercase tracking-wider text-foreground/40">
           {t('agent.risk.title')}

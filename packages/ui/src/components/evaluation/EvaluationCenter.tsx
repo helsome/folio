@@ -145,8 +145,8 @@ export const EvaluationCenter: React.FC = () => {
   }
 
   return (
-    <div className="flex h-full flex-col bg-[#f6f8fb]" data-testid="evaluation-center">
-      <header className="flex items-center justify-between border-b border-[var(--mac-border)] bg-white px-5 py-4">
+    <div className="folio-evaluation-view flex h-full flex-col bg-[#f6f8fb]" data-testid="evaluation-center">
+      <header className="folio-evaluation-header flex items-center justify-between border-b border-[var(--mac-border)] bg-white px-5 py-4">
         <div>
           <h2 className="text-[15px] font-semibold text-foreground">{t('evaluation.center')}</h2>
           <p className="mt-0.5 text-[11.5px] text-text-muted">{t('evaluation.centerDescription')}</p>
@@ -158,7 +158,7 @@ export const EvaluationCenter: React.FC = () => {
       </header>
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto p-5">
-        <div className="mb-4 flex gap-1 border-b border-[var(--mac-border)]">
+        <div className="folio-evaluation-tabs mb-4 flex gap-1 border-b border-[var(--mac-border)]">
           {TAB_LABELS.map((entry) => (
             <button
               key={entry.id}
@@ -215,7 +215,7 @@ export const EvaluationCenter: React.FC = () => {
 // ── Overview (spec §65, §111) ───────────────────────────────────────────────
 
 const StatCard: React.FC<{ label: string; value: string; sub?: string }> = ({ label, value, sub }) => (
-  <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
+  <div className="folio-evaluation-stat-card rounded-[10px] border border-[var(--mac-border)] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
     <p className="text-[11px] font-medium uppercase tracking-wide text-foreground/44">{label}</p>
     <p className="mt-1.5 text-[22px] font-semibold tabular-nums text-foreground">{value}</p>
     {sub && <p className="mt-1 text-[11px] text-foreground/44">{sub}</p>}

@@ -13,13 +13,19 @@ import { navigation as enNavigation } from '../../../i18n/src/locales/en-US/navi
 import { today as enToday } from '../../../i18n/src/locales/en-US/today'
 import { discover as enDiscover } from '../../../i18n/src/locales/en-US/discover'
 import { portfolio as enPortfolio } from '../../../i18n/src/locales/en-US/portfolio'
+import { events as enEvents } from '../../../i18n/src/locales/en-US/events'
+import { profile as enProfile } from '../../../i18n/src/locales/en-US/profile'
+import { demo as enDemo } from '../../../i18n/src/locales/en-US/demo'
 import { common as zhCommon } from '../../../i18n/src/locales/zh-CN/common'
 import { navigation as zhNavigation } from '../../../i18n/src/locales/zh-CN/navigation'
 import { today as zhToday } from '../../../i18n/src/locales/zh-CN/today'
 import { discover as zhDiscover } from '../../../i18n/src/locales/zh-CN/discover'
 import { portfolio as zhPortfolio } from '../../../i18n/src/locales/zh-CN/portfolio'
+import { events as zhEvents } from '../../../i18n/src/locales/zh-CN/events'
+import { profile as zhProfile } from '../../../i18n/src/locales/zh-CN/profile'
+import { demo as zhDemo } from '../../../i18n/src/locales/zh-CN/demo'
 
-const NAMESPACES = ['common', 'navigation', 'today', 'discover', 'portfolio'] as const
+const NAMESPACES = ['common', 'navigation', 'today', 'discover', 'portfolio', 'events', 'profile', 'demo'] as const
 
 const resources = {
   'en-US': {
@@ -28,6 +34,9 @@ const resources = {
     today: enToday,
     discover: enDiscover,
     portfolio: enPortfolio,
+    events: enEvents,
+    profile: enProfile,
+    demo: enDemo,
   },
   'zh-CN': {
     common: zhCommon,
@@ -35,6 +44,9 @@ const resources = {
     today: zhToday,
     discover: zhDiscover,
     portfolio: zhPortfolio,
+    events: zhEvents,
+    profile: zhProfile,
+    demo: zhDemo,
   },
 }
 

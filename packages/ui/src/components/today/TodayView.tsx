@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react'
-import { ArrowUpRight, BriefcaseBusiness, GitCompareArrows, Search, Sparkles } from 'lucide-react'
+import { ArrowUpRight, BriefcaseBusiness, CalendarDays, GitCompareArrows, Search } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next';
@@ -18,6 +18,9 @@ import {
 } from '../../atoms'
 import { researchOriginAtom } from '../../atoms/discoverAtoms'
 import { watchlistMoversAtom, mapUpcomingEvents, thesesNeedingReview } from '../../atoms/todayAtoms'
+import { watchlistQuotesAreDemoAtom } from '../../atoms/quoteAtoms'
+import { demoCalendarEvents } from '../../demo/demoData'
+import { DemoBadge } from '../primitives/DemoBadge'
 import { analyzePortfolioRiskAtom } from '../../atoms/portfolioRiskAtoms'
 import { loadSymbolReports } from '../../atoms/researchAtoms'
 import { loadTheses } from '../../client/thesis'
@@ -91,8 +94,10 @@ export const TodayView: React.FC = () => {
   const [thesesLoading, setThesesLoading] = useState(true)
   const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([])
   const [eventsLoading, setEventsLoading] = useState(true)
+  const [eventsAreDemo, setEventsAreDemo] = useState(false)
   const [automationOpen, setAutomationOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
+  const quotesAreDemo = useAtomValue(watchlistQuotesAreDemoAtom)
 
   useEffect(() => {
     let cancelled = false
@@ -117,7 +122,11 @@ export const TodayView: React.FC = () => {
       setReportsLoading(false)
       setTheses(nextTheses)
       setThesesLoading(false)
-      setUpcomingEvents(nextEvents)
+      // No calendar channel / no data: fall back to badged sample events so
+      // the dashboard shows a populated default instead of an empty state.
+      const eventsAreSample = nextEvents.length === 0
+      setEventsAreDemo(eventsAreSample)
+      setUpcomingEvents(eventsAreSample ? demoCalendarEvents(t) : nextEvents)
       setEventsLoading(false)
     })()
     return () => {
@@ -153,7 +162,7 @@ export const TodayView: React.FC = () => {
 
   const portfolioContent = (() => {
     if (portfolioCache.loading && !portfolioView) return <SectionState kind="loading" />
-    if (portfolioView) return <PortfolioCard view={portfolioView} />
+    if (portfolioView) return <PortfolioCard view={portfolioView} isDemo={portfolioCache.isDemo} />
     const failure = portfolioCache.failure
     if (failure?.kind === 'not-connected' || failure?.kind === 'no-account-permission') {
       return <SectionState kind="empty" message={t('today.connectPortfolio')} />
@@ -311,33 +320,53 @@ export const TodayView: React.FC = () => {
   })()
 
   return (
-    <div className="folio-today-view h-full overflow-y-auto bg-background px-5 py-6" data-testid="today-view">
-      <section data-testid="today-hero" className="folio-today-hero mb-5 rounded-[14px] border border-border bg-surface-raised p-5 shadow-none">
-        <div className="flex flex-wrap items-start justify-between gap-6">
-          <div className="min-w-0"><div className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[.15em] text-accent"><Sparkles className="h-3.5 w-3.5" />{t('today.quietWorkspace')}</div><h1 className="mt-2 text-[25px] font-semibold tracking-[-.03em] text-foreground">{t('today.greeting')}</h1><p className="mt-1 text-[13px] leading-relaxed text-foreground/52">{t('today.heroSubtitle')}</p></div>
-          <div className="flex min-w-[280px] flex-1 justify-end"><label className="relative block w-full max-w-lg"><Search className="pointer-events-none absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-foreground/34" /><input data-testid="today-search" value={searchQuery} onChange={(event) => setSearchQuery(event.target.value)} onKeyDown={handleSearchKeyDown} placeholder={t('today.searchPlaceholder')} aria-label={t('today.searchAria')} className="h-10 w-full rounded-[9px] border border-input bg-background pl-9 pr-3 text-[13px] text-foreground placeholder:text-foreground/38 transition-smooth focus:border-accent/45 focus:outline-none focus:ring-2 focus:ring-accent/15" /></label></div>
+    <div className="folio-today-view h-full overflow-y-auto bg-background px-6 py-6" data-testid="today-view">
+      <div className="folio-today-content mx-auto max-w-6xl">
+        <header className="folio-today-heading mb-6">
+          <h1 className="font-display-lg text-foreground">{t('today.greeting')}</h1>
+          <p>{t('today.heroSubtitle')}</p>
+        </header>
+        <div className="folio-today-bento grid grid-cols-1 gap-4 lg:grid-cols-3">
+          <section className="folio-stitch-card lg:col-span-2" data-testid="today-portfolio-glance">
+            <div className="folio-stitch-card-heading">
+              <h2>{t('portfolio.totalValue')}</h2>
+              <span className="flex items-center gap-2">
+                {(portfolioCache.isDemo || quotesAreDemo) && <DemoBadge />}
+                <span className="folio-card-menu" aria-hidden="true">•••</span>
+              </span>
+            </div>
+            {portfolioContent}
+            <div className="folio-today-mover-columns mt-5 grid grid-cols-2 gap-4 border-t border-border pt-4">
+              <div><h3>{t('today.topGainers')}</h3>{movers.length > 0 ? movers.filter((item) => (item.changePercent ?? 0) >= 0).slice(0, 2).map((item) => <div className="folio-today-mini-row" key={item.symbol}><span>{item.symbol}</span><strong className="text-positive">{formatPercent(item.changePercent)}</strong></div>) : <div className="folio-today-muted">{DASH}</div>}</div>
+              <div className="border-l border-border pl-4"><h3>{t('today.topLosers')}</h3>{movers.length > 0 ? movers.filter((item) => (item.changePercent ?? 0) < 0).slice(0, 2).map((item) => <div className="folio-today-mini-row" key={item.symbol}><span>{item.symbol}</span><strong className="text-negative">{formatPercent(item.changePercent)}</strong></div>) : <div className="folio-today-muted">{DASH}</div>}</div>
+            </div>
+          </section>
+
+          <section className="folio-stitch-card" data-testid="today-upcoming-events">
+            <div className="folio-stitch-card-heading"><h2>{t('today.upcomingEvents')}</h2><span className="flex items-center gap-2">{eventsAreDemo && <DemoBadge />}<CalendarDays className="h-4 w-4 text-foreground/48" /></span></div>
+            {upcomingContent}
+            <button type="button" onClick={() => setNavSection('events')} className="folio-stitch-secondary-button mt-5 w-full">{t('events.title')}</button>
+          </section>
+
+          <section className="folio-stitch-card lg:col-span-3" data-testid="today-watchlist-activity">
+            <div className="folio-stitch-card-heading"><h2>{t('today.watchlistMovers')}</h2><span className="flex items-center gap-2">{quotesAreDemo && <DemoBadge />}<button type="button" onClick={() => setNavSection('watchlist')} className="folio-stitch-text-button">{t('navigation.watchlist')}</button></span></div>
+            {moversContent}
+          </section>
         </div>
-        <div className="mt-6 grid grid-cols-1 gap-2 sm:grid-cols-3">
+
+        <div className="folio-today-actions mt-4 grid grid-cols-1 gap-2 sm:grid-cols-3">
           <QuickAction icon={Search} label={t('today.quickActionDeepResearch')} hint={t('today.quickActionDeepResearchHint')} onClick={handleResearchStock} tone="blue" />
           <QuickAction icon={BriefcaseBusiness} label={t('today.quickActionReviewPortfolio')} hint={t('today.quickActionReviewPortfolioHint')} onClick={handleAnalyzePortfolio} tone="green" />
           <QuickAction icon={GitCompareArrows} label={t('today.quickActionCompareStocks')} hint={t('today.quickActionCompareStocksHint')} onClick={handleCompare} tone="violet" />
         </div>
-      </section>
 
-      <div className="mb-3">
-        <DailyBriefSection onManage={() => setAutomationOpen(true)} />
-      </div>
-      <div className="mb-3">
-        <MarketPulse />
-      </div>
-
-      <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-        <TodaySection title={t('today.portfolio')}>{portfolioContent}</TodaySection>
-        <TodaySection title={t('today.watchlistMovers')}>{moversContent}</TodaySection>
-        <TodaySection title={t('today.triggeredAlerts')}>{alertsContent}</TodaySection>
-        <TodaySection title={t('today.upcomingEvents')}>{upcomingContent}</TodaySection>
-        <TodaySection title={t('today.recentResearch')}>{researchContent}</TodaySection>
-        <TodaySection title={t('today.thesesNeedingReview')}>{thesesContent}</TodaySection>
+        <div className="folio-today-secondary mt-4 grid grid-cols-1 gap-4 lg:grid-cols-2">
+          <DailyBriefSection onManage={() => setAutomationOpen(true)} />
+          <MarketPulse />
+          <TodaySection title={t('today.triggeredAlerts')}>{alertsContent}</TodaySection>
+          <TodaySection title={t('today.recentResearch')}>{researchContent}</TodaySection>
+          <TodaySection title={t('today.thesesNeedingReview')}>{thesesContent}</TodaySection>
+        </div>
       </div>
 
       <Dialog open={automationOpen} onClose={() => setAutomationOpen(false)} title={t('today.automation')}>

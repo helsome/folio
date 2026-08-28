@@ -1,0 +1,18 @@
+export const events = {
+  eyebrow: 'Market calendar',
+  title: 'Events & Catalysts',
+  subtitle: 'Upcoming events and earnings that may affect active portfolios.',
+  upcomingEyebrow: 'Today and next',
+  upcomingTitle: 'Upcoming events',
+  loading: 'Loading upcoming events…',
+  empty: 'No upcoming events are available. Connect a market-data provider to populate this view.',
+  loadError: 'Upcoming events are unavailable. Try again or check your market-data connection.',
+  event: 'Event',
+  marketEvent: 'Market event',
+  noDescription: 'No description available.',
+  openResearch: 'Open research for {{symbol}}',
+  catalystEyebrow: 'Catalyst synthesis',
+  catalystTitle: 'Folio Agent',
+  catalystEmpty: 'Select an event with a symbol to carry its context into Research or Copilot.',
+  catalystHint: 'Folio does not invent a catalyst summary when the underlying event or research data is unavailable.',
+} satisfies Record<string, string>;

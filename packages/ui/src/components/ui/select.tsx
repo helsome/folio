@@ -9,13 +9,13 @@ export const SelectValue = SelectPrimitive.Value;
 export const SelectTrigger = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Trigger>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Trigger>
->(({ className, children, ...props }, ref) => <SelectPrimitive.Trigger ref={ref} className={cn('flex h-9 w-full items-center justify-between gap-2 rounded-[8px] border border-input bg-surface px-3 text-[13px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50', className)} {...props}>{children}<ChevronDown className="h-3.5 w-3.5 text-foreground/44" /></SelectPrimitive.Trigger>);
+>(({ className, children, ...props }, ref) => <SelectPrimitive.Trigger ref={ref} className={cn('flex h-9 w-full items-center justify-between gap-2 rounded-[4px] border border-input bg-surface px-3 text-[13px] text-foreground focus:outline-none focus:ring-2 focus:ring-ring disabled:cursor-not-allowed disabled:opacity-50', className)} {...props}>{children}<ChevronDown className="h-3.5 w-3.5 text-foreground/44" /></SelectPrimitive.Trigger>);
 SelectTrigger.displayName = SelectPrimitive.Trigger.displayName;
 
 export const SelectContent = React.forwardRef<
   React.ElementRef<typeof SelectPrimitive.Content>,
   React.ComponentPropsWithoutRef<typeof SelectPrimitive.Content>
->(({ className, children, position = 'popper', ...props }, ref) => <SelectPrimitive.Portal><SelectPrimitive.Content ref={ref} position={position} className={cn('z-(--z-index-dropdown) min-w-[8rem] overflow-hidden rounded-[8px] border border-border bg-surface p-1 text-foreground shadow-[0_12px_36px_rgba(0,0,0,.16)]', className)} {...props}><SelectPrimitive.Viewport>{children}</SelectPrimitive.Viewport></SelectPrimitive.Content></SelectPrimitive.Portal>);
+>(({ className, children, position = 'popper', ...props }, ref) => <SelectPrimitive.Portal><SelectPrimitive.Content ref={ref} position={position} className={cn('z-(--z-index-dropdown) min-w-[8rem] overflow-hidden rounded-[4px] border border-border bg-surface p-1 text-foreground shadow-[0_12px_36px_rgba(0,0,0,.16)]', className)} {...props}><SelectPrimitive.Viewport>{children}</SelectPrimitive.Viewport></SelectPrimitive.Content></SelectPrimitive.Portal>);
 SelectContent.displayName = SelectPrimitive.Content.displayName;
 
 export const SelectItem = React.forwardRef<

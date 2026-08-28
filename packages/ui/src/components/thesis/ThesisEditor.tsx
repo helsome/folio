@@ -69,7 +69,7 @@ export const ThesisEditor: React.FC<{
   };
 
   return (
-    <div className="space-y-3 rounded-[12px] border border-[#bfd2ff] border-l-2 border-l-[#0052ff] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
+    <div className="folio-thesis-editor space-y-3 rounded-[12px] border border-[#bfd2ff] border-l-2 border-l-[#0052ff] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
       <div className="flex flex-wrap items-center gap-2">
         <span className="text-[10px] font-semibold uppercase tracking-[0.08em] text-[#68778c]">
           {t('thesis.editor.stance')}

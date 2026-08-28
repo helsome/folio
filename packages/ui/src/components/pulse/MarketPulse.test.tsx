@@ -168,11 +168,13 @@ describe('MarketPulse', () => {
     expect(container.querySelectorAll('[data-testid="pulse-mover-row"]').length).toBe(0)
   })
 
-  it('renders empty states when the pulse channel is missing (pre-wiring)', async () => {
+  it('falls back to the badged sample snapshot when the pulse channel is missing (pre-wiring)', async () => {
     await renderPulse(fallbackClient)
     const text = container.textContent ?? ''
-    expect(text).toContain('Index quotes unavailable')
-    expect(text).toContain('No movers in your watchlist')
-    expect(container.querySelectorAll('[data-testid="pulse-mover-row"]').length).toBe(0)
+    // Sample-data fallback instead of empty states: sample indices/movers
+    // render, and the DemoBadge marks the card as sample content.
+    expect(container.querySelector('[data-testid="demo-badge"]')).not.toBeNull()
+    expect(text).toContain('S&P 500')
+    expect(container.querySelectorAll('[data-testid="pulse-mover-row"]').length).toBeGreaterThan(0)
   })
 })

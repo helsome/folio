@@ -11,8 +11,9 @@ interface MessageListProps {
 export const MessageList: React.FC<MessageListProps> = ({ messages, isLoading }) => {
   const { t } = useTranslation();
   return (
-    <div className="flex-1 overflow-y-auto px-5 py-5">
-      <div className="mx-auto max-w-3xl space-y-4">
+    <div className="flex-1 overflow-y-auto px-0.5 py-0">
+      {/* Inside the 400px Copilot panel the shell already pads the body; no max-width rail. */}
+      <div className="max-w-none space-y-3">
         {messages.map((message) => (
           <TurnCard key={message.id} message={message} />
         ))}
