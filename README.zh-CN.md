@@ -36,21 +36,31 @@ Folio 本地优先：会话、凭证与研究状态默认保存在设备本地�
 </p>
 
 <p align="center">
-  <em>Today——投资组合关注事项、自选清单上下文与快速研究操作。</em>
+  <em>Today——投资组合关注事项、市场脉搏、事件与快速研究操作。</em>
 </p>
 
 <p align="center">
   <img src="docs/screenshots/workspace.png" alt="Folio 证券工作区" width="49%" />
+  <img src="docs/screenshots/events.png" alt="Folio 事件与催化" width="49%" />
+</p>
+
+<p align="center">
+  <img src="docs/screenshots/portfolio.png" alt="Folio 投资组合" width="49%" />
+  <img src="docs/screenshots/profile.png" alt="Folio 个人资料与健康检查" width="49%" />
+</p>
+
+<p align="center">
   <img src="docs/screenshots/settings.png" alt="Folio 设置中心" width="49%" />
-</p>
-
-<p align="center">
   <img src="docs/screenshots/evaluation.png" alt="Folio Agent 评测设置" width="49%" />
-  <img src="docs/screenshots/skills.png" alt="Folio 技能中心" width="49%" />
 </p>
 
 <p align="center">
-  <em>从安静的研究工作区，到技能状态、评测追踪与实验配置，Folio 把 Agent 工程能力放进同一个桌面工作流。</em>
+  <img src="docs/screenshots/skills.png" alt="Folio 技能中心" width="49%" />
+  <img src="docs/screenshots/discover.png" alt="Folio 发现页" width="49%" />
+</p>
+
+<p align="center">
+  <em>从证券工作区、事件与催化、组合总览，到设置中心、技能状态与评测追踪——未接入任何服务时，以上页面均以内置示例数据（带“示例数据”徽标）完整呈现。</em>
 </p>
 
 ## 核心功能
