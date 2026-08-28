@@ -58,9 +58,15 @@ Folio is local-first: sessions, credentials, and research state stay on the devi
 ### Research Workspace
 
 - Watchlists, quotes, K-line charts, financial statements, news, and security overviews.
-- A three-pane desktop layout: navigation, market workspace, and Agent copilot.
+- A three-pane desktop layout: navigation, market workspace, and Agent copilot, with persistent asset tabs (K-Lines / Statements / News / Reports) in the workspace topbar.
 - Compare 2–4 symbols across valuation, growth, margins, ROE, dividends, returns, ratings, and momentum.
 - Data freshness is visible; missing values render as `—` instead of being guessed.
+
+### Built-in Sample Data (offline fallback)
+
+- With no market-data provider or LLM connected, Today, the portfolio card, Market Pulse, events, and the daily brief render built-in sample data — the workspace is complete from the very first launch.
+- Every sample surface carries a visible “Sample data” badge (with a tooltip explaining how to connect real sources); error details stay in the underlying state, and live data replaces samples the moment it becomes available.
+- Symbols outside the sample set (e.g. `0700.HK`) keep their honest empty/error states — nothing is fabricated.
 
 ### Deep Research
 
@@ -104,6 +110,8 @@ Folio is local-first: sessions, credentials, and research state stay on the devi
 - Save a report as an editable investment thesis and re-evaluate it against fresh data.
 - Alert rules for price, news, earnings, ratings, dividends, position weight, and drawdown.
 - Today combines portfolio attention items, watchlist movers, alerts, upcoming events, recent research, and theses needing review.
+- A dedicated **Events & Catalysts page**: earnings, macro releases, and central-bank calendar events, with one-click context handoff into Research.
+- A **Profile page** with at-a-glance local workspace health (AI / market data / skills / agent runtime).
 
 ## How It Works
 
@@ -140,9 +148,10 @@ The core boundary is deliberately small: providers return normalized data with p
 
 Download the latest macOS build from the [Releases page](https://github.com/helsome/folio/releases). After launching Folio:
 
-1. Configure an LLM provider in **Settings → Models**, or use the local provider for a deterministic demo.
-2. Connect Longbridge in **Settings → Connections** if you want live market data and portfolio access.
-3. Select a symbol from the Watchlist and open **Deep Research**.
+1. The full workspace is browsable on first launch — built-in sample data (badged “Sample data”) is shown until services are connected.
+2. Configure an LLM provider in **Settings → Models**, or use the local provider for a deterministic demo.
+3. Connect Longbridge in **Settings → Connections** for live market data and portfolio access; sample data switches to live data automatically.
+4. Select a symbol from the Watchlist and open **Deep Research**.
 
 Longbridge authentication can also be completed from the terminal:
 
@@ -195,14 +204,14 @@ The packaged artifacts are staged in `dist/release/`.
 
 ## Project Status
 
-Folio is in beta. The current repository includes the V5 research, discovery, monitoring, outcome, and adaptive-calibration surfaces, plus the V6 quiet workspace visual system.
+Folio is in beta. The current repository includes the V5 research, discovery, monitoring, outcome, and adaptive-calibration surfaces, plus a refreshed visual system implementing the Stitch “Minimalist Personal Portfolio” design language: a redrawn sidebar and workspace topbar, new Events & Catalysts and Profile pages, a unified component library and radius scale, and the offline sample-data fallback.
 
 Agent engineering evaluation (V7) is now wired into Settings and the Evaluation Center: LangSmith connection, privacy controls, benchmark experiments, failure-mode analysis, case-level traces, and human feedback are available as an advanced workflow.
 
-- Unit and integration tests: **912 passing**
+- Unit and integration tests: **1157+ passing**
 - Typecheck: **green**
 - Electron E2E and packaged smoke gates: available through the release scripts
-- Current package channel: `0.4.0-beta.1`
+- Current package channel: `0.4.0-beta.2`
 
 Known limitations and release decisions are documented in [`docs/release-gates.md`](docs/release-gates.md) ([简体中文](docs/release-gates.zh-CN.md)) and [`docs/provider-b-decision.md`](docs/provider-b-decision.md) ([简体中文](docs/provider-b-decision.zh-CN.md)).
 
@@ -212,6 +221,7 @@ Known limitations and release decisions are documented in [`docs/release-gates.m
 
 - More provider coverage behind the same capability contracts.
 - Better report navigation and evidence inspection.
+- Valuation comparison table (CURRENT vs 5Y AVG) and target-price cards for the security workspace (see [`docs/design-comparison.md`](docs/design-comparison.md)).
 - More useful portfolio-aware research prompts without leaking internal runtime instructions into the user conversation.
 
 ### Longer Term
@@ -230,6 +240,7 @@ Known limitations and release decisions are documented in [`docs/release-gates.m
 - [`docs/longbridge-skill-setup.md`](docs/longbridge-skill-setup.md) — skill setup and capability coverage · [简体中文](docs/longbridge-skill-setup.zh-CN.md)
 - [`docs/release-gates.md`](docs/release-gates.md) — release validation checklist · [简体中文](docs/release-gates.zh-CN.md)
 - [`docs/EVALUATION.md`](docs/EVALUATION.md) — Agent evaluation, LangSmith observability, and experiment architecture · [CI strategy](docs/EVALUATION-CI.md) · [benchmark](docs/EVALUATION-BENCHMARK.md)
+- [`docs/design-comparison.md`](docs/design-comparison.md) — screen-by-screen comparison between the Stitch designs and the current implementation
 
 ## Contributing
 

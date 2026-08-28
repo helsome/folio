@@ -58,9 +58,15 @@ Folio 本地优先：会话、凭证与研究状态默认保存在设备本地�
 ### 研究工作区
 
 - 自选清单、行情、K 线图、财务报表、新闻与证券概览。
-- 三栏桌面布局：导航、市场工作区与 Agent 副驾驶。
+- 三栏桌面布局：导航、市场工作区与 Agent 副驾驶；顶部常驻资产页签（K 线 / 报表 / 新闻 / 报告），任何页面都能一键切换视角。
 - 在估值、成长性、利润率、ROE、股息、回报、评级与动量等维度对比 2–4 只标的。
 - 数据新鲜度可见；缺失值显示为 `—`，不会凭空猜测。
+
+### 开箱即用的示例数据（离线回退）
+
+- 未接入行情提供商或 LLM 时，Today、组合总览、市场脉搏、事件与每日简报自动展示内置示例数据，应用从第一次启动起就是完整的。
+- 所有示例内容都带有醒目的“示例数据”徽标（含接入指引 tooltip），错误信息保留在底层状态中，真实数据一旦可用立即覆盖示例。
+- 不在示例集内的代码（如 `0700.HK`）保持诚实的空态/错误态，绝不编造数据。
 
 ### 深度研究
 
@@ -104,6 +110,8 @@ Folio 本地优先：会话、凭证与研究状态默认保存在设备本地�
 - 将报告保存为可编辑的投资论点，并基于新数据重新评估。
 - 针对价格、新闻、财报、评级、股息、持仓权重与回撤的提醒规则。
 - Today 整合投资组合关注事项、自选异动、提醒、即将到来的事件、近期研究与待复审的论点。
+- 独立的 **Events & Catalysts 页面**：财报、宏观数据与央行日历，一键带上下文跳转研究。
+- **个人资料页**：本地工作区健康检查（AI / 行情 / 技能 / Agent 运行时）一目了然。
 
 ## 工作原理
 
@@ -140,9 +148,10 @@ Longbridge / Massive 提供商
 
 从[发布页面](https://github.com/helsome/folio/releases)下载最新的 macOS 构建。启动 Folio 后：
 
-1. 在 **设置 → 模型** 中配置 LLM 提供商，或使用本地提供商进行确定性演示。
-2. 如需实时行情数据与投资组合访问，在 **设置 → 连接** 中连接 Longbridge。
-3. 从自选清单中选择标的，打开**深度研究**。
+1. 首次启动即可浏览完整工作台——未接入服务前展示内置示例数据（带“示例数据”徽标）。
+2. 在 **设置 → 模型** 中配置 LLM 提供商，或使用本地提供商进行确定性演示。
+3. 如需实时行情数据与投资组合访问，在 **设置 → 连接** 中连接 Longbridge；连接后示例数据自动切换为真实数据。
+4. 从自选清单中选择标的，打开**深度研究**。
 
 Longbridge 认证也可以在终端完成：
 
@@ -195,14 +204,14 @@ FINAGENT_AGENT_PROVIDER=local bun run dev
 
 ## 项目状态
 
-Folio 处于测试版（beta）。当前仓库包含 V5 研究、发现、监控、结果与自适应校准相关功能面，以及 V6 安静工作区视觉系统。
+Folio 处于测试版（beta）。当前仓库包含 V5 研究、发现、监控、结果与自适应校准相关功能面，以及落地 Stitch「Minimalist Personal Portfolio」设计语言的全新视觉系统：重绘的侧栏与顶部工作区栏、Events & Catalysts 与个人资料页面、统一的组件库与圆角阶梯，以及离线示例数据回退。
 
 Agent 工程评测（V7）已接入设置与评测中心：支持 LangSmith 连接、隐私控制、基准实验、失败模式分析、案例级 trace 与人工反馈。
 
-- 单元与集成测试：**912 项通过**
+- 单元与集成测试：**1157+ 项通过**
 - 类型检查：**通过**
 - Electron E2E 与打包冒烟门槛：可通过发布脚本运行
-- 当前包通道：`0.4.0-beta.1`
+- 当前包通道：`0.4.0-beta.2`
 
 已知限制与发布决策记录在 [`docs/release-gates.zh-CN.md`](docs/release-gates.zh-CN.md)（[英文原文](docs/release-gates.md)）与 [`docs/provider-b-decision.zh-CN.md`](docs/provider-b-decision.zh-CN.md)（[英文原文](docs/provider-b-decision.md)）。
 
@@ -212,6 +221,7 @@ Agent 工程评测（V7）已接入设置与评测中心：支持 LangSmith 连�
 
 - 在同一能力契约下覆盖更多提供商。
 - 更好的报告导航与证据检视。
+- 证券工作台的估值对比表（CURRENT vs 5Y AVG）与目标价卡片（见 [`docs/design-comparison.md`](docs/design-comparison.md)）。
 - 更有用的组合感知研究提示，同时不把内部运行时指令泄漏进用户对话。
 
 ### 长期
@@ -230,6 +240,7 @@ Agent 工程评测（V7）已接入设置与评测中心：支持 LangSmith 连�
 - [`docs/longbridge-skill-setup.zh-CN.md`](docs/longbridge-skill-setup.zh-CN.md) — 技能安装与能力覆盖 · [English](docs/longbridge-skill-setup.md)
 - [`docs/release-gates.zh-CN.md`](docs/release-gates.zh-CN.md) — 发布验证清单 · [English](docs/release-gates.md)
 - [`docs/EVALUATION.md`](docs/EVALUATION.md) — Agent 评测、LangSmith 可观测性与实验架构 · [CI 策略](docs/EVALUATION-CI.md) · [基准集](docs/EVALUATION-BENCHMARK.md)
+- [`docs/design-comparison.md`](docs/design-comparison.md) — Stitch 设计稿与当前实现的逐屏对比
 
 ## 参与贡献
 
