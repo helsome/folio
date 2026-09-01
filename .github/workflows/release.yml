@@ -75,6 +75,10 @@ jobs:
         working-directory: apps/electron
         run: bun run test:package-smoke
 
+      - name: Fresh-install E2E
+        working-directory: apps/electron
+        run: bun run test:fresh-install
+
       - name: Verify checksums
         working-directory: dist/release
         run: shasum -a 256 -c SHA256SUMS.txt
