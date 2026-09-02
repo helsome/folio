@@ -1,16 +1,18 @@
-import { mkdtemp, readFile, rm } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 
 // safeStorage is unavailable outside Electron; encrypt/decrypt through a
 // deterministic stand-in so the round-trip contract is still exercised.
+let encryptionAvailable = true;
+
 mock.module('electron', () => ({
   app: {
     getPath: () => '/tmp/finagent-test',
   },
   safeStorage: {
-    isEncryptionAvailable: () => true,
+    isEncryptionAvailable: () => encryptionAvailable,
     encryptString: (value: string) =>
       Buffer.from(`enc:${Buffer.from(value, 'utf8').toString('base64')}`, 'utf8'),
     decryptString: (buffer: Buffer) =>
@@ -31,6 +33,7 @@ let dir = '';
 let file = '';
 
 beforeEach(async () => {
+  encryptionAvailable = true;
   dir = await mkdtemp(join(tmpdir(), 'credstore-'));
   file = join(dir, 'credentials.json');
 });
@@ -62,6 +65,7 @@ describe('CredentialStore', () => {
 
     const infos = await store.listCredentials();
     expect(infos.find((info) => info.provider === 'anthropic')?.configured).toBe(true);
+    expect(infos.find((info) => info.provider === 'anthropic')?.updatedAt).toBeNumber();
   });
 
   it('removes credentials', async () => {
@@ -102,5 +106,39 @@ describe('CredentialStore', () => {
 
     const reloaded = new CredentialStore(file);
     expect(await reloaded.getCredential('anthropic')).toBe('sk-persisted-999');
+  });
+
+  it('refuses to persist credentials when secure storage is unavailable', async () => {
+    encryptionAvailable = false;
+    const store = new CredentialStore(file);
+
+    await expect(store.setCredential('anthropic', 'sk-must-not-hit-disk')).rejects.toThrow(
+      'Secure credential storage is unavailable'
+    );
+    await expect(readFile(file, 'utf8')).rejects.toMatchObject({ code: 'ENOENT' });
+  });
+
+  it('preserves the previous file and cache when an atomic write fails', async () => {
+    const store = new CredentialStore(file);
+    await store.setCredential('anthropic', 'sk-original-value');
+    const original = await readFile(file, 'utf8');
+    await mkdir(`${file}.tmp`);
+
+    await expect(store.setCredential('openai', 'sk-new-value')).rejects.toBeDefined();
+    expect(await readFile(file, 'utf8')).toBe(original);
+    expect(await store.getCredential('openai')).toBeUndefined();
+    expect(await store.getCredential('anthropic')).toBe('sk-original-value');
+  });
+
+  it('serializes concurrent credential updates without losing either value', async () => {
+    const store = new CredentialStore(file);
+    await Promise.all([
+      store.setCredential('anthropic', 'sk-anthropic-concurrent'),
+      store.setCredential('openai', 'sk-openai-concurrent'),
+    ]);
+
+    const reloaded = new CredentialStore(file);
+    expect(await reloaded.getCredential('anthropic')).toBe('sk-anthropic-concurrent');
+    expect(await reloaded.getCredential('openai')).toBe('sk-openai-concurrent');
   });
 });
