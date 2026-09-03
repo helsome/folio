@@ -27,6 +27,7 @@ import type { Dirent } from 'node:fs';
 import { homedir } from 'node:os';
 import { basename, join, relative, resolve, sep } from 'node:path';
 import type { Skill } from '@finagent/core';
+import { parse as parseYaml } from 'yaml';
 
 export type SkillSource = 'bundled' | 'user';
 
@@ -497,45 +498,9 @@ export function parseSkillMarkdown(contents: string): ParsedSkillMarkdown {
 }
 
 function parseFrontmatter(raw: string): Record<string, unknown> {
-  const result: Record<string, unknown> = {};
-  const lines = raw.split(/\r?\n/);
-  for (let index = 0; index < lines.length; index += 1) {
-    const line = lines[index];
-    const colon = line.indexOf(':');
-    if (colon <= 0) continue;
-    const key = line.slice(0, colon).trim();
-    const rawValue = line.slice(colon + 1).trim();
-    if (!key || /^[#\s-]/.test(key)) continue;
-
-    if (rawValue.length === 0 && index + 1 < lines.length && /^\s/.test(lines[index + 1] ?? '')) {
-      // Nested block: collect indented `key: value` lines until dedent.
-      const nested: Record<string, unknown> = {};
-      while (index + 1 < lines.length && /^\s/.test(lines[index + 1] ?? '')) {
-        index += 1;
-        const childLine = lines[index].trim();
-        const childColon = childLine.indexOf(':');
-        if (childColon <= 0) continue;
-        nested[childLine.slice(0, childColon).trim()] = parseScalar(childLine.slice(childColon + 1).trim());
-      }
-      result[key] = nested;
-      continue;
-    }
-    result[key] = parseScalar(rawValue);
-  }
-  return result;
-}
-
-function parseScalar(rawValue: string): unknown {
-  if (/^-?\d+(\.\d+)?$/.test(rawValue)) return Number(rawValue);
-  if (rawValue === 'true') return true;
-  if (rawValue === 'false') return false;
-  if (
-    (rawValue.startsWith('"') && rawValue.endsWith('"')) ||
-    (rawValue.startsWith("'") && rawValue.endsWith("'"))
-  ) {
-    return rawValue.slice(1, -1);
-  }
-  return rawValue;
+  const parsed: unknown = parseYaml(raw);
+  if (parsed === null || typeof parsed !== 'object' || Array.isArray(parsed)) return {};
+  return parsed as Record<string, unknown>;
 }
 
 function toDescription(frontmatter: Record<string, unknown>): string {
