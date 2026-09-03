@@ -23,7 +23,7 @@ async function writeFileAt(relativePath: string, contents: string) {
 const SKILL_MD = [
   '---',
   'name: market-data',
-  'description: Quotes and K-lines. Triggers: "股价", "kline", "quote"',
+  'description: \'Quotes and K-lines. Triggers: "股价", "kline", "quote"\'',
   'license: MIT',
   'metadata:',
   '  author: longbridge',
@@ -42,6 +42,30 @@ describe('parseSkillMarkdown', () => {
     const parsed = parseSkillMarkdown(SKILL_MD);
     expect(parsed.frontmatter.name).toBe('market-data');
     expect(parsed.body).toContain('# Market Data');
+  });
+
+  it('parses literal and folded YAML block descriptions', () => {
+    const literal = parseSkillMarkdown([
+      '---',
+      'name: literal-description',
+      'description: |',
+      '  First line.',
+      '  Triggers: "literal trigger"',
+      '---',
+      '# Literal',
+    ].join('\n'));
+    const folded = parseSkillMarkdown([
+      '---',
+      'name: folded-description',
+      'description: >',
+      '  First line.',
+      '  Triggers: "folded trigger"',
+      '---',
+      '# Folded',
+    ].join('\n'));
+
+    expect(literal.frontmatter.description).toBe('First line.\nTriggers: "literal trigger"\n');
+    expect(folded.frontmatter.description).toBe('First line. Triggers: "folded trigger"\n');
   });
 
   it('treats files without frontmatter as body-only', () => {
@@ -115,11 +139,11 @@ describe('SkillHub V2', () => {
   it('matches skills by query tokens and scores relevance', async () => {
     await writeFileAt(
       'longbridge-market-data/SKILL.md',
-      '---\nname: market data\ndescription: Real-time quotes and K-line charts for stocks.\n---\nbody'
+      "---\nname: market data\ndescription: 'Real-time quotes and K-line charts for stocks.'\n---\nbody"
     );
     await writeFileAt(
       'longbridge-technical/SKILL.md',
-      '---\nname: technical\ndescription: Technical analysis methodology: moving averages, RSI, MACD.\n---\nbody'
+      "---\nname: technical\ndescription: 'Technical analysis methodology: moving averages, RSI, MACD.'\n---\nbody"
     );
     const hub = new SkillHub({ skillsDirectory: dir, stateFile: join(dir, 'state.json') });
     await hub.loadSkills();
@@ -145,5 +169,34 @@ describe('SkillHub V2', () => {
     expect(metadata.tier).toBe('read');
     expect(metadata.license).toBe('MIT');
     expect(metadata.defaultInstall).toBe(true);
+  });
+
+  it('extracts trigger keywords from YAML block descriptions', async () => {
+    await writeFileAt('literal-description/SKILL.md', [
+      '---',
+      'name: Literal Description',
+      'description: |',
+      '  Market data skill.',
+      '  Triggers: "股价", "quote"',
+      '---',
+      '# Literal Description',
+    ].join('\n'));
+    await writeFileAt('folded-description/SKILL.md', [
+      '---',
+      'name: Folded Description',
+      'description: >',
+      '  Earnings skill.',
+      '  Triggers: "财报", "earnings"',
+      '---',
+      '# Folded Description',
+    ].join('\n'));
+    const hub = new SkillHub({ skillsDirectory: dir, stateFile: join(dir, 'state.json') });
+
+    await hub.loadSkills();
+
+    expect(hub.getSkill('literal-description')?.trigger.keywords).toEqual(['股价', 'quote']);
+    expect(hub.getSkill('folded-description')?.trigger.keywords).toEqual(['财报', 'earnings']);
+    expect(hub.listAllSkillMetadata().find((entry) => entry.id === 'folded-description')?.description)
+      .toBe('Earnings skill. Triggers: "财报", "earnings"');
   });
 });

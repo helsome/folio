@@ -164,6 +164,7 @@ import {
   getLangSmithExtensionEntry,
   getRuntimeRoot,
   getSkillsDir,
+  getUserSkillsDir,
   listBundledPiExtensions,
 } from '@finagent/shared/resources';
 import {
@@ -288,7 +289,10 @@ export class AgentKernelHost {
     process.env.FINAGENT_PI_EXTENSION = getPiExtensionEntry();
     this.credentials = new CredentialStore(join(app.getPath('userData'), 'credentials.json'));
     this.skillHub = new SkillHub({
-      skillsDirectory: getSkillsDir(),
+      skillsDirectories: [
+        { path: getSkillsDir(), source: 'bundled' },
+        { path: getUserSkillsDir(), source: 'user' },
+      ],
       stateFile: join(app.getPath('userData'), 'skills-state.json'),
     });
 
@@ -2039,7 +2043,7 @@ export class AgentKernelHost {
   // -------------------------------------------------------------------------
 
   async listSkills() {
-    const metadataById = new Map(this.skillHub.listSkillMetadata().map((m) => [m.id, m]));
+    const metadataById = new Map(this.skillHub.listAllSkillMetadata().map((m) => [m.id, m]));
     return this.skillHub.listSkills().map((skill) => {
       const meta = metadataById.get(skill.id);
       return {
@@ -2052,8 +2056,38 @@ export class AgentKernelHost {
         tier: meta?.tier,
         version: meta?.version,
         author: meta?.author,
+        source: meta?.source ?? 'bundled',
       };
     });
+  }
+
+  async installLocalSkillDirectory(sourceDirectory: unknown) {
+    try {
+      return await this.skillHub.installSkillFromDirectory(
+        requireString(sourceDirectory, 'sourceDirectory')
+      );
+    } catch (error) {
+      if (isCodeError(error)) throw error;
+      throw createCodeError(
+        'SKILL_INSTALL_FAILED',
+        error instanceof Error ? error.message : 'Skill installation failed.'
+      );
+    }
+  }
+
+  async removeUserSkill(input: unknown): Promise<void> {
+    const request = requireObject(input);
+    const skillId = requireString(request.skillId, 'skillId');
+    try {
+      await shell.trashItem(this.skillHub.userSkillDirectory(skillId));
+      await this.skillHub.loadSkills();
+    } catch (error) {
+      if (isCodeError(error)) throw error;
+      throw createCodeError(
+        'SKILL_REMOVE_FAILED',
+        error instanceof Error ? error.message : 'Skill removal failed.'
+      );
+    }
   }
 
   async setSkillEnabled(input: unknown): Promise<void> {
@@ -2101,6 +2135,9 @@ export class AgentKernelHost {
     }
     const env: NodeJS.ProcessEnv = {
       FINAGENT_SKILLS_DIR: getSkillsDir(),
+      FINAGENT_SKILLS_DIRS: JSON.stringify(
+        this.skillHub.skillsDirectories.map((entry) => entry.path)
+      ),
       FINAGENT_PROVIDER_OVERRIDES: overrides.length > 0 ? JSON.stringify(overrides) : '',
       // V7: the Finagent extension enforces tool-output privacy from this flag
       // (spec §60) — always set so the level is unambiguous.

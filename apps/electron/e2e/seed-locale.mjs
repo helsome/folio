@@ -15,3 +15,16 @@ export function seedLocale(userDataDir, locale = 'en-US') {
     console.warn(`seedLocale: could not write preference (${String(error)})`);
   }
 }
+
+/** Seed harnesses that test post-onboarding settings/workbench surfaces. */
+export function seedOnboardingCompleted(userDataDir) {
+  try {
+    writeFileSync(
+      join(userDataDir, 'onboarding.json'),
+      JSON.stringify({ completed: true }),
+      'utf8'
+    );
+  } catch (error) {
+    console.warn(`seedOnboardingCompleted: could not write state (${String(error)})`);
+  }
+}

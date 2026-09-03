@@ -2,26 +2,20 @@ var __defProp = Object.defineProperty;
 var __getOwnPropNames = Object.getOwnPropertyNames;
 var __getOwnPropDesc = Object.getOwnPropertyDescriptor;
 var __hasOwnProp = Object.prototype.hasOwnProperty;
-function __accessProp(key) {
-  return this[key];
-}
+var __moduleCache = /* @__PURE__ */ new WeakMap;
 var __toCommonJS = (from) => {
-  var entry = (__moduleCache ??= new WeakMap).get(from), desc;
+  var entry = __moduleCache.get(from), desc;
   if (entry)
     return entry;
   entry = __defProp({}, "__esModule", { value: true });
-  if (from && typeof from === "object" || typeof from === "function") {
-    for (var key of __getOwnPropNames(from))
-      if (!__hasOwnProp.call(entry, key))
-        __defProp(entry, key, {
-          get: __accessProp.bind(from, key),
-          enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
-        });
-  }
+  if (from && typeof from === "object" || typeof from === "function")
+    __getOwnPropNames(from).map((key) => !__hasOwnProp.call(entry, key) && __defProp(entry, key, {
+      get: () => from[key],
+      enumerable: !(desc = __getOwnPropDesc(from, key)) || desc.enumerable
+    }));
   __moduleCache.set(from, entry);
   return entry;
 };
-var __moduleCache;
 
 // src/preload/index.ts
 var exports_preload = {};
@@ -129,7 +123,9 @@ var electronAPI = {
     setEnabled: (input) => import_electron.ipcRenderer.invoke("skills:setEnabled", input),
     listResources: (skillId) => import_electron.ipcRenderer.invoke("skills:listResources", skillId),
     readResource: (skillId, relativePath) => import_electron.ipcRenderer.invoke("skills:readResource", skillId, relativePath),
-    readiness: () => import_electron.ipcRenderer.invoke("skills:readiness")
+    readiness: () => import_electron.ipcRenderer.invoke("skills:readiness"),
+    installLocal: () => import_electron.ipcRenderer.invoke("skills:installLocal"),
+    remove: (input) => import_electron.ipcRenderer.invoke("skills:remove", input)
   },
   about: {
     get: () => import_electron.ipcRenderer.invoke("app:about")

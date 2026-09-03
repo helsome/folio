@@ -1,10 +1,12 @@
 import { afterEach, describe, expect, it } from 'bun:test';
+import { homedir } from 'node:os';
 import { resolve } from 'node:path';
 import {
   getPiCwd,
   getPiExtensionEntry,
   getRuntimeRoot,
   getSkillsDir,
+  getUserSkillsDir,
   isPackaged,
 } from './resource-locator.ts';
 
@@ -31,6 +33,11 @@ describe('ResourceLocator (dev mode)', () => {
   it('resolves the dev Pi extension entry to the source .ts file', () => {
     delete process.env[PACKAGED];
     expect(getPiExtensionEntry()).toBe(resolve(getRuntimeRoot(), '.pi', 'extensions', 'finagent', 'index.ts'));
+  });
+
+  it('keeps user-installed skills outside bundled runtime resources', () => {
+    expect(getUserSkillsDir()).toBe(resolve(homedir(), '.finagent', 'skills'));
+    expect(getUserSkillsDir()).not.toBe(getSkillsDir());
   });
 
   it('does not report packaged without a real resourcesPath (non-Electron env)', () => {

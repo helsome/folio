@@ -108,6 +108,8 @@ function createElectronClient(): FinagentClient {
       readResource: (skillId, relativePath) =>
         ipcResult(window.electronAPI.skills.readResource(skillId, relativePath)),
       readiness: () => ipcResult(window.electronAPI.skills.readiness()),
+      installLocal: () => ipcResult(window.electronAPI.skills.installLocal()),
+      remove: (skillId) => ipcResult(window.electronAPI.skills.remove({ skillId })),
     },
     about: {
       get: () => ipcResult(window.electronAPI.about.get()),
