@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { existsSync } from 'node:fs';
 import {
   classifyPortfolioFailure,
   computeUnrealizedPnLPercent,
@@ -7,7 +8,7 @@ import {
 } from './normalizer.ts';
 import { parsePortfolioResponse } from './parser.ts';
 import { LongBridgeError } from './errors.ts';
-import { loadFixture, loadFixtureText } from './testing/load-fixture.ts';
+import { fixturePath, loadFixture, loadFixtureText } from './testing/load-fixture.ts';
 import type { Holding, PortfolioSnapshot } from '@finagent/core';
 
 // ── UI-visible invariants (spec §15, §17) ─────────────────────────────────
@@ -161,7 +162,9 @@ describe('normalizePortfolioSnapshot fixture matrix (spec §59)', () => {
 });
 
 describe('real CLI fixture', () => {
-  it('maps the real `longbridge portfolio --format json` body (totals + holdings + base USD)', () => {
+  // The `portfolio` fixture is captured from a real authenticated account and
+  // never committed; skip when absent (see .gitignore + capture.sh).
+  it.skipIf(!existsSync(fixturePath('portfolio')))('maps the real `longbridge portfolio --format json` body (totals + holdings + base USD)', () => {
     const raw = JSON.parse(loadFixtureText('portfolio'));
     const snapshot = normalizePortfolioSnapshot(raw, 1000);
     expect(snapshot.baseCurrency).toBe('USD');
