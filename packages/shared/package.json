@@ -19,10 +19,11 @@
   },
   "dependencies": {
     "@finagent/core": "workspace:*",
+    "@finagent/i18n": "workspace:*",
     "@finagent/longbridge-tools": "workspace:*",
     "@sinclair/typebox": "^0.34.0",
     "zod": "^3.23.0",
-    "@finagent/i18n": "workspace:*"
+    "@finagent/skill-hub": "workspace:*"
   },
   "scripts": {
     "test": "bun test",
