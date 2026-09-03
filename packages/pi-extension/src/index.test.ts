@@ -18,7 +18,7 @@ describe('pi extension registration', () => {
     expect(registered).toEqual(tools.map((tool) => tool.name));
   });
 
-  it('overrides anthropic baseUrl for MiniMax-compatible runtimes', () => {
+  it('registers no anthropic override when no base URL is configured', () => {
     const calls: Array<{ name: string; config: { baseUrl?: string } }> = [];
 
     registerProviderOverrides({
@@ -28,12 +28,7 @@ describe('pi extension registration', () => {
       },
     });
 
-    expect(calls).toEqual([
-      {
-        name: 'anthropic',
-        config: { baseUrl: 'https://api.minimaxi.com/anthropic' },
-      },
-    ]);
+    expect(calls).toEqual([]);
   });
 
   it('prefers ANTHROPIC_BASE_URL from the environment', () => {

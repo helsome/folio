@@ -1,6 +1,6 @@
 # Folio 设计稿 vs 当前实现 对比报告
 
-> 数据来源：Stitch 项目 **Minimalist Personal Portfolio**（`projects/4232596277189541114`，TEXT_TO_UI_PRO，DESKTOP，11 屏）。
+> 数据来源：Stitch 设计稿 **Minimalist Personal Portfolio**（桌面端，11 屏）。
 > 对比基准：`packages/ui` 当前工作区实现。
 > 生成方式：通过 Stitch MCP（Streamable HTTP，`tools/call list_screens`）拉取全部屏幕的截图与 HTML 源码逐屏比对。
 
