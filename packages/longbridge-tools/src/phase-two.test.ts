@@ -1,6 +1,14 @@
 import { beforeEach, describe, expect, it, mock } from 'bun:test';
-import { loadFixture } from './testing/load-fixture.ts';
+import { existsSync } from 'node:fs';
+import { fixturePath, loadFixture } from './testing/load-fixture.ts';
 import { LongBridgeError } from './errors.ts';
+
+// Account-scoped fixtures (positions/assets/cash-flow/portfolio) are captured
+// from a real authenticated account and never committed (see .gitignore +
+// capture.sh). Skip the tests that need them when they are absent, so a fresh
+// clone keeps a green suite; maintainers with a captured account still get the
+// coverage.
+const hasAccountFixture = (name: string): boolean => existsSync(fixturePath(name));
 
 type ExecaResult = { stdout: string };
 type ExecaHandler = (
@@ -135,7 +143,7 @@ describe('phase-2 parser normalization', () => {
     expect(events).toEqual([]);
   });
 
-  it('parses positions fixture', () => {
+  it.skipIf(!hasAccountFixture('positions'))('parses positions fixture', () => {
     const positions = parsePositionsResponse(JSON.stringify(loadFixture('positions')));
     expect(positions.length).toBeGreaterThan(0);
     expect(typeof positions[0].quantity).toBe('number');
@@ -143,14 +151,14 @@ describe('phase-2 parser normalization', () => {
     expect(positions[0].symbol).toBeTruthy();
   });
 
-  it('parses assets fixture', () => {
+  it.skipIf(!hasAccountFixture('assets'))('parses assets fixture', () => {
     const assets = parseAssetsResponse(JSON.stringify(loadFixture('assets')));
     expect(assets.length).toBeGreaterThan(0);
     expect(typeof assets[0].netAssets).toBe('number');
     expect(assets[0].cashInfos.length).toBeGreaterThan(0);
   });
 
-  it('parses cash-flow fixture', () => {
+  it.skipIf(!hasAccountFixture('cash-flow'))('parses cash-flow fixture', () => {
     const flows = parseCashFlowResponse(JSON.stringify(loadFixture('cash-flow')));
     expect(flows.length).toBeGreaterThan(0);
     expect(typeof flows[0].amount).toBe('number');
@@ -227,13 +235,13 @@ describe('phase-2 argv construction', () => {
     );
   });
 
-  it('getAccountPositions takes no symbol', async () => {
+  it.skipIf(!hasAccountFixture('positions'))('getAccountPositions takes no symbol', async () => {
     execaHandler = async () => ({ stdout: JSON.stringify(loadFixture('positions')) });
     await getAccountPositions();
     expect(execaMock).toHaveBeenCalledWith('longbridge', ['positions', '--format', 'json'], expect.any(Object));
   });
 
-  it('getAssets forwards optional currency', async () => {
+  it.skipIf(!hasAccountFixture('assets'))('getAssets forwards optional currency', async () => {
     execaHandler = async () => ({ stdout: JSON.stringify(loadFixture('assets')) });
     await getAssets('HKD');
     expect(execaMock).toHaveBeenCalledWith(
@@ -243,7 +251,7 @@ describe('phase-2 argv construction', () => {
     );
   });
 
-  it('getCashFlow forwards date range', async () => {
+  it.skipIf(!hasAccountFixture('cash-flow'))('getCashFlow forwards date range', async () => {
     execaHandler = async () => ({ stdout: JSON.stringify(loadFixture('cash-flow')) });
     await getCashFlow({ start: '2026-01-01', end: '2026-03-31' });
     expect(execaMock).toHaveBeenCalledWith(
