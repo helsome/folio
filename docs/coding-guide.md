@@ -115,8 +115,8 @@ Prompt Skills are stored as JSON and editable via UI:
 ### 1. Before Starting Any Task
 
 ```bash
-# Navigate to project
-cd ~/coding/agentdev/finagent
+# Navigate to the project directory
+cd folio
 
 # Check git status
 git status
