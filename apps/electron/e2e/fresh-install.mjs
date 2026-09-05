@@ -14,7 +14,7 @@
 // (no provider connected → wizard gate opens).
 
 import { execSync, spawn } from 'node:child_process';
-import { existsSync, rmSync, mkdirSync } from 'node:fs';
+import { existsSync, mkdirSync, readdirSync, rmSync, statSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -25,12 +25,23 @@ const { chromium } = require('playwright-core');
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, '..');
 const repoRoot = join(here, '../../..');
-const packagedBinary = join(
-  repoRoot,
-  'dist/electron/mac-arm64/Folio.app/Contents/MacOS/Folio'
-);
+const distDir = join(repoRoot, 'dist', 'electron');
 const CDP_PORT = 9347;
 const userDataDir = join(appRoot, 'e2e/.user-data-fresh');
+
+function findAppBinary() {
+  if (!existsSync(distDir)) {
+    throw new Error(`No dist output at ${distDir}. Run \`bun run package\` first.`);
+  }
+  for (const entry of readdirSync(distDir)) {
+    if (!entry.startsWith('mac')) continue;
+    const candidate = join(distDir, entry, 'Folio.app', 'Contents', 'MacOS', 'Folio');
+    if (existsSync(candidate) && statSync(candidate).isFile()) {
+      return candidate;
+    }
+  }
+  throw new Error(`No Folio.app binary found under ${distDir}/mac*.`);
+}
 
 // FINAGENT_E2E_KEEP_OPEN=1 — debugging only, NEVER in automated runs: leave
 // the app running when the harness finishes and print where it is, instead of
@@ -107,11 +118,7 @@ async function waitForCdp(timeoutMs) {
 }
 
 async function main() {
-  if (!existsSync(packagedBinary)) {
-    console.error(`Packaged app not found: ${packagedBinary}`);
-    console.error('Run `bun run package` first.');
-    process.exit(1);
-  }
+  const packagedBinary = findAppBinary();
   try {
     execSync("pkill -f 'remote-debugging-port=9347' || true", { stdio: 'ignore' });
   } catch {

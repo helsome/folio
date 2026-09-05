@@ -75,10 +75,10 @@ payload, or export surface changed.
    bounded by the health probe (health.ts:238, 250: 5s + 10s CLI timeouts, 15s cache TTL
    health.ts:217), so worst case the wizard appears after ~15s on a hung CLI. Not stuck,
    but add a renderer-side timeout (e.g. 4s) if first-launch polish matters in V5.
-2. **CI skips fresh-install gate (info):** release-check.mjs includes it (gate 7) but
-   release.yml does not run `test:fresh-install`; also "interaction audit"/"secret scan"
-   from docs are not mechanically enforced. Consider wiring the full `release:check` step
-   (or the missing gates) into CI.
+2. **CI gate coverage:** `release.yml` now runs `test:fresh-install` after packaged smoke,
+   matching the release gate defined in `release-check.mjs`. The "interaction audit" and
+   "secret scan" listed in the quality-gate documentation remain informational and are not
+   yet mechanically enforced by CI.
 
 ## 6. Pre-existing failures (NOT from this sweep)
 
