@@ -132,6 +132,15 @@ describe('parseCsv', () => {
     expect(mapped).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, issues: [] })
   })
 
+  it('ignores zero-width characters glued to headers and numbers', () => {
+    const rows = parseCsv('\u200BSymbol,Quantity,Cost\nAAPL.US,1\u200B000,180.5')
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, confidence: 1, issues: [] })
+    const wordJoiner = parseCsv('\u2060代码,数量,成本\n0700.HK,500,320')
+    expect(wordJoiner[0]).toMatchObject({ symbol: '0700.HK', quantity: 500, costPrice: 320, confidence: 1, issues: [] })
+    expect(toFiniteNumber('1\u200B,000')).toBe(1000)
+    expect(toFiniteNumber('\u200B')).toBeUndefined()
+  })
+
   it('flags formatting-only quantities and costs without inventing zeros', () => {
     const rows = parseCsv('Symbol,Quantity,Cost\nAAPL.US,100,$\nMSFT.US,",",180.5\n0700.HK,500,320')
     expect(rows).toHaveLength(3)

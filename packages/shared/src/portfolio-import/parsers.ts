@@ -83,9 +83,17 @@ export function checkSymbol(raw: string): SymbolCheck {
   }
 }
 
+/** Characters `trim` does not remove, but spreadsheets and web paste often insert. */
+const INVISIBLE_CHARS = /[\uFEFF\u200B\u200C\u200D\u2060]/g
+
+function stripInvisible(value: string): string {
+  return value.replace(INVISIBLE_CHARS, '')
+}
+
 /**
  * Coerce a CSV/paste cell to a finite number. Strings with thousands
  * separators or a leading `$` are handled; empty/null/non-numeric → undefined.
+ * Zero-width characters from web paste are removed first.
  */
 export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value === 'number') {
@@ -94,7 +102,7 @@ export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value !== 'string') {
     return undefined
   }
-  const trimmed = value.trim()
+  const trimmed = stripInvisible(value).trim()
   if (trimmed === '') {
     return undefined
   }
@@ -172,7 +180,7 @@ export function splitCsvLine(line: string, delimiter: ',' | '\t' = csvDelimiter(
 }
 
 function normalizeHeaderCell(cell: string): string {
-  return cell.trim().toLowerCase().replace(/[\s_\-]/g, '')
+  return stripInvisible(cell).trim().toLowerCase().replace(/[\s_\-]/g, '')
 }
 
 /** Field → resolved column index for one CSV file. */
