@@ -12,6 +12,8 @@ import { createCodeError } from '../agent/errors.ts';
 import type { PiRpcClientOptions } from '../agent/pi-rpc-client.ts';
 import { SessionManager } from './session-manager.ts';
 import { RunManager } from './run-manager.ts';
+import type { ResolveBudgetInput } from './run-budget.ts';
+import type { RunawayPolicy } from './runaway-detector.ts';
 
 export type AgentProvider = 'local' | 'pi-runtime';
 
@@ -33,6 +35,15 @@ export interface AgentKernelOptions {
   /** Skill hub used for progressive skill loading in the runtime prompt. */
   skillHub?: SkillHub;
   now?: () => number;
+  /**
+   * Budget defaults and the system ceiling every run obeys (#17). Without it
+   * runs are unbudgeted; a run may still tighten its own limits at startRun.
+   */
+  budgets?: ResolveBudgetInput;
+  /** Tool-name patterns (`*` wildcard) whose `query` argument feeds the search-loop detector. */
+  searchTools?: string[];
+  /** Runaway detector thresholds; unset fields fall back to `defaultRunawayPolicy()`. */
+  runaway?: Partial<RunawayPolicy>;
 }
 
 /**
@@ -68,6 +79,9 @@ export class AgentKernel {
       runs: new RunRepository(store),
       runtime: this.runtime,
       now,
+      budgets: options.budgets,
+      searchTools: options.searchTools,
+      runaway: options.runaway,
     });
   }
 
