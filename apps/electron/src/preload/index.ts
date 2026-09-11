@@ -28,6 +28,7 @@ export interface ElectronAPI {
     }) => Promise<unknown>;
     cancelRun: (input: { sessionId: string; runId: string }) => Promise<unknown>;
     onAgentEvent: (callback: (event: unknown) => void) => () => void;
+    onStreamEvent: (callback: (payload: { sessionId: string; event: unknown }) => void) => () => void;
   };
   agent: {
     getTools: () => Promise<unknown>;
@@ -212,6 +213,14 @@ const electronAPI: ElectronAPI = {
       ipcRenderer.on('agent:event', listener);
       return () => {
         ipcRenderer.removeListener('agent:event', listener);
+      };
+    },
+    onStreamEvent: (callback: (payload: { sessionId: string; event: unknown }) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: { sessionId: string; event: unknown }) =>
+        callback(payload);
+      ipcRenderer.on('agent:stream', listener);
+      return () => {
+        ipcRenderer.removeListener('agent:stream', listener);
       };
     },
   },

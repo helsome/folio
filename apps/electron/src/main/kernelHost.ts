@@ -283,6 +283,7 @@ export class AgentKernelHost {
   private instrumentResolver: InstrumentResolver;
   private activeLogin: { cancel: () => void } | null = null;
   private unsubscribe: (() => void) | null = null;
+  private streamUnsubscribe: (() => void) | null = null;
   private connectionsUnsubscribe: (() => void) | null = null;
   private window: BrowserWindow | null = null;
 
@@ -477,6 +478,14 @@ export class AgentKernelHost {
     this.unsubscribe = this.kernel.runs.subscribe((event: AgentEvent) => {
       if (!window.isDestroyed()) {
         window.webContents.send('agent:event', event);
+      }
+    });
+    // Stream Event Protocol v1 (issue #27): parallel transport for the
+    // protocol channel, alongside the legacy agent:event delivery.
+    this.streamUnsubscribe?.();
+    this.streamUnsubscribe = this.kernel.runs.subscribeStream((sessionId, event) => {
+      if (!window.isDestroyed()) {
+        window.webContents.send('agent:stream', { sessionId, event });
       }
     });
     this.connectionsUnsubscribe?.();
