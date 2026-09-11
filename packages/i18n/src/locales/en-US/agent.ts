@@ -11,6 +11,7 @@ export const agent = {
     stop: 'Stop',
     agentRunning: 'Agent running',
     thinking: 'Thinking…',
+    jumpToLatest: 'Jump to latest',
   },
   runtime: {
     // V8.1 §38–39: distinct infra-failure banner instead of chat spam.
@@ -49,7 +50,6 @@ export const agent = {
     analyzedSources_one: 'Analyzed {{count}} source',
     analyzedSources_other: 'Analyzed {{count}} sources',
     statusRunning: 'running',
-    failed: 'Tool failed',
     label: 'Tool: {{name}}',
     calls: 'Tool calls',
     names: {

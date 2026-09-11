@@ -12,6 +12,7 @@ export const agent = {
     stop: '停止',
     agentRunning: 'Agent 运行中',
     thinking: '思考中…',
+    jumpToLatest: '跳到最新',
   },
   runtime: {
     unavailable: 'Agent 不可用',
@@ -49,7 +50,6 @@ export const agent = {
     analyzedSources_one: '分析了 {{count}} 个数据源',
     analyzedSources_other: '分析了 {{count}} 个数据源',
     statusRunning: '运行中',
-    failed: '工具调用失败',
     label: '工具：{{name}}',
     calls: '工具调用',
     names: {

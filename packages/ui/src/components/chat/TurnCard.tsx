@@ -1,8 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Message } from '@finagent/core';
-import { MarkdownContent } from './MarkdownContent';
-import { ToolActivity } from '../agent/ToolActivity';
+import { StreamingMarkdown } from './StreamingMarkdown';
 
 interface TurnCardProps {
   message: Message;
@@ -35,11 +34,34 @@ export const TurnCard: React.FC<TurnCardProps> = ({ message }) => {
         {isUser ? (
           <div className="max-w-none whitespace-pre-wrap text-[14px] leading-relaxed">{message.content}</div>
         ) : (
-          <MarkdownContent content={message.content} />
+          <StreamingMarkdown content={message.content} />
         )}
         {!isUser && toolCalls.length > 0 && (
           <div className="mt-3 border-t mac-section-divider pt-3">
-            <ToolActivity toolCalls={toolCalls} />
+            <div className="mb-2 text-[11px] font-semibold uppercase text-foreground/42">
+              {t('agent.tool.calls')}
+            </div>
+            <div className="space-y-1.5">
+              {toolCalls.map((toolCall) => (
+                <div
+                  key={toolCall.id}
+                  className="flex items-center justify-between gap-3 rounded-[10px] bg-foreground/[0.045] px-3 py-2 text-[12px]"
+                >
+                  <span className="truncate font-mono text-foreground/68">
+                    {toolCall.toolName}
+                  </span>
+                  <span
+                    className={
+                      toolCall.status === 'success'
+                        ? 'font-semibold text-success'
+                        : 'font-semibold text-destructive'
+                    }
+                  >
+                    {toolCall.status}
+                  </span>
+                </div>
+              ))}
+            </div>
           </div>
         )}
         <div className={`mt-2 text-[11px] ${isUser ? 'text-white/68' : 'text-foreground/38'}`}>
