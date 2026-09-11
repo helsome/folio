@@ -121,6 +121,8 @@ export interface Session {
   status: SessionStatus;
   createdAt: number;
   updatedAt: number;
+  /** Persisted branch selected when the session was last opened. */
+  activeBranchId?: string;
   /** Runtime-context identity (e.g. Pi session id) so the runtime conversation can be recovered after restart. */
   runtimeSessionId?: string;
   /** Runtime session file path (e.g. Pi JSONL session file). */
@@ -135,6 +137,47 @@ export interface SessionMeta extends Session {
   lastMessageAt?: number;
 }
 
+/**
+ * A user-visible conversation action.  Every action creates new artifacts;
+ * none of the values below mean "update the previous answer in place".
+ */
+export type ConversationOperation = 'send' | 'retry' | 'regenerate' | 'edit' | 'fork';
+
+/**
+ * Snapshot of the workspace/security context used to start a run.  The
+ * current workspace may change while a historical branch is being viewed, so
+ * replaying a run must use this persisted value instead of live UI state.
+ */
+export interface RunContextSnapshot {
+  capturedAt: number;
+  workspaceContext?: WorkspaceContext;
+  recentSymbols?: string[];
+}
+
+/**
+ * A logical conversation branch.  `forkMessageId` is the last message from
+ * the parent branch visible in this branch; messages after it are local to the
+ * new branch. `null` explicitly means "start before the first parent
+ * message", while `undefined` is reserved for legacy metadata. This makes
+ * branch materialization deterministic and preserves the original branch
+ * unchanged.
+ */
+export interface ConversationBranch {
+  id: string;
+  sessionId: string;
+  name: string;
+  createdAt: number;
+  updatedAt: number;
+  parentBranchId?: string;
+  forkMessageId?: string | null;
+  /** Pi's tree leaf for this branch, when the Pi runtime is in use. */
+  runtimeLeafId?: string;
+  /** Runtime session file created for this logical branch. */
+  runtimeSessionPath?: string;
+  /** Runtime entry used to create this branch from its parent. */
+  runtimeForkEntryId?: string;
+}
+
 export interface Message {
   id: string;
   role: 'user' | 'assistant' | 'tool';
@@ -143,6 +186,19 @@ export interface Message {
   toolName?: string;
   toolCalls?: ToolCallRecord[];
   trace?: AgentTraceEvent[];
+  /** Branch containing this immutable message artifact. */
+  branchId?: string;
+  /** Previous message in the visible branch at creation time. */
+  parentMessageId?: string;
+  /** Run/generation that produced this message. */
+  runId?: string;
+  generationId?: string;
+  operation?: ConversationOperation;
+  /** Message/run this operation was derived from (edit, retry, regenerate). */
+  sourceMessageId?: string;
+  contextSnapshot?: RunContextSnapshot;
+  /** Stable entry id in the backing runtime's conversation tree. */
+  runtimeEntryId?: string;
 }
 
 export type RunStatus = 'running' | 'completed' | 'failed' | 'cancelled';
@@ -170,10 +226,43 @@ export interface Run {
   completedAt?: number;
   answer?: string;
   error?: ApiError;
+  /** Conversation branch in which this generation ran. */
+  branchId?: string;
+  operation?: ConversationOperation;
+  parentRunId?: string;
+  sourceMessageId?: string;
+  userMessageId?: string;
+  /** Explicit generation identity; normally equal to `id`, kept for APIs. */
+  generationId?: string;
+  contextSnapshot?: RunContextSnapshot;
+  /** Runtime identities captured for this generation's audit manifest. */
+  runtimeSessionId?: string;
+  runtimeSessionPath?: string;
+  runtimeLeafId?: string;
+  runtimeUserEntryId?: string;
+  runtimeAssistantEntryId?: string;
+  /** Immutable run manifest for audit/evaluation consumers. */
+  manifest?: RunManifest;
   /** Machine-readable reason the run stopped; absent on records written before #17. */
   stopReason?: StopReason;
   /** The numbers behind a non-success stop (which budget ran out, which loop fired). */
   stopDetail?: Record<string, unknown>;
+}
+
+export interface RunManifest {
+  runId: string;
+  branchId: string;
+  operation: ConversationOperation;
+  inputMessageId?: string;
+  parentRunId?: string;
+  sourceMessageId?: string;
+  contextSnapshot?: RunContextSnapshot;
+  toolCallIds: string[];
+  runtimeSessionId?: string;
+  runtimeSessionPath?: string;
+  runtimeLeafId?: string;
+  runtimeUserEntryId?: string;
+  runtimeAssistantEntryId?: string;
 }
 
 /** Live tool call state, streamed through agent events. */
@@ -220,6 +309,8 @@ export type AgentEvent =
 export interface RunStartedPayload {
   run: Run;
   userMessage: Message;
+  /** False when a new generation reuses an inherited user message. */
+  userMessageIsNew?: boolean;
 }
 
 /**
@@ -408,9 +499,37 @@ export interface AgentRunInput {
   sessionId: string;
   runId: string;
   content: string;
+  /** Logical Folio branch that owns this runtime generation. */
+  branchId?: string;
+  /** Runtime session file selected for this branch. */
+  sessionPath?: string;
   workspaceContext?: WorkspaceContext;
   /** V8: effective UI locale for new agent responses (spec §41–42). */
   locale?: SupportedLocale;
+}
+
+/** Request to materialize a logical branch in a runtime conversation tree. */
+export interface RuntimeBranchPreparationInput {
+  sessionId: string;
+  branchId: string;
+  parentBranchId?: string;
+  parentSessionPath?: string;
+  forkMessageId?: string | null;
+  /** Runtime entry id of the parent message used as the native fork cursor. */
+  forkRuntimeEntryId?: string;
+}
+
+/** Runtime identities returned after a branch has been prepared. */
+export interface RuntimeBranchState {
+  runtimeSessionId?: string;
+  runtimeSessionPath?: string;
+  runtimeLeafId?: string;
+}
+
+/** Stable runtime identities captured for one generation. */
+export interface RuntimeRunArtifacts extends RuntimeBranchState {
+  runtimeUserEntryId?: string;
+  runtimeAssistantEntryId?: string;
 }
 
 /** A model as reported by the Pi model registry. */
@@ -504,10 +623,15 @@ export interface AgentRuntime {
   ensureSession: (session: {
     id: string;
     title?: string;
+    branchId?: string;
     sessionPath?: string;
     recentSymbols?: string[];
   }) => Promise<RuntimeSession>;
   run: (input: AgentRunInput) => AsyncIterable<AgentEvent>;
+  /** Optional native branch operation (Pi uses its session-tree fork). */
+  prepareBranch?: (input: RuntimeBranchPreparationInput) => Promise<RuntimeBranchState>;
+  /** Optional runtime identities captured after a generation settles. */
+  getRunArtifacts?: (input: { sessionId: string; runId: string }) => Promise<RuntimeRunArtifacts | undefined>;
   cancel: (input: { sessionId: string; runId: string }) => Promise<void>;
   disposeSession?: (sessionId: string) => Promise<void>;
   dispose: () => Promise<void>;

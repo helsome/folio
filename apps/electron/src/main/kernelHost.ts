@@ -8,6 +8,7 @@ import type {
   ApiResult,
   CapabilityRegistry,
   Comparison,
+  ConversationBranch,
   CredentialInfo,
   CustomProviderConfig,
   FinancialProviderStatus,
@@ -490,40 +491,25 @@ export class AgentKernelHost {
     return this.kernel.sessions.listMessages(requireString(sessionId, 'sessionId'));
   }
 
+  async listBranches(sessionId: unknown): Promise<ConversationBranch[]> {
+    return this.kernel.sessions.listBranches(requireString(sessionId, 'sessionId'));
+  }
+
+  async setActiveBranch(input: unknown): Promise<ConversationBranch> {
+    const request = requireObject(input);
+    return this.kernel.runs.setActiveBranch(
+      requireString(request.sessionId, 'sessionId'),
+      requireString(request.branchId, 'branchId')
+    );
+  }
+
   async listRuns(sessionId: unknown): Promise<Run[]> {
     return this.kernel.sessions.listRuns(requireString(sessionId, 'sessionId'));
   }
 
   async startRun(input: unknown): Promise<Run> {
     const request = requireObject(input) as Partial<StartRunRequest>;
-    let workspaceContext: WorkspaceContext | undefined;
-    if (request.workspaceContext && typeof request.workspaceContext === 'object') {
-      const context = request.workspaceContext as Record<string, unknown>;
-      workspaceContext = {};
-      if (typeof context.activeSymbol === 'string') {
-        workspaceContext.activeSymbol = context.activeSymbol.toUpperCase();
-      }
-      if (
-        context.activeView === 'overview' ||
-        context.activeView === 'chart' ||
-        context.activeView === 'financials' ||
-        context.activeView === 'news' ||
-        context.activeView === 'portfolio'
-      ) {
-        workspaceContext.activeView = context.activeView;
-      }
-      if (typeof context.selectedPosition === 'string') {
-        workspaceContext.selectedPosition = context.selectedPosition;
-      }
-      if (
-        Array.isArray(context.comparisonSymbols) &&
-        context.comparisonSymbols.every((entry) => typeof entry === 'string')
-      ) {
-        workspaceContext.comparisonSymbols = context.comparisonSymbols.map((entry) =>
-          entry.toUpperCase()
-        );
-      }
-    }
+    const workspaceContext = readWorkspaceContext(request.workspaceContext);
     // V8: new agent responses follow the *effective* app locale unless the
     // user explicitly requests another language in the prompt (spec §41–42).
     // Resolved after validation and with a safe fallback so a prefs failure
@@ -533,6 +519,47 @@ export class AgentKernelHost {
       requireString(request.content, 'content'),
       workspaceContext,
       await this.effectiveRunLocale()
+    );
+  }
+
+  async retryRun(input: unknown): Promise<Run> {
+    const request = requireObject(input);
+    return this.kernel.runs.retryRun(
+      requireString(request.sessionId, 'sessionId'),
+      requireString(request.runId, 'runId'),
+      readWorkspaceContext(request.workspaceContext),
+      await this.effectiveRunLocale()
+    );
+  }
+
+  async editMessage(input: unknown): Promise<Run> {
+    const request = requireObject(input);
+    return this.kernel.runs.editMessage(
+      requireString(request.sessionId, 'sessionId'),
+      requireString(request.messageId, 'messageId'),
+      requireString(request.content, 'content'),
+      readWorkspaceContext(request.workspaceContext),
+      await this.effectiveRunLocale()
+    );
+  }
+
+  async regenerateMessage(input: unknown): Promise<Run> {
+    const request = requireObject(input);
+    return this.kernel.runs.regenerateMessage(
+      requireString(request.sessionId, 'sessionId'),
+      requireString(request.messageId, 'messageId'),
+      readWorkspaceContext(request.workspaceContext),
+      await this.effectiveRunLocale()
+    );
+  }
+
+  async forkBranch(input: unknown): Promise<ConversationBranch> {
+    const request = requireObject(input);
+    const name = request.name === undefined ? undefined : requireString(request.name, 'name');
+    return this.kernel.runs.forkBranch(
+      requireString(request.sessionId, 'sessionId'),
+      requireString(request.messageId, 'messageId'),
+      name
     );
   }
 
@@ -2608,6 +2635,34 @@ function requireObject(value: unknown): Record<string, unknown> {
     throw createCodeError('INVALID_ARGUMENT', 'Expected an object payload.');
   }
   return value as Record<string, unknown>;
+}
+
+function readWorkspaceContext(value: unknown): WorkspaceContext | undefined {
+  if (typeof value !== 'object' || value === null || Array.isArray(value)) return undefined;
+  const context = value as Record<string, unknown>;
+  const result: WorkspaceContext = {};
+  if (typeof context.activeSymbol === 'string') {
+    result.activeSymbol = context.activeSymbol.toUpperCase();
+  }
+  if (
+    context.activeView === 'overview' ||
+    context.activeView === 'chart' ||
+    context.activeView === 'financials' ||
+    context.activeView === 'news' ||
+    context.activeView === 'portfolio'
+  ) {
+    result.activeView = context.activeView;
+  }
+  if (typeof context.selectedPosition === 'string') {
+    result.selectedPosition = context.selectedPosition;
+  }
+  if (
+    Array.isArray(context.comparisonSymbols) &&
+    context.comparisonSymbols.every((entry) => typeof entry === 'string')
+  ) {
+    result.comparisonSymbols = context.comparisonSymbols.map((entry) => String(entry).toUpperCase());
+  }
+  return result;
 }
 
 function createCodeError(code: string, message: string, action?: string) {

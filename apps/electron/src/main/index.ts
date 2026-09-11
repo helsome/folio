@@ -116,12 +116,36 @@ ipcMain.handle('sessions:getMessages', async (_event, sessionId: unknown) =>
   toIpcResult(() => agentKernelHost.getMessages(sessionId))
 );
 
+ipcMain.handle('sessions:listBranches', async (_event, sessionId: unknown) =>
+  toIpcResult(() => agentKernelHost.listBranches(sessionId))
+);
+
+ipcMain.handle('sessions:setActiveBranch', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.setActiveBranch(input))
+);
+
 ipcMain.handle('sessions:listRuns', async (_event, sessionId: unknown) =>
   toIpcResult(() => agentKernelHost.listRuns(sessionId))
 );
 
 ipcMain.handle('runs:start', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.startRun(input))
+);
+
+ipcMain.handle('runs:retry', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.retryRun(input))
+);
+
+ipcMain.handle('messages:edit', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.editMessage(input))
+);
+
+ipcMain.handle('messages:regenerate', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.regenerateMessage(input))
+);
+
+ipcMain.handle('branches:fork', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.forkBranch(input))
 );
 
 ipcMain.handle('runs:cancel', async (_event, input: unknown) =>

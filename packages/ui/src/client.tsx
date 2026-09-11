@@ -5,6 +5,7 @@ import type {
   AlertTriggerEvent,
   ApiResult,
   CalcIndex,
+  ConversationBranch,
   Comparison,
   CredentialInfo,
   CustomProviderConfig,
@@ -180,12 +181,35 @@ export interface FinagentClient {
     createSession: (title?: string) => Promise<ApiResult<SessionMeta>>;
     deleteSession: (sessionId: string) => Promise<ApiResult<void>>;
     getMessages: (sessionId: string) => Promise<ApiResult<Message[]>>;
+    listBranches: (sessionId: string) => Promise<ApiResult<ConversationBranch[]>>;
+    setActiveBranch: (sessionId: string, branchId: string) => Promise<ApiResult<ConversationBranch>>;
     listRuns: (sessionId: string) => Promise<ApiResult<Run[]>>;
     startRun: (
       sessionId: string,
       content: string,
       workspaceContext?: WorkspaceContext
     ) => Promise<ApiResult<Run>>;
+    retryRun: (
+      sessionId: string,
+      runId: string,
+      workspaceContext?: WorkspaceContext
+    ) => Promise<ApiResult<Run>>;
+    editMessage: (
+      sessionId: string,
+      messageId: string,
+      content: string,
+      workspaceContext?: WorkspaceContext
+    ) => Promise<ApiResult<Run>>;
+    regenerateMessage: (
+      sessionId: string,
+      messageId: string,
+      workspaceContext?: WorkspaceContext
+    ) => Promise<ApiResult<Run>>;
+    forkBranch: (
+      sessionId: string,
+      messageId: string,
+      name?: string
+    ) => Promise<ApiResult<ConversationBranch>>;
     cancelRun: (sessionId: string, runId: string) => Promise<ApiResult<void>>;
     onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
   };
@@ -310,8 +334,14 @@ export const fallbackClient: FinagentClient = {
     createSession: missingClient('kernel.createSession'),
     deleteSession: missingClient('kernel.deleteSession'),
     getMessages: missingClient('kernel.getMessages'),
+    listBranches: missingClient('kernel.listBranches'),
+    setActiveBranch: missingClient('kernel.setActiveBranch'),
     listRuns: missingClient('kernel.listRuns'),
     startRun: missingClient('kernel.startRun'),
+    retryRun: missingClient('kernel.retryRun'),
+    editMessage: missingClient('kernel.editMessage'),
+    regenerateMessage: missingClient('kernel.regenerateMessage'),
+    forkBranch: missingClient('kernel.forkBranch'),
     cancelRun: missingClient('kernel.cancelRun'),
     onAgentEvent: () => () => undefined,
   },

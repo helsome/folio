@@ -11,6 +11,9 @@ import type {
   LlmRuntimeState,
   LlmTestResult,
   RuntimeSession,
+  RuntimeBranchPreparationInput,
+  RuntimeBranchState,
+  RuntimeRunArtifacts,
   SkillReadiness,
   ToolCall,
   ToolDefinition,
@@ -21,7 +24,13 @@ import type { SkillHub } from '@finagent/skill-hub';
 import { FinanceToolRegistry } from './finance-tool-registry.ts';
 import { createPhaseOneRegistry } from '../capabilities/index.ts';
 import { MarketDataService } from './market-data-service.ts';
-import { PiRpcClient, type PiRpcClientOptions, type PiState } from './pi-rpc-client.ts';
+import {
+  PiRpcClient,
+  type PiEntriesResult,
+  type PiRpcClientOptions,
+  type PiSessionEntry,
+  type PiState,
+} from './pi-rpc-client.ts';
 import { PiEventAdapter } from './pi-event-adapter.ts';
 import { createCodeError, toApiError } from './errors.ts';
 
@@ -63,8 +72,10 @@ export interface LlmRuntimeApi {
 
 interface RuntimeSessionState {
   sessionId: string;
+  branchId?: string;
   sessionPath: string;
   runtimeSessionId?: string;
+  runtimeLeafId?: string;
   recentSymbols: string[];
 }
 
@@ -86,8 +97,12 @@ export class PiRuntimeAdapter implements AgentRuntime {
   private readonly readinessProvider?: (skillId: string) => SkillReadiness | undefined;
   private readonly now: () => number;
   private readonly sessions = new Map<string, RuntimeSessionState>();
+  private readonly runStartLeaves = new Map<string, string | undefined>();
+  private readonly runArtifacts = new Map<string, RuntimeRunArtifacts>();
   /** Active session file in the runtime. */
   private activePath: string | null = null;
+  /** Active Folio runtime state key. */
+  private activeStateKey: string | null = null;
   /** Last configured Pi extension list + the Finagent-core-only subset. */
   private extensions: string[] = [];
   private coreExtensions: string[] = [];
@@ -137,16 +152,64 @@ export class PiRuntimeAdapter implements AgentRuntime {
     };
   }
 
-  async ensureSession(session: { id: string; title?: string; sessionPath?: string }): Promise<RuntimeSession> {
+  async ensureSession(session: {
+    id: string;
+    title?: string;
+    branchId?: string;
+    sessionPath?: string;
+    recentSymbols?: string[];
+  }): Promise<RuntimeSession> {
     const sessionPath = session.sessionPath ?? this.sessionPathFor(session.id);
-    const state = this.getOrCreateState(session.id, sessionPath);
+    const state = this.getOrCreateState(session.id, session.branchId, sessionPath);
+    if (session.recentSymbols && session.recentSymbols.length > 0 && state.recentSymbols.length === 0) {
+      state.recentSymbols = [...session.recentSymbols];
+    }
     await this.activate(state);
     return {
       sessionId: session.id,
       runtimeSessionId: state.runtimeSessionId,
-      sessionPath,
+      sessionPath: state.sessionPath,
       status: 'active',
     };
+  }
+
+  /**
+   * Materialize a Folio child branch in Pi. Pi's `fork` creates a new JSONL
+   * session file; a branch without a known native cursor gets a fresh empty
+   * session so historical answers can never leak into the new generation.
+   */
+  async prepareBranch(input: RuntimeBranchPreparationInput): Promise<RuntimeBranchState> {
+    if (input.parentSessionPath && this.activePath !== input.parentSessionPath) {
+      await this.rpcClient.switchSession(input.parentSessionPath);
+      this.activePath = input.parentSessionPath;
+    }
+
+    if (input.forkRuntimeEntryId) {
+      const result = await this.rpcClient.fork(input.forkRuntimeEntryId);
+      if (result.cancelled) {
+        throw createCodeError('RUN_CANCELLED', 'Pi cancelled the conversation branch fork.');
+      }
+    } else {
+      const freshPath = this.branchPathFor(input.sessionId, input.branchId);
+      await this.rpcClient.switchSession(freshPath);
+      this.activePath = freshPath;
+    }
+
+    const state = await this.rpcClient.getState();
+    const entries = await this.rpcClient.getEntries().catch(() => undefined);
+    const runtimeSessionPath = state.sessionFile ?? this.activePath ?? undefined;
+    this.activePath = runtimeSessionPath ?? null;
+    return {
+      runtimeSessionId: state.sessionId,
+      runtimeSessionPath,
+      runtimeLeafId: entries?.leafId ?? undefined,
+    };
+  }
+
+  async getRunArtifacts(input: { sessionId: string; runId: string }): Promise<RuntimeRunArtifacts | undefined> {
+    const artifacts = this.runArtifacts.get(input.runId);
+    this.runArtifacts.delete(input.runId);
+    return artifacts;
   }
 
   /** 
@@ -219,7 +282,11 @@ export class PiRuntimeAdapter implements AgentRuntime {
     outcome: { error: ApiError | undefined; terminated: boolean },
     yieldInfraFailure: boolean
   ): AsyncIterable<AgentEvent> {
-    const state = this.getOrCreateState(input.sessionId, this.sessionPathFor(input.sessionId));
+    const state = this.getOrCreateState(
+      input.sessionId,
+      input.branchId,
+      input.sessionPath ?? this.sessionPathFor(input.sessionId)
+    );
     const now = this.now;
     const fail = async function* (error: unknown, emit: boolean): AsyncIterable<AgentEvent> {
       outcome.error = toApiError(error);
@@ -236,6 +303,9 @@ export class PiRuntimeAdapter implements AgentRuntime {
       yield* fail(error, emit);
       return;
     }
+
+    const beforeEntries = await this.readEntries();
+    this.runStartLeaves.set(input.runId, beforeEntries?.leafId ?? undefined);
 
     const adapter = new PiEventAdapter({ sessionId: input.sessionId, runId: input.runId, now: this.now });
     const stream = this.rpcClient.promptStreaming(
@@ -259,6 +329,8 @@ export class PiRuntimeAdapter implements AgentRuntime {
       runError = error;
     }
 
+    await this.captureRunArtifacts(input, state).catch(() => undefined);
+
     if (runError !== undefined) {
       const emitTerminal =
         yieldInfraFailure || !(await this.isOptionalExtensionFailure(runError));
@@ -270,6 +342,49 @@ export class PiRuntimeAdapter implements AgentRuntime {
     if (aborted) {
       yield* adapter.cancelled();
     }
+  }
+
+  private async captureRunArtifacts(
+    input: AgentRunInput,
+    state: RuntimeSessionState
+  ): Promise<void> {
+    const since = this.runStartLeaves.get(input.runId);
+    this.runStartLeaves.delete(input.runId);
+
+    const initialEntries = await this.readEntries(since);
+    if (!initialEntries) return;
+    let entries = initialEntries;
+
+    // A Pi restart or a stale cursor can make the incremental query empty;
+    // the full tree still gives us the durable identities for this run.
+    if (entries.entries.length === 0) {
+      entries = (await this.readEntries()) ?? entries;
+    }
+
+    const messageEntries = entries.entries.filter((entry) => entry.type === 'message' && entry.message);
+    const userIndex = findLatestMatchingUser(messageEntries, input.content);
+    const userEntry = userIndex >= 0 ? messageEntries[userIndex] : undefined;
+    const assistantEntry = userIndex >= 0
+      ? [...messageEntries.slice(userIndex + 1)].reverse().find((entry) => entry.message?.role === 'assistant')
+      : undefined;
+
+    state.runtimeLeafId = entries.leafId ?? state.runtimeLeafId;
+    const artifacts: RuntimeRunArtifacts = {
+      runtimeSessionId: state.runtimeSessionId,
+      runtimeSessionPath: state.sessionPath,
+      runtimeLeafId: state.runtimeLeafId,
+      runtimeUserEntryId: userEntry?.id,
+      runtimeAssistantEntryId: assistantEntry?.id,
+    };
+    this.runArtifacts.set(input.runId, artifacts);
+  }
+
+  private async readEntries(since?: string): Promise<PiEntriesResult | undefined> {
+    const client = this.rpcClient as PiRpcClient & {
+      getEntries?: (cursor?: string) => Promise<PiEntriesResult>;
+    };
+    if (typeof client.getEntries !== 'function') return undefined;
+    return client.getEntries(since).catch(() => undefined);
   }
 
   /** True when the error signature points at a broken optional-extension load. */
@@ -298,17 +413,18 @@ export class PiRuntimeAdapter implements AgentRuntime {
   }
 
   async disposeSession(sessionId: string): Promise<void> {
-    const state = this.sessions.get(sessionId);
-    this.sessions.delete(sessionId);
-    // Remove the Pi conversation file together with the Folio session. The
-    // path is deterministic per session, so this works even when the session
-    // was created but never ran.
-    await unlink(join(this.sessionDir, `${sessionId}.jsonl`)).catch(() => undefined);
-    if (state?.sessionPath && state.sessionPath !== join(this.sessionDir, `${sessionId}.jsonl`)) {
-      await unlink(state.sessionPath).catch(() => undefined);
+    const states = Array.from(this.sessions.values()).filter((state) => state.sessionId === sessionId);
+    for (const [key, state] of this.sessions.entries()) {
+      if (state.sessionId === sessionId) this.sessions.delete(key);
     }
-    if (this.activePath === state?.sessionPath) {
+    const paths = new Set([
+      join(this.sessionDir, `${sessionId}.jsonl`),
+      ...states.map((state) => state.sessionPath),
+    ]);
+    await Promise.all(Array.from(paths, (path) => unlink(path).catch(() => undefined)));
+    if (states.some((state) => state.sessionPath === this.activePath)) {
       this.activePath = null;
+      this.activeStateKey = null;
     }
   }
 
@@ -325,22 +441,46 @@ export class PiRuntimeAdapter implements AgentRuntime {
     return join(this.sessionDir, `${sessionId}.jsonl`);
   }
 
-  private getOrCreateState(sessionId: string, sessionPath: string): RuntimeSessionState {
-    const existing = this.sessions.get(sessionId);
-    if (existing) return existing;
-    const state: RuntimeSessionState = { sessionId, sessionPath, recentSymbols: [] };
-    this.sessions.set(sessionId, state);
+  private branchPathFor(sessionId: string, branchId: string): string {
+    return join(this.sessionDir, `${sessionId}-${branchId}.jsonl`);
+  }
+
+  private stateKey(sessionId: string, branchId?: string): string {
+    return `${sessionId}:${branchId ?? 'main'}`;
+  }
+
+  private getOrCreateState(
+    sessionId: string,
+    branchId: string | undefined,
+    sessionPath: string
+  ): RuntimeSessionState {
+    const key = this.stateKey(sessionId, branchId);
+    const existing = this.sessions.get(key);
+    if (existing) {
+      if (existing.sessionPath !== sessionPath) {
+        existing.sessionPath = sessionPath;
+        existing.runtimeSessionId = undefined;
+        existing.runtimeLeafId = undefined;
+      }
+      return existing;
+    }
+    const state: RuntimeSessionState = { sessionId, branchId, sessionPath, recentSymbols: [] };
+    this.sessions.set(key, state);
     return state;
   }
 
   /** Ensure the Pi runtime has the session's conversation file loaded. */
   private async activate(state: RuntimeSessionState): Promise<void> {
     if (this.activePath === state.sessionPath && state.runtimeSessionId) {
+      this.activeStateKey = this.stateKey(state.sessionId, state.branchId);
       return;
     }
     const piState = await this.rpcClient.switchSession(state.sessionPath);
     state.runtimeSessionId = piState.sessionId;
+    state.sessionPath = piState.sessionFile ?? state.sessionPath;
+    state.runtimeLeafId = undefined;
     this.activePath = state.sessionPath;
+    this.activeStateKey = this.stateKey(state.sessionId, state.branchId);
   }
 
   private rememberSymbols(event: AgentEvent) {
@@ -350,7 +490,10 @@ export class PiRuntimeAdapter implements AgentRuntime {
       ? toolCall.args.symbol.toUpperCase()
       : undefined;
     if (!symbol) return;
-    const state = this.sessions.get(event.sessionId);
+    const activeState = this.activeStateKey ? this.sessions.get(this.activeStateKey) : undefined;
+    const state = activeState?.sessionId === event.sessionId
+      ? activeState
+      : Array.from(this.sessions.values()).find((candidate) => candidate.sessionId === event.sessionId);
     if (!state) return;
     state.recentSymbols = [
       symbol,
@@ -466,6 +609,25 @@ function toLlmRuntimeState(piState: PiState): LlmRuntimeState {
     sessionId: piState.sessionId,
     messageCount: piState.messageCount,
   };
+}
+
+function findLatestMatchingUser(entries: PiSessionEntry[], input: string): number {
+  for (let index = entries.length - 1; index >= 0; index -= 1) {
+    const entry = entries[index];
+    if (entry.message?.role !== 'user') continue;
+    if (piMessageText(entry.message.content).includes(input)) return index;
+  }
+  return -1;
+}
+
+function piMessageText(content: unknown): string {
+  if (typeof content === 'string') return content;
+  if (!Array.isArray(content)) return '';
+  return content.flatMap((part) => {
+    if (!part || typeof part !== 'object') return [];
+    const record = part as Record<string, unknown>;
+    return record.type === 'text' && typeof record.text === 'string' ? [record.text] : [];
+  }).join('');
 }
 
 function buildPrompt(

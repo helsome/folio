@@ -44,5 +44,6 @@ export class SessionRepository {
     await this.store.write(SessionRepository.FILE, file);
     await this.store.remove(`sessions/${id}/messages.json`);
     await this.store.remove(`sessions/${id}/runs.json`);
+    await this.store.remove(`sessions/${id}/branches.json`);
   }
 }

@@ -29,9 +29,24 @@ function createElectronClient(): FinagentClient {
       createSession: (title?: string) => ipcResult(window.electronAPI.kernel.createSession(title)),
       deleteSession: (sessionId: string) => ipcResult(window.electronAPI.kernel.deleteSession(sessionId)),
       getMessages: (sessionId: string) => ipcResult(window.electronAPI.kernel.getMessages(sessionId)),
+      listBranches: (sessionId: string) => ipcResult(window.electronAPI.kernel.listBranches(sessionId)),
+      setActiveBranch: (sessionId: string, branchId: string) =>
+        ipcResult(window.electronAPI.kernel.setActiveBranch({ sessionId, branchId })),
       listRuns: (sessionId: string) => ipcResult(window.electronAPI.kernel.listRuns(sessionId)),
       startRun: (sessionId: string, content: string, workspaceContext?: WorkspaceContext) =>
         ipcResult(window.electronAPI.kernel.startRun({ sessionId, content, workspaceContext })),
+      retryRun: (sessionId: string, runId: string, workspaceContext?: WorkspaceContext) =>
+        ipcResult(window.electronAPI.kernel.retryRun({ sessionId, runId, workspaceContext })),
+      editMessage: (
+        sessionId: string,
+        messageId: string,
+        content: string,
+        workspaceContext?: WorkspaceContext
+      ) => ipcResult(window.electronAPI.kernel.editMessage({ sessionId, messageId, content, workspaceContext })),
+      regenerateMessage: (sessionId: string, messageId: string, workspaceContext?: WorkspaceContext) =>
+        ipcResult(window.electronAPI.kernel.regenerateMessage({ sessionId, messageId, workspaceContext })),
+      forkBranch: (sessionId: string, messageId: string, name?: string) =>
+        ipcResult(window.electronAPI.kernel.forkBranch({ sessionId, messageId, name })),
       cancelRun: (sessionId: string, runId: string) =>
         ipcResult(window.electronAPI.kernel.cancelRun({ sessionId, runId })),
       onAgentEvent: (callback: (event: AgentEvent) => void) =>

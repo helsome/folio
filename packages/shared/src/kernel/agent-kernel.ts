@@ -1,6 +1,7 @@
 import type { AgentRuntime, ApiResult, ToolDefinition } from '@finagent/core';
 import type { SkillHub } from '@finagent/skill-hub';
 import { JsonFileStore } from '../storage/json-file-store.ts';
+import { BranchRepository } from '../storage/branch-repository.ts';
 import { MessageRepository } from '../storage/message-repository.ts';
 import { RunRepository } from '../storage/run-repository.ts';
 import { SessionRepository } from '../storage/session-repository.ts';
@@ -70,6 +71,7 @@ export class AgentKernel {
       sessions: new SessionRepository(store),
       messages: new MessageRepository(store),
       runs: new RunRepository(store),
+      branches: new BranchRepository(store),
       piSessionDir: options.piSessionDir,
       now,
     });

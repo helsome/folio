@@ -2,9 +2,10 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowUp, ChevronLeft, ChevronRight, Square, Sparkles } from 'lucide-react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import type { ApiError, FolioTrace, PortfolioSnapshot, Quote, ToolCall } from '@finagent/core';
+import type { ApiError, FolioTrace, Message, PortfolioSnapshot, Quote, Run, ToolCall } from '@finagent/core';
 import {
   activeMessagesAtom,
+  activeRunsAtom,
   activeSessionIdAtom,
   agentPanelVisibleAtom,
   cancelRunAtom,
@@ -12,6 +13,7 @@ import {
   lastRunSummaryAtom,
   navSectionAtom,
   runViewAtom,
+  refreshBranchProjectionAtom,
   settingsTabAtom,
   workspaceContextAtom,
   type LastRunSummary,
@@ -22,6 +24,7 @@ import { MessageList } from '../chat/MessageList';
 import { AnswerContent } from '../chat/AnswerContent';
 import { ModelSelector } from './ModelSelector';
 import { ThinkingSelector } from './ThinkingSelector';
+import { BranchSwitcher } from './BranchSwitcher';
 import { ToolActivity } from './ToolActivity';
 import { ContextChip } from './ContextChip';
 import { TraceInspector } from '../trace/TraceInspector';
@@ -89,11 +92,13 @@ export const AgentPanel: React.FC = () => {
   const { t } = useTranslation();
   const client = useFinagentClient();
   const [messages] = useAtom(activeMessagesAtom);
+  const [runs] = useAtom(activeRunsAtom);
   const [activeSessionId] = useAtom(activeSessionIdAtom);
   const [runView] = useAtom(runViewAtom);
   const setAgentPanelVisible = useSetAtom(agentPanelVisibleAtom);
   const createSession = useSetAtom(createSessionAtom);
   const cancelRun = useSetAtom(cancelRunAtom);
+  const refreshBranchProjection = useSetAtom(refreshBranchProjectionAtom);
   const [lastRun, setLastRun] = useAtom(lastRunSummaryAtom);
   const workspaceContext = useAtomValue(workspaceContextAtom);
 
@@ -183,13 +188,73 @@ export const AgentPanel: React.FC = () => {
 
   /** V8.1 §38: retry the last user message after an infra failure. */
   const handleRetry = async () => {
-    const lastUser = [...messages].reverse().find((message) => message.role === 'user');
-    if (!lastUser || !activeSessionId) return;
+    if (!lastRun || !activeSessionId || (lastRun.status !== 'failed' && lastRun.status !== 'cancelled')) return;
     setSendError(null);
-    const result = await client.kernel.startRun(activeSessionId, lastUser.content, workspaceContext);
+    const result = await client.kernel.retryRun(activeSessionId, lastRun.runId, workspaceContext);
     if (!result.ok) {
       setSendError(result.error.message);
+      return;
     }
+    await activateRunBranch(result.data);
+  };
+
+  const activateRunBranch = async (run: Run): Promise<boolean> => {
+    if (!activeSessionId || !run.branchId) return true;
+    const result = await refreshBranchProjection(client, activeSessionId, run.branchId);
+    if (!result.ok) {
+      setSendError(result.error.message);
+      return false;
+    }
+    return true;
+  };
+
+  const handleRetryMessage = async (message: Message): Promise<boolean> => {
+    if (!activeSessionId || !message.runId || isRunning) return false;
+    setSendError(null);
+    const result = await client.kernel.retryRun(activeSessionId, message.runId, workspaceContext);
+    if (!result.ok) {
+      setSendError(result.error.message);
+      return false;
+    }
+    return activateRunBranch(result.data);
+  };
+
+  const handleRegenerate = async (message: Message): Promise<boolean> => {
+    if (!activeSessionId || isRunning) return false;
+    setSendError(null);
+    const result = await client.kernel.regenerateMessage(activeSessionId, message.id, workspaceContext);
+    if (!result.ok) {
+      setSendError(result.error.message);
+      return false;
+    }
+    return activateRunBranch(result.data);
+  };
+
+  const handleEdit = async (message: Message, content: string): Promise<boolean> => {
+    if (!activeSessionId || isRunning) return false;
+    setSendError(null);
+    const result = await client.kernel.editMessage(activeSessionId, message.id, content, workspaceContext);
+    if (!result.ok) {
+      setSendError(result.error.message);
+      return false;
+    }
+    return activateRunBranch(result.data);
+  };
+
+  const handleFork = async (message: Message): Promise<boolean> => {
+    if (!activeSessionId || isRunning) return false;
+    setSendError(null);
+    const result = await client.kernel.forkBranch(activeSessionId, message.id);
+    if (!result.ok) {
+      setSendError(result.error.message);
+      return false;
+    }
+    const projection = await refreshBranchProjection(client, activeSessionId, result.data.id);
+    if (!projection.ok) {
+      setSendError(projection.error.message);
+      return false;
+    }
+    return true;
   };
 
   const handleStop = async () => {
@@ -261,6 +326,7 @@ export const AgentPanel: React.FC = () => {
       <div className="folio-agent-context border-b mac-section-divider px-3 py-2">
         <ContextChip />
       </div>
+      <BranchSwitcher disabled={isRunning} />
 
       {/* Scrollable body: tool activity, structured results, messages, live answer */}
       <div
@@ -299,7 +365,15 @@ export const AgentPanel: React.FC = () => {
               }}
             />
           )}
-          <MessageList messages={messages} isLoading={isRunning} />
+          <MessageList
+            messages={messages}
+            runs={runs}
+            isLoading={isRunning}
+            onEdit={handleEdit}
+            onRegenerate={handleRegenerate}
+            onRetry={handleRetryMessage}
+            onFork={handleFork}
+          />
           {isRunning && <StreamingBlock answer={runView?.answer ?? ''} />}
           <RunFooter
             lastRun={lastRun}

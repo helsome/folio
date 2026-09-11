@@ -28,6 +28,8 @@ class FakePiProcess extends EventEmitter {
   killed = false;
   pid = 1234;
   private received: string[] = [];
+  private activeRequestId: string | undefined;
+  private activeRequestResponded = false;
 
   constructor(
     private readonly handler: (line: Record<string, unknown>, proc: FakePiProcess) => void
@@ -42,7 +44,20 @@ class FakePiProcess extends EventEmitter {
         buffer = buffer.slice(newlineIndex + 1);
         if (line) {
           this.received.push(line);
-          this.handler(JSON.parse(line) as Record<string, unknown>, this);
+          const request = JSON.parse(line) as Record<string, unknown>;
+          this.activeRequestId = typeof request.id === 'string' ? request.id : undefined;
+          this.activeRequestResponded = false;
+          this.handler(request, this);
+          if (request.type === 'get_entries' && !this.activeRequestResponded) {
+            this.writeEvent({
+              id: request.id,
+              type: 'response',
+              command: 'get_entries',
+              success: true,
+              data: { entries: [], leafId: null },
+            });
+          }
+          this.activeRequestId = undefined;
         }
         newlineIndex = buffer.indexOf('\n');
       }
@@ -56,6 +71,7 @@ class FakePiProcess extends EventEmitter {
   }
 
   writeEvent(event: Record<string, unknown>) {
+    if (event.id === this.activeRequestId) this.activeRequestResponded = true;
     this.stdout.write(`${JSON.stringify(event)}\n`);
   }
 
@@ -141,6 +157,58 @@ describe('PiRpcClient', () => {
 
     expect(sessions).toEqual(['/tmp/s1.jsonl']);
     expect(state).toMatchObject({ sessionId: 'pi-123', sessionFile: '/tmp/s1.jsonl' });
+  });
+
+  it('exposes Pi native fork cursors and append-only entry identities', async () => {
+    const client = new PiRpcClient({
+      spawnProcess: createSpawn(() =>
+        new FakePiProcess((line, proc) => {
+          if (line.type === 'fork') {
+            proc.writeEvent({
+              id: line.id,
+              type: 'response',
+              command: 'fork',
+              success: true,
+              data: { text: 'Original prompt', cancelled: false },
+            });
+          }
+          if (line.type === 'get_fork_messages') {
+            proc.writeEvent({
+              id: line.id,
+              type: 'response',
+              command: 'get_fork_messages',
+              success: true,
+              data: { messages: [{ entryId: 'u-1', text: 'Original prompt' }] },
+            });
+          }
+          if (line.type === 'get_entries') {
+            proc.writeEvent({
+              id: line.id,
+              type: 'response',
+              command: 'get_entries',
+              success: true,
+              data: {
+                entries: [
+                  { type: 'message', id: 'u-1', parentId: null, message: { role: 'user', content: 'Original prompt' } },
+                  { type: 'message', id: 'a-1', parentId: 'u-1', message: { role: 'assistant', content: 'Original answer' } },
+                ],
+                leafId: 'a-1',
+              },
+            });
+          }
+        })
+      ),
+    });
+
+    await expect(client.fork('u-1')).resolves.toEqual({ text: 'Original prompt', cancelled: false });
+    await expect(client.getForkMessages()).resolves.toEqual([{ entryId: 'u-1', text: 'Original prompt' }]);
+    await expect(client.getEntries()).resolves.toMatchObject({
+      leafId: 'a-1',
+      entries: [
+        { id: 'u-1', parentId: null, message: { role: 'user' } },
+        { id: 'a-1', parentId: 'u-1', message: { role: 'assistant' } },
+      ],
+    });
   });
 
   it('streams raw Pi events and settles with the aggregated result', async () => {
@@ -532,6 +600,131 @@ describe('PiRuntimeAdapter', () => {
       join('/tmp/pi', 's2.jsonl'),
       join('/tmp/pi', 's1.jsonl'),
     ]);
+  });
+
+  it('captures stable runtime entry identities for a generation', async () => {
+    let entriesCalls = 0;
+    const client = new PiRpcClient({
+      spawnProcess: createSpawn(() =>
+        new FakePiProcess((line, proc) => {
+          if (line.type === 'switch_session') {
+            proc.writeEvent({ id: line.id, type: 'response', command: 'switch_session', success: true });
+          }
+          if (line.type === 'get_state') {
+            proc.writeEvent({
+              id: line.id,
+              type: 'response',
+              command: 'get_state',
+              success: true,
+              data: { sessionId: 'pi-1', sessionFile: '/tmp/s.jsonl' },
+            });
+          }
+          if (line.type === 'get_entries') {
+            entriesCalls += 1;
+            proc.writeEvent({
+              id: line.id,
+              type: 'response',
+              command: 'get_entries',
+              success: true,
+              data: entriesCalls === 1
+                ? { entries: [], leafId: null }
+                : {
+                    entries: [
+                      { type: 'message', id: 'u-2', parentId: 'a-1', message: { role: 'user', content: 'wrapper hello' } },
+                      { type: 'message', id: 'a-2', parentId: 'u-2', message: { role: 'assistant', content: 'Answer' } },
+                    ],
+                    leafId: 'a-2',
+                  },
+            });
+          }
+          if (line.type === 'prompt') {
+            proc.writeEvent({ id: line.id, type: 'response', command: 'prompt', success: true });
+            proc.writeEvent({
+              id: line.id,
+              type: 'agent_end',
+              messages: [{ role: 'assistant', content: [{ type: 'text', text: 'Answer' }] }],
+            });
+          }
+        })
+      ),
+    });
+    const adapter = new PiRuntimeAdapter({ rpcClient: client, sessionDir: '/tmp/pi' });
+
+    await adapter.ensureSession({ id: 's1', branchId: 'main', sessionPath: '/tmp/s.jsonl' });
+    for await (const _event of adapter.run({
+      sessionId: 's1',
+      branchId: 'main',
+      sessionPath: '/tmp/s.jsonl',
+      runId: 'r1',
+      content: 'hello',
+    })) {
+      // Drain the stream so post-run entry capture completes.
+    }
+
+    await expect(adapter.getRunArtifacts({ sessionId: 's1', runId: 'r1' })).resolves.toMatchObject({
+      runtimeSessionId: 'pi-1',
+      runtimeSessionPath: '/tmp/s.jsonl',
+      runtimeLeafId: 'a-2',
+      runtimeUserEntryId: 'u-2',
+      runtimeAssistantEntryId: 'a-2',
+    });
+  });
+
+  it('prepares a child branch with Pi fork and records the new session file', async () => {
+    let stateCalls = 0;
+    const client = new PiRpcClient({
+      spawnProcess: createSpawn(() =>
+        new FakePiProcess((line, proc) => {
+          if (line.type === 'switch_session') {
+            proc.writeEvent({ id: line.id, type: 'response', command: 'switch_session', success: true });
+          }
+          if (line.type === 'fork') {
+            proc.writeEvent({
+              id: line.id,
+              type: 'response',
+              command: 'fork',
+              success: true,
+              data: { text: 'hello', cancelled: false },
+            });
+          }
+          if (line.type === 'get_state') {
+            stateCalls += 1;
+            proc.writeEvent({
+              id: line.id,
+              type: 'response',
+              command: 'get_state',
+              success: true,
+              data: {
+                sessionId: `pi-${stateCalls}`,
+                sessionFile: stateCalls === 1 ? '/tmp/main.jsonl' : '/tmp/forked.jsonl',
+              },
+            });
+          }
+          if (line.type === 'get_entries') {
+            proc.writeEvent({
+              id: line.id,
+              type: 'response',
+              command: 'get_entries',
+              success: true,
+              data: { entries: [], leafId: 'a-1' },
+            });
+          }
+        })
+      ),
+    });
+    const adapter = new PiRuntimeAdapter({ rpcClient: client, sessionDir: '/tmp/pi' });
+
+    await expect(adapter.prepareBranch({
+      sessionId: 's1',
+      branchId: 'b1',
+      parentBranchId: 'main',
+      parentSessionPath: '/tmp/main.jsonl',
+      forkRuntimeEntryId: 'u-1',
+    })).resolves.toEqual({
+      runtimeSessionId: 'pi-2',
+      runtimeSessionPath: '/tmp/forked.jsonl',
+      runtimeLeafId: 'a-1',
+    });
   });
 
   it('ends a cancelled run with a RUN_CANCELLED failure event', async () => {

@@ -1,20 +1,25 @@
 import { beforeEach, describe, expect, it } from 'bun:test';
 import { createStore } from 'jotai';
 import type { FinagentClient } from '../client';
-import type { Run, SessionMeta } from '@finagent/core';
+import type { ConversationBranch, Run, SessionMeta } from '@finagent/core';
 import {
   activeMessagesAtom,
   activeSessionIdAtom,
+  branchesAtomFamily,
   createSessionAtom,
   hydrateSessionsAtom,
+  loadBranchesAtom,
   loadMessagesAtom,
   messagesAtomFamily,
   sessionsAtom,
+  switchBranchAtom,
 } from './sessionAtoms.ts';
 
 let sessionCounter = 0;
 let savedSessions: SessionMeta[] = [];
 let savedMessages: Record<string, unknown[]> = {};
+let savedBranches: Record<string, ConversationBranch[]> = {};
+let savedBranchMessages: Record<string, unknown[]> = {};
 
 function makeSession(title: string): SessionMeta {
   sessionCounter += 1;
@@ -45,8 +50,22 @@ function makeClient(): FinagentClient {
         ok: true as const,
         data: (savedMessages[sessionId] ?? []) as never[],
       }),
+      listBranches: async (sessionId: string) => ({ ok: true as const, data: savedBranches[sessionId] ?? [] }),
+      setActiveBranch: async (sessionId: string, branchId: string) => {
+        const branch = (savedBranches[sessionId] ?? []).find((candidate) => candidate.id === branchId);
+        if (!branch) return { ok: false as const, error: { code: 'TEST', message: 'branch not found' } };
+        savedSessions = savedSessions.map((session) =>
+          session.id === sessionId ? { ...session, activeBranchId: branchId } : session
+        );
+        savedMessages[sessionId] = savedBranchMessages[branchId] ?? [];
+        return { ok: true as const, data: branch };
+      },
       listRuns: async () => ({ ok: true as const, data: [] as Run[] }),
       startRun: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      retryRun: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      editMessage: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      regenerateMessage: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
+      forkBranch: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
       cancelRun: async () => ({ ok: true as const, data: undefined }),
       onAgentEvent: () => () => undefined,
     },
@@ -100,6 +119,8 @@ describe('session atoms', () => {
     sessionCounter = 0;
     savedSessions = [];
     savedMessages = {};
+    savedBranches = {};
+    savedBranchMessages = {};
   });
 
   it('hydrates sessions from the kernel and activates the first one', async () => {
@@ -168,5 +189,27 @@ describe('session atoms', () => {
 
     expect(store.get(messagesAtomFamily('s1'))[0].content).toBe('from A');
     expect(store.get(messagesAtomFamily('s2'))[0].content).toBe('from B');
+  });
+
+  it('loads and switches branches without mixing the visible transcript', async () => {
+    const store = createStore();
+    savedSessions = [makeSession('Branching')];
+    savedBranches.s1 = [
+      { id: 'main', sessionId: 's1', name: 'Main', createdAt: 1, updatedAt: 1 },
+      { id: 'alt', sessionId: 's1', name: 'Alternative', createdAt: 2, updatedAt: 2, parentBranchId: 'main', forkMessageId: null },
+    ];
+    savedBranchMessages.main = [{ id: 'main-user', role: 'user', content: 'main question', timestamp: 1 }];
+    savedBranchMessages.alt = [{ id: 'alt-user', role: 'user', content: 'alternative question', timestamp: 2 }];
+    savedMessages.s1 = savedBranchMessages.main;
+    const client = makeClient();
+
+    await store.set(hydrateSessionsAtom, client);
+    await store.set(loadBranchesAtom, client, 's1');
+    await store.set(loadMessagesAtom, client, 's1');
+    await store.set(switchBranchAtom, client, 's1', 'alt');
+
+    expect(store.get(branchesAtomFamily('s1'))).toHaveLength(2);
+    expect(store.get(sessionsAtom)[0].activeBranchId).toBe('alt');
+    expect(store.get(activeMessagesAtom).map((message) => message.content)).toEqual(['alternative question']);
   });
 });

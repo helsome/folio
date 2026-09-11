@@ -2,7 +2,8 @@ import { mkdtemp, readdir, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import type { Message, Run, SessionMeta } from '@finagent/core';
+import type { ConversationBranch, Message, Run, SessionMeta } from '@finagent/core';
+import { BranchRepository } from './branch-repository.ts';
 import { JsonFileStore } from './json-file-store.ts';
 import { MessageRepository } from './message-repository.ts';
 import { RunRepository } from './run-repository.ts';
@@ -140,5 +141,37 @@ describe('RunRepository', () => {
 
     const runs = await repo.list('s1');
     expect(runs.map((run) => run.id)).toEqual(['r2', 'r1']);
+  });
+});
+
+describe('BranchRepository', () => {
+  it('persists branches and keeps them ordered by creation time', async () => {
+    const repo = new BranchRepository(store);
+    const main: ConversationBranch = {
+      id: 'b-main',
+      sessionId: 's1',
+      name: 'Main',
+      createdAt: 1000,
+      updatedAt: 1000,
+    };
+    const alternative: ConversationBranch = {
+      id: 'b-alt',
+      sessionId: 's1',
+      name: 'Alternative',
+      createdAt: 2000,
+      updatedAt: 2000,
+      parentBranchId: main.id,
+      forkMessageId: 'm1',
+    };
+
+    await repo.create(alternative);
+    await repo.create(main);
+    const reloaded = new BranchRepository(new JsonFileStore(dir));
+
+    expect((await reloaded.list('s1')).map((branch) => branch.id)).toEqual(['b-main', 'b-alt']);
+    expect(await reloaded.get('s1', 'b-alt')).toMatchObject({
+      parentBranchId: 'b-main',
+      forkMessageId: 'm1',
+    });
   });
 });

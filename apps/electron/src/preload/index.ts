@@ -20,12 +20,23 @@ export interface ElectronAPI {
     createSession: (title?: string) => Promise<unknown>;
     deleteSession: (sessionId: string) => Promise<unknown>;
     getMessages: (sessionId: string) => Promise<unknown>;
+    listBranches: (sessionId: string) => Promise<unknown>;
+    setActiveBranch: (input: { sessionId: string; branchId: string }) => Promise<unknown>;
     listRuns: (sessionId: string) => Promise<unknown>;
     startRun: (input: {
       sessionId: string;
       content: string;
       workspaceContext?: unknown;
     }) => Promise<unknown>;
+    retryRun: (input: { sessionId: string; runId: string; workspaceContext?: unknown }) => Promise<unknown>;
+    editMessage: (input: {
+      sessionId: string;
+      messageId: string;
+      content: string;
+      workspaceContext?: unknown;
+    }) => Promise<unknown>;
+    regenerateMessage: (input: { sessionId: string; messageId: string; workspaceContext?: unknown }) => Promise<unknown>;
+    forkBranch: (input: { sessionId: string; messageId: string; name?: string }) => Promise<unknown>;
     cancelRun: (input: { sessionId: string; runId: string }) => Promise<unknown>;
     onAgentEvent: (callback: (event: unknown) => void) => () => void;
   };
@@ -197,12 +208,27 @@ const electronAPI: ElectronAPI = {
     createSession: (title?: string) => ipcRenderer.invoke('sessions:create', title),
     deleteSession: (sessionId: string) => ipcRenderer.invoke('sessions:delete', sessionId),
     getMessages: (sessionId: string) => ipcRenderer.invoke('sessions:getMessages', sessionId),
+    listBranches: (sessionId: string) => ipcRenderer.invoke('sessions:listBranches', sessionId),
+    setActiveBranch: (input: { sessionId: string; branchId: string }) =>
+      ipcRenderer.invoke('sessions:setActiveBranch', input),
     listRuns: (sessionId: string) => ipcRenderer.invoke('sessions:listRuns', sessionId),
     startRun: (input: {
       sessionId: string;
       content: string;
       workspaceContext?: unknown;
     }) => ipcRenderer.invoke('runs:start', input),
+    retryRun: (input: { sessionId: string; runId: string; workspaceContext?: unknown }) =>
+      ipcRenderer.invoke('runs:retry', input),
+    editMessage: (input: {
+      sessionId: string;
+      messageId: string;
+      content: string;
+      workspaceContext?: unknown;
+    }) => ipcRenderer.invoke('messages:edit', input),
+    regenerateMessage: (input: { sessionId: string; messageId: string; workspaceContext?: unknown }) =>
+      ipcRenderer.invoke('messages:regenerate', input),
+    forkBranch: (input: { sessionId: string; messageId: string; name?: string }) =>
+      ipcRenderer.invoke('branches:fork', input),
     cancelRun: (input: { sessionId: string; runId: string }) => ipcRenderer.invoke('runs:cancel', input),
     onAgentEvent: (callback: (event: unknown) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, agentEvent: unknown) => callback(agentEvent);

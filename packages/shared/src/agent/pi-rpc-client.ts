@@ -65,6 +65,32 @@ export interface PiState {
   thinkingLevel?: string;
 }
 
+export interface PiForkResult {
+  text?: string;
+  cancelled: boolean;
+}
+
+export interface PiForkMessage {
+  entryId: string;
+  text: string;
+}
+
+/** Append-only entry returned by Pi's session-tree RPC. */
+export interface PiSessionEntry {
+  type?: string;
+  id: string;
+  parentId?: string | null;
+  message?: {
+    role?: string;
+    content?: unknown;
+  };
+}
+
+export interface PiEntriesResult {
+  entries: PiSessionEntry[];
+  leafId?: string | null;
+}
+
 /** Events yielded by {@link PiRpcClient.promptStreaming}. */
 export type PiStreamEvent =
   | { kind: 'event'; event: Record<string, unknown> }
@@ -162,6 +188,57 @@ export class PiRpcClient {
   async switchSession(sessionPath: string): Promise<PiState> {
     await this.sendControl<unknown>({ type: 'switch_session', sessionPath }, this.healthTimeoutMs);
     return this.getState();
+  }
+
+  /** Fork the active Pi conversation before a previous user entry. */
+  async fork(entryId: string): Promise<PiForkResult> {
+    const data = await this.sendControl<unknown>({ type: 'fork', entryId }, this.controlTimeoutMs);
+    const record = readRecord(data);
+    return {
+      text: typeof record.text === 'string' ? record.text : undefined,
+      cancelled: record.cancelled === true,
+    };
+  }
+
+  /** Return user entries that Pi exposes as native fork cursors. */
+  async getForkMessages(): Promise<PiForkMessage[]> {
+    const data = await this.sendControl<unknown>({ type: 'get_fork_messages' }, this.controlTimeoutMs);
+    const record = readRecord(data);
+    if (!Array.isArray(record.messages)) {
+      throw createCodeError('PI_PROTOCOL_ERROR', 'Pi get_fork_messages returned no messages list.');
+    }
+    return record.messages.flatMap((message) => {
+      const item = readRecord(message);
+      if (typeof item.entryId !== 'string' || typeof item.text !== 'string') return [];
+      return [{ entryId: item.entryId, text: item.text }];
+    });
+  }
+
+  /** Read the append-only Pi session tree and its current leaf cursor. */
+  async getEntries(since?: string): Promise<PiEntriesResult> {
+    const data = await this.sendControl<unknown>(
+      since ? { type: 'get_entries', since } : { type: 'get_entries' },
+      this.controlTimeoutMs
+    );
+    const record = readRecord(data);
+    if (!Array.isArray(record.entries)) {
+      throw createCodeError('PI_PROTOCOL_ERROR', 'Pi get_entries returned no entries list.');
+    }
+    return {
+      entries: record.entries.flatMap((entry) => {
+        const item = readRecord(entry);
+        if (typeof item.id !== 'string') return [];
+        return [{
+          type: typeof item.type === 'string' ? item.type : undefined,
+          id: item.id,
+          parentId: typeof item.parentId === 'string' ? item.parentId : item.parentId === null ? null : undefined,
+          message: item.message && typeof item.message === 'object'
+            ? readRecord(item.message) as PiSessionEntry['message']
+            : undefined,
+        }];
+      }),
+      leafId: typeof record.leafId === 'string' ? record.leafId : record.leafId === null ? null : undefined,
+    };
   }
 
   /**

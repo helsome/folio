@@ -39,8 +39,14 @@ var electronAPI = {
     createSession: (title) => import_electron.ipcRenderer.invoke("sessions:create", title),
     deleteSession: (sessionId) => import_electron.ipcRenderer.invoke("sessions:delete", sessionId),
     getMessages: (sessionId) => import_electron.ipcRenderer.invoke("sessions:getMessages", sessionId),
+    listBranches: (sessionId) => import_electron.ipcRenderer.invoke("sessions:listBranches", sessionId),
+    setActiveBranch: (input) => import_electron.ipcRenderer.invoke("sessions:setActiveBranch", input),
     listRuns: (sessionId) => import_electron.ipcRenderer.invoke("sessions:listRuns", sessionId),
     startRun: (input) => import_electron.ipcRenderer.invoke("runs:start", input),
+    retryRun: (input) => import_electron.ipcRenderer.invoke("runs:retry", input),
+    editMessage: (input) => import_electron.ipcRenderer.invoke("messages:edit", input),
+    regenerateMessage: (input) => import_electron.ipcRenderer.invoke("messages:regenerate", input),
+    forkBranch: (input) => import_electron.ipcRenderer.invoke("branches:fork", input),
     cancelRun: (input) => import_electron.ipcRenderer.invoke("runs:cancel", input),
     onAgentEvent: (callback) => {
       const listener = (_event, agentEvent) => callback(agentEvent);
