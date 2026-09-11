@@ -1,6 +1,7 @@
 import { Type } from '@sinclair/typebox';
-import type { Kline } from '@finagent/core';
+import type { FinancialFact, Kline } from '@finagent/core';
 import type { FinanceCapability } from '@finagent/core';
+import { describeFact, klineToFacts, marketCurrencyOf } from '@finagent/core';
 import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
@@ -43,22 +44,40 @@ export function createMarketKlineCapability(
       const period = input.period ?? '1d';
       const limit = input.limit ?? 100;
       const klines = await fetchers.getKline({ symbol, period, limit });
+      const fetchedAt = (ctx?.now ?? Date.now)();
+      const timing = period === '1d' || period === '1w' ? 'eod' : 'historical';
+      const facts = klines.map((kline) =>
+        klineToFacts(kline, {
+          provider: 'longbridge',
+          currency: marketCurrencyOf(symbol),
+          timing,
+          adjustment: 'unknown', // CLI does not report adjustment — never assume raw
+          retrievedAt: Math.floor(fetchedAt / 1000),
+        })
+      );
       return {
         data: klines,
+        facts: facts.flat(),
         provenance: {
           provider: 'longbridge',
-          fetchedAt: (ctx?.now ?? Date.now)(),
+          fetchedAt,
           marketTime: klines[klines.length - 1]?.timestamp,
           stale: false,
         },
-        summary: formatKline(symbol, period, klines),
+        summary: formatKline(symbol, period, klines, facts),
       };
     },
   });
 }
 
-function formatKline(symbol: string, period: string, klines: Kline[]) {
+function formatKline(
+  symbol: string,
+  period: string,
+  klines: Kline[],
+  facts: FinancialFact[][]
+) {
   const recent = klines.slice(-5);
+  const latestClose = facts[facts.length - 1]?.find((fact) => fact.metric === 'close');
   return [
     `${symbol} K-Line (${period})`,
     '-----------------',
@@ -66,5 +85,6 @@ function formatKline(symbol: string, period: string, klines: Kline[]) {
       const date = new Date(kline.timestamp * 1000).toLocaleDateString();
       return `${date}: O$${kline.open.toFixed(2)} H$${kline.high.toFixed(2)} L$${kline.low.toFixed(2)} C$${kline.close.toFixed(2)} V${kline.volume}`;
     }),
+    latestClose ? `Semantics: ${describeFact(latestClose)}` : '',
   ].join('\n');
 }
