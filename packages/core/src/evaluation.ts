@@ -112,6 +112,106 @@ export interface EvaluationDataset {
   cases: EvaluationCase[];
 }
 
+/** A source/evidence expectation for a research Gold Case. */
+export interface EvaluationEvidenceRequirement {
+  /** Whether every material claim must carry a citation/evidence reference. */
+  mustCite: boolean;
+  /** Minimum number of independent sources required when applicable. */
+  minSources?: number;
+  /** Allowed source classes, e.g. filing, company-ir, or news. */
+  sourceKinds?: string[];
+}
+
+/** Weighted, machine-readable rubric for a research Gold Case. */
+export interface EvaluationRubric {
+  criteria: Record<string, { description: string; weight: number }>;
+  /** Minimum weighted score in the normalized 0..1 range. */
+  passThreshold: number;
+}
+
+/**
+ * Versioned Deep Research case contract.
+ *
+ * This deliberately extends the existing agent case instead of replacing it,
+ * so the regular benchmark runner can execute Gold Cases unchanged while
+ * research-specific evaluators can consume the richer expectations.
+ */
+export interface EvaluationGoldCase extends EvaluationCase {
+  schemaVersion: 'gold-case/v1';
+  expectedFacts: string[];
+  expectedSources?: string[];
+  evidenceRequirements: EvaluationEvidenceRequirement;
+  forbiddenConditions: string[];
+  rubric: EvaluationRubric;
+}
+
+export interface EvaluationGoldDataset extends Omit<EvaluationDataset, 'cases'> {
+  schemaVersion: 'gold-case/v1';
+  cases: EvaluationGoldCase[];
+}
+
+export interface GoldCaseValidationIssue {
+  path: string;
+  message: string;
+}
+
+/** Deterministically validate a versioned Gold Case dataset before execution. */
+export function validateGoldCaseDataset(
+  dataset: EvaluationGoldDataset,
+): GoldCaseValidationIssue[] {
+  const issues: GoldCaseValidationIssue[] = [];
+  if (dataset.schemaVersion !== 'gold-case/v1') {
+    issues.push({ path: 'schemaVersion', message: 'must be gold-case/v1' });
+  }
+  if (!/^\d+\.\d+\.\d+$/.test(dataset.version)) {
+    issues.push({ path: 'version', message: 'must be semantic version x.y.z' });
+  }
+  if (dataset.cases.length < 1) {
+    issues.push({ path: 'cases', message: 'must contain at least one case' });
+  }
+
+  const ids = new Set<string>();
+  for (const [index, caseItem] of dataset.cases.entries()) {
+    const path = `cases[${index}]`;
+    if (ids.has(caseItem.id)) issues.push({ path: `${path}.id`, message: 'must be unique' });
+    ids.add(caseItem.id);
+    if (caseItem.schemaVersion !== 'gold-case/v1') {
+      issues.push({ path: `${path}.schemaVersion`, message: 'must be gold-case/v1' });
+    }
+    if (caseItem.expectedFacts.length === 0) {
+      issues.push({ path: `${path}.expectedFacts`, message: 'must contain at least one fact' });
+    }
+    if (caseItem.forbiddenConditions.length === 0) {
+      issues.push({ path: `${path}.forbiddenConditions`, message: 'must contain at least one condition' });
+    }
+    const requirement = caseItem.evidenceRequirements;
+    if (requirement.minSources !== undefined && (!Number.isInteger(requirement.minSources) || requirement.minSources < 1)) {
+      issues.push({ path: `${path}.evidenceRequirements.minSources`, message: 'must be a positive integer' });
+    }
+    const criteria = Object.entries(caseItem.rubric.criteria);
+    if (criteria.length === 0) {
+      issues.push({ path: `${path}.rubric.criteria`, message: 'must contain at least one criterion' });
+    }
+    const weightTotal = criteria.reduce((sum, [, criterion]) => sum + criterion.weight, 0);
+    if (criteria.some(([, criterion]) => !Number.isFinite(criterion.weight) || criterion.weight <= 0)) {
+      issues.push({ path: `${path}.rubric.criteria`, message: 'weights must be positive finite numbers' });
+    } else if (Math.abs(weightTotal - 1) > 0.0001) {
+      issues.push({ path: `${path}.rubric.criteria`, message: 'weights must sum to 1' });
+    }
+    if (!Number.isFinite(caseItem.rubric.passThreshold) || caseItem.rubric.passThreshold < 0 || caseItem.rubric.passThreshold > 1) {
+      issues.push({ path: `${path}.rubric.passThreshold`, message: 'must be between 0 and 1' });
+    }
+  }
+  return issues;
+}
+
+export function assertValidGoldCaseDataset(dataset: EvaluationGoldDataset): void {
+  const issues = validateGoldCaseDataset(dataset);
+  if (issues.length > 0) {
+    throw new Error(issues.map((issue) => `${issue.path}: ${issue.message}`).join('; '));
+  }
+}
+
 // ── Failure taxonomy (spec §40-41) ──────────────────────────────────────────
 
 export type EvaluationFailureMode =

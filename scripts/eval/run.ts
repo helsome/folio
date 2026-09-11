@@ -28,6 +28,7 @@ import { LocalEvaluationBackend, resolveBackend } from '../../packages/shared/sr
 import { TraceCorrelationService } from '../../packages/shared/src/evaluation/correlation.ts';
 import { createJudgeClient, resolveJudgeConfig } from '../../packages/shared/src/evaluation/judge-client.ts';
 import { embeddedDatasets } from '../../packages/shared/src/evaluation/datasets/index.ts';
+import { validateGoldCaseDataset } from '../../packages/core/src/evaluation.ts';
 import {
   createBaselineFromExperiment,
   ExperimentService,
@@ -37,6 +38,7 @@ import type {
   EvaluationBaseline,
   EvaluationCase,
   EvaluationDataset,
+  EvaluationGoldDataset,
   EvaluationExperiment,
   EvaluationRun,
   ExperimentConfig,
@@ -651,6 +653,14 @@ async function main(): Promise<number> {
     return 1;
   }
   const dataset = datasetEntry.load();
+  if ((dataset as Partial<EvaluationGoldDataset>).schemaVersion === 'gold-case/v1') {
+    const issues = validateGoldCaseDataset(dataset as EvaluationGoldDataset);
+    if (issues.length > 0) {
+      console.error(`Invalid Gold Case dataset ${dataset.id}@${dataset.version}:`);
+      for (const issue of issues) console.error(`  ${issue.path}: ${issue.message}`);
+      return 1;
+    }
+  }
   const cases = selectCases(dataset, options.smoke, options.maxCases);
   if (cases.length === 0) {
     console.error('No cases selected.');
