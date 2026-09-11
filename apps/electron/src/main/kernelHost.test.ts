@@ -51,6 +51,7 @@ const fakeSessions = {
 
 const fakeRuns = {
   subscribe: (_listener: (event: AgentEvent) => void) => () => undefined,
+  subscribeStream: (_listener: (sessionId: string, event: unknown) => void) => () => undefined,
   startRun: async (sessionId: string, content: string) => ({
     id: 'r1',
     sessionId,
@@ -59,6 +60,7 @@ const fakeRuns = {
     startedAt: 1,
   }),
   cancelRun: async () => undefined,
+  replayStream: (_runId: string, _lastSequence: number) => ({ recoverable: false, events: [], atEnd: true }),
 };
 
 class FakeAgentKernel {
