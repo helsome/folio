@@ -19,6 +19,7 @@
  */
 import type { CapabilityId } from './capability.ts';
 import type { AccountAssets, CashFlowRecord, PortfolioSnapshot } from './account.ts';
+import type { InstrumentCandidateSummary } from './instrument.ts';
 
 // ── Domains ────────────────────────────────────────────────────────────────
 
@@ -147,6 +148,8 @@ export interface ProviderError {
   message: string;
   /** True when an immediate retry may succeed (transient). */
   retryable?: boolean;
+  /** Listing choices when `code` is `AMBIGUOUS_INSTRUMENT`. */
+  candidates?: InstrumentCandidateSummary[];
 }
 
 export type ProviderResult<T> =

@@ -94,6 +94,16 @@ export type InstrumentResolution =
       query: string;
     };
 
+/** UI/error payload for an ambiguous resolution. Omits alias maps. */
+export interface InstrumentCandidateSummary {
+  instrumentId: string;
+  symbol: string;
+  name: string;
+  market: string;
+  currency: string;
+  exchange?: string;
+}
+
 function normalizedCode(value: string): string {
   return value.trim().toUpperCase();
 }
@@ -201,6 +211,34 @@ export function isCanonicalInstrument(value: unknown): value is CanonicalInstrum
     typeof record.market === 'string' &&
     Array.isArray(record.providerAliases)
   );
+}
+
+/** Slim listing fields for ambiguity errors and candidate pickers. */
+export function summarizeInstrument(instrument: CanonicalInstrument): InstrumentCandidateSummary {
+  return {
+    instrumentId: instrument.instrumentId,
+    symbol: instrument.symbol,
+    name: instrument.name,
+    market: instrument.market,
+    currency: instrument.currency,
+    ...(instrument.exchange ? { exchange: instrument.exchange } : {}),
+  };
+}
+
+/** Read a canonical id off a stamped payload (object or array of objects). */
+export function readInstrumentId(data: unknown): string | undefined {
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      const id = readInstrumentId(item);
+      if (id) return id;
+    }
+    return undefined;
+  }
+  if (typeof data !== 'object' || data === null) return undefined;
+  const instrumentId = (data as { instrumentId?: unknown }).instrumentId;
+  return typeof instrumentId === 'string' && instrumentId.trim() !== ''
+    ? instrumentId.trim()
+    : undefined;
 }
 
 /** Resolve the symbol that one provider expects for a canonical instrument. */

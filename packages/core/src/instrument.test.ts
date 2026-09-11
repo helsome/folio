@@ -4,6 +4,8 @@ import {
   createInstrumentId,
   getProviderSymbol,
   InstrumentResolver,
+  readInstrumentId,
+  summarizeInstrument,
   type CanonicalInstrument,
 } from './instrument.ts';
 
@@ -262,5 +264,26 @@ describe('DEFAULT_INSTRUMENT_CATALOG', () => {
 describe('createInstrumentId', () => {
   it('normalizes exchange MIC and local symbol', () => {
     expect(createInstrumentId(' xhkg ', ' 0700 ')).toBe('XHKG:0700');
+  });
+});
+
+describe('summarizeInstrument', () => {
+  it('keeps listing fields and drops alias maps', () => {
+    expect(summarizeInstrument(APPLE)).toEqual({
+      instrumentId: 'XNAS:AAPL',
+      symbol: 'AAPL',
+      name: 'Apple Inc.',
+      market: 'US',
+      currency: 'USD',
+      exchange: 'NASDAQ',
+    });
+  });
+});
+
+describe('readInstrumentId', () => {
+  it('reads from a stamped object or the first stamped array item', () => {
+    expect(readInstrumentId({ symbol: 'AAPL.US', instrumentId: 'XNAS:AAPL' })).toBe('XNAS:AAPL');
+    expect(readInstrumentId([{ id: 'n1', instrumentId: ' XNAS:AAPL ' }])).toBe('XNAS:AAPL');
+    expect(readInstrumentId({ symbol: 'AAPL.US' })).toBeUndefined();
   });
 });

@@ -1,20 +1,20 @@
-import type {
-  CapabilityRunStatus,
-  CapabilityRunSummary,
-  EvidenceRef,
-  ResearchReport,
-  ResearchRunStatus,
-  ResearchRunSummary,
-  ResearchSection,
-  ResearchSynthesis,
-  ResearchSynthesizer,
-  StrategyId,
+import {
+  readInstrumentId,
+  type CapabilityRunStatus,
+  type CapabilityRunSummary,
+  type EvidenceRef,
+  type ResearchReport,
+  type ResearchRunStatus,
+  type ResearchRunSummary,
+  type ResearchSection,
+  type ResearchSynthesis,
+  type ResearchSynthesizer,
+  type StrategyId,
 } from '@finagent/core';
 import { i18nCurrentLocale } from '@finagent/i18n';
 import type { SupportedLocale } from '@finagent/core';
 import type { CapabilityRegistry } from '@finagent/core';
 import { CapabilityExecutor, type RunOutcome } from '../capabilities/index.ts';
-import { isRecord } from '../guards.ts';
 import {
   buildCapabilityInput,
   planForStrategy,
@@ -239,7 +239,7 @@ function assembleReport(args: {
     const evidence: EvidenceRef[] = [];
     if (outcome && outcome.record.status === 'success') {
       const instrumentId =
-        outcome.result?.provenance?.instrumentId ?? instrumentIdOf(outcome.result?.data);
+        outcome.result?.provenance?.instrumentId ?? readInstrumentId(outcome.result?.data);
       evidence.push({
         capabilityId: outcome.record.capabilityId,
         runId: outcome.record.id,
@@ -278,7 +278,7 @@ function assembleReport(args: {
     .map((o) => o.record.capabilityId);
 
   const instrumentId = outcomes
-    .map((outcome) => outcome.result?.provenance?.instrumentId ?? instrumentIdOf(outcome.result?.data))
+    .map((outcome) => outcome.result?.provenance?.instrumentId ?? readInstrumentId(outcome.result?.data))
     .find((id): id is string => typeof id === 'string' && id.length > 0);
 
   return {
@@ -303,17 +303,4 @@ function assembleReport(args: {
     capabilityRuns,
     runStatus: computeRunStatus(plan, successIds),
   };
-}
-
-function instrumentIdOf(data: unknown): string | undefined {
-  if (isRecord(data) && typeof data.instrumentId === 'string' && data.instrumentId.trim() !== '') {
-    return data.instrumentId;
-  }
-  if (Array.isArray(data)) {
-    for (const item of data) {
-      const id = instrumentIdOf(item);
-      if (id) return id;
-    }
-  }
-  return undefined;
 }

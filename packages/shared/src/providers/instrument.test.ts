@@ -116,6 +116,12 @@ describe('createRouterFetchers instrument binding', () => {
     expect(caught).toBeInstanceOf(ProviderFetchError);
     if (caught instanceof ProviderFetchError) {
       expect(caught.code).toBe('AMBIGUOUS_INSTRUMENT');
+      expect(caught.candidates?.map((candidate) => candidate.instrumentId)).toEqual([
+        'XNYS:BABA',
+        'XHKG:9988',
+      ]);
+      expect(caught.message).toContain('XNYS:BABA');
+      expect(caught.message).toContain('XHKG:9988');
     }
   });
 });

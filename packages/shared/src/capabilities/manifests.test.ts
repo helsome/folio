@@ -4,6 +4,7 @@ import type { CapabilityFetchers } from './fetchers.ts';
 
 const quote = {
   symbol: 'AAPL.US',
+  instrumentId: 'XNAS:AAPL',
   lastPrice: 200,
   change: 3,
   changePercent: 1.5,
@@ -65,6 +66,7 @@ describe('market.quote manifest', () => {
       provider: 'longbridge',
       fetchedAt: 12345,
       stale: false,
+      instrumentId: 'XNAS:AAPL',
     });
     expect(result.data.symbol).toBe('AAPL.US');
     expect(result.summary).toContain('AAPL.US');

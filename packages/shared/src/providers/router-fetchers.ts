@@ -1,18 +1,20 @@
-import type {
-  AccountAssets,
-  CalcIndex,
-  CashFlowRecord,
-  FinancialProviderRouter,
-  Holding,
-  IntradayData,
-  Kline,
-  MarketStatus,
-  NewsItem,
-  PortfolioSnapshot,
-  ProviderError,
-  ProviderResult,
-  Quote,
-  StaticInfo,
+import {
+  summarizeInstrument,
+  type AccountAssets,
+  type CalcIndex,
+  type CashFlowRecord,
+  type FinancialProviderRouter,
+  type Holding,
+  type IntradayData,
+  type InstrumentCandidateSummary,
+  type Kline,
+  type MarketStatus,
+  type NewsItem,
+  type PortfolioSnapshot,
+  type ProviderError,
+  type ProviderResult,
+  type Quote,
+  type StaticInfo,
 } from '@finagent/core';
 import type {
   CalendarEvent,
@@ -40,12 +42,15 @@ import { attachResolvedInstrument, type InstrumentQueryResolver } from './instru
 export class ProviderFetchError extends Error {
   readonly code: string;
   readonly retryable?: boolean;
+  /** Present when `code` is `AMBIGUOUS_INSTRUMENT`. */
+  readonly candidates?: InstrumentCandidateSummary[];
 
   constructor(error: ProviderError) {
     super(error.message);
     this.name = 'ProviderFetchError';
     this.code = error.code;
     this.retryable = error.retryable;
+    this.candidates = error.candidates;
   }
 }
 
@@ -108,9 +113,13 @@ function bindSymbolInput(
   if (!resolve) return input;
   const resolution = resolve(symbol);
   if (resolution.status === 'ambiguous') {
+    const candidates = resolution.candidates.map(summarizeInstrument);
     throw new ProviderFetchError({
       code: 'AMBIGUOUS_INSTRUMENT',
-      message: `Multiple instruments match "${symbol}". Choose a market or a canonical id.`,
+      message: `Multiple instruments match "${symbol}" (${candidates
+        .map((candidate) => candidate.instrumentId)
+        .join(', ')}). Choose a market or a canonical id.`,
+      candidates,
     });
   }
   return attachResolvedInstrument(input, resolution);

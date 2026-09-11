@@ -231,6 +231,8 @@ export interface ToolResultProvenance {
   fetchedAt: number;
   marketTime?: number;
   stale?: boolean;
+  /** Canonical instrument id when the tool ran against a resolved listing. */
+  instrumentId?: string;
 }
 
 /** Structured tool result: raw data plus optional provenance. */
