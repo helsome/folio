@@ -11,3 +11,13 @@ export { LocalResearchSynthesizer } from './synthesizer-local.ts';
 export { createAgentSynthesizer, parseSynthesisJson, type ResearchAgentRunner } from './agent-synth.ts';
 export { ResearchReportRepository, type ReportSummary } from './repository.ts';
 export { ResearchService, type ResearchServiceOptions } from './service.ts';
+export {
+  INJECTION_DEFENSE_RULES,
+  sanitizeNewsItem,
+  sanitizeNewsItems,
+  sanitizeUntrustedText,
+  scrubInjectedPhrases,
+  type InjectionFlag,
+  type SanitizePolicy,
+  type SanitizeResult,
+} from './sanitize.ts';

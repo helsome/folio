@@ -274,10 +274,13 @@ function buildDataBundle(outcomes: RunOutcome[]): string {
   const bundle: Record<string, unknown> = {};
   for (const outcome of outcomes) {
     if (outcome.record.status === 'success' && outcome.result) {
-      bundle[outcome.record.capabilityId] = truncateData(
-        outcome.record.capabilityId,
-        outcome.result.data
-      );
+      const data = truncateData(outcome.record.capabilityId, outcome.result.data);
+      // Security: external-text capabilities (news) are labeled untrusted so
+      // the synthesizer treats their prose as attributed claims, never
+      // instructions. Text was already sanitized at the capability boundary.
+      bundle[outcome.record.capabilityId] = outcome.record.capabilityId === 'research.news'
+        ? { trust: 'untrusted', provider: outcome.result.provenance?.provider ?? 'unknown', items: data }
+        : data;
     }
   }
   return JSON.stringify(bundle);

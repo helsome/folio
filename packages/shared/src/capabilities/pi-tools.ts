@@ -1,5 +1,6 @@
-import type { FinanceCapability } from '@finagent/core';
+import type { FinanceCapability, NewsItem } from '@finagent/core';
 import { validateInput } from './validate.ts';
+import { sanitizeNewsItem, sanitizeUntrustedText } from '../research/sanitize.ts';
 
 /** Shape the Pi Agent runtime expects for a registered tool. */
 export interface CapabilityTool {
@@ -33,8 +34,13 @@ export function createCapabilityTools(capabilities: FinanceCapability[]): Capabi
     async execute(_toolCallId, rawParams, signal) {
       const input = validateInput(cap.inputSchema, rawParams);
       const result = await cap.execute(input, { signal });
-      const json = JSON.stringify(result.data);
-      const text = result.summary ? `${result.summary}\n\nDATA: ${json}` : `DATA: ${json}`;
+      // Security (defense in depth): external-text payloads such as news are
+      // sanitized again at the LLM boundary. The capability manifest already
+      // sanitizes at ingestion; this wrapper covers any provider that does not.
+      const data = isNewsItemList(result.data) ? result.data.map(sanitizeNewsItem) : result.data;
+      const summary = result.summary ? sanitizeUntrustedText(result.summary).text : undefined;
+      const json = JSON.stringify(data);
+      const text = summary ? `${summary}\n\nDATA: ${json}` : `DATA: ${json}`;
       return {
         content: [{ type: 'text', text }],
         details: result.data,
@@ -43,4 +49,15 @@ export function createCapabilityTools(capabilities: FinanceCapability[]): Capabi
       };
     },
   }));
+}
+
+/** Structural check for news-shaped payloads (title/summary/url items). */
+function isNewsItemList(data: unknown): data is NewsItem[] {
+  return Array.isArray(data)
+    && data.length > 0
+    && data.every((item) => {
+      if (!item || typeof item !== 'object') return false;
+      const record = item as Record<string, unknown>;
+      return typeof record.title === 'string' && typeof record.summary === 'string' && typeof record.url === 'string';
+    });
 }

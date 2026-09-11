@@ -1,6 +1,7 @@
 import type { ResearchSynthesis, ResearchSynthesisInput, ResearchSynthesizer } from '@finagent/core';
 import { createCodeError } from '../agent/errors.ts';
 import { LocalResearchSynthesizer } from './synthesizer-local.ts';
+import { scrubInjectedPhrases } from './sanitize.ts';
 
 /**
  * Agent-backed synthesizer boundary. The runner is injected by the Lead at
@@ -68,15 +69,27 @@ export function parseSynthesisJson(text: string): ResearchSynthesis {
   });
 
   return {
-    summary: value.summary,
+    summary: scrub(value.summary),
     stance: value.stance as ResearchSynthesis['stance'],
     confidence,
-    sections,
-    bullCase: stringArray(value.bullCase, 'bullCase'),
-    bearCase: stringArray(value.bearCase, 'bearCase'),
-    catalysts: stringArray(value.catalysts, 'catalysts'),
-    risks: stringArray(value.risks, 'risks'),
+    sections: sections.map((section) => ({ ...section, summary: scrub(section.summary) })),
+    bullCase: stringArray(value.bullCase, 'bullCase').map(scrub),
+    bearCase: stringArray(value.bearCase, 'bearCase').map(scrub),
+    catalysts: stringArray(value.catalysts, 'catalysts').map(scrub),
+    risks: stringArray(value.risks, 'risks').map(scrub),
   };
+}
+
+/**
+ * Security: synthesis prose can echo injection phrasing copied from untrusted
+ * source text (the model was instructed not to, but output is the last line of
+ * defense). Sentences repeating known injection phrasing are dropped; a value
+ * emptied entirely by scrubbing falls back to its original — the parser's
+ * non-empty contract must hold even for fully-injected prose.
+ */
+function scrub(text: string): string {
+  const scrubbed = scrubInjectedPhrases(text).text;
+  return scrubbed.length > 0 ? scrubbed : text;
 }
 
 /**
