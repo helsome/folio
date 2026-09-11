@@ -235,7 +235,7 @@ interface PendingEvalRun {
  * main process.
  */
 export class AgentKernelHost {
-  private readonly marketData = new MarketDataService();
+  private readonly marketData: MarketDataService;
   private readonly kernel: AgentKernel;
   private readonly credentials: CredentialStore;
   private readonly skillHub: SkillHub;
@@ -314,7 +314,12 @@ export class AgentKernelHost {
     this.providerRouter.register(massive);
     this.providerRouter.setRouting({ primary: 'longbridge', fallback: 'massive' });
 
-    this.registry = createFullRegistry(createRouterFetchers(this.providerRouter));
+    // Keep renderer IPC and agent tools on the same provider gateway.  The
+    // service retains its dedicated Longbridge status probe, while market-data
+    // capabilities use the router's configured primary/fallback chain.
+    const routerFetchers = createRouterFetchers(this.providerRouter);
+    this.marketData = new MarketDataService({ fetchers: routerFetchers });
+    this.registry = createFullRegistry(routerFetchers);
     this.executor = new CapabilityExecutor();
 
     this.researchService = new ResearchService({

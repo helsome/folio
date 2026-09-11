@@ -4,9 +4,11 @@ import type { AgentEvent } from '@finagent/core';
 let lastKernelOptions: Record<string, unknown> | null = null;
 let lastMarketData: FakeMarketDataService | null = null;
 let forwardedEvents: unknown[] = [];
+const routerFetchers = { getQuote: async () => ({ symbol: 'AAPL.US' }) };
 
 class FakeMarketDataService {
   quoteSymbols: string[] = [];
+  constructor(readonly options?: { fetchers?: unknown }) {}
 
   async getQuote(symbol: string) {
     this.quoteSymbols.push(symbol);
@@ -95,8 +97,8 @@ const noopStore = class {
 mock.module('@finagent/shared', () => ({
   AgentKernel: FakeAgentKernel,
   MarketDataService: class extends FakeMarketDataService {
-    constructor() {
-      super();
+    constructor(options?: { fetchers?: unknown }) {
+      super(options);
       lastMarketData = this;
     }
   },
@@ -149,7 +151,7 @@ mock.module('@finagent/shared', () => ({
   computeSkillReadiness: () => undefined,
   parseSynthesisJson: (text: string) => JSON.parse(text),
   parseImpactJson: (text: string) => JSON.parse(text),
-  createRouterFetchers: () => ({}),
+  createRouterFetchers: () => routerFetchers,
   MassiveFinancialDataProvider: class {
     clearCache = () => undefined;
   },
@@ -414,6 +416,13 @@ describe('AgentKernelHost', () => {
       symbol: 'AAPL.US',
     });
     expect(lastMarketData?.quoteSymbols).toEqual(['AAPL.US']);
+    host.dispose();
+  });
+
+  it('uses the provider-router fetchers for renderer market data', () => {
+    const host = new AgentKernelHost();
+
+    expect(lastMarketData?.options?.fetchers).toBe(routerFetchers);
     host.dispose();
   });
 
