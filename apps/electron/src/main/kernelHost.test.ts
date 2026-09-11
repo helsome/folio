@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { join } from 'node:path';
 import type { AgentEvent } from '@finagent/core';
 
 let lastKernelOptions: Record<string, unknown> | null = null;
@@ -331,8 +332,8 @@ describe('AgentKernelHost', () => {
     const host = new AgentKernelHost();
 
     expect(lastKernelOptions).toMatchObject({
-      storageDir: '/tmp/finagent-test/store',
-      piSessionDir: '/tmp/finagent-test/pi-sessions',
+      storageDir: join('/tmp/finagent-test', 'store'),
+      piSessionDir: join('/tmp/finagent-test', 'pi-sessions'),
     });
     host.dispose();
   });

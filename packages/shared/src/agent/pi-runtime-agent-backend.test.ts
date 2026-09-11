@@ -1,6 +1,7 @@
 import { EventEmitter } from 'node:events';
 import { PassThrough } from 'node:stream';
 import { mkdir, writeFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'bun:test';
 import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import { PiRuntimeAdapter } from './pi-runtime-adapter.ts';
@@ -526,7 +527,11 @@ describe('PiRuntimeAdapter', () => {
     await adapter.ensureSession({ id: 's2' });
     await adapter.ensureSession({ id: 's1' });
 
-    expect(switched).toEqual(['/tmp/pi/s1.jsonl', '/tmp/pi/s2.jsonl', '/tmp/pi/s1.jsonl']);
+    expect(switched).toEqual([
+      join('/tmp/pi', 's1.jsonl'),
+      join('/tmp/pi', 's2.jsonl'),
+      join('/tmp/pi', 's1.jsonl'),
+    ]);
   });
 
   it('ends a cancelled run with a RUN_CANCELLED failure event', async () => {
