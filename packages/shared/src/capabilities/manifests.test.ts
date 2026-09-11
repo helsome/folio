@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { createMarketQuoteCapability } from './manifests/market-quote.ts';
+import { createMarketKlineCapability } from './manifests/market-kline.ts';
+import { createCompanyProfileCapability } from './manifests/company-profile.ts';
+import { createCompanyFinancialsCapability } from './manifests/phase-two.ts';
 import type { CapabilityFetchers } from './fetchers.ts';
 
 const quote = {
@@ -77,5 +80,66 @@ describe('market.quote manifest', () => {
     expect(cap.auth).toBe('public');
     expect(cap.category).toBe('market');
     expect(cap.riskLevel).toBe('read');
+  });
+
+  it('preserves the answering provider provenance from the gateway', async () => {
+    const routed = fetchers({
+      getQuote: async () => {
+        throw new Error('legacy fetcher should not be called');
+      },
+      execute: async <T>() => ({
+        ok: true as const,
+        data: quote as T,
+        provenance: {
+          providerId: 'massive',
+          providerName: 'Massive',
+          fetchedAt: 20000,
+          marketTime: 19000,
+          delayed: true,
+          stale: false,
+        },
+      }),
+    });
+
+    const result = await createMarketQuoteCapability(routed).execute(
+      { symbol: 'AAPL.US' },
+      { now: () => 99999 }
+    );
+    expect(result.provenance).toEqual({
+      provider: 'massive',
+      providerId: 'massive',
+      fetchedAt: 20000,
+      marketTime: 19000,
+      delayed: true,
+      stale: false,
+    });
+  });
+});
+
+describe('provider-routed history and fundamentals manifests', () => {
+  it('uses gateway provenance for K-line history and company profile', async () => {
+    const klines = [{ symbol: 'AAPL.US', timestamp: 18000, open: 1, high: 2, low: 0.5, close: 1.5, volume: 10 }];
+    const info = { symbol: 'AAPL.US', name: 'Apple' };
+    const financials = { symbol: 'AAPL.US', report: 'qf', statements: {} };
+    const routed = fetchers({
+      execute: async <T>(capabilityId: string) => ({
+        ok: true as const,
+        data: (capabilityId === 'market.kline' ? klines : capabilityId === 'company.financials' ? financials : info) as T,
+        provenance: {
+          providerId: 'massive',
+          providerName: 'Massive',
+          fetchedAt: 22000,
+          stale: false,
+        },
+      }),
+    });
+
+    const history = await createMarketKlineCapability(routed).execute({ symbol: 'AAPL.US', limit: 1 });
+    const profile = await createCompanyProfileCapability(routed).execute({ symbol: 'AAPL.US' });
+    const fundamentals = await createCompanyFinancialsCapability(routed).execute({ symbol: 'AAPL.US' });
+    expect(history.provenance.provider).toBe('massive');
+    expect(history.provenance.marketTime).toBe(18000);
+    expect(profile.provenance.provider).toBe('massive');
+    expect(fundamentals.provenance.provider).toBe('massive');
   });
 });

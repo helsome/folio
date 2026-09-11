@@ -1,11 +1,14 @@
 import type {
   AccountAssets,
+  CalendarEventsQueryOptions,
   CalcIndex,
+  CashFlowQueryOptions,
   CashFlowRecord,
   FinancialProviderRouter,
   Holding,
   IntradayData,
   Kline,
+  KlineQueryOptions,
   MarketStatus,
   NewsItem,
   PortfolioSnapshot,
@@ -25,11 +28,6 @@ import type {
   MarketTemperature,
   TradeTick,
 } from '@finagent/core/market-data';
-import type {
-  GetCalendarEventsOptions,
-  GetCashFlowOptions,
-  GetKlineOptions,
-} from '@finagent/longbridge-tools';
 
 /**
  * Normalized failure thrown by the router-backed fetchers. Carries the stable
@@ -56,7 +54,7 @@ export class ProviderFetchError extends Error {
  */
 export interface RouterCapabilityFetchers {
   getQuote: (symbol: string) => Promise<Quote>;
-  getKline: (options: GetKlineOptions) => Promise<Kline[]>;
+  getKline: (options: KlineQueryOptions) => Promise<Kline[]>;
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
   getMarketStatus: () => Promise<MarketStatus[]>;
   getStaticInfo: (symbol: string) => Promise<StaticInfo>;
@@ -75,10 +73,11 @@ export interface RouterCapabilityFetchers {
   getInstitutionRating: (symbol: string) => Promise<InstitutionRating>;
   getDividends: (symbol: string) => Promise<DividendRecord[]>;
   getEpsForecasts: (symbol: string) => Promise<EpsForecast[]>;
-  getCalendarEvents: (options: GetCalendarEventsOptions) => Promise<CalendarEvent[]>;
+  getCalendarEvents: (options: CalendarEventsQueryOptions) => Promise<CalendarEvent[]>;
   getAccountPositions: () => Promise<Holding[]>;
   getAssets: (currency?: string) => Promise<AccountAssets[]>;
-  getCashFlow: (options?: GetCashFlowOptions) => Promise<CashFlowRecord[]>;
+  getCashFlow: (options?: CashFlowQueryOptions) => Promise<CashFlowRecord[]>;
+  execute: <T>(capabilityId: string, input: unknown, signal?: AbortSignal) => Promise<ProviderResult<T>>;
 }
 
 async function fetch<T>(
@@ -102,6 +101,7 @@ async function fetch<T>(
  */
 export function createRouterFetchers(router: FinancialProviderRouter): RouterCapabilityFetchers {
   return {
+    execute: (capabilityId, input, signal) => router.execute(capabilityId, input, signal),
     getQuote: (symbol) => fetch(router, 'market.quote', { symbol }),
     getKline: (options) => fetch(router, 'market.kline', options),
     getIntraday: (symbol) => fetch(router, 'market.intraday', { symbol }),

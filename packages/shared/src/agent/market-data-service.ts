@@ -1,17 +1,18 @@
 import type {
   AccountAssets,
+  CalendarEventsQueryOptions,
   CalcIndex,
+  CashFlowQueryOptions,
   CashFlowRecord,
   Holding,
   IntradayData,
   Kline,
+  KlineQueryOptions,
   MarketStatus,
   NewsItem,
   PortfolioSnapshot,
   Quote,
   StaticInfo,
-} from '@finagent/core';
-import type {
   CalendarEvent,
   CapitalFlow,
   Depth,
@@ -21,7 +22,7 @@ import type {
   InstitutionRating,
   MarketTemperature,
   TradeTick,
-} from '@finagent/longbridge-tools';
+} from '@finagent/core';
 import {
   getAccountPositions,
   getAssets,
@@ -44,9 +45,6 @@ import {
   getQuote,
   getStaticInfo,
   getTrades,
-  type GetCalendarEventsOptions,
-  type GetCashFlowOptions,
-  type GetKlineOptions,
   type LongBridgeStatus,
 } from '@finagent/longbridge-tools';
 
@@ -62,7 +60,7 @@ export interface MarketDataServiceOptions {
 
 export interface MarketDataFetchers {
   getQuote: (symbol: string) => Promise<Quote>;
-  getKline: (options: GetKlineOptions) => Promise<Kline[]>;
+  getKline: (options: KlineQueryOptions) => Promise<Kline[]>;
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
   getPortfolio: () => Promise<PortfolioSnapshot>;
   getLongBridgeStatus: () => Promise<LongBridgeStatus>;
@@ -82,10 +80,10 @@ export interface MarketDataFetchers {
   getInstitutionRating: (symbol: string) => Promise<InstitutionRating>;
   getDividends: (symbol: string) => Promise<DividendRecord[]>;
   getEpsForecasts: (symbol: string) => Promise<EpsForecast[]>;
-  getCalendarEvents: (options: GetCalendarEventsOptions) => Promise<CalendarEvent[]>;
+  getCalendarEvents: (options: CalendarEventsQueryOptions) => Promise<CalendarEvent[]>;
   getAccountPositions: () => Promise<Holding[]>;
   getAssets: (currency?: string) => Promise<AccountAssets[]>;
-  getCashFlow: (options?: GetCashFlowOptions) => Promise<CashFlowRecord[]>;
+  getCashFlow: (options?: CashFlowQueryOptions) => Promise<CashFlowRecord[]>;
 }
 
 interface CacheEntry<T> {
@@ -142,7 +140,7 @@ export class MarketDataService {
     return this.cached(`quote:${symbol}`, this.quoteTTL, () => this.fetchers.getQuote(symbol));
   }
 
-  getKline(options: GetKlineOptions) {
+  getKline(options: KlineQueryOptions) {
     const key = `kline:${options.symbol}:${options.period ?? '1d'}:${options.limit ?? 100}`;
     return this.cached(key, this.klineTTL, () => this.fetchers.getKline(options));
   }
@@ -222,7 +220,7 @@ export class MarketDataService {
     );
   }
 
-  getCalendarEvents(options: GetCalendarEventsOptions) {
+  getCalendarEvents(options: CalendarEventsQueryOptions) {
     const key = `calendar:${options.eventType}:${(options.symbols ?? []).join(',')}:${options.start ?? ''}:${options.end ?? ''}:${options.count ?? 100}`;
     return this.cached(key, this.referenceTTL, () => this.fetchers.getCalendarEvents(options));
   }
@@ -237,7 +235,7 @@ export class MarketDataService {
     );
   }
 
-  getCashFlow(options: GetCashFlowOptions = {}) {
+  getCashFlow(options: CashFlowQueryOptions = {}) {
     const key = `cash-flow:${options.start ?? ''}:${options.end ?? ''}`;
     return this.cached(key, this.portfolioTTL, () => this.fetchers.getCashFlow(options));
   }
