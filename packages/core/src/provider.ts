@@ -125,6 +125,8 @@ export interface ProviderCoverage {
 export interface ProviderProvenance {
   providerId: string;
   providerName: string;
+  /** Canonical instrument id when the request was bound to a catalog listing. */
+  instrumentId?: string;
   /** Epoch ms when the data was fetched. */
   fetchedAt: number;
   /** Epoch ms of the data's own market timestamp, when known. */

@@ -6,6 +6,8 @@ export type { SupportedLocale, LocalePreference } from './locale.ts';
 
 export interface Quote {
   symbol: string;
+  /** Folio canonical instrument id when the quote was resolved through the catalog. */
+  instrumentId?: string;
   lastPrice: number;
   change: number;
   changePercent: number;
@@ -61,11 +63,15 @@ export interface NewsItem {
   url: string;
   timestamp: number;
   symbols: string[];
+  /** Folio canonical instrument id when news was fetched for a resolved listing. */
+  instrumentId?: string;
 }
 
 /** Static reference info for a security. */
 export interface StaticInfo {
   symbol: string;
+  /** Folio canonical instrument id when profile data was resolved through the catalog. */
+  instrumentId?: string;
   name: string;
   exchange?: string;
   currency?: string;
@@ -81,6 +87,7 @@ export interface StaticInfo {
 /** Calculated financial indexes (PE, PB, dividend yield, market value…). */
 export interface CalcIndex {
   symbol: string;
+  instrumentId?: string;
   pe?: number;
   pb?: number;
   dpsRate?: number;
@@ -565,3 +572,4 @@ export * from './locale.ts';
 export * from './trace.ts';
 export * from './trace-projection.ts';
 export * from './instrument.ts';
+export * from './instrument-catalog.ts';

@@ -69,7 +69,7 @@ import type {
   ToolCallRecord,
   TraceReference,
 } from '@finagent/core';
-import { STRATEGY_IDS } from '@finagent/core';
+import { DEFAULT_INSTRUMENT_CATALOG, InstrumentResolver, STRATEGY_IDS } from '@finagent/core';
 import { isLocalePreference } from '@finagent/i18n';
 import { createAppPreferencesService, type AppPreferencesService } from './app-preferences.ts';
 import {
@@ -86,6 +86,7 @@ import {
   createLocalThesisEvaluator,
   createRouterFetchers,
   ConnectionStore,
+  InstrumentCatalogStore,
   defaultPortfolioRiskSynthesizer,
   FinanceToolRegistry,
   JsonFileStore,
@@ -270,6 +271,7 @@ export class AgentKernelHost {
   private readonly portfolioRisk: PortfolioRiskService;
   private readonly connectionStore: ConnectionStore;
   private readonly providerRouter: ProviderRouter;
+  private instrumentResolver: InstrumentResolver;
   private activeLogin: { cancel: () => void } | null = null;
   private unsubscribe: (() => void) | null = null;
   private connectionsUnsubscribe: (() => void) | null = null;
@@ -330,7 +332,11 @@ export class AgentKernelHost {
     // Keep renderer IPC and agent tools on the same provider gateway.  The
     // service retains its dedicated Longbridge status probe, while market-data
     // capabilities use the router's configured primary/fallback chain.
-    const routerFetchers = createRouterFetchers(this.providerRouter);
+    this.instrumentResolver = new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG);
+    const routerFetchers = createRouterFetchers(this.providerRouter, {
+      resolve: (query, options) => this.instrumentResolver.resolve(query, options),
+    });
+    void this.hydrateInstrumentCatalog(userData);
     this.marketData = new MarketDataService({ fetchers: routerFetchers });
     this.registry = createFullRegistry(routerFetchers);
     this.executor = new CapabilityExecutor();
@@ -1415,6 +1421,15 @@ export class AgentKernelHost {
     const agentRuntime = item(true, 'Agent kernel running', null);
 
     return { ai, marketData, skills, agentRuntime };
+  }
+
+  private async hydrateInstrumentCatalog(userData: string): Promise<void> {
+    try {
+      const store = new InstrumentCatalogStore(new JsonFileStore(userData));
+      this.instrumentResolver = await store.load();
+    } catch {
+      // Keep the in-memory seed catalog if persistence is unavailable.
+    }
   }
 
   // -------------------------------------------------------------------------

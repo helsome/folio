@@ -121,6 +121,22 @@ describe('LongbridgeFinancialDataProvider', () => {
     expect(lastArgs[1]).toBe('NVDA.US');
   });
 
+  it('converts a canonical instrument to the Longbridge symbol and stamps instrumentId', async () => {
+    execaHandler = async (_command, args) => {
+      lastArgs = args;
+      return { stdout: CANNED.quote };
+    };
+    const { DEFAULT_INSTRUMENT_CATALOG } = await import('@finagent/core');
+    const apple = DEFAULT_INSTRUMENT_CATALOG.find((item) => item.instrumentId === 'XNAS:AAPL')!;
+    const result = await provider.execute('market.quote', { instrument: apple });
+    expect(result.ok).toBe(true);
+    expect(lastArgs[1]).toBe('AAPL.US');
+    if (result.ok) {
+      expect(result.provenance.instrumentId).toBe('XNAS:AAPL');
+      expect((result.data as { instrumentId?: string }).instrumentId).toBe('XNAS:AAPL');
+    }
+  });
+
   it('maps auth failures to AUTH_EXPIRED with a user-safe message', async () => {
     const authError = Object.assign(new Error('not authenticated'), { stderr: 'please login', code: '1' });
     execaHandler = async () => {

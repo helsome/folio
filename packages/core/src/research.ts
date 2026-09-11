@@ -32,6 +32,8 @@ export interface EvidenceRef {
   fetchedAt: number;
   /** Short factual summary of the data point (from CapabilityResult.summary). */
   summary?: string;
+  /** Canonical instrument id linking this evidence to one listing. */
+  instrumentId?: string;
 }
 
 /** Condensed outcome of one capability run, embedded in the report. */
@@ -57,6 +59,8 @@ export interface ResearchSection {
 export interface ResearchReport {
   id: string;
   symbol: string;
+  /** Canonical instrument id when the run was bound to a catalog listing. */
+  instrumentId?: string;
   generatedAt: number;
   /** V5: research strategy that produced this report (spec §100). */
   strategyId?: string;

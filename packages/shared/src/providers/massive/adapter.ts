@@ -12,6 +12,7 @@ import type {
   StaticInfo,
 } from '@finagent/core'
 import { isRecord } from '../../guards.ts'
+import { bindProviderInput, stampProviderResult } from '../instrument.ts'
 import { TtlCache } from './cache.ts'
 
 /**
@@ -143,8 +144,10 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
     if (signal?.aborted) return { ok: false, error: ABORTED }
     if (!CAPABILITIES.includes(capabilityId)) return { ok: false, error: UNSUPPORTED }
 
-    const symbol = readSymbol(input)
-    if (symbol === undefined) {
+    const bound = bindProviderInput(input, PROVIDER_ID)
+    if (!bound.ok) return { ok: false, error: bound.error }
+    const symbol = bound.symbol || readSymbol(input)
+    if (!symbol) {
       return {
         ok: false,
         error: { code: 'INVALID_INPUT', message: 'A stock symbol is required' },
@@ -162,7 +165,7 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
     const apiKey = (await this.getApiKey())?.trim()
     if (!apiKey) return { ok: false, error: CONFIG_MISSING }
 
-    const cacheKey = `${capabilityId}:${JSON.stringify(input)}`
+    const cacheKey = `${capabilityId}:${bound.instrumentId ?? symbol}:${JSON.stringify(bound.input)}`
     const cached = this.cache.get(cacheKey)
     if (cached) return cached as ProviderResult<T>
 
@@ -173,12 +176,13 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
         ticker.ticker,
         symbol,
         apiKey,
-        input,
+        bound.input,
         signal,
         endpoint
       )
-      if (result.ok) this.cache.set(cacheKey, result)
-      return result as ProviderResult<T>
+      const stamped = stampProviderResult(result, bound.instrumentId)
+      if (stamped.ok) this.cache.set(cacheKey, stamped)
+      return stamped as ProviderResult<T>
     } catch (error) {
       if (
         signal?.aborted &&

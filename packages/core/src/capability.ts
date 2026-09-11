@@ -33,6 +33,8 @@ export interface CapabilityProvenance {
   provider: string;
   /** Provider id of the ACTUAL answering adapter (fallback-aware). */
   providerId?: string;
+  /** Canonical instrument id when the capability ran against a resolved listing. */
+  instrumentId?: string;
   /** Epoch ms at which the data was fetched. */
   fetchedAt: number;
   /** Epoch ms of the data's own market timestamp, when known. */

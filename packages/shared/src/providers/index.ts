@@ -8,7 +8,16 @@ export {
   ProviderFetchError,
   createRouterFetchers,
   type RouterCapabilityFetchers,
+  type RouterFetcherOptions,
 } from './router-fetchers.ts';
+export {
+  InstrumentCatalogStore,
+  INSTRUMENT_CATALOG_FILE,
+  attachResolvedInstrument,
+  bindProviderInput,
+  stampInstrumentId,
+  stampProviderResult,
+} from './instrument.ts';
 export { healthAll } from './health.ts';
 export { MassiveFinancialDataProvider } from './massive/index.ts';
 export { TtlCache } from './massive/cache.ts';

@@ -7,16 +7,21 @@
 
 export const INSTRUMENT_CATALOG_SCHEMA_VERSION = 1 as const;
 
-export type InstrumentAssetType =
-  | 'equity'
-  | 'etf'
-  | 'fund'
-  | 'index'
-  | 'future'
-  | 'option'
-  | 'forex'
-  | 'crypto'
-  | 'other';
+export const INSTRUMENT_ASSET_TYPES = [
+  'equity',
+  'etf',
+  'fund',
+  'index',
+  'future',
+  'option',
+  'forex',
+  'crypto',
+  'other',
+] as const;
+
+export type InstrumentAssetType = (typeof INSTRUMENT_ASSET_TYPES)[number];
+
+const INSTRUMENT_ASSET_TYPE_SET: ReadonlySet<string> = new Set(INSTRUMENT_ASSET_TYPES);
 
 export type InstrumentExternalIdType = 'isin' | 'cusip' | 'sedol';
 
@@ -121,6 +126,9 @@ function validateInstrument(instrument: CanonicalInstrument): void {
   ];
   const missing = required.find(([, value]) => value.trim().length === 0);
   if (missing) throw new Error(`Instrument ${missing[0]} is required.`);
+  if (!INSTRUMENT_ASSET_TYPE_SET.has(instrument.assetType)) {
+    throw new Error(`Instrument ${instrument.instrumentId} has an invalid assetType.`);
+  }
 
   const providerIds = new Set<string>();
   for (const alias of instrument.providerAliases) {
@@ -154,12 +162,45 @@ function resolutionOf(
   };
 }
 
-/** Build a stable Folio id from an exchange MIC and its local symbol. */
+function uniqueInstruments(instruments: CanonicalInstrument[]): CanonicalInstrument[] {
+  const seen = new Set<string>();
+  const unique: CanonicalInstrument[] = [];
+  for (const instrument of instruments) {
+    const id = normalizedCode(instrument.instrumentId);
+    if (seen.has(id)) continue;
+    seen.add(id);
+    unique.push(instrument);
+  }
+  return unique;
+}
+
+/**
+ * Listing-key helper for catalog authors (`MIC:SYMBOL`).
+ *
+ * The value identifies one listing, not an issuer. Once stored on a
+ * `CanonicalInstrument` it is immutable — ticker changes must update `symbol`
+ * and aliases, not mint a new id for the same listing. First-version catalogs
+ * use this as a convenient listing key; a full securities master is out of scope.
+ */
 export function createInstrumentId(exchangeMic: string, symbol: string): string {
   const mic = normalizedCode(exchangeMic);
   const localSymbol = normalizedCode(symbol);
   if (!mic || !localSymbol) throw new Error('Exchange MIC and symbol are required.');
   return `${mic}:${localSymbol}`;
+}
+
+/** Narrow unknown provider/router input to a canonical instrument. */
+export function isCanonicalInstrument(value: unknown): value is CanonicalInstrument {
+  if (typeof value !== 'object' || value === null) return false;
+  const record = value as Record<string, unknown>;
+  return (
+    typeof record.instrumentId === 'string' &&
+    record.instrumentId.trim() !== '' &&
+    typeof record.symbol === 'string' &&
+    record.symbol.trim() !== '' &&
+    typeof record.market === 'string' &&
+    Array.isArray(record.providerAliases)
+  );
 }
 
 /** Resolve the symbol that one provider expects for a canonical instrument. */
@@ -210,6 +251,9 @@ export class InstrumentResolver {
   static fromSnapshot(snapshot: InstrumentCatalogSnapshot): InstrumentResolver {
     if (snapshot.schemaVersion !== INSTRUMENT_CATALOG_SCHEMA_VERSION) {
       throw new Error(`Unsupported instrument catalog schema: ${snapshot.schemaVersion}`);
+    }
+    if (!Number.isFinite(snapshot.updatedAt) || snapshot.updatedAt < 0) {
+      throw new Error('Instrument catalog updatedAt must be a non-negative epoch timestamp.');
     }
     return new InstrumentResolver(snapshot.instruments);
   }
@@ -262,21 +306,16 @@ export class InstrumentResolver {
     }
 
     if (!providerId) {
-      const bySymbol = resolutionOf(
-        originalQuery,
-        'symbol',
-        candidates.filter((instrument) => normalizedCode(instrument.symbol) === code)
+      const bySymbol = candidates.filter(
+        (instrument) => normalizedCode(instrument.symbol) === code
       );
-      if (bySymbol) return bySymbol;
-
-      const byProviderAlias = resolutionOf(
-        originalQuery,
-        'provider_alias',
-        candidates.filter((instrument) =>
-          instrument.providerAliases.some((alias) => normalizedCode(alias.symbol) === code)
-        )
+      const byProviderAlias = candidates.filter((instrument) =>
+        instrument.providerAliases.some((alias) => normalizedCode(alias.symbol) === code)
       );
-      if (byProviderAlias) return byProviderAlias;
+      const merged = uniqueInstruments([...bySymbol, ...byProviderAlias]);
+      const matchedBy: InstrumentMatchKind = bySymbol.length > 0 ? 'symbol' : 'provider_alias';
+      const byCode = resolutionOf(originalQuery, matchedBy, merged);
+      if (byCode) return byCode;
     }
 
     const byName = resolutionOf(
@@ -291,5 +330,18 @@ export class InstrumentResolver {
     if (byName) return byName;
 
     return { status: 'not_found', query: originalQuery };
+  }
+
+  get(instrumentId: string): CanonicalInstrument | undefined {
+    const code = normalizedCode(instrumentId);
+    if (!code) return undefined;
+    const match = this.instruments.find(
+      (instrument) => normalizedCode(instrument.instrumentId) === code
+    );
+    return match ? cloneInstrument(match) : undefined;
+  }
+
+  list(): CanonicalInstrument[] {
+    return this.instruments.map(cloneInstrument);
   }
 }

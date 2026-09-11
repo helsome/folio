@@ -14,6 +14,7 @@ import { i18nCurrentLocale } from '@finagent/i18n';
 import type { SupportedLocale } from '@finagent/core';
 import type { CapabilityRegistry } from '@finagent/core';
 import { CapabilityExecutor, type RunOutcome } from '../capabilities/index.ts';
+import { isRecord } from '../guards.ts';
 import {
   buildCapabilityInput,
   planForStrategy,
@@ -237,12 +238,15 @@ function assembleReport(args: {
     const outcome = outcomeByCapability.get(section.key);
     const evidence: EvidenceRef[] = [];
     if (outcome && outcome.record.status === 'success') {
+      const instrumentId =
+        outcome.result?.provenance?.instrumentId ?? instrumentIdOf(outcome.result?.data);
       evidence.push({
         capabilityId: outcome.record.capabilityId,
         runId: outcome.record.id,
         claim: section.summary,
         fetchedAt: outcome.record.provenance?.fetchedAt ?? generatedAt,
         summary: outcome.result?.summary,
+        ...(instrumentId ? { instrumentId } : {}),
       });
     }
     return { ...section, evidence };
@@ -273,9 +277,14 @@ function assembleReport(args: {
     .filter((o) => o.record.status === 'success')
     .map((o) => o.record.capabilityId);
 
+  const instrumentId = outcomes
+    .map((outcome) => outcome.result?.provenance?.instrumentId ?? instrumentIdOf(outcome.result?.data))
+    .find((id): id is string => typeof id === 'string' && id.length > 0);
+
   return {
     id: `report-${runId}`,
     symbol,
+    ...(instrumentId ? { instrumentId } : {}),
     ...(strategyId ? { strategyId } : {}),
     generatedAt,
     // Stamp the generating locale so the report records which language produced
@@ -294,4 +303,17 @@ function assembleReport(args: {
     capabilityRuns,
     runStatus: computeRunStatus(plan, successIds),
   };
+}
+
+function instrumentIdOf(data: unknown): string | undefined {
+  if (isRecord(data) && typeof data.instrumentId === 'string' && data.instrumentId.trim() !== '') {
+    return data.instrumentId;
+  }
+  if (Array.isArray(data)) {
+    for (const item of data) {
+      const id = instrumentIdOf(item);
+      if (id) return id;
+    }
+  }
+  return undefined;
 }

@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test';
+import { DEFAULT_INSTRUMENT_CATALOG } from './instrument-catalog.ts';
 import {
   createInstrumentId,
   getProviderSymbol,
@@ -186,6 +187,75 @@ describe('InstrumentResolver', () => {
           },
         ])
     ).toThrow(/Duplicate provider symbol/);
+  });
+
+  it('rejects an invalid asset type and a snapshot with a bad timestamp', () => {
+    expect(
+      () =>
+        new InstrumentResolver([
+          {
+            ...APPLE,
+            assetType: 'not-an-asset' as CanonicalInstrument['assetType'],
+          },
+        ])
+    ).toThrow(/invalid assetType/);
+    expect(() =>
+      InstrumentResolver.fromSnapshot({
+        schemaVersion: 1,
+        updatedAt: Number.NaN,
+        instruments: [APPLE],
+      })
+    ).toThrow(/updatedAt/);
+  });
+
+  it('returns ambiguity when a canonical symbol collides with another provider alias', () => {
+    const colliding: CanonicalInstrument = {
+      ...TENCENT,
+      instrumentId: 'XHKG:FOO',
+      symbol: 'FOO',
+      providerAliases: [{ providerId: 'longbridge', symbol: 'AAPL' }],
+    };
+    const resolver = new InstrumentResolver([APPLE, colliding]);
+    const result = resolver.resolve('AAPL');
+    expect(result.status).toBe('ambiguous');
+    if (result.status !== 'ambiguous') return;
+    expect(result.candidates.map((candidate) => candidate.instrumentId)).toEqual([
+      'XNAS:AAPL',
+      'XHKG:FOO',
+    ]);
+  });
+});
+
+describe('DEFAULT_INSTRUMENT_CATALOG', () => {
+  const resolver = new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG);
+
+  it('covers five real listings across US and HK, including ambiguity and provider-symbol drift', () => {
+    const cases = [
+      { query: 'AAPL.US', instrumentId: 'XNAS:AAPL', matchedBy: 'provider_alias' },
+      { query: '0700.HK', instrumentId: 'XHKG:0700', matchedBy: 'provider_alias' },
+      { query: 'TSLA', instrumentId: 'XNAS:TSLA', matchedBy: 'symbol' },
+      { query: 'NVDA', options: { providerId: 'massive' }, instrumentId: 'XNAS:NVDA' },
+      { query: 'BABA.US', options: { providerId: 'longbridge' }, instrumentId: 'XNYS:BABA' },
+    ] as const;
+
+    for (const example of cases) {
+      const result = resolver.resolve(example.query, 'options' in example ? example.options : {});
+      expect(result).toMatchObject({
+        status: 'resolved',
+        instrument: { instrumentId: example.instrumentId },
+      });
+    }
+
+    const ambiguous = resolver.resolve('Alibaba');
+    expect(ambiguous.status).toBe('ambiguous');
+    if (ambiguous.status !== 'ambiguous') return;
+    expect(ambiguous.candidates.map((candidate) => candidate.instrumentId)).toEqual([
+      'XNYS:BABA',
+      'XHKG:9988',
+    ]);
+
+    expect(getProviderSymbol(resolver.get('XNAS:AAPL')!, 'longbridge')).toBe('AAPL.US');
+    expect(getProviderSymbol(resolver.get('XNAS:AAPL')!, 'massive')).toBe('AAPL');
   });
 });
 

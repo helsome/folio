@@ -152,6 +152,11 @@ mock.module('@finagent/shared', () => ({
   parseSynthesisJson: (text: string) => JSON.parse(text),
   parseImpactJson: (text: string) => JSON.parse(text),
   createRouterFetchers: () => routerFetchers,
+  InstrumentCatalogStore: class {
+    load = async () => {
+      throw new Error('skip instrument catalog persist in unit tests');
+    };
+  },
   MassiveFinancialDataProvider: class {
     clearCache = () => undefined;
   },

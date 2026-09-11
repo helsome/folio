@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import type { Kline, ProviderResult, Quote, StaticInfo } from '@finagent/core'
+import { DEFAULT_INSTRUMENT_CATALOG } from '@finagent/core'
 import { MassiveFinancialDataProvider } from './adapter.ts'
 import { TtlCache } from './cache.ts'
 
@@ -89,6 +90,20 @@ describe('MassiveFinancialDataProvider', () => {
     expect(calls[0].url).toContain('https://api.massive.com')
     expect(calls[0].url).toContain('apiKey=testkey')
     expect(calls[0].url).toContain('/v2/snapshot/locale/us/markets/stocks/tickers/AAPL')
+  })
+
+  it('converts a canonical instrument to the Massive ticker and stamps instrumentId', async () => {
+    const apple = DEFAULT_INSTRUMENT_CATALOG.find((item) => item.instrumentId === 'XNAS:AAPL')!
+    const calls = installFetch(() => jsonResponse(snapshotPayload()))
+    const provider = makeProvider('testkey')
+    const result = await provider.execute<Quote>('market.quote', { instrument: apple })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.instrumentId).toBe('XNAS:AAPL')
+    expect(result.provenance.instrumentId).toBe('XNAS:AAPL')
+    expect(calls[0].url).toContain('/v2/snapshot/locale/us/markets/stocks/tickers/AAPL')
+    expect(calls[0].url).not.toContain('AAPL.US')
   })
 
   it('uses an HTTPS endpoint override without exposing the API key in provider state', async () => {
