@@ -227,6 +227,25 @@ describe('position_weight', () => {
   });
 });
 describe('portfolio_drawdown', () => {
+  it('records the first portfolio value and detects a subsequent drawdown', async () => {
+    let totalAssets = 100;
+    const registry = makeRegistry({
+      'portfolio.summary': () => ({ baseCurrency: 'USD', totalAssets, holdings: [], accounts: [], fetchedAt: 0 }),
+    });
+    const r = rule({}, { type: 'portfolio_drawdown', threshold: 0.1 });
+    const snapshots = makeSnapshotContext();
+    const context = { now, ...snapshots };
+
+    expect(await evaluateRule(r, registry, context)).toBeNull();
+    expect(await snapshots.getRuleSnapshot(r.id)).toEqual({ peakValue: 100 });
+
+    totalAssets = 80;
+    const event = await evaluateRule(r, registry, context);
+    expect(event?.payload?.drawdown).toBeCloseTo(0.2);
+    expect(event?.payload?.peak).toBe(100);
+    expect(await snapshots.getRuleSnapshot(r.id)).toEqual({ peakValue: 100 });
+  });
+
   it('triggers when drawdown exceeds the threshold', async () => {
     const registry = makeRegistry({ 'portfolio.summary': { baseCurrency: 'USD', totalAssets: 80, holdings: [], accounts: [], fetchedAt: 0 } });
     const r = rule({}, { type: 'portfolio_drawdown', threshold: 0.1 });
@@ -236,11 +255,33 @@ describe('portfolio_drawdown', () => {
     expect(event?.payload?.drawdown).toBeCloseTo(0.2);
     expect(event?.payload?.peak).toBe(100);
   });
-  it('does not trigger below the threshold (and resets peak on a new high)', async () => {
+  it('does not trigger below the threshold', async () => {
     const registry = makeRegistry({ 'portfolio.summary': { baseCurrency: 'USD', totalAssets: 95, holdings: [], accounts: [], fetchedAt: 0 } });
     const r = rule({}, { type: 'portfolio_drawdown', threshold: 0.1 });
     const snapshots = makeSnapshotContext({ [r.id]: { peakValue: 100 } });
     expect(await evaluateRule(r, registry, { now, ...snapshots })).toBeNull();
+  });
+
+  it('records a new high and measures subsequent drawdowns from it', async () => {
+    let totalAssets = 120;
+    const registry = makeRegistry({
+      'portfolio.summary': () => ({ baseCurrency: 'USD', totalAssets, holdings: [], accounts: [], fetchedAt: 0 }),
+    });
+    const r = rule({}, { type: 'portfolio_drawdown', threshold: 0.1 });
+    const snapshots = makeSnapshotContext({ [r.id]: { peakValue: 100 } });
+    const context = { now, ...snapshots };
+
+    expect(await evaluateRule(r, registry, context)).toBeNull();
+    expect(await snapshots.getRuleSnapshot(r.id)).toEqual({ peakValue: 120 });
+
+    totalAssets = 115;
+    expect(await evaluateRule(r, registry, context)).toBeNull();
+    expect(await snapshots.getRuleSnapshot(r.id)).toEqual({ peakValue: 120 });
+
+    totalAssets = 100;
+    const event = await evaluateRule(r, registry, context);
+    expect(event?.payload?.drawdown).toBeCloseTo(1 / 6);
+    expect(event?.payload?.peak).toBe(120);
   });
 
   it('returns null when the portfolio is missing', async () => {

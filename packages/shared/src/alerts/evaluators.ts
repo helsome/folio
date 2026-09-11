@@ -336,9 +336,9 @@ async function evaluateDrawdown(
   if (!summary || typeof summary.totalAssets !== 'number' || summary.totalAssets <= 0) return null;
   const current = summary.totalAssets;
   const snapshot = await ctx.getRuleSnapshot(rule.id);
-  let peak = snapshot.peakValue ?? current;
-  if (current > peak) {
-    // New high-water mark — reset the peak, no drawdown.
+  const peak = snapshot.peakValue;
+  if (peak === undefined || current > peak) {
+    // First observation or a new high-water mark — persist the peak, no drawdown.
     await ctx.patchRuleSnapshot(rule.id, { peakValue: current });
     return null;
   }

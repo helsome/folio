@@ -247,3 +247,62 @@ describe('AlertEngine rating change across ticks', () => {
     expect(events[0].payload).toEqual({ previous: 'strong_buy@302', current: 'hold@280' });
   });
 });
+
+describe('AlertEngine portfolio drawdown persistence', () => {
+  it('uses the initial peak after recreating the engine and repository', async () => {
+    const rootDir = mkdtempSync(join(tmpdir(), 'folio-alerts-drawdown-'));
+    const store = new JsonFileStore(rootDir);
+    let nowMs = 1000;
+    const clock = () => nowMs;
+    const repository = new AlertRuleRepository(store, clock);
+    await repository.save({
+      id: 'drawdown-1',
+      createdAt: nowMs,
+      enabled: true,
+      cooldownMinutes: 30,
+      type: 'portfolio_drawdown',
+      threshold: 0.1,
+    });
+
+    let totalAssets = 100;
+    const registry = makeRegistry({
+      'portfolio.summary': () => ({ baseCurrency: 'USD', totalAssets, holdings: [], accounts: [], fetchedAt: 0 }),
+      'market.status': openStatus(),
+    });
+    const events: AlertTriggerEvent[] = [];
+    const engine = new AlertEngine({
+      registry,
+      repository,
+      eventLog: new AlertEventLog(store),
+      now: clock,
+      onTrigger: (event) => events.push(event),
+    });
+
+    await engine.tick();
+    expect(events).toHaveLength(0);
+
+    const reloadedStore = new JsonFileStore(rootDir);
+    const reloadedRepository = new AlertRuleRepository(reloadedStore, clock);
+    const reloadedEventLog = new AlertEventLog(reloadedStore);
+    const reloadedEngine = new AlertEngine({
+      registry,
+      repository: reloadedRepository,
+      eventLog: reloadedEventLog,
+      now: clock,
+      onTrigger: (event) => events.push(event),
+    });
+
+    nowMs += 60_000;
+    totalAssets = 80;
+    await reloadedEngine.tick();
+
+    expect(events).toHaveLength(1);
+    expect(events[0].payload).toEqual({ drawdown: 0.2, peak: 100, currency: 'USD' });
+    expect(await reloadedRepository.getRuleSnapshot('drawdown-1')).toEqual({ peakValue: 100 });
+    expect(await reloadedRepository.get('drawdown-1')).toMatchObject({
+      lastCheckedAt: nowMs,
+      lastTriggeredAt: nowMs,
+    });
+    expect(await reloadedEventLog.list()).toEqual(events);
+  });
+});
