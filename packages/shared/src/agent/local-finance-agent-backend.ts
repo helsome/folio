@@ -4,6 +4,7 @@ import type {
   AgentResponse,
   AgentSessionSnapshot,
   ApiResult,
+  AnswerBlock,
   Kline,
   PortfolioSnapshot,
   Quote,
@@ -11,25 +12,36 @@ import type {
   ToolDefinition,
 } from '@finagent/core';
 import { FinanceToolRegistry, type FinanceToolName } from './finance-tool-registry.ts';
-import { routeFinanceIntent, unsupportedFinanceMessage } from './intent-router.ts';
+import { routeFinanceIntent, unsupportedFinanceMessage, type FinanceIntent } from './intent-router.ts';
 import { MarketDataService } from './market-data-service.ts';
 import { createPhaseOneRegistry } from '../capabilities/index.ts';
 import { composeToolResponse } from './response-composer.ts';
+import {
+  appendBlocksToAnswer,
+  buildPortfolioTableBlock,
+  buildQuoteAnswerBlocks,
+  buildRiskComparisonBlock,
+  dailyVolatility,
+} from './answer-block-emitter.ts';
 import { toApiError } from './errors.ts';
 
 export interface LocalFinanceAgentBackendOptions {
   registry?: FinanceToolRegistry;
   marketData?: MarketDataService;
+  /** Label emitted answer blocks as built-in sample data (offline demo mode). */
+  demoData?: boolean;
   now?: () => number;
 }
 
 export class LocalFinanceAgentBackend implements AgentBackend {
   private readonly registry: FinanceToolRegistry;
   private readonly now: () => number;
+  private readonly demoData: boolean;
   private readonly sessions = new Map<string, AgentSessionSnapshot>();
 
   constructor(options: LocalFinanceAgentBackendOptions = {}) {
     this.now = options.now ?? Date.now;
+    this.demoData = options.demoData === true;
     const marketData = options.marketData ?? new MarketDataService();
     this.registry = options.registry ?? new FinanceToolRegistry(
       createPhaseOneRegistry(marketData),
@@ -85,8 +97,16 @@ export class LocalFinanceAgentBackend implements AgentBackend {
       }
       toolCall.result = structuredResult(result.details, result.provenance);
       const response = composeToolResponse(toolName, result, toolCall, session);
-      response.session = session;
-      return { ok: true, data: response };
+      const enriched = await this.enrichWithAnswerBlocks(
+        response,
+        routed.intent,
+        result.details,
+        toolCall,
+        session,
+        routed.symbol
+      );
+      enriched.session = session;
+      return { ok: true, data: enriched };
     } catch (error) {
       const apiError = toApiError(error);
       toolCall.status = 'error';
@@ -175,7 +195,13 @@ export class LocalFinanceAgentBackend implements AgentBackend {
       if (kline) klines.set(symbol, kline);
     }
 
-    const content = composePortfolioRiskAnswer(portfolio, quotes, klines, toolCalls);
+    const content = composePortfolioRiskAnswer(
+      portfolio,
+      quotes,
+      klines,
+      toolCalls,
+      this.demoData ? 'demo' : undefined
+    );
     return {
       answer: content,
       content,
@@ -206,6 +232,56 @@ export class LocalFinanceAgentBackend implements AgentBackend {
       status: 'success',
     };
   }
+
+  /**
+   * #31: append typed answer blocks to the local provider's deterministic
+   * answers. Quote answers additionally fetch a 30-day K-line series for the
+   * time-series chart; a failed chart call degrades the quote answer, never
+   * breaks it.
+   */
+  private async enrichWithAnswerBlocks(
+    response: AgentResponse,
+    intent: FinanceIntent,
+    details: unknown,
+    toolCall: ToolCallRecord,
+    session: AgentSessionSnapshot,
+    symbol?: string
+  ): Promise<AgentResponse> {
+    const blocks: AnswerBlock[] = [];
+
+    if (intent === 'quote' && isQuoteDetails(details)) {
+      const chartSymbol = symbol ?? details.symbol;
+      const source = this.demoData ? 'demo' : undefined;
+      const klineCall = this.createToolCall('get_kline', { symbol: chartSymbol, period: '1d', limit: 30 });
+      let klines: Kline[] | undefined;
+      try {
+        const klineResult = await this.registry.execute({
+          name: 'get_kline',
+          args: { symbol: chartSymbol, period: '1d', limit: 30 },
+        });
+        klineCall.result = structuredResult(klineResult.details, klineResult.provenance);
+        klines = isKlineList(klineResult.details) ? klineResult.details : undefined;
+        blocks.push(...buildQuoteAnswerBlocks(details, klines, [toolCall.id, klineCall.id], source));
+      } catch (error) {
+        klineCall.status = 'error';
+        klineCall.error = toApiError(error);
+        blocks.push(...buildQuoteAnswerBlocks(details, undefined, [toolCall.id], source));
+      }
+      klineCall.completedAt = this.now();
+      session.toolCalls.unshift(klineCall);
+      response.toolCalls = [toolCall, klineCall];
+    } else if (intent === 'portfolio' && isPortfolioDetails(details)) {
+      const table = buildPortfolioTableBlock(details, [toolCall.id], this.demoData ? 'demo' : undefined);
+      if (table) blocks.push(table);
+    }
+
+    if (blocks.length > 0) {
+      const enriched = appendBlocksToAnswer(response.answer, blocks);
+      response.answer = enriched;
+      response.content = enriched;
+    }
+    return response;
+  }
 }
 
 function intentToToolName(intent: 'quote' | 'kline' | 'portfolio' | 'intraday'): FinanceToolName {
@@ -219,7 +295,8 @@ function composePortfolioRiskAnswer(
   portfolio: PortfolioSnapshot | undefined,
   quotes: Map<string, Quote>,
   klines: Map<string, Kline[]>,
-  toolCalls: ToolCallRecord[]
+  toolCalls: ToolCallRecord[],
+  source?: string
 ) {
   if (!portfolio) {
     return '无法完成组合风险分析：持仓数据不可用。请检查 LongBridge 连接后重试。';
@@ -249,7 +326,7 @@ function composePortfolioRiskAnswer(
   const concentrationRisk = topWeight >= 0.35 ? '高' : topWeight >= 0.2 ? '中' : '低';
   const marketRisk = averageVolatility(klines) >= 0.03 ? '高' : averageVolatility(klines) >= 0.018 ? '中' : '低';
 
-  return [
+  const text = [
     'Portfolio Risk Summary',
     '----------------------',
     `Total value: $${totalValue.toFixed(2)} | Invested: $${investedValue.toFixed(2)} | Cash: ${formatPercent(cashRatio)}`,
@@ -265,6 +342,27 @@ function composePortfolioRiskAnswer(
       ? `- Data gaps: ${failedCalls.map((toolCall) => `${toolCall.toolName} failed`).join(', ')}.`
       : '- Data gaps: none from executed tools.',
   ].join('\n');
+
+  // #31: a position-by-position comparison block over the same data.
+  const evidenceIds = toolCalls
+    .filter((toolCall) => toolCall.status === 'success')
+    .map((toolCall) => toolCall.id)
+    .slice(0, 4);
+  const comparison = buildRiskComparisonBlock(
+    sortedPositions.slice(0, 5).map((position) => {
+      const positionValue = position.marketValueBase ?? position.marketValue ?? 0;
+      const quote = quotes.get(position.symbol);
+      return {
+        symbol: position.symbol,
+        weight: totalValue > 0 ? positionValue / totalValue : null,
+        volatility: dailyVolatility(klines.get(position.symbol)),
+        dayChangePercent: quote ? quote.changePercent : null,
+      };
+    }),
+    evidenceIds,
+    source
+  );
+  return comparison ? appendBlocksToAnswer(text, [comparison]) : text;
 }
 
 function estimateVolatility(klines: Kline[]) {
@@ -301,4 +399,23 @@ function rememberSymbol(session: AgentSessionSnapshot, symbol: string) {
 function structuredResult(details: unknown, provenance?: { provider: string; fetchedAt: number }) {
   if (!provenance) return details;
   return { data: details, provenance };
+}
+
+function isQuoteDetails(value: unknown): value is Quote {
+  return Boolean(value)
+    && typeof value === 'object'
+    && typeof (value as Quote).lastPrice === 'number'
+    && typeof (value as Quote).symbol === 'string';
+}
+
+function isPortfolioDetails(value: unknown): value is PortfolioSnapshot {
+  return Boolean(value)
+    && typeof value === 'object'
+    && Array.isArray((value as PortfolioSnapshot).holdings);
+}
+
+function isKlineList(value: unknown): value is Kline[] {
+  return Array.isArray(value)
+    && value.length > 0
+    && value.every((kline) => typeof kline === 'object' && kline !== null && typeof (kline as Kline).close === 'number');
 }

@@ -153,6 +153,7 @@ mock.module('@finagent/shared', () => ({
   parseSynthesisJson: (text: string) => JSON.parse(text),
   parseImpactJson: (text: string) => JSON.parse(text),
   createRouterFetchers: () => routerFetchers,
+  withDemoDataFallback: (fetchers: unknown) => fetchers,
   InstrumentCatalogStore: class {
     load = async () => {
       throw new Error('skip instrument catalog persist in unit tests');

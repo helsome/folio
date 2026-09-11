@@ -74,6 +74,23 @@ export const agent = {
     volume: 'Volume',
     updated: 'Updated',
   },
+  blocks: {
+    loading: 'Building data block…',
+    invalid: 'Malformed data block — degraded to text.',
+    evidence: 'Evidence',
+    evidenceTip: 'Evidence record: {{id}}',
+    asOf: 'As of {{time}}',
+    copy: 'Copy table',
+    copied: 'Copied',
+    sourceLabel: 'Source',
+    sortHint: 'Sort by this column',
+    titles: {
+      metric_grid: 'Key metrics',
+      data_table: 'Data',
+      time_series_chart: 'Time series',
+      comparison_table: 'Comparison',
+    },
+  },
   risk: {
     title: 'Portfolio risk',
     totalValue: 'Total Assets',

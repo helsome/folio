@@ -74,6 +74,23 @@ export const agent = {
     volume: '成交量',
     updated: '更新于',
   },
+  blocks: {
+    loading: '正在生成数据块…',
+    invalid: '数据块格式无效，已降级为文本显示。',
+    evidence: '证据',
+    evidenceTip: '证据记录：{{id}}',
+    asOf: '数据截至 {{time}}',
+    copy: '复制表格',
+    copied: '已复制',
+    sourceLabel: '来源',
+    sortHint: '按此列排序',
+    titles: {
+      metric_grid: '关键指标',
+      data_table: '数据表格',
+      time_series_chart: '时间序列',
+      comparison_table: '对比',
+    },
+  },
   risk: {
     title: '投资组合风险',
     totalValue: '总资产',

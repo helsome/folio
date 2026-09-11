@@ -26,6 +26,8 @@ export interface AgentKernelOptions {
   /** Explicit runtime override (tests). */
   runtime?: AgentRuntime;
   marketData?: MarketDataService;
+  /** Label local-runtime answer blocks as built-in sample data (#31 demo mode). */
+  demoData?: boolean;
   /**
    * Capability-backed tool registry shared by the local and Pi adapters.
    * Defaults to the phase-1 registry when omitted.
@@ -124,7 +126,7 @@ function createDefaultRuntime(
   now: () => number
 ): AgentRuntime {
   if (options.provider === 'local') {
-    return new LocalRuntimeAdapter({ marketData, registry: options.registry, now });
+    return new LocalRuntimeAdapter({ marketData, registry: options.registry, demoData: options.demoData, now });
   }
   return new PiRuntimeAdapter({
     marketData,

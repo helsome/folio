@@ -155,6 +155,7 @@ import {
   type MarketPulseSnapshot,
   type ShareCard,
   type WatchlistQuote,
+  withDemoDataFallback,
 } from '@finagent/shared';
 import {
   LongbridgeBrokerAccountProvider,
@@ -346,8 +347,13 @@ export class AgentKernelHost {
       resolve: (query, options) => this.instrumentResolver.resolve(query, options),
     });
     void this.hydrateInstrumentCatalog(userData);
-    this.marketData = new MarketDataService({ fetchers: routerFetchers });
-    this.registry = createFullRegistry(routerFetchers);
+    // FINAGENT_DEMO_DATA=1: offline demo mode. When every real provider is
+    // unavailable, built-in sample data answers instead; every surface built
+    // on it labels its content with source 'demo' (DemoBadge).
+    const demoData = process.env.FINAGENT_DEMO_DATA === '1';
+    const capabilityFetchers = demoData ? withDemoDataFallback(routerFetchers) : routerFetchers;
+    this.marketData = new MarketDataService({ fetchers: capabilityFetchers });
+    this.registry = createFullRegistry(capabilityFetchers);
     this.executor = new CapabilityExecutor();
 
     this.researchService = new ResearchService({
@@ -423,6 +429,7 @@ export class AgentKernelHost {
       piSessionDir: join(userData, 'pi-sessions'),
       provider,
       marketData: this.marketData,
+      demoData,
       registry: new FinanceToolRegistry(this.registry),
       skillHub: this.skillHub,
       rpc: {
