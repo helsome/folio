@@ -1,0 +1,4 @@
+import { describe, expect, it } from 'bun:test';
+import { reconcileFinancialFacts } from './reconciliation';
+const base={period:'2025Q4',currency:'USD',unit:'USD',adjustment:'reported'};
+describe('reconcileFinancialFacts',()=>{it('detects material conflict without averaging',()=>{const r=reconcileFinancialFacts([{...base,provider:'a',value:100},{...base,provider:'b',value:120}],{version:'1',relativeTolerance:.03});expect(r.state).toBe('material-conflict');expect(r.selected?.value).toBe(100)});it('rejects mismatched semantics',()=>expect(reconcileFinancialFacts([{...base,provider:'a',value:1},{...base,provider:'b',value:1,period:'2024Q4'}],{version:'1'}).state).toBe('incomparable'));it('accepts tolerance',()=>expect(reconcileFinancialFacts([{...base,provider:'a',value:100},{...base,provider:'b',value:101}],{version:'1',absoluteTolerance:2}).state).toBe('within-tolerance'))});
