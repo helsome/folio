@@ -564,3 +564,4 @@ export * from './evaluation.ts';
 export * from './locale.ts';
 export * from './trace.ts';
 export * from './trace-projection.ts';
+export * from './financial-evidence.ts';

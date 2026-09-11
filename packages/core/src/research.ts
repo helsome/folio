@@ -32,6 +32,17 @@ export interface EvidenceRef {
   fetchedAt: number;
   /** Short factual summary of the data point (from CapabilityResult.summary). */
   summary?: string;
+  /**
+   * V9: id of the FinancialEvidenceEnvelope that provides full structured
+   * provenance (issue #29). When present, the UI can show the complete
+   * lineage: provider → instrument → metric → original vs normalized value.
+   */
+  evidenceId?: string;
+  /**
+   * V9: ids of specific metrics within the evidence envelope that this claim
+   * is based on. Enables "click a number → see its source" drill-down.
+   */
+  metricIds?: string[];
 }
 
 /** Condensed outcome of one capability run, embedded in the report. */

@@ -2,6 +2,7 @@ import type {
   CapabilityRunStatus,
   CapabilityRunSummary,
   EvidenceRef,
+  FinancialEvidenceEnvelope,
   ResearchReport,
   ResearchRunStatus,
   ResearchRunSummary,
@@ -14,6 +15,8 @@ import { i18nCurrentLocale } from '@finagent/i18n';
 import type { SupportedLocale } from '@finagent/core';
 import type { CapabilityRegistry } from '@finagent/core';
 import { CapabilityExecutor, type RunOutcome } from '../capabilities/index.ts';
+import { collectEvidence } from '../financial-evidence/index.ts';
+import type { EvidenceRepository } from '../financial-evidence/index.ts';
 import {
   buildCapabilityInput,
   planForStrategy,
@@ -28,6 +31,12 @@ export interface ResearchRunnerOptions {
   synthesizer: ResearchSynthesizer;
   executor?: CapabilityExecutor;
   now?: () => number;
+  /**
+   * V9: optional evidence repository. When provided, every successful
+   * capability run produces a FinancialEvidenceEnvelope that is persisted
+   * here and referenced from the report's EvidenceRef entries (issue #29).
+   */
+  evidenceRepository?: EvidenceRepository;
 }
 
 export interface ResearchRunRequest {
@@ -44,6 +53,8 @@ export interface ResearchRunRequest {
 export interface ResearchRunResult {
   summary: ResearchRunSummary;
   report?: ResearchReport;
+  /** V9: evidence envelopes collected during this run (issue #29). */
+  evidence?: FinancialEvidenceEnvelope[];
 }
 
 /**
@@ -61,12 +72,14 @@ export class ResearchRunner {
   private readonly synthesizer: ResearchSynthesizer;
   private readonly executor: CapabilityExecutor;
   private readonly now: () => number;
+  private readonly evidenceRepository?: EvidenceRepository;
 
   constructor(options: ResearchRunnerOptions) {
     this.registry = options.registry;
     this.synthesizer = options.synthesizer;
     this.now = options.now ?? Date.now;
     this.executor = options.executor ?? new CapabilityExecutor({ now: this.now });
+    this.evidenceRepository = options.evidenceRepository;
   }
 
   async run(request: ResearchRunRequest): Promise<ResearchRunResult> {
@@ -128,6 +141,9 @@ export class ResearchRunner {
     const runs = buildRuns(plan, outcomes);
     const dataBundle = buildDataBundle(outcomes);
 
+    // V9: collect evidence envelopes from successful outcomes (issue #29)
+    const evidenceEnvelopes = await this.collectEvidence(outcomes, specs, runId);
+
     let synthesis: ResearchSynthesis;
     try {
       synthesis = await this.synthesizer.synthesize(
@@ -159,6 +175,7 @@ export class ResearchRunner {
       outcomes,
       synthesis,
       locale: request.locale,
+      evidenceEnvelopes,
     });
 
     const summary = await emit(computeRunStatus(plan, successIds), {
@@ -167,7 +184,39 @@ export class ResearchRunner {
       completedCapabilities: successIds,
       failedCapabilities: failedIds,
     });
-    return { summary, report };
+    return { summary, report, evidence: evidenceEnvelopes };
+  }
+
+  /**
+   * V9: collect evidence envelopes from successful capability outcomes.
+   * When an evidenceRepository is configured, envelopes are persisted to disk.
+   */
+  private async collectEvidence(
+    outcomes: RunOutcome[],
+    specs: Array<{ cap: { id: string }; input: unknown }>,
+    agentRunId: string
+  ): Promise<FinancialEvidenceEnvelope[]> {
+    const envelopes: FinancialEvidenceEnvelope[] = [];
+    const inputByCapability = new Map(specs.map((s) => [s.cap.id, s.input]));
+
+    for (const outcome of outcomes) {
+      if (outcome.record.status !== 'success' || !outcome.result) continue;
+      const input = inputByCapability.get(outcome.record.capabilityId);
+      const envelope = collectEvidence({
+        runRecord: outcome.record,
+        result: outcome.result,
+        input: input ?? {},
+        agentRunId,
+      });
+      if (envelope) {
+        envelopes.push(envelope);
+        // Persist to repository if configured
+        if (this.evidenceRepository) {
+          await this.evidenceRepository.save(envelope);
+        }
+      }
+    }
+    return envelopes;
   }
 }
 
@@ -222,27 +271,39 @@ function computeRunStatus(plan: PlannedCapability[], successIds: string[]): Rese
 function assembleReport(args: {
   runId: string;
   symbol: string;
-  strategyId?: string;
+  strategyId?: StrategyId;
   generatedAt: number;
   plan: PlannedCapability[];
   outcomes: RunOutcome[];
   synthesis: ResearchSynthesis;
   locale?: SupportedLocale;
+  evidenceEnvelopes: FinancialEvidenceEnvelope[];
 }): ResearchReport {
-  const { runId, symbol, strategyId, generatedAt, plan, outcomes, synthesis, locale } = args;
+  const { runId, symbol, strategyId, generatedAt, plan, outcomes, synthesis, locale, evidenceEnvelopes } = args;
 
   const outcomeByCapability = new Map(outcomes.map((o) => [o.record.capabilityId, o]));
+  const evidenceByCapability = new Map(
+    evidenceEnvelopes.map((e) => [e.capabilityId, e])
+  );
 
   const sections: ResearchSection[] = synthesis.sections.map((section) => {
     const outcome = outcomeByCapability.get(section.key);
     const evidence: EvidenceRef[] = [];
     if (outcome && outcome.record.status === 'success') {
+      const envelope = evidenceByCapability.get(outcome.record.capabilityId);
       evidence.push({
         capabilityId: outcome.record.capabilityId,
         runId: outcome.record.id,
         claim: section.summary,
         fetchedAt: outcome.record.provenance?.fetchedAt ?? generatedAt,
         summary: outcome.result?.summary,
+        // V9: attach structured evidence reference (issue #29)
+        ...(envelope
+          ? {
+              evidenceId: envelope.evidenceId,
+              metricIds: envelope.metrics.map((m) => m.metricId),
+            }
+          : {}),
       });
     }
     return { ...section, evidence };

@@ -90,6 +90,8 @@ export function reportToMarkdown(report: ResearchReport, options: MarkdownOption
         claim: ref.claim,
         capabilityId: ref.capabilityId,
         runId: ref.runId,
+        evidenceId: ref.evidenceId,
+        metricIds: ref.metricIds,
       }))
     )
     if (refs.length === 0) {
@@ -98,7 +100,15 @@ export function reportToMarkdown(report: ResearchReport, options: MarkdownOption
     } else {
       for (const ref of refs) {
         lines.push('')
-        lines.push(`- ${ref.sectionTitle}: ${ref.claim || '(claim not recorded)'} — ${ref.capabilityId} (run ${ref.runId})`)
+        const baseLine = `- ${ref.sectionTitle}: ${ref.claim || '(claim not recorded)'} — ${ref.capabilityId} (run ${ref.runId})`
+        lines.push(baseLine)
+        // V9: include structured evidence reference when available (issue #29)
+        if (ref.evidenceId) {
+          lines.push(`  - Evidence: ${ref.evidenceId}`)
+        }
+        if (ref.metricIds && ref.metricIds.length > 0) {
+          lines.push(`  - Metrics: ${ref.metricIds.join(', ')}`)
+        }
       }
     }
   }
