@@ -19,6 +19,7 @@
     "eval:smoke": "bun scripts/eval/run.ts --smoke",
     "eval:full": "bun scripts/eval/run.ts",
     "eval:langfuse": "bun scripts/eval/langfuse-live.ts",
+    "eval:retrieval-ranking-live": "bun scripts/eval/retrieval-ranking-smoke.ts",
     "test:ui": "bun test packages/ui",
     "test:e2e": "cd apps/electron && bun run test:e2e",
     "test:e2e:visible": "cd apps/electron && FINAGENT_E2E_VISIBLE=1 bun run test:e2e",
