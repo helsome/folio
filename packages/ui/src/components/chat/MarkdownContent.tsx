@@ -1,6 +1,12 @@
-import React from 'react';
+import React, { memo, useRef } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { useFinagentClient } from '../../client';
+import {
+  EMPTY_STREAMING_MARKDOWN,
+  updateStreamingMarkdown,
+  type StreamingMarkdownSnapshot,
+} from './streamingMarkdown';
 
 /**
  * Render agent-authored Markdown without allowing raw HTML to enter the DOM.
@@ -8,7 +14,18 @@ import remarkGfm from 'remark-gfm';
  * is intentional. GFM adds the table, task-list, strike-through, and URL
  * behaviours people expect from a research answer.
  */
-const components: Components = {
+function isSafeExternalUrl(value: string | undefined): value is string {
+  if (!value) return false;
+  try {
+    const url = new URL(value);
+    return url.protocol === 'http:' || url.protocol === 'https:';
+  } catch {
+    return false;
+  }
+}
+
+function createComponents(openExternal?: (url: string) => void): Components {
+  return {
   h1: ({ children }) => (
     <h1 className="mb-3 mt-1 text-[18px] font-bold tracking-tight text-foreground">{children}</h1>
   ),
@@ -31,16 +48,23 @@ const components: Components = {
   strong: ({ children }) => <strong className="font-semibold text-foreground">{children}</strong>,
   em: ({ children }) => <em className="italic">{children}</em>,
   del: ({ children }) => <del className="text-foreground/55">{children}</del>,
-  a: ({ href, children }) => (
-    <a
-      href={href}
-      target="_blank"
-      rel="noreferrer"
-      className="text-accent underline decoration-accent/35 underline-offset-2 hover:decoration-accent"
-    >
-      {children}
-    </a>
-  ),
+  a: ({ href, children }) => {
+    if (!isSafeExternalUrl(href)) return <span>{children}</span>;
+    return (
+      <a
+        href={href}
+        target="_blank"
+        rel="noopener noreferrer"
+        onClick={openExternal ? (event) => {
+          event.preventDefault();
+          openExternal(href);
+        } : undefined}
+        className="text-accent underline decoration-accent/35 underline-offset-2 hover:decoration-accent"
+      >
+        {children}
+      </a>
+    );
+  },
   code: ({ className, children, ...props }) => {
     const isBlock = Boolean(className?.includes('language-'));
     return (
@@ -75,12 +99,61 @@ const components: Components = {
   input: ({ checked, ...props }) => (
     <input {...props} type="checkbox" checked={checked} readOnly className="mr-1.5 accent-accent" />
   ),
-};
+  };
+}
 
-export const MarkdownContent: React.FC<{ content: string; className?: string }> = ({ content, className = '' }) => (
-  <div className={`markdown-content break-words text-[14px] leading-relaxed ${className}`}>
+const MarkdownFragment = memo(function MarkdownFragment({
+  content,
+  components,
+}: {
+  content: string;
+  components: Components;
+}) {
+  return (
     <ReactMarkdown remarkPlugins={[remarkGfm]} components={components}>
       {content}
     </ReactMarkdown>
-  </div>
-);
+  );
+});
+
+function useMarkdownComponents(): Components {
+  const client = useFinagentClient();
+  const openExternal = client.openExternal;
+  const ref = useRef<{ channel: typeof openExternal; components: Components }>();
+  if (!ref.current || ref.current.channel !== openExternal) {
+    ref.current = {
+      channel: openExternal,
+      components: createComponents(openExternal ? (url) => void openExternal(url) : undefined),
+    };
+  }
+  return ref.current.components;
+}
+
+export const MarkdownContent: React.FC<{ content: string; className?: string }> = ({ content, className = '' }) => {
+  const components = useMarkdownComponents();
+  return (
+    <div className={`markdown-content break-words text-[14px] leading-relaxed ${className}`}>
+      <MarkdownFragment content={content} components={components} />
+    </div>
+  );
+};
+
+/** Markdown renderer optimized for append-only model output. */
+export const StreamingMarkdownContent: React.FC<{ content: string; className?: string }> = ({
+  content,
+  className = '',
+}) => {
+  const components = useMarkdownComponents();
+  const snapshotRef = useRef<StreamingMarkdownSnapshot>(EMPTY_STREAMING_MARKDOWN);
+  snapshotRef.current = updateStreamingMarkdown(snapshotRef.current, content);
+  const snapshot = snapshotRef.current;
+
+  return (
+    <div className={`markdown-content break-words text-[14px] leading-relaxed ${className}`}>
+      {snapshot.chunks.map((chunk, index) => (
+        <MarkdownFragment key={index} content={chunk} components={components} />
+      ))}
+      {snapshot.tail && <MarkdownFragment content={snapshot.tail} components={components} />}
+    </div>
+  );
+};

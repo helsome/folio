@@ -19,7 +19,7 @@ import {
 } from '../../atoms';
 import { useFinagentClient } from '../../client';
 import { MessageList } from '../chat/MessageList';
-import { MarkdownContent } from '../chat/MarkdownContent';
+import { StreamingMarkdownContent } from '../chat/MarkdownContent';
 import { ModelSelector } from './ModelSelector';
 import { ThinkingSelector } from './ThinkingSelector';
 import { ToolActivity } from './ToolActivity';
@@ -29,6 +29,7 @@ import { loadSessionTraceSources, projectSessionTrace } from '../../lib/traceDat
 import { QuoteCard } from './structured/QuoteCard';
 import { PortfolioRiskCard } from './structured/PortfolioRiskCard';
 import { AgentAmbientField, type AgentMotionState } from '../motion/AgentAmbientField';
+import { isNearScrollBottom } from './streamingScroll';
 
 const folioLogoUrl = new URL('../../assets/folio-logo.png', import.meta.url).href;
 
@@ -101,7 +102,9 @@ export const AgentPanel: React.FC = () => {
   const [sendError, setSendError] = useState<string | null>(null);
   const [traceDialog, setTraceDialog] = useState<{ runId: string; trace: FolioTrace | null } | null>(null);
   const [traceLoading, setTraceLoading] = useState(false);
+  const bodyRef = useRef<HTMLDivElement>(null);
   const bodyEndRef = useRef<HTMLDivElement>(null);
+  const followOutputRef = useRef(true);
 
   const isRunning = runView !== null && runView.infraError === undefined;
   const agentMotionState: AgentMotionState = runView?.infraError
@@ -115,7 +118,9 @@ export const AgentPanel: React.FC = () => {
           : 'idle';
 
   useEffect(() => {
-    bodyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (followOutputRef.current) {
+      bodyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    }
   }, [messages, runView?.answer, runView?.toolCalls]);
 
   const handleSend = async () => {
@@ -253,7 +258,13 @@ export const AgentPanel: React.FC = () => {
       </div>
 
       {/* Scrollable body: tool activity, structured results, messages, live answer */}
-      <div className="folio-agent-body flex-1 overflow-y-auto scrollbar-hover">
+      <div
+        ref={bodyRef}
+        className="folio-agent-body flex-1 overflow-y-auto scrollbar-hover"
+        onScroll={() => {
+          if (bodyRef.current) followOutputRef.current = isNearScrollBottom(bodyRef.current);
+        }}
+      >
         <div className="flex flex-col gap-3 p-3">
           {runView?.infraError && (
             <RuntimeInfraBanner
@@ -438,7 +449,7 @@ const StreamingBlock: React.FC<{ answer: string }> = ({ answer }) => {
         {t('agent.panel.agentRunning')}
       </div>
       {answer.length > 0 ? (
-        <MarkdownContent content={answer} className="text-[13px] text-foreground/72" />
+        <StreamingMarkdownContent content={answer} className="text-[13px] text-foreground/72" />
       ) : (
         <div className="text-[13px] italic text-foreground/40">{t('agent.panel.thinking')}</div>
       )}
