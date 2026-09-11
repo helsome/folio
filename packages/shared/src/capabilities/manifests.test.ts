@@ -73,7 +73,18 @@ describe('market.quote manifest', () => {
       instrumentId: 'XNAS:AAPL',
     });
     expect(result.data.symbol).toBe('AAPL.US');
+    expect(result.facts?.every((fact) => fact.instrumentId === 'XNAS:AAPL')).toBe(true);
     expect(result.summary).toContain('AAPL.US');
+  });
+
+  it('shares the resolved canonical identity with facts for an unstamped quote', async () => {
+    const cap = createMarketQuoteCapability(fetchers({
+      getQuote: async () => ({ ...quote, instrumentId: undefined }),
+    }));
+    const result = await cap.execute({ symbol: 'AAPL.US' }, { now: () => 12345 });
+    expect(result.provenance.instrumentId).toBe('XNAS:AAPL');
+    expect(result.facts?.every((fact) => fact.instrumentId === result.provenance.instrumentId)).toBe(true);
+    expect(result.provenance.marketTime).toBe(quote.timestamp * 1000);
   });
 
   it('registers under the expected id, tool name, auth, and category', () => {

@@ -3,11 +3,11 @@ import {
   DEFAULT_INSTRUMENT_CATALOG,
   InstrumentResolver,
   readInstrumentId,
+  describeFact,
+  marketCurrencyOf,
+  quoteToFacts,
 } from '@finagent/core';
-import type {
-  FinanceCapability,
-  Quote,
-} from '@finagent/core';
+import type { FinanceCapability, FinancialFact, Quote } from '@finagent/core';
 import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
@@ -41,17 +41,29 @@ export function createMarketQuoteCapability(
       const quote = fetched?.data ?? await fetchers.getQuote(symbol);
       if (fetched) reportProvider?.(fetched.provenance);
       const instrumentId = readInstrumentId(quote) ?? resolveCanonicalInstrumentId(symbol);
+      const fetchedAt = (ctx?.now ?? Date.now)();
+      // Native currency is derived from the market code (structured, not free
+      // text). Quotes are real-time by contract; the `delayed`/`eod` variants
+      // are produced by callers that know a delay applies.
+      const facts = quoteToFacts(quote, {
+        instrumentId,
+        provider: 'longbridge',
+        currency: marketCurrencyOf(symbol),
+        timing: 'live',
+        retrievedAt: Math.floor(fetchedAt / 1000),
+      });
       return {
         data: quote,
+        facts,
         provenance: {
           provider: 'longbridge',
           providerName: 'Longbridge',
           ...(instrumentId ? { instrumentId } : {}),
-          fetchedAt: (ctx?.now ?? Date.now)(),
+          fetchedAt,
           marketTime: quote.timestamp * 1000,
           stale: false,
         },
-        summary: formatQuote(quote),
+        summary: formatQuote(quote, facts),
       };
     },
   });
@@ -62,19 +74,37 @@ function resolveCanonicalInstrumentId(symbol: string): string | undefined {
   return resolution.status === 'resolved' ? resolution.instrument.instrumentId : undefined;
 }
 
-function formatQuote(quote: Quote) {
+function formatQuote(quote: Quote, facts: FinancialFact[]) {
+  const symbol = currencySymbol(facts.find((fact) => fact.metric === 'lastPrice')?.currency);
   const changeIcon = quote.change >= 0 ? '[up]' : '[down]';
   const changeStr = quote.change >= 0
     ? `+${quote.change.toFixed(2)} (+${quote.changePercent.toFixed(2)}%)`
     : `${quote.change.toFixed(2)} (${quote.changePercent.toFixed(2)}%)`;
-  const asOf = new Date(quote.timestamp * 1000).toLocaleString();
+
+  const lastPrice = facts.find((fact) => fact.metric === 'lastPrice');
 
   return [
-    `${changeIcon} ${quote.symbol}: $${quote.lastPrice.toFixed(2)}`,
+    `${changeIcon} ${quote.symbol}: ${symbol}${quote.lastPrice.toFixed(2)}`,
     `Change: ${changeStr}`,
     `Volume: ${quote.volume.toLocaleString()}`,
-    `High: $${quote.high.toFixed(2)} | Low: $${quote.low.toFixed(2)}`,
-    `Open: $${quote.open.toFixed(2)} | Prev Close: $${quote.prevClose.toFixed(2)}`,
-    `As of: ${asOf}`,
+    `High: ${symbol}${quote.high.toFixed(2)} | Low: ${symbol}${quote.low.toFixed(2)}`,
+    `Open: ${symbol}${quote.open.toFixed(2)} | Prev Close: ${symbol}${quote.prevClose.toFixed(2)}`,
+    lastPrice ? `Semantics: ${describeFact(lastPrice)}` : '',
   ].join('\n');
+}
+
+/** Minimal structured currency-symbol lookup (falls back to the ISO code). */
+function currencySymbol(currency: string | undefined): string {
+  switch (currency) {
+    case 'USD':
+      return '$';
+    case 'HKD':
+      return 'HK$';
+    case 'CNY':
+      return '¥';
+    case 'SGD':
+      return 'S$';
+    default:
+      return currency ? `${currency} ` : '';
+  }
 }
