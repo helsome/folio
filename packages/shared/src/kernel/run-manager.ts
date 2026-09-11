@@ -40,6 +40,7 @@ import {
 import { buildFinancialEvidence } from '../evidence/financial-evidence.ts';
 import { toStreamEvents } from './stream-event-adapter.ts';
 import { StreamEventHistory, type StreamReplayResult } from './stream-history.ts';
+import { StreamEventLog } from './stream-event-log.ts';
 
 export interface RunManagerOptions {
   sessions: SessionManager;
@@ -56,6 +57,8 @@ export interface RunManagerOptions {
   searchTools?: string[];
   /** Runaway detector thresholds; unset fields fall back to `defaultRunawayPolicy()`. */
   runaway?: Partial<RunawayPolicy>;
+  /** Stream event log 目录（issue #75）：持久化 replay 历史，跨重启可用；缺省为纯内存。 */
+  streamLogDir?: string;
 }
 
 interface ActiveRun {
@@ -106,8 +109,8 @@ export class RunManager {
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly streamListeners = new Set<(sessionId: string, event: StreamEvent) => void>();
   private activeRun: ActiveRun | null = null;
-  /** run 级内存事件历史：为 reconnect replay 提供数据源（ADR 0001）。 */
-  private readonly streamHistory = new StreamEventHistory();
+  /** run 级事件历史（内存 + 可选磁盘日志）：为 reconnect replay 提供数据源（ADR 0001 / #75）。 */
+  private readonly streamHistory: StreamEventHistory;
 
   constructor(options: RunManagerOptions) {
     this.sessions = options.sessions;
@@ -117,6 +120,13 @@ export class RunManager {
     this.budgetInput = options.budgets ?? {};
     this.searchToolPatterns = options.searchTools ?? [];
     this.runawayPolicy = options.runaway ?? {};
+    // issue #75：可选持久化 —— 启动时从磁盘恢复历史，使 replay 跨重启可用；
+    // 无目录或磁盘故障时降级为纯内存（实时链路不受影响）。
+    const streamLog = options.streamLogDir ? new StreamEventLog(options.streamLogDir) : undefined;
+    this.streamHistory = new StreamEventHistory({
+      log: streamLog,
+      persisted: streamLog?.load().events,
+    });
   }
 
   subscribe(listener: (event: AgentEvent) => void): () => void {

@@ -34,7 +34,10 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-/** 全链路装配：真实 SessionManager/RunManager + LocalRuntimeAdapter。 */
+/**
+ * 全链路装配：真实 SessionManager/RunManager + LocalRuntimeAdapter。
+ * 默认启用持久化日志（issue #75）——目录写入 e2e 临时目录，跑完即清。
+ */
 function makeStack(runtime = new LocalRuntimeAdapter({ now: () => clock })) {
   const store = new JsonFileStore(dir);
   const sessions = new SessionManager({
@@ -44,7 +47,13 @@ function makeStack(runtime = new LocalRuntimeAdapter({ now: () => clock })) {
     piSessionDir: join(dir, 'pi-sessions'),
     now: () => clock,
   });
-  const runs = new RunManager({ sessions, runs: new RunRepository(store), runtime, now: () => clock });
+  const runs = new RunManager({
+    sessions,
+    runs: new RunRepository(store),
+    runtime,
+    now: () => clock,
+    streamLogDir: join(dir, 'stream-events'),
+  });
   return { sessions, runs };
 }
 
@@ -130,6 +139,32 @@ describe('Stream Event replay E2E（真实 runtime 全链路）', () => {
     expect(replay.recoverable).toBe(true);
     expectStrictSequence(replay.events);
     expect(replay.events.length).toBeGreaterThanOrEqual(5);
+  });
+
+  it('跨进程重启：磁盘日志恢复历史，replay 对重启前的 run 仍可用', async () => {
+    const first = makeStack();
+    const session = await first.sessions.createSession('restart me');
+    const run = await first.runs.startRun(session.id, '你好，随便聊聊');
+    await waitFor(async () => !first.runs.isRunning());
+
+    // 模拟进程重启：同一 storageDir 新建一整套 kernel（不保留原 RunManager 内存状态）。
+    const second = makeStack();
+    const replay = second.runs.replayStream(run.id, 0);
+    expect(replay.recoverable).toBe(true);
+    expectStrictSequence(replay.events);
+    expect(replay.atEnd).toBe(true);
+    expect(replay.events.map((e) => e.type)).toEqual([
+      'run_started',
+      'message_started',
+      'text_delta',
+      'message_completed',
+      'run_completed',
+    ]);
+    // 重启后按 lastSequence 补发剩余段同样成立。
+    const tail = second.runs.replayStream(run.id, 2);
+    expect(tail.recoverable).toBe(true);
+    expect(tail.events[0]?.sequence).toBe(3);
+    expect(tail.atEnd).toBe(true);
   });
 
   it('中途断线：按已收 lastSequence 补发剩余段，拼接与全量一致', async () => {

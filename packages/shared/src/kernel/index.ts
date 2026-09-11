@@ -3,6 +3,11 @@ export { SessionManager, type SessionManagerOptions } from './session-manager.ts
 export { RunManager, type RunManagerOptions } from './run-manager.ts';
 export { StreamEventHistory, type StreamReplayResult } from './stream-history.ts';
 export {
+  StreamEventLog,
+  DEFAULT_MAX_LOG_RUNS,
+  type StreamEventLogLoadResult,
+} from './stream-event-log.ts';
+export {
   BUDGET_KEYS,
   addUsage,
   budgetStop,

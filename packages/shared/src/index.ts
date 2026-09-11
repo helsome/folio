@@ -88,6 +88,7 @@ export {
   SessionManager,
   RunManager,
   StreamEventHistory,
+  StreamEventLog,
   type StreamReplayResult,
   BUDGET_KEYS,
   addUsage,

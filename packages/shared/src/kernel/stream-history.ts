@@ -7,11 +7,19 @@
 // - 截断/未知 run/段不连续 → recoverable=false，调用方应呈现明确失败。
 
 import type { StreamEvent } from '@finagent/core';
+import type { StreamEventLog } from './stream-event-log.ts';
 
 /** 保留的最大 run 数（最早的新增 run 被淘汰）。 */
 const MAX_RUNS = 32;
 /** 单 run 内存缓冲的事件上限（截断后无法从头恢复 → 明确不可恢复）。 */
 const MAX_EVENTS_PER_RUN = 2000;
+
+export interface StreamEventHistoryOptions {
+  /** 磁盘恢复的事件（issue #75：跨重启补齐历史）。 */
+  persisted?: Iterable<StreamEvent>;
+  /** 挂载的持久化日志：append 时与内存并行落盘。 */
+  log?: StreamEventLog;
+}
 
 export interface StreamReplayResult {
   /** true：补发成功；false：内存中已无连续段/未知 run，明确不可恢复。 */
@@ -28,8 +36,18 @@ export class StreamEventHistory {
   private readonly runs = new Map<string, StreamEvent[]>();
   /** FIFO LRU 顺序，用于淘汰最久未更新的 run。 */
   private readonly order: string[] = [];
+  private readonly log?: StreamEventLog;
+
+  constructor(options: StreamEventHistoryOptions = {}) {
+    this.log = options.log;
+    for (const event of options.persisted ?? []) {
+      this.append(event);
+    }
+  }
 
   append(event: StreamEvent): void {
+    // 与内存缓冲并行持久化；磁盘失败由 log 自吞（降级内存-only）。
+    this.log?.append(event);
     const list = this.runs.get(event.runId);
     if (list) {
       list.push(event);
