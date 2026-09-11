@@ -32,14 +32,23 @@ gradually replaces it.
 ```ts
 interface StreamEventEnvelope<T extends StreamEventType> {
   protocolVersion: 1;   // forward-compat gate
-  runId: string;
-  messageId: string;    // equals runId in v1; split later if one message spans runs
-  sequence: number;     // monotonic per run; idempotency key = runId + messageId + sequence
+  runId: string;        // one run = one generation (identity, see #34)
+  messageId?: string;   // message-level events only: stable message id (#34);
+                        // run-level events omit it. message and run are distinct identities
+  sequence: number;     // monotonic per run; idempotency key = runId + sequence
   type: T;
   timestamp: string;    // ISO 8601 UTC; display only, never identity
   payload: StreamEventTypeToPayload[T];
 }
 ```
+
+Identity model (aligned with #34): a message has a stable id and can span
+multiple runs (edit / regenerate / fork); an assistant generation binds to
+exactly one run. Message-level events (`message_started / text_delta /
+message_completed / cancelled`) carry the real assistant `messageId`; run-level
+events (`run_started / run_completed / tool_* / citation_added / status /
+error`) carry only `runId`. Implemented in `run-manager` (pre-assigned
+assistant message id per run) and `stream-event-adapter`.
 
 ### Event types (12)
 
@@ -53,9 +62,9 @@ Key behavior change: `message_delta` (full-answer snapshot) becomes `text_delta`
 
 | Capability | Contract |
 |---|---|
-| Idempotency | Consumers dedupe on `runId + messageId + sequence`; replayed events never re-insert text, tool cards, or citations |
+| Idempotency | Consumers dedupe on `runId + sequence`; replayed events never re-insert text, tool cards, or citations |
 | Cancel | renderer `cancelRun` → runtime propagates → runtime **explicitly emits `cancelled`**; partial answer preserved |
-| Reconnect | client reconnects with `lastSequence`; unconsumed gap is replayed (resume), consumed events are not re-applied |
+| Reconnect | **Implemented (v1, in-memory):** `RunManager.replayStream(runId, lastSequence)` returns the contiguous tail from `StreamEventHistory` (`packages/shared/src/kernel/stream-history.ts`); when the run is unknown or the tail is non-contiguous (buffer eviction), it returns `recoverable: false` — an explicit unrecoverable path the renderer must surface. IPC: `runs:stream-replay` |
 | Final-state parity | UI `stopReason` and persisted `run.status` come from the same single final state in run-manager (aligns with #18) |
 | Security (#19) | `status` never exposes chain-of-thought; tool payloads pass redaction before reaching the UI; renderer never executes model-returned code |
 
@@ -73,7 +82,9 @@ Key behavior change: `message_delta` (full-answer snapshot) becomes `text_delta`
   state; groundwork for reconnect/resume and for #21 immutable run manifests.
 - **Negative:** dual event families during migration; consumers must handle both.
 - **Open questions for reviewers:**
-  1. Resume data source: v1 keeps events in memory for the run's lifetime and defers
-     persisting an event log (ties into #21) — acceptable?
+  1. Resume data source: v1 keeps events in memory (`StreamEventHistory`); persisting
+     an event log is deferred (ties into #21 immutable run manifests) — acceptable?
   2. Is `status.phase` of `thinking / searching / working` sufficient?
-  3. Keep `messageId` merged with `runId` in v1 and split only when needed?
+  3. ~~Keep `messageId` merged with `runId`~~ **resolved**: #34 requires distinct
+     message / run identities — envelope carries `messageId` only on message-level
+     events (see Identity model above).
