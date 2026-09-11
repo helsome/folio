@@ -1,4 +1,4 @@
-// Folio V7 — Agent Engineering Evaluation domain types.
+﻿// Folio V7 鈥?Agent Engineering Evaluation domain types.
 //
 // These types are the shared contract between:
 //   - the benchmark dataset (EvaluationCase / EvaluationDataset)
@@ -8,13 +8,13 @@
 //   - trace correlation (TraceReference)
 //   - observability settings (EvaluationSettings / PrivacyLevel)
 //
-// Layer scope (spec §3): this file covers Layer 1 (agent engineering) and the
+// Layer scope (spec 搂3): this file covers Layer 1 (agent engineering) and the
 // accounting for Layer 2 (financial research) and Layer 3 (investment outcome)
 // linkage. It does not replace the existing outcome/calibration domain.
 
 import type { ApiError, ToolCallRecord, SupportedLocale, WorkspaceContext } from './index.ts';
 
-// ── Benchmark cases ─────────────────────────────────────────────────────────
+// 鈹€鈹€ Benchmark cases 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export type EvaluationCategory =
   | 'market'
@@ -29,7 +29,7 @@ export type EvaluationCategory =
   | 'long-tail'
   | 'adversarial';
 
-/** Difficulty tags drive release gates: regression cases weigh most (spec §26). */
+/** Difficulty tags drive release gates: regression cases weigh most (spec 搂26). */
 export type EvaluationDifficulty =
   | 'golden'
   | 'difficult'
@@ -38,7 +38,7 @@ export type EvaluationDifficulty =
   | 'regression'
   | 'adversarial';
 
-/** Where a case came from — trace mining requires privacy cleanup (spec §24). */
+/** Where a case came from 鈥?trace mining requires privacy cleanup (spec 搂24). */
 export type EvaluationCaseSource =
   | 'hand-authored'
   | 'real-trace'
@@ -46,7 +46,7 @@ export type EvaluationCaseSource =
   | 'provider-fixture'
   | 'historical-issue';
 
-/** Input surface for a single agent run under evaluation (spec §19). */
+/** Input surface for a single agent run under evaluation (spec 搂19). */
 export interface EvaluationCaseInput {
   prompt: string;
   workspaceContext?: WorkspaceContext;
@@ -60,7 +60,7 @@ export interface EvaluationCaseInput {
 }
 
 /**
- * Expected *behavior*, not just an expected answer string (spec §20).
+ * Expected *behavior*, not just an expected answer string (spec 搂20).
  * Benchmark evaluation targets what the agent did, which tools it used,
  * whether it stayed grounded, and how it handled failure.
  */
@@ -70,7 +70,7 @@ export interface EvaluationExpectations {
   forbiddenCapabilities?: string[];
   maxToolCalls?: number;
   mustHaveEvidence?: boolean;
-  /** Research dimensions the answer should cover (valuation, growth, risk…). */
+  /** Research dimensions the answer should cover (valuation, growth, risk鈥?. */
   requiredResearchDimensions?: string[];
   expectedFailureMode?: EvaluationFailureMode;
   expectedStance?: 'bullish' | 'bearish' | 'neutral';
@@ -93,7 +93,7 @@ export interface EvaluationCase {
   tags: string[];
   source: EvaluationCaseSource;
   /**
-   * Runtime locale for this case (spec §37–38). The Eval Runner drives the
+   * Runtime locale for this case (spec 搂37鈥?8). The Eval Runner drives the
    * agent's response language from the case/experiment, NOT the user's UI
    * locale. Defaults to 'en-US' for older cases so benchmark reproducibility
    * is preserved. Does not change stored user content or historical reports.
@@ -104,7 +104,7 @@ export interface EvaluationCase {
 export interface EvaluationDataset {
   /** Stable id, e.g. "folio-agent-v1". */
   id: string;
-  /** Semantic version; bump on any case change so experiments stay comparable (spec §25). */
+  /** Semantic version; bump on any case change so experiments stay comparable (spec 搂25). */
   version: string;
   name: string;
   description?: string;
@@ -112,7 +112,7 @@ export interface EvaluationDataset {
   cases: EvaluationCase[];
 }
 
-// ── Failure taxonomy (spec §40-41) ──────────────────────────────────────────
+// 鈹€鈹€ Failure taxonomy (spec 搂40-41) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export type EvaluationFailureMode =
   | 'wrong_tool'
@@ -132,7 +132,7 @@ export type EvaluationFailureMode =
   | 'judge_error'
   | 'resource_unavailable';
 
-// ── Metrics & scores (spec §27, §110) ───────────────────────────────────────
+// 鈹€鈹€ Metrics & scores (spec 搂27, 搂110) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export type EvaluationMetricId =
   | 'task_completion'
@@ -159,17 +159,17 @@ export interface EvaluationMetric {
   id: EvaluationMetricId;
   name: string;
   description?: string;
-  /** Rubric/implementation version; rubrics must version so history stays comparable (spec §81). */
+  /** Rubric/implementation version; rubrics must version so history stays comparable (spec 搂81). */
   version: string;
   kind: EvaluationMetricKind;
   higherIsBetter: boolean;
-  /** Metrics whose regression fails the gate (spec §77). */
+  /** Metrics whose regression fails the gate (spec 搂77). */
   critical: boolean;
   /** Default max |delta| for regression gating when a baseline does not override it. */
   defaultMaxDelta: number;
 }
 
-/** Evaluator registry content (spec §27): one metric definition per id. */
+/** Evaluator registry content (spec 搂27): one metric definition per id. */
 export const EVALUATION_METRICS: readonly EvaluationMetric[] = [
   {
     id: 'task_completion',
@@ -340,7 +340,7 @@ export interface EvaluationScore {
   detail?: unknown;
 }
 
-// ── Runs, results, artifacts (spec §42-43) ─────────────────────────────────
+// 鈹€鈹€ Runs, results, artifacts (spec 搂42-43) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export type EvaluationRunStatus = 'completed' | 'failed' | 'cancelled' | 'timeout' | 'skipped';
 
@@ -361,7 +361,7 @@ export interface EvaluationRun {
   error?: ApiError;
 }
 
-/** Backend the trace lives in; `none` when observability is off (spec §89). */
+/** Backend the trace lives in; `none` when observability is off (spec 搂89). */
 export type TraceBackendKind = 'langsmith' | 'local' | 'none';
 
 export interface TraceReference {
@@ -372,7 +372,7 @@ export interface TraceReference {
   threadId?: string;
   sessionId?: string;
   runId?: string;
-  /** Case/experiment runtime locale stamped into trace metadata (spec §74). */
+  /** Case/experiment runtime locale stamped into trace metadata (spec 搂74). */
   locale?: SupportedLocale;
 }
 
@@ -387,7 +387,7 @@ export interface EvaluationResultRecord {
   notes?: string;
 }
 
-// ── Experiment (spec §42-45, §79) ──────────────────────────────────────────
+// 鈹€鈹€ Experiment (spec 搂42-45, 搂79) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface ExperimentConfig {
   mode: 'fixture' | 'live';
@@ -397,10 +397,10 @@ export interface ExperimentConfig {
   strategyId?: string;
   skillVersions?: Record<string, string>;
   capabilityRegistryVersion?: string;
-  /** Judge model separate from the agent under test (spec §80). */
+  /** Judge model separate from the agent under test (spec 搂80). */
   judgeModel?: string;
   judgeProvider?: string;
-  /** Cost guardrails (spec §79): 0 = unlimited. */
+  /** Cost guardrails (spec 搂79): 0 = unlimited. */
   maxCases?: number;
   concurrency?: number;
   timeoutMs?: number;
@@ -456,7 +456,7 @@ export interface EvaluationExperiment {
   error?: ApiError;
 }
 
-// ── Baseline & regression gates (spec §75-78) ──────────────────────────────
+// 鈹€鈹€ Baseline & regression gates (spec 搂75-78) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export interface EvaluationBaseline {
   id: string;
@@ -478,11 +478,11 @@ export interface RegressionResult {
   delta: number | null;
   maxDelta: number;
   critical: boolean;
-  /** False when a critical metric regressed beyond maxDelta (spec §76). */
+  /** False when a critical metric regressed beyond maxDelta (spec 搂76). */
   passed: boolean;
 }
 
-// ── Observability settings & privacy (spec §11-13, §56-59) ─────────────────
+// 鈹€鈹€ Observability settings & privacy (spec 搂11-13, 搂56-59) 鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€鈹€
 
 export type PrivacyLevel = 'minimal' | 'standard' | 'full';
 
@@ -493,7 +493,7 @@ export interface EvaluationSettings {
   langsmithEndpoint: string;
   privacyLevel: PrivacyLevel;
   onlineEvaluationEnabled: boolean;
-  /** Mirror of the credential store; renderer never sees the key (spec §12). */
+  /** Mirror of the credential store; renderer never sees the key (spec 搂12). */
   apiKeyConfigured: boolean;
   updatedAt: number;
 }

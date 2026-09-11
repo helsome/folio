@@ -3,8 +3,10 @@ import type { EvaluationSettings, PrivacyLevel } from '@finagent/core';
 
 export const DEFAULT_EVALUATION_SETTINGS: EvaluationSettings = {
   tracingEnabled: false,
+  traceBackend: 'langsmith',
   langsmithProject: 'folio-agent',
   langsmithEndpoint: '',
+  langfuseHost: 'https://cloud.langfuse.com',
   privacyLevel: 'standard',
   onlineEvaluationEnabled: false,
   apiKeyConfigured: false,
@@ -17,6 +19,13 @@ export function isPrivacyLevel(value: unknown): value is PrivacyLevel {
   return typeof value === 'string' && (PRIVACY_LEVELS as readonly string[]).includes(value);
 }
 
+const TRACE_BACKENDS = ['langsmith', 'langfuse'] as const;
+export type TraceBackend = (typeof TRACE_BACKENDS)[number];
+
+export function isTraceBackend(value: unknown): value is TraceBackend {
+  return typeof value === 'string' && (TRACE_BACKENDS as readonly string[]).includes(value);
+}
+
 /** Sanitize a partial settings object from IPC/localStorage into full settings. */
 export function sanitizeSettings(
   input: Partial<EvaluationSettings> | Record<string, unknown> | null | undefined
@@ -27,12 +36,17 @@ export function sanitizeSettings(
   return {
     ...base,
     tracingEnabled: typeof src.tracingEnabled === 'boolean' ? src.tracingEnabled : base.tracingEnabled,
+    traceBackend: isTraceBackend(src.traceBackend) ? src.traceBackend : base.traceBackend,
     langsmithProject:
       typeof src.langsmithProject === 'string' && src.langsmithProject.trim().length > 0
         ? src.langsmithProject.trim().slice(0, 128)
         : base.langsmithProject,
     langsmithEndpoint:
       typeof src.langsmithEndpoint === 'string' ? src.langsmithEndpoint.trim().slice(0, 512) : base.langsmithEndpoint,
+    langfuseHost:
+      typeof src.langfuseHost === 'string' && src.langfuseHost.trim().length > 0
+        ? src.langfuseHost.trim().replace(/\/+$/, '').slice(0, 512)
+        : base.langfuseHost,
     privacyLevel: isPrivacyLevel(src.privacyLevel) ? src.privacyLevel : base.privacyLevel,
     onlineEvaluationEnabled:
       typeof src.onlineEvaluationEnabled === 'boolean' ? src.onlineEvaluationEnabled : base.onlineEvaluationEnabled,

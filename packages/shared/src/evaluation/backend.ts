@@ -7,7 +7,7 @@
 // throwing into agent execution paths.
 import type { TraceReference } from '@finagent/core';
 
-export type EvaluationBackendKind = 'langsmith' | 'local' | 'none';
+export type EvaluationBackendKind = 'langsmith' | 'langfuse' | 'local' | 'none';
 
 export interface TraceQuery {
   /** Pi session id = LangSmith thread_id when known. */
