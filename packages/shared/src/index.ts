@@ -87,6 +87,8 @@ export {
   AgentKernel,
   SessionManager,
   RunManager,
+  StreamEventHistory,
+  type StreamReplayResult,
   BUDGET_KEYS,
   addUsage,
   budgetStop,

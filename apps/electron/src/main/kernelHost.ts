@@ -154,6 +154,7 @@ import {
   type BriefPortfolioSummary,
   type MarketPulseSnapshot,
   type ShareCard,
+  type StreamReplayResult,
   type WatchlistQuote,
   withDemoDataFallback,
 } from '@finagent/shared';
@@ -573,7 +574,7 @@ export class AgentKernelHost {
   }
 
   /** Stream Event replay（ADR 0001 §Reconnect）：按 lastSequence 补发或明确不可恢复。 */
-  streamReplay(input: unknown) {
+  streamReplay(input: unknown): StreamReplayResult {
     const request = requireObject(input);
     const lastSequence = request.lastSequence;
     if (typeof lastSequence !== 'number' || !Number.isFinite(lastSequence)) {
