@@ -4,13 +4,13 @@ import { deepResearchGoldV1Dataset } from './deep-research-gold-v1.ts';
 import { embeddedDatasets } from './index.ts';
 
 describe('deep-research-gold-v1 dataset', () => {
-  it('contains the required ten research failure-mode cases', () => {
-    expect(deepResearchGoldV1Dataset.cases).toHaveLength(10);
+  it('contains the required eleven research failure-mode cases', () => {
+    expect(deepResearchGoldV1Dataset.cases).toHaveLength(11);
     expect(deepResearchGoldV1Dataset.cases.map((item) => item.id)).toEqual([
       'drg-v1-single-fact', 'drg-v1-cross-source', 'drg-v1-cited-summary',
       'drg-v1-root-cause', 'drg-v1-conflict', 'drg-v1-insufficient',
       'drg-v1-multistep', 'drg-v1-long-synthesis', 'drg-v1-evidence-map',
-      'drg-v1-unsupported',
+      'drg-v1-unsupported', 'drg-v1-news-injection',
     ]);
   });
 
