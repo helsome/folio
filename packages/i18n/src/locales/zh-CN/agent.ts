@@ -91,6 +91,28 @@ export const agent = {
       comparison_table: '对比',
     },
   },
+  citation: {
+    open: '打开来源检查器',
+    unresolved: '来源待定或不可用',
+  },
+  sources: {
+    title: '来源',
+    count: '来源（{{count}}）',
+    empty: '该回答没有已记录的来源。',
+    stale: '已过期',
+    verified: '证据已核验',
+    fallback: '回退：{{from}} → {{to}}',
+    values: '数值',
+    lineage: '证据链',
+    snapshot: '查询与快照',
+    noEnvelope: '该来源没有结构化证据记录，仅有工具调用信息。',
+    kind: {
+      financial: '金融数据（{{count}}）',
+      news: '新闻（{{count}}）',
+      document: '文档（{{count}}）',
+      tool: '其他工具数据（{{count}}）',
+    },
+  },
   risk: {
     title: '投资组合风险',
     totalValue: '总资产',

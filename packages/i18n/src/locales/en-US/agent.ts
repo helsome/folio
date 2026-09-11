@@ -91,6 +91,28 @@ export const agent = {
       comparison_table: 'Comparison',
     },
   },
+  citation: {
+    open: 'Open source inspector',
+    unresolved: 'Source pending or unavailable',
+  },
+  sources: {
+    title: 'Sources',
+    count: 'Sources ({{count}})',
+    empty: 'No recorded sources for this answer.',
+    stale: 'Stale',
+    verified: 'Evidence verified',
+    fallback: 'Fallback: {{from}} → {{to}}',
+    values: 'Values',
+    lineage: 'Lineage',
+    snapshot: 'Query & snapshot',
+    noEnvelope: 'No structured evidence record for this origin — only the tool call is available.',
+    kind: {
+      financial: 'Financial data ({{count}})',
+      news: 'News ({{count}})',
+      document: 'Documents ({{count}})',
+      tool: 'Other tool data ({{count}})',
+    },
+  },
   risk: {
     title: 'Portfolio risk',
     totalValue: 'Total Assets',

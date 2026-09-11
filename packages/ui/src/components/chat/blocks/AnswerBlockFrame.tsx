@@ -3,12 +3,14 @@ import { useTranslation } from 'react-i18next';
 import type { AnswerBlock } from '@finagent/core';
 import { DemoBadge } from '../../primitives/DemoBadge';
 import { formatIsoDate } from './blockFormat';
+import { useCitations } from '../citationsContext';
 
 /**
  * Common chrome for every typed answer block: optional heading, the rendered
  * body, and a provenance footer (as-of + evidence references). Evidence ids
- * carry `data-evidence-id` hooks so the #30 source inspector can attach
- * without re-plumbing the block components.
+ * carry `data-evidence-id` hooks; when the message-level citation index is
+ * available they render as numbered `[n]` chips sharing the inline-marker
+ * numbering space and deep-link into the #30 source inspector.
  */
 export const AnswerBlockFrame: React.FC<{
   block: AnswerBlock;
@@ -18,6 +20,7 @@ export const AnswerBlockFrame: React.FC<{
   children: React.ReactNode;
 }> = ({ block, streaming = false, headerAction, children }) => {
   const { t } = useTranslation();
+  const { numbers, sourceIds, onOpenSource } = useCitations();
   const evidenceIds = collectEvidenceIds(block);
   const asOf = block.type === 'time_series_chart' ? block.asOf : undefined;
   // Currency display is handled by the value formatters; only the as-of and
@@ -49,16 +52,36 @@ export const AnswerBlockFrame: React.FC<{
           {evidenceIds.length > 0 && (
             <span className="flex flex-wrap items-center gap-1">
               <span className="uppercase tracking-wide">{t('agent.blocks.evidence')}</span>
-              {evidenceIds.map((id) => (
-                <span
-                  key={id}
-                  data-evidence-id={id}
-                  title={t('agent.blocks.evidenceTip', { id })}
-                  className="rounded-[4px] bg-foreground/[0.07] px-1 py-0.5 font-mono text-[10px] text-foreground/62"
-                >
-                  {id}
-                </span>
-              ))}
+              {evidenceIds.map((id) => {
+                const known = sourceIds === null ? false : sourceIds.has(id);
+                const number = known ? numbers.get(id) : undefined;
+                const label = number !== undefined ? `[${number}]` : id;
+                const tip = number !== undefined
+                  ? t('agent.citation.open')
+                  : t('agent.blocks.evidenceTip', { id });
+                const className =
+                  'rounded-[4px] bg-foreground/[0.07] px-1 py-0.5 font-mono text-[10px] text-foreground/62'
+                  + (number !== undefined && onOpenSource ? ' transition-smooth hover:bg-accent/15 hover:text-accent' : '');
+                return onOpenSource && number !== undefined ? (
+                  <button
+                    key={id}
+                    type="button"
+                    data-evidence-id={id}
+                    title={tip}
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      onOpenSource(id);
+                    }}
+                    className={className}
+                  >
+                    {label}
+                  </button>
+                ) : (
+                  <span key={id} data-evidence-id={id} title={tip} className={className}>
+                    {label}
+                  </span>
+                );
+              })}
             </span>
           )}
         </div>
