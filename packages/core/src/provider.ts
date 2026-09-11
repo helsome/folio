@@ -119,6 +119,25 @@ export interface ProviderCoverage {
 // ── Results / Provenance / Errors ──────────────────────────────────────────
 
 /**
+ * One failed provider attempt, recorded when a fallback ultimately served a
+ * request (#25). The trail is evidence of *how* the final provider was
+ * reached — it never rewrites `providerId`, so stale/backup data can never be
+ * presented as if it came from the original source (spec §62).
+ */
+export interface ProviderFailoverStep {
+  /** The provider that failed before the final provider answered. */
+  providerId: string;
+  /** Stable machine code of that attempt's last error (`ProviderError.code`). */
+  code: string;
+  /** Classified failure kind (shared resilience layer's `FailureKind`). */
+  kind: string;
+  /** Total attempts made against this provider (1 = no retry). */
+  attempts: number;
+  /** Epoch ms when this provider was abandoned. */
+  at: number;
+}
+
+/**
  * Where data came from and how fresh it is. `providerId`/`providerName` are
  * the ACTUAL provider that answered — never faked when a fallback served the
  * request (spec §62).
@@ -136,6 +155,12 @@ export interface ProviderProvenance {
   delayed?: boolean;
   /** True when the data may be outdated relative to the market. */
   stale: boolean;
+  /**
+   * Failed providers skipped before this result was produced (#25). Absent on
+   * a first-choice success; attached only when non-empty (a fallback or a
+   * stale-cache downgrade served the call).
+   */
+  failoverTrail?: ProviderFailoverStep[];
 }
 
 /**
@@ -150,6 +175,11 @@ export interface ProviderError {
   retryable?: boolean;
   /** Listing choices when `code` is `AMBIGUOUS_INSTRUMENT`. */
   candidates?: InstrumentCandidateSummary[];
+  /**
+   * Providers attempted before this error (#25). Present only when routing
+   * actually failed over; mirrors `ProviderProvenance.failoverTrail`.
+   */
+  failoverTrail?: ProviderFailoverStep[];
 }
 
 export type ProviderResult<T> =
@@ -187,7 +217,7 @@ export interface BrokerAccount {
   id: string;
   /** User-facing label, e.g. `US Margin (D1234567)`. */
   name: string;
-  /** Primary currency of this account, e.g. `USD`. */
+  /** Primary currency of the account, e.g. `USD`. */
   currency?: string;
   region?: string;
 }
