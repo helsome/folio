@@ -143,6 +143,7 @@ export class ResearchService {
     strategyId?: StrategyId,
     locale?: SupportedLocale
   ): Promise<void> {
+    let deferredTerminalSummary: ResearchRunSummary | undefined;
     try {
       const result = await this.runner.run({
         symbol: key,
@@ -151,14 +152,25 @@ export class ResearchService {
         signal,
         locale,
         onStatus: async (summary) => {
+          if (
+            summary.reportId !== undefined &&
+            (summary.status === 'completed' || summary.status === 'partial')
+          ) {
+            deferredTerminalSummary = summary;
+            return;
+          }
           this.memory.set(runId, summary);
           await this.repository.saveRunSummary(summary);
         },
       });
-      this.memory.set(runId, result.summary);
       if (result.report) {
         await this.repository.saveReport(result.report);
+        const terminalSummary = deferredTerminalSummary ?? result.summary;
+        this.memory.set(runId, terminalSummary);
+        await this.repository.saveRunSummary(terminalSummary);
         await this.onReport?.(result.report);
+      } else {
+        this.memory.set(runId, result.summary);
       }
     } finally {
       this.active.delete(key);

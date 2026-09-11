@@ -22,14 +22,17 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-function makeService(capabilities: Array<[string, Parameters<typeof fakeCap>[1]?]>) {
+function makeService(
+  capabilities: Array<[string, Parameters<typeof fakeCap>[1]?]>,
+  repository = new ResearchReportRepository(new JsonFileStore(dir))
+) {
   const registry = createCapabilityRegistry(
     capabilities.map(([id, mode]) => fakeCap(id, mode ?? 'success'))
   );
   return new ResearchService({
     registry,
     synthesizer: new LocalResearchSynthesizer(),
-    repository: new ResearchReportRepository(new JsonFileStore(dir)),
+    repository,
     now: () => 1_700_000_000_000,
   });
 }
@@ -52,19 +55,6 @@ async function waitForTerminal(
   throw new Error(`run ${runId} did not reach a terminal status`);
 }
 
-/** The run summary goes terminal before execute() persists the report. */
-async function waitForReports(
-  service: ResearchService,
-  symbol: string
-): Promise<ResearchReport[]> {
-  for (let i = 0; i < 100; i += 1) {
-    const reports = await service.listReports(symbol);
-    if (reports.length > 0) return reports;
-    await new Promise((resolve) => setTimeout(resolve, 5));
-  }
-  throw new Error(`no report persisted for ${symbol}`);
-}
-
 describe('ResearchService', () => {
   it('runs a report end-to-end and persists it', async () => {
     const service = makeService(RESEARCH_CAPABILITY_PLAN.map((id) => [id, 'success' as const]));
@@ -80,9 +70,41 @@ describe('ResearchService', () => {
     expect(run?.reportId).toBeDefined();
     expect(run?.completedCapabilities).toHaveLength(RESEARCH_CAPABILITY_PLAN.length);
 
-    const reports = await waitForReports(service, 'NVDA.US');
+    const report = await service.getReport(run!.reportId!);
+    expect(report?.symbol).toBe('NVDA.US');
+    const reports = await service.listReports('NVDA.US');
     expect(reports).toHaveLength(1);
     expect(reports[0].symbol).toBe('NVDA.US');
+  });
+
+  it('does not expose a terminal status until the report is persisted', async () => {
+    const repository = new ResearchReportRepository(new JsonFileStore(dir));
+    const persist = repository.saveReport.bind(repository);
+    let reportWriteStarted!: () => void;
+    const started = new Promise<void>((resolve) => {
+      reportWriteStarted = resolve;
+    });
+    let allowReportWrite!: () => void;
+    const blocked = new Promise<void>((resolve) => {
+      allowReportWrite = resolve;
+    });
+    repository.saveReport = async (report: ResearchReport) => {
+      reportWriteStarted();
+      await blocked;
+      await persist(report);
+    };
+    const service = makeService([['company.profile', 'success']], repository);
+
+    const queued = await service.start('NVDA.US');
+    await started;
+
+    expect((await service.getRun(queued.id))?.status).toBe('synthesizing');
+
+    allowReportWrite();
+    expect(await waitForTerminal(service, queued.id)).toBe('partial');
+    const terminal = await service.getRun(queued.id);
+    expect(terminal?.reportId).toBeDefined();
+    expect(await service.getReport(terminal!.reportId!)).toBeDefined();
   });
 
   it('rejects a second start for the same symbol while a run is active', async () => {
@@ -135,7 +157,10 @@ describe('ResearchService', () => {
 
     expect(await waitForTerminal(service, queued.id)).toBe('completed');
 
-    const reports = await waitForReports(service, 'NVDA.US');
+    const run = await service.getRun(queued.id);
+    const report = await service.getReport(run!.reportId!);
+    expect(report?.strategyId).toBe('value');
+    const reports = await service.listReports('NVDA.US');
     expect(reports).toHaveLength(1);
     expect(reports[0].strategyId).toBe('value');
   });
