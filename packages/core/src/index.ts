@@ -551,6 +551,8 @@ export * from './portfolio-risk.ts';
 export * from './provider.ts';
 export * from './account.ts';
 export * from './market-data.ts';
+export * from './financial-fact.ts';
+export * from './financial-fact-factories.ts';
 export * from './screening.ts';
 export * from './strategy.ts';
 export * from './research-diff.ts';

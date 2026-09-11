@@ -1,4 +1,5 @@
 import type { TSchema } from '@sinclair/typebox';
+import type { FinancialFact } from './financial-fact.ts';
 
 /**
  * Finance Capability domain — the single source of truth for every piece of
@@ -47,6 +48,12 @@ export interface CapabilityResult<T> {
   data: T;
   provenance: CapabilityProvenance;
   summary?: string;
+  /**
+   * Unified `FinancialFact` envelope for the result's key values (issue #24).
+   * Optional for backward compatibility; market-data capabilities SHOULD attach
+   * it so the Agent/UI can answer "what time, what currency, what basis".
+   */
+  facts?: FinancialFact[];
 }
 
 export type CapabilityRunStatus = 'success' | 'failed' | 'unavailable' | 'cancelled';

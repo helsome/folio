@@ -1,5 +1,12 @@
 import { Type } from '@sinclair/typebox';
-import type { AccountAssets, CashFlowRecord, FinanceCapability, Holding } from '@finagent/core';
+import type {
+  AccountAssets,
+  CashFlowRecord,
+  FinanceCapability,
+  FinancialFact,
+  Holding,
+} from '@finagent/core';
+import { factsToSummary, financialReportToFacts } from '@finagent/core';
 import type {
   CalendarEvent,
   CapitalFlow,
@@ -186,10 +193,16 @@ export function createCompanyFinancialsCapability(
         input.kind ?? 'ALL',
         input.report
       );
+      const fetchedAt = (ctx?.now ?? Date.now)();
+      const facts = financialReportToFacts(report, {
+        provider: 'longbridge',
+        retrievedAt: Math.floor(fetchedAt / 1000),
+      });
       return {
         data: report,
-        provenance: { provider: 'longbridge', fetchedAt: (ctx?.now ?? Date.now)(), stale: false },
-        summary: `Financial statements for ${symbol}: ${formatStatementNames(report.statements)}.`,
+        facts,
+        provenance: { provider: 'longbridge', fetchedAt, stale: false },
+        summary: formatFinancialsSummary(symbol, report, facts),
       };
     },
   });
@@ -474,4 +487,17 @@ function formatStatementNames(
 ): string {
   const names = Object.keys(statements);
   return names.length > 0 ? names.join(', ') : 'none';
+}
+
+function formatFinancialsSummary(
+  symbol: string,
+  report: FinancialReport,
+  facts: FinancialFact[]
+): string {
+  const names = formatStatementNames(report.statements);
+  const sample = factsToSummary(facts, 6);
+  return [
+    `Financial statements for ${symbol}: ${names} (${facts.length} fact values).`,
+    sample,
+  ].join('\n');
 }
