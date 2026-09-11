@@ -140,6 +140,19 @@ export interface Message {
 
 export type RunStatus = 'running' | 'completed' | 'failed' | 'cancelled';
 
+/**
+ * Why a run stopped. `completed` is the only success value: a run cut short by a
+ * budget or a runaway loop is not an ordinary answer, so telemetry, evaluation
+ * and the UI branch on this instead of treating every terminal run as success.
+ */
+export type StopReason =
+  | 'completed'
+  | 'budget_exhausted'
+  | 'loop_detected'
+  | 'retry_storm'
+  | 'cancelled'
+  | 'error';
+
 /** One agent execution inside a session. */
 export interface Run {
   id: string;
@@ -150,6 +163,10 @@ export interface Run {
   completedAt?: number;
   answer?: string;
   error?: ApiError;
+  /** Machine-readable reason the run stopped; absent on records written before #17. */
+  stopReason?: StopReason;
+  /** The numbers behind a non-success stop (which budget ran out, which loop fired). */
+  stopDetail?: Record<string, unknown>;
 }
 
 /** Live tool call state, streamed through agent events. */

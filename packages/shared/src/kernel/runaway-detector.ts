@@ -172,6 +172,18 @@ function wildcardToRegExp(pattern: string): RegExp {
 }
 
 /**
+ * Whether a tool name matches one `*`-wildcard pattern. Exported because the
+ * runtime uses the same matching to decide which tool calls carry a search
+ * query, so both sides agree on what "the same tool scope" means.
+ * @param pattern - a tool-name pattern.
+ * @param tool - the tool name to test.
+ * @returns true when the name matches.
+ */
+export function toolPatternMatches(pattern: string, tool: string): boolean {
+  return wildcardToRegExp(pattern).test(tool);
+}
+
+/**
  * Whether a tool participates in loop detection. Untracked tools are
  * transparent: they neither count nor reset the chain, so polling through an
  * excluded tool cannot hide a loop on a tracked one.

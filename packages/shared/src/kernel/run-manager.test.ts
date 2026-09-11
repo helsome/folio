@@ -16,7 +16,7 @@ import { MessageRepository } from '../storage/message-repository.ts';
 import { RunRepository } from '../storage/run-repository.ts';
 import { SessionRepository } from '../storage/session-repository.ts';
 import { SessionManager } from './session-manager.ts';
-import { RunManager } from './run-manager.ts';
+import { RunManager, type RunManagerOptions } from './run-manager.ts';
 
 let dir = '';
 let clock = 1000;
@@ -30,7 +30,10 @@ afterEach(async () => {
   await rm(dir, { recursive: true, force: true });
 });
 
-function makeKernel(script: (input: AgentRunInput) => AsyncIterable<AgentEvent>) {
+function makeKernel(
+  script: (input: AgentRunInput) => AsyncIterable<AgentEvent>,
+  extra: Partial<Omit<RunManagerOptions, 'sessions' | 'runs' | 'runtime' | 'now'>> = {}
+) {
   const runtime = new ScriptedRuntime(script);
   const store = new JsonFileStore(dir);
   const sessions = new SessionManager({
@@ -45,6 +48,7 @@ function makeKernel(script: (input: AgentRunInput) => AsyncIterable<AgentEvent>)
     runs: new RunRepository(store),
     runtime,
     now: () => clock,
+    ...extra,
   });
   return { runtime, sessions, runs, store };
 }
@@ -279,6 +283,159 @@ describe('RunManager', () => {
     await expect(runs.startRun('missing', 'hello')).rejects.toMatchObject({
       code: 'SESSION_NOT_FOUND',
     });
+  });
+});
+
+describe('RunManager budgets and runaway detection (#17)', () => {
+  const toolEvent = (
+    input: AgentRunInput,
+    toolName: string,
+    args: Record<string, unknown>,
+    sequence: number
+  ) =>
+    event(
+      input.sessionId,
+      input.runId,
+      'tool_completed',
+      {
+        toolCall: {
+          id: `t${sequence}`,
+          toolName,
+          args,
+          startedAt: clock,
+          completedAt: clock,
+          status: 'success',
+          result: {},
+        },
+      },
+      sequence
+    );
+
+  it('stops a run that exceeds its model-call budget and keeps the partial answer', async () => {
+    const { sessions, runs, runtime } = makeKernel(
+      async function* (input) {
+        yield event(input.sessionId, input.runId, 'message_completed', { answer: 'partial one' }, 1);
+        yield event(input.sessionId, input.runId, 'message_completed', { answer: 'partial two' }, 2);
+        yield event(input.sessionId, input.runId, 'run_completed', { answer: 'finished', toolCalls: [] }, 3);
+      },
+      { budgets: { defaults: { modelCalls: 2 } } }
+    );
+    const session = await sessions.createSession('Budget');
+
+    const run = await runs.startRun(session.id, 'long task');
+    await waitFor(async () => !runs.isRunning());
+
+    expect(runtime.cancelCalls).toEqual([{ sessionId: session.id, runId: run.id }]);
+    const persisted = await sessions.getRun(session.id, run.id);
+    expect(persisted).toMatchObject({
+      status: 'cancelled',
+      answer: 'partial two',
+      stopReason: 'budget_exhausted',
+      stopDetail: { key: 'modelCalls', limit: 2, used: 2 },
+    });
+    const messages = await sessions.listMessages(session.id);
+    expect(messages[1]).toMatchObject({ role: 'assistant', content: 'partial two' });
+  });
+
+  it('lets a run tighten its own budget but clamps it to the system ceiling', async () => {
+    const script = async function* (input: AgentRunInput) {
+      yield event(input.sessionId, input.runId, 'message_completed', { answer: 'one' }, 1);
+      yield event(input.sessionId, input.runId, 'run_completed', { answer: 'one', toolCalls: [] }, 2);
+    };
+    const { sessions, runs, runtime } = makeKernel(script, {
+      budgets: { defaults: { modelCalls: 10 }, ceiling: { modelCalls: 5 } },
+    });
+    const session = await sessions.createSession('Override');
+
+    const tightened = await runs.startRun(session.id, 'q', undefined, undefined, { modelCalls: 1 });
+    await waitFor(async () => !runs.isRunning());
+    expect(runtime.cancelCalls).toEqual([{ sessionId: session.id, runId: tightened.id }]);
+    expect(await sessions.getRun(session.id, tightened.id)).toMatchObject({
+      stopReason: 'budget_exhausted',
+      stopDetail: { key: 'modelCalls', limit: 1, used: 1 },
+    });
+
+    const clamped = await runs.startRun(session.id, 'q', undefined, undefined, { modelCalls: 100 });
+    await waitFor(async () => !runs.isRunning());
+    expect(runtime.cancelCalls).toHaveLength(1);
+    expect(await sessions.getRun(session.id, clamped.id)).toMatchObject({ status: 'completed' });
+  });
+
+  it('stops on a repeated identical tool call and reports loop_detected', async () => {
+    const { sessions, runs, runtime } = makeKernel(
+      async function* (input) {
+        for (let i = 1; i <= 3; i += 1) {
+          yield toolEvent(input, 'get_quote', { symbol: 'AAPL.US' }, i);
+        }
+        yield event(input.sessionId, input.runId, 'run_completed', { answer: 'done', toolCalls: [] }, 9);
+      },
+      { runaway: { repeatedToolCallThreshold: 2 } }
+    );
+    const session = await sessions.createSession('Loop');
+
+    const run = await runs.startRun(session.id, 'q');
+    await waitFor(async () => !runs.isRunning());
+
+    expect(runtime.cancelCalls).toHaveLength(1);
+    const persisted = await sessions.getRun(session.id, run.id);
+    expect(persisted).toMatchObject({ status: 'cancelled', stopReason: 'loop_detected' });
+    expect(persisted?.stopDetail).toMatchObject({
+      signal: 'repeated_tool_call',
+      tool: 'get_quote',
+      count: 2,
+    });
+  });
+
+  it('stops on a repeated search query once search tools are configured', async () => {
+    const { sessions, runs } = makeKernel(
+      async function* (input) {
+        yield toolEvent(input, 'web_search', { query: 'nvidia earnings 2026' }, 1);
+        yield toolEvent(input, 'web_search', { query: 'nvidia earnings 2026 q2' }, 2);
+        yield event(input.sessionId, input.runId, 'run_completed', { answer: 'done', toolCalls: [] }, 9);
+      },
+      { searchTools: ['web_search*'], runaway: { repeatedSearchQueryThreshold: 2 } }
+    );
+    const session = await sessions.createSession('Search');
+
+    const run = await runs.startRun(session.id, 'q');
+    await waitFor(async () => !runs.isRunning());
+
+    const persisted = await sessions.getRun(session.id, run.id);
+    expect(persisted).toMatchObject({ stopReason: 'loop_detected' });
+    expect(persisted?.stopDetail).toMatchObject({ signal: 'repeated_search_query', count: 2 });
+  });
+
+  it('stops on the wall-clock budget measured with the injected clock', async () => {
+    const { sessions, runs } = makeKernel(
+      async function* (input) {
+        clock += 5_000;
+        yield event(input.sessionId, input.runId, 'message_completed', { answer: 'slow step' }, 1);
+        yield event(input.sessionId, input.runId, 'run_completed', { answer: 'done', toolCalls: [] }, 2);
+      },
+      { budgets: { defaults: { wallClockMs: 1_000 } } }
+    );
+    const session = await sessions.createSession('Clock');
+
+    const run = await runs.startRun(session.id, 'q');
+    await waitFor(async () => !runs.isRunning());
+
+    expect(await sessions.getRun(session.id, run.id)).toMatchObject({
+      stopReason: 'budget_exhausted',
+      stopDetail: { key: 'wallClockMs', limit: 1_000, used: 5_000 },
+    });
+  });
+
+  it('leaves a run untouched when neither budgets nor detectors are configured', async () => {
+    const { sessions, runs, runtime } = makeKernel(completedScript('Answer'));
+    const session = await sessions.createSession('Plain');
+
+    const run = await runs.startRun(session.id, 'q');
+    await waitFor(async () => !runs.isRunning());
+
+    expect(runtime.cancelCalls).toEqual([]);
+    const persisted = await sessions.getRun(session.id, run.id);
+    expect(persisted).toMatchObject({ status: 'completed', answer: 'Answer' });
+    expect(persisted?.stopReason).toBeUndefined();
   });
 });
 

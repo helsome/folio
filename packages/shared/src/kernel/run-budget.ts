@@ -8,6 +8,8 @@
  * instead of reporting it as an ordinary success.
  */
 
+import type { StopReason } from '@finagent/core';
+
 /** Every dimension a run budget can constrain. */
 export type BudgetKey =
   | 'wallClockMs'
@@ -54,16 +56,11 @@ export interface BudgetExhaustion {
 }
 
 /**
- * Why a run stopped. Machine-readable so traces, run summaries and evaluation
- * can branch on it; `completed` is the only success value.
+ * Why a run stopped. Owned by the core protocol because the UI, telemetry and
+ * evaluation read it off the persisted run record; re-exported here so callers
+ * that only work with budgets keep importing it from one place.
  */
-export type StopReason =
-  | 'completed'
-  | 'budget_exhausted'
-  | 'loop_detected'
-  | 'retry_storm'
-  | 'cancelled'
-  | 'error';
+export type { StopReason };
 
 /** A run outcome paired with the detail behind a non-success reason. */
 export interface RunStop {

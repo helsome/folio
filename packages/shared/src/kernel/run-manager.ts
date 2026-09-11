@@ -15,18 +15,56 @@ import type {
 import type { RunRepository } from '../storage/index.ts';
 import type { SessionManager } from './session-manager.ts';
 import { createCodeError, isRuntimeInfraCode, toApiError } from '../agent/errors.ts';
+import {
+  addUsage,
+  budgetStop,
+  checkBudget,
+  createUsage,
+  resolveBudget,
+  type ResolveBudgetInput,
+  type RunBudgetLimits,
+  type RunBudgetUsage,
+  type RunStop,
+} from './run-budget.ts';
+import {
+  createRunawayState,
+  observeSearchQuery,
+  observeToolCall,
+  runawayStop,
+  toolPatternMatches,
+  type RunawayPolicy,
+  type RunawayState,
+} from './runaway-detector.ts';
 
 export interface RunManagerOptions {
   sessions: SessionManager;
   runs: RunRepository;
   runtime: AgentRuntime;
   now?: () => number;
+  /**
+   * Budget defaults and the system ceiling applied to every run (#17). A run
+   * may override the defaults but never the ceiling; with no `budgets` option a
+   * run is unbudgeted and behaves exactly as before.
+   */
+  budgets?: ResolveBudgetInput;
+  /** Tool-name patterns (`*` wildcard) whose `query` argument feeds the search-loop detector. */
+  searchTools?: string[];
+  /** Runaway detector thresholds; unset fields fall back to `defaultRunawayPolicy()`. */
+  runaway?: Partial<RunawayPolicy>;
 }
 
 interface ActiveRun {
   sessionId: string;
   runId: string;
   cancelRequested: boolean;
+  /** When the run started, for the wall-clock budget. */
+  startedAt: number;
+  /** Effective limits for this run, after defaults, overrides and the ceiling. */
+  limits: RunBudgetLimits;
+  usage: RunBudgetUsage;
+  runaway: RunawayState;
+  /** Set when a budget or a runaway detector stopped the run. */
+  stop?: RunStop;
 }
 
 /**
@@ -43,6 +81,9 @@ export class RunManager {
   private readonly runs: RunRepository;
   private readonly runtime: AgentRuntime;
   private readonly now: () => number;
+  private readonly budgetInput: ResolveBudgetInput;
+  private readonly searchToolPatterns: readonly string[];
+  private readonly runawayPolicy: Partial<RunawayPolicy>;
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private activeRun: ActiveRun | null = null;
 
@@ -51,6 +92,9 @@ export class RunManager {
     this.runs = options.runs;
     this.runtime = options.runtime;
     this.now = options.now ?? Date.now;
+    this.budgetInput = options.budgets ?? {};
+    this.searchToolPatterns = options.searchTools ?? [];
+    this.runawayPolicy = options.runaway ?? {};
   }
 
   subscribe(listener: (event: AgentEvent) => void): () => void {
@@ -68,11 +112,21 @@ export class RunManager {
     return this.activeRun?.sessionId === sessionId;
   }
 
+  /**
+   * Start a run and drive it to a terminal state.
+   * @param sessionId - the session the run belongs to.
+   * @param content - the user message.
+   * @param workspaceContext - optional workspace context for the runtime.
+   * @param locale - optional UI locale.
+   * @param budgetOverrides - per-run budget overrides, clamped by the system ceiling.
+   * @returns the persisted running run.
+   */
   async startRun(
     sessionId: string,
     content: string,
     workspaceContext?: WorkspaceContext,
-    locale?: SupportedLocale
+    locale?: SupportedLocale,
+    budgetOverrides?: RunBudgetLimits
   ): Promise<Run> {
     const text = content.trim();
     if (!text) {
@@ -109,7 +163,20 @@ export class RunManager {
     await this.sessions.appendMessage(sessionId, userMessage);
     await this.sessions.updateSession(sessionId, { status: 'running' });
 
-    this.activeRun = { sessionId, runId: run.id, cancelRequested: false };
+    const { limits } = resolveBudget({
+      defaults: this.budgetInput.defaults,
+      ceiling: this.budgetInput.ceiling,
+      overrides: budgetOverrides,
+    });
+    this.activeRun = {
+      sessionId,
+      runId: run.id,
+      cancelRequested: false,
+      startedAt: now,
+      limits,
+      usage: createUsage(),
+      runaway: createRunawayState(),
+    };
     this.emit({
       id: randomUUID(),
       sessionId,
@@ -172,6 +239,10 @@ export class RunManager {
           answer = event.payload.answer;
           sawTerminal = true;
         }
+
+        // Budgets and detectors are evaluated after the event is accounted for,
+        // so a run that stops keeps the evidence it had already produced.
+        if (await this.applyBudget(event)) break;
       }
     } catch (error) {
       failure = toApiError(error);
@@ -179,6 +250,11 @@ export class RunManager {
 
     const active = this.activeRun;
     const cancelRequested = active?.cancelRequested ?? false;
+    const stop = active?.stop;
+    if (stop !== undefined) {
+      run.stopReason = stop.stopReason;
+      run.stopDetail = stop.detail;
+    }
 
     const now = this.now();
     const cancelled = Boolean(cancelRequested || (failure && failure.code === 'RUN_CANCELLED'));
@@ -225,7 +301,9 @@ export class RunManager {
     // stream failed before producing one (e.g. runtime spawn failure), so the
     // UI always observes a terminal event.
     if (!sawTerminal) {
-      if (cancelled) {
+      if (stop !== undefined) {
+        this.emitRunEvent(run, 'run_failed', { error: stopError(stop) });
+      } else if (cancelled) {
         this.emitRunEvent(run, 'run_failed', {
           error: { code: 'RUN_CANCELLED', message: 'Run cancelled by user.' },
         });
@@ -235,6 +313,71 @@ export class RunManager {
         this.emitRunEvent(run, 'run_completed', { answer, toolCalls });
       }
     }
+  }
+
+  /**
+   * Account for one runtime event and decide whether the run must stop. A stop
+   * requests cancellation, so the caller stops consuming events and the run
+   * settles as `cancelled` — never as an ordinary success — carrying its partial
+   * answer, its tool calls and the machine-readable reason it stopped.
+   * @param event - the event that was just broadcast.
+   * @returns true when the run was stopped and cancellation was requested.
+   */
+  private async applyBudget(event: AgentEvent): Promise<boolean> {
+    const active = this.activeRun;
+    if (!active) return false;
+
+    let usage = active.usage;
+    if (event.type === 'message_completed') usage = addUsage(usage, { modelCalls: 1 });
+    if (event.type === 'tool_completed') usage = addUsage(usage, { toolCalls: 1 });
+
+    const searchQuery =
+      event.type === 'tool_completed' ? this.searchQueryOf(event.payload.toolCall) : undefined;
+    if (searchQuery !== undefined) usage = addUsage(usage, { searchIterations: 1 });
+
+    // Wall-clock is absolute: recomputed from the run's start on every event.
+    active.usage = { ...usage, wallClockMs: this.now() - active.startedAt };
+
+    let stop: RunStop | undefined;
+    const exhaustion = checkBudget(active.limits, active.usage);
+    if (exhaustion !== undefined) {
+      stop = budgetStop(exhaustion);
+    } else if (event.type === 'tool_completed') {
+      const call = observeToolCall(
+        active.runaway,
+        { tool: event.payload.toolCall.toolName, args: event.payload.toolCall.args },
+        this.runawayPolicy
+      );
+      active.runaway = call.state;
+      if (call.detection.detected) stop = runawayStop(call.detection);
+    }
+
+    if (stop === undefined && searchQuery !== undefined) {
+      const search = observeSearchQuery(active.runaway, searchQuery, this.runawayPolicy);
+      active.runaway = search.state;
+      if (search.detection.detected) stop = runawayStop(search.detection);
+    }
+
+    if (stop === undefined) return false;
+
+    active.stop = stop;
+    active.cancelRequested = true;
+    await this.runtime.cancel({ sessionId: active.sessionId, runId: active.runId });
+    return true;
+  }
+
+  /**
+   * The query a search-tool call carries, when this run tracks search loops.
+   * @param toolCall - the completed tool call.
+   * @returns the query text, or undefined when the call is not a tracked search.
+   */
+  private searchQueryOf(toolCall: ToolCall): string | undefined {
+    if (this.searchToolPatterns.length === 0) return undefined;
+    if (!this.searchToolPatterns.some((pattern) => toolPatternMatches(pattern, toolCall.toolName))) {
+      return undefined;
+    }
+    const query = toolCall.args.query ?? toolCall.args.q;
+    return typeof query === 'string' && query.trim() !== '' ? query : undefined;
   }
 
   private emitRunEvent(run: Run, type: AgentEvent['type'], payload?: AgentEventPayload): void {
@@ -256,6 +399,24 @@ export class RunManager {
       listener(event);
     }
   }
+}
+
+/**
+ * The error a budget or runaway stop reports to the UI. The code is stable so
+ * the renderer can tell a budget stop from a user cancel, and the detail keeps
+ * the numbers (which budget, which loop) attached to the message.
+ * @param stop - the stop recorded on the run.
+ * @returns an ApiError describing why the run stopped.
+ */
+function stopError(stop: RunStop): ApiError {
+  const code =
+    stop.stopReason === 'budget_exhausted'
+      ? 'BUDGET_EXHAUSTED'
+      : stop.stopReason === 'retry_storm'
+        ? 'RETRY_STORM'
+        : 'LOOP_DETECTED';
+  const detail = stop.detail === undefined ? '' : ` ${JSON.stringify(stop.detail)}`;
+  return { code, message: `Run stopped: ${stop.stopReason}.${detail}` };
 }
 
 function toRecord(toolCall: ToolCall): ToolCallRecord {
