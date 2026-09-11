@@ -118,6 +118,7 @@ export async function loadResearchReport(reportId: string): Promise<ResearchRepo
 
 /** Terminal statuses — a run in one of these stops progress polling. */
 export const TERMINAL_RUN_STATUSES: Partial<Record<ResearchRunStatus, true>> = {
+  interrupted: true,
   completed: true,
   partial: true,
   failed: true,

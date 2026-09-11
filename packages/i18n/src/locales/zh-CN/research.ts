@@ -62,6 +62,8 @@ export const research = {
   failedCount: '({{failed}} 项失败)',
   empty: '暂无研究。选择一个标的并开始深度研究。',
   runStatus: {
+    interrupted: '已中断',
+    recovering: '恢复中',
     queued: '排队中',
     fetching: '获取中',
     synthesizing: '合成中',
@@ -71,6 +73,13 @@ export const research = {
     cancelled: '已取消',
   },
   reportFor: '{{symbol}} · 研究报告',
+  recovery: {
+    title: '{{symbol}} · 研究任务需要处理',
+    saved: '已保存 {{count}} 项完成结果，继续研究将保留原有证据。',
+    resume: '继续研究',
+    restart: '从头重跑',
+    discard: '丢弃任务',
+  },
   confidence: '置信度',
   partialRun: '部分运行 — 不可用的数据已明确标注。',
   allCompleted: '所有计划中的能力均已完成。',

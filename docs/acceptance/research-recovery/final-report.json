@@ -1,0 +1,185 @@
+{
+  "id": "report-research-1de3f102-13b4-4261-810e-93e5bff7abde",
+  "symbol": "NVDA.US",
+  "generatedAt": 1789121517226,
+  "locale": "en-US",
+  "summary": "Only the research.news capability returned data (43 live Longbridge articles, with 10 saved). All other planned sections are unavailable, so no market, valuation, financial, earnings, ratings, capital-flow or portfolio evidence exists in the saved facts. The news set is net constructive: NVIDIA leads the IC design industry with 99% revenue growth and 64% share of the top-ten total, shows 105.85% revenue growth with 28.12% ROE and a low 0.17 debt-to-equity ratio, trades at a P/E of 27.61 below industry average, and GPU economics are supported by strong rental rates and resale premiums. Offsetting this are institutional trimming, insider selling, DOJ antitrust scrutiny over Groq licensing, Michael Burry's bearish options positioning (partially unwound), and a competitive/rotation hit to chip stocks. Stance is therefore modestly bullish on news-only evidence, with low confidence because nine of ten planned keys are missing.",
+  "stance": "bullish",
+  "confidence": 0.42,
+  "sections": [
+    {
+      "key": "company.profile",
+      "title": "Company Profile",
+      "verdict": "unavailable",
+      "summary": "No company profile data was saved; nothing can be stated about business description, segment mix, or corporate structure beyond incidental news references.",
+      "evidence": []
+    },
+    {
+      "key": "market.quote",
+      "title": "Market Quote",
+      "verdict": "unavailable",
+      "summary": "No live quote, price, or change data was saved. Directional price moves are only mentioned qualitatively inside news articles and cannot be treated as quotes.",
+      "evidence": []
+    },
+    {
+      "key": "market.kline",
+      "title": "Price History (K-Line)",
+      "verdict": "unavailable",
+      "summary": "No candlestick or historical price series was saved, so trend, momentum, and support/resistance cannot be assessed.",
+      "evidence": []
+    },
+    {
+      "key": "company.valuation",
+      "title": "Valuation",
+      "verdict": "unavailable",
+      "summary": "No valuation capability data was saved. One news article cites a P/E of 27.61 (below the industry average) but flags higher P/B and P/S as possible overvaluation; this is third-party news content, not a valuation dataset.",
+      "evidence": []
+    },
+    {
+      "key": "company.financials",
+      "title": "Financials",
+      "verdict": "unavailable",
+      "summary": "No financial statements were saved. News mentions $96.2B quarterly revenue (+106% YoY), $72.86B EBITDA, 105.85% revenue growth, 28.12% ROE, and 0.17 debt-to-equity, but these figures are unaudited news references and are not confirmed by a financials capability.",
+      "evidence": []
+    },
+    {
+      "key": "company.earnings",
+      "title": "Earnings",
+      "verdict": "unavailable",
+      "summary": "No earnings calendar, surprise history, or guidance data was saved. News refers to a strong last quarterly report and conference call, but no earnings dataset is present.",
+      "evidence": []
+    },
+    {
+      "key": "company.ratings",
+      "title": "Analyst Ratings",
+      "verdict": "unavailable",
+      "summary": "No ratings capability data was saved. News cites a consensus 'Buy' and an average target of $324.34, but this is news-sourced and not a verified ratings dataset.",
+      "evidence": []
+    },
+    {
+      "key": "research.news",
+      "title": "News Flow",
+      "verdict": "positive",
+      "summary": "43 live articles were retrieved and 10 saved. Positives dominate: NVIDIA ranks first among top-ten IC design companies with 99% revenue growth and 64% of the group total; GPU rental rates rose 22% MoM; Oracle's CEO confirmed four-year-old GPUs resell at a 20% premium with 97.9% utilization; some institutions (Drive Wealth, Longfellow) increased positions. Negatives: Franchise GP cut its stake 69.8%, insiders Stevens and Teter sold shares, the DOJ is investigating Groq licensing, chip stocks including NVDA fell over 2% in one premarket session, and Michael Burry closed December 2026 NVDA puts while retaining 2027 puts.",
+      "evidence": [
+        {
+          "capabilityId": "research.news",
+          "runId": "run-research.news-1789121493368-1",
+          "claim": "43 live articles were retrieved and 10 saved. Positives dominate: NVIDIA ranks first among top-ten IC design companies with 99% revenue growth and 64% of the group total; GPU rental rates rose 22% MoM; Oracle's CEO confirmed four-year-old GPUs resell at a 20% premium with 97.9% utilization; some institutions (Drive Wealth, Longfellow) increased positions. Negatives: Franchise GP cut its stake 69.8%, insiders Stevens and Teter sold shares, the DOJ is investigating Groq licensing, chip stocks including NVDA fell over 2% in one premarket session, and Michael Burry closed December 2026 NVDA puts while retaining 2027 puts.",
+          "fetchedAt": 1789121506494,
+          "summary": "Retrieved 43 live Longbridge news articles"
+        }
+      ]
+    },
+    {
+      "key": "market.capitalFlow",
+      "title": "Capital Flow",
+      "verdict": "unavailable",
+      "summary": "No capital-flow data was saved. Only news-level references to institutional buying and selling and insider transactions are available, which are not a substitute for flow data.",
+      "evidence": []
+    },
+    {
+      "key": "portfolio.positions",
+      "title": "Portfolio Positions",
+      "verdict": "unavailable",
+      "summary": "No portfolio or position data was saved, so exposure, sizing, and P&L context cannot be evaluated.",
+      "evidence": []
+    }
+  ],
+  "bullCase": [
+    "NVIDIA ranks first among the world's top-ten IC design companies with 99% revenue growth and 64% of the group's total revenue, per TrendForce data cited in the news.",
+    "Reported fundamentals cited in news are strong: $96.2B quarterly revenue (+106% YoY), $72.86B EBITDA, 105.85% revenue growth, 28.12% ROE, and a conservative 0.17 debt-to-equity ratio.",
+    "News cites a P/E of 27.61, below the semiconductor industry average, suggesting relative valuation support versus peers.",
+    "GPU economics look durable: 22% MoM rise in rental rates, Oracle reporting 97.9% GPU utilization, and four-year-old GPUs reselling at a 20% premium.",
+    "Several institutions increased NVDA stakes in Q2 (Drive Wealth +5.6% to $20.7M; Longfellow also added), and news notes a consensus 'Buy' with an average target of $324.34.",
+    "CEO and management commentary signals continued momentum from the last quarter and conference call."
+  ],
+  "bearCase": [
+    "Institutional trimming: Franchise GP Ltd cut its NVIDIA position by 69.8% in Q2, leaving 98,619 shares valued at $19.7M.",
+    "Insider selling: EVP Timothy Teter and Director Mark Stevens sold significant shares in June and August under pre-arranged plans.",
+    "Regulatory overhang: DOJ antitrust investigations into Groq licensing are cited as a sentiment headwind.",
+    "Michael Burry closed December 2026 NVDA put options but continues to hold 2027 puts and other tech shorts, keeping a high-profile bear thesis alive.",
+    "Competitive and sector pressure: chip stocks, including NVDA (-2%) and INTC (-5%), sold off in one premarket session as Oracle's capex pushed free cash flow to -$5B, hinting at AI infrastructure spending strain.",
+    "Rising P/B and P/S ratios cited as possible overvaluation, and broad macroeconomic pressures are noted."
+  ],
+  "catalysts": [
+    "Continued AI demand and Microsoft data center expansion referenced in news.",
+    "Sustained GPU rental rate increases (22% MoM) and high utilization (97.9% at Oracle) supporting pricing power.",
+    "Strong resale/renewal economics for older GPUs (20% premium on four-year-old units).",
+    "NVIDIA's dominant 64% share of top-ten IC design revenue and 99% growth versus peers.",
+    "Potential resolution or clarity on the DOJ Groq-licensing investigation.",
+    "Analyst target revisions around the cited $324.34 consensus average."
+  ],
+  "risks": [
+    "Nine of ten planned data capabilities are unavailable, so conclusions rest on news alone and may be incomplete or stale.",
+    "No verified price, valuation, financial, earnings, ratings, or capital-flow data to confirm or refute the news narrative.",
+    "Institutional and insider selling signals possible distribution or reduced conviction.",
+    "DOJ antitrust scrutiny into Groq licensing may expand into broader regulatory risk.",
+    "High-profile bearish positioning (Burry's 2027 puts) and negative chip-sector sentiment could weigh on shares.",
+    "AI infrastructure capex concerns (Oracle FCF of -$5B) could pressure the semiconductor complex if spending normalizes.",
+    "Elevated P/B and P/S ratios leave the stock exposed to multiple compression if growth decelerates."
+  ],
+  "capabilityRuns": [
+    {
+      "runId": "missing:company.profile",
+      "capabilityId": "company.profile",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:market.quote",
+      "capabilityId": "market.quote",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:market.kline",
+      "capabilityId": "market.kline",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:company.valuation",
+      "capabilityId": "company.valuation",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:company.financials",
+      "capabilityId": "company.financials",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:company.earnings",
+      "capabilityId": "company.earnings",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:company.ratings",
+      "capabilityId": "company.ratings",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "run-research.news-1789121493368-1",
+      "capabilityId": "research.news",
+      "status": "success",
+      "fetchedAt": 1789121506494
+    },
+    {
+      "runId": "missing:market.capitalFlow",
+      "capabilityId": "market.capitalFlow",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:portfolio.positions",
+      "capabilityId": "portfolio.positions",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    }
+  ],
+  "runStatus": "partial"
+}

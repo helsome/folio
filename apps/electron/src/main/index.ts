@@ -21,6 +21,13 @@ if (process.env.FINAGENT_USER_DATA_DIR) {
 loadFinagentEnv({
   roots: [runtimeRoot, appRoot],
 });
+// Only one main process may reconcile/write checkpoints in a userData profile.
+if (!app.requestSingleInstanceLock()) app.exit(0);
+app.on('second-instance', () => {
+  if (process.env.FINAGENT_E2E_HIDDEN === '1') return;
+  if (mainWindow?.isMinimized()) mainWindow.restore();
+  mainWindow?.focus();
+});
 const agentKernelHost = new AgentKernelHost();
 registerAboutIpc();
 const isDev = !app.isPackaged;
@@ -183,6 +190,16 @@ ipcMain.handle('research:cancel', async (_event, input: unknown) =>
 
 ipcMain.handle('research:listRuns', async () =>
   toIpcResult(() => agentKernelHost.researchListRuns())
+);
+
+ipcMain.handle('research:resume', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.researchResume(input))
+);
+ipcMain.handle('research:restart', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.researchRestart(input))
+);
+ipcMain.handle('research:discard', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.researchDiscard(input))
 );
 
 ipcMain.handle('research:getRun', async (_event, input: unknown) =>

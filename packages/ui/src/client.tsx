@@ -226,6 +226,9 @@ export interface FinagentClient {
     list: () => Promise<ApiResult<CapabilityMetadata[]>>;
   };
   research?: {
+    resume?: (input: { runId: string }) => Promise<ApiResult<ResearchRunSummary>>;
+    restart?: (input: { runId: string }) => Promise<ApiResult<ResearchRunSummary>>;
+    discard?: (input: { runId: string }) => Promise<ApiResult<void>>;
     start: (input: { symbol: string; strategyId?: string }) => Promise<ApiResult<ResearchRunSummary>>;
     cancel: (input: { runId: string }) => Promise<ApiResult<void>>;
     listRuns: () => Promise<ApiResult<ResearchRunSummary[]>>;
@@ -343,6 +346,9 @@ export const fallbackClient: FinagentClient = {
     list: missingClient('capabilities.list'),
   },
   research: {
+    resume: missingClient('research.resume'),
+    restart: missingClient('research.restart'),
+    discard: missingClient('research.discard'),
     start: missingClient('research.start'),
     cancel: missingClient('research.cancel'),
     listRuns: missingClient('research.listRuns'),

@@ -1,0 +1,605 @@
+{
+  "version": 1,
+  "summary": {
+    "id": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+    "symbol": "NVDA.US",
+    "startedAt": 1789121493351,
+    "plannedCapabilities": [
+      "company.profile",
+      "market.quote",
+      "market.kline",
+      "company.valuation",
+      "company.financials",
+      "company.earnings",
+      "company.ratings",
+      "research.news",
+      "market.capitalFlow",
+      "portfolio.positions"
+    ],
+    "completedCapabilities": [
+      "research.news"
+    ],
+    "failedCapabilities": [
+      "company.profile",
+      "market.quote",
+      "market.kline",
+      "company.valuation",
+      "company.financials",
+      "company.earnings",
+      "company.ratings",
+      "market.capitalFlow",
+      "portfolio.positions"
+    ],
+    "status": "partial",
+    "locale": "en-US",
+    "recoveryCount": 1,
+    "recoverable": false,
+    "finishedAt": 1789121517235,
+    "reportId": "report-research-1de3f102-13b4-4261-810e-93e5bff7abde"
+  },
+  "plan": [
+    {
+      "capabilityId": "company.profile",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "market.quote",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "market.kline",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "company.valuation",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "company.financials",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "company.earnings",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "company.ratings",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "research.news",
+      "available": true,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "market.capitalFlow",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "portfolio.positions",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    }
+  ],
+  "outcomes": [
+    {
+      "record": {
+        "id": "run-research.news-1789121493368-1",
+        "capabilityId": "research.news",
+        "startedAt": 1789121493368,
+        "finishedAt": 1789121506494,
+        "durationMs": 13126,
+        "status": "success",
+        "provenance": {
+          "provider": "longbridge",
+          "fetchedAt": 1789121506494,
+          "stale": false
+        }
+      },
+      "result": {
+        "data": [
+          {
+            "id": "298712839",
+            "title": "Nvidia CEO signals strong momentum for shareholders",
+            "description": "Nvidia's last quarterly report and conference call provided plenty for investors to be excited about.",
+            "url": "https://longbridge.com/news/298712839",
+            "published_at": "2026-09-11T10:00:10Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298712927",
+            "title": "Performance Comparison: NVIDIA And Competitors In Semiconductors & Semiconductor Equipment Industry",
+            "description": "This article compares NVIDIA with competitors in the Semiconductors & Semiconductor Equipment industry. Key metrics show NVIDIA has a lower P/E ratio (27.61) than the industry average, suggesting favorable growth potential, while higher P/B and P/S ratios indicate possible overvaluation. NVIDIA demonstrates strong financial health with an ROE of 28.12%, significantly above peers, and robust profitability driven by $72.86B EBITDA and 105.85% revenue growth. Its low debt-to-equity ratio of 0.17 highlights a conservative capital structure compared to top peers.",
+            "url": "https://longbridge.com/news/298712927",
+            "published_at": "2026-09-11T09:58:20Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298708551",
+            "title": "Premarket: Oracle Slides After Earnings, Chip Stocks Sink While Apple Jumps Over 3%",
+            "description": "Oracle OCI revenue surged 121% but $28B capex pushed FCF to -$5B; NVDA fell over 2%, INTC dropped over 5%, AAPL gained over 3%.",
+            "url": "https://longbridge.com/news/298708551",
+            "published_at": "2026-09-11T09:24:02Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298704149",
+            "title": "Michael Burry Dumps NVDA, PLTR December Puts While Touting Fine Wine as a ‘Short’ on the Dollar",
+            "description": "Investor Michael Burry sold his December 2026 put options on Nvidia and Palantir to reduce portfolio risk. He is shifting focus to a macro thesis of 'shorting the dollar' by investing in bonded European fine wine as a hedge against currency debasement and technological disruption. Burry views physical assets like wine, which face supply destruction, as superior to digital holdings vulnerable to AI and quantum computing threats.",
+            "url": "https://longbridge.com/news/298704149",
+            "published_at": "2026-09-11T07:48:22Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298696945",
+            "title": "GPU/CPU stocks rise in overnight trading, Dell up 1%, CBRS up 0.7%",
+            "description": "GPU/CPU stocks edged higher in overnight trading. Dell gained 1.26% to $513, CBRS rose 0.74% to $192.75, while NVDA, AMD and peers posted modest gains in a broadly positive session.",
+            "url": "https://longbridge.com/news/298696945",
+            "published_at": "2026-09-11T07:47:43Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298694248",
+            "title": "NVIDIA Corporation $NVDA Holdings Lowered by Franchise GP Ltd",
+            "description": "Franchise GP Ltd reduced its NVIDIA stake by 69.8% in Q2, leaving it with 98,619 shares valued at $19.7 million. Meanwhile, other institutions like Longfellow increased holdings. NVIDIA reported $96.2 billion quarterly revenue, up 106% YoY, driven by strong AI demand and Microsoft's data center expansion. However, sentiment faces headwinds from DOJ antitrust investigations into Groq licensing, insider selling by directors Mark Stevens and Timothy Teter, and broader macroeconomic pressures.",
+            "url": "https://longbridge.com/news/298694248",
+            "published_at": "2026-09-11T07:22:32Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298694242",
+            "title": "Drive Wealth Management LLC Has $20.70 Million Holdings in NVIDIA Corporation $NVDA",
+            "description": "Drive Wealth Management LLC increased its NVIDIA holdings by 5.6% in Q2, reaching $20.7 million. Other institutions like Longfellow also boosted stakes. Analysts maintain a consensus 'Buy' rating with an average target of $324.34. Meanwhile, insiders EVP Timothy Teter and Director Mark Stevens sold significant shares in August and June respectively, reducing their positions under pre-arranged plans.",
+            "url": "https://longbridge.com/news/298694242",
+            "published_at": "2026-09-11T07:22:32Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298692946",
+            "title": "Retreat Signal? \"The Big Short\" Closes NVIDIA and Palantir Put Options",
+            "description": "\"The Big Short\" Michael Burry has comprehensively reduced risk exposure by closing his December 2026 put options on NVIDIA and Palantir, citing the avoidance of time value decay. However, he continues to hold put options on both stocks expiring in 2027, along with short positions in several other tech stocks. Meanwhile, Jensen Huang reposted data showing a 22% month-over-month increase in GPU rental rates, countering Burry's core bearish argument that chip depreciation periods are overestimated",
+            "url": "https://longbridge.com/news/298692946",
+            "published_at": "2026-09-11T07:21:10Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298691467",
+            "title": "In Q2 2026, the revenue of the world's top ten IC design companies increased by 73% year-on-year, with AMD breaking into the top three",
+            "description": "TrendForce data shows that in the second quarter of 2026, the revenue of the world's top ten IC design companies will increase by 73% year-on-year to USD 141.45 billion. NVIDIA ranks first with a 99% increase, accounting for 64%; AMD benefits from AI driving CPU demand, rising to third; Broadcom ranks second due to growth in ASIC shipments and communications business; Qualcomm falls to fourth due to weakness in its mobile business",
+            "url": "https://longbridge.com/news/298691467",
+            "published_at": "2026-09-11T06:53:13Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298695447",
+            "title": "Nvidia CEO Jensen Huang Said Nvidia Compute Is 'Fungible, Durable and Highly Rentable' — Now Oracle CEO Stands Impressed as 4-Year Old GPUs Fetch 20% Premium",
+            "description": "Oracle CEO Clay Magouyrk echoed Nvidia's Jensen Huang, stating four-year-old GPUs are renewed or resold at a 20% premium, highlighting AI hardware longevity. Oracle reported Q1 earnings of $1.92 per share and revenue of $19.35 billion, beating estimates. The company delivered 850MW of AI capacity with 97.9% GPU utilization. Oracle expects strong Q2 growth, though shares dipped initially before rising in after-hours trading.",
+            "url": "https://longbridge.com/news/298695447",
+            "published_at": "2026-09-11T06:47:52Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          }
+        ],
+        "provenance": {
+          "provider": "longbridge",
+          "fetchedAt": 1789121506494,
+          "stale": false
+        },
+        "summary": "Retrieved 43 live Longbridge news articles"
+      }
+    }
+  ],
+  "phase": "publishing",
+  "identity": {
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "config": "live-http-news-v1"
+  },
+  "budget": {
+    "limits": {},
+    "usage": {
+      "wallClockMs": 23884,
+      "modelCalls": 2,
+      "toolCalls": 1,
+      "searchIterations": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": 0
+    }
+  },
+  "retry": {
+    "attempts": {
+      "research.news": 1
+    },
+    "synthesisAttempts": 2
+  },
+  "inFlight": [],
+  "events": [
+    {
+      "runId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "parentRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "spanId": "bf6cbb1a-575f-4b72-a1a1-e0dade93447d",
+      "type": "started",
+      "at": 1789121493352
+    },
+    {
+      "runId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "parentRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "spanId": "85238e75-6a1c-4f49-bfcc-702296d5b1ba",
+      "type": "step",
+      "stepId": "research.news",
+      "at": 1789121506494
+    },
+    {
+      "runId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "parentRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "spanId": "8d859107-be1a-4e15-ab39-26a771e4f821",
+      "type": "synthesis",
+      "at": 1789121506538,
+      "agentRunId": "2f91d332-859d-439f-8461-7fcff8aba38a",
+      "sessionId": "33db05b2-736b-4424-bf98-fd7a43ee40ab"
+    },
+    {
+      "runId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "parentRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "spanId": "7d672ae2-8a51-46c8-a2b3-8c90f06230eb",
+      "type": "interrupted",
+      "at": 1789121508063
+    },
+    {
+      "runId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "parentRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "spanId": "a53b8de2-603a-4acf-941a-7fce87a4cc6a",
+      "type": "recovery",
+      "at": 1789121508074
+    },
+    {
+      "runId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "parentRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "spanId": "c5439a91-badb-47b4-88b9-ae142d548cc0",
+      "type": "synthesis",
+      "at": 1789121508115,
+      "agentRunId": "71b0bc03-8f18-4425-b08d-44e4b6e0da9c",
+      "sessionId": "9d60fa75-fae0-4a83-be08-acf936cef16e"
+    },
+    {
+      "runId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "parentRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "spanId": "1878cdb8-1e68-4bc1-bf7e-c131d93f7394",
+      "type": "published",
+      "at": 1789121517235
+    }
+  ],
+  "synthesis": {
+    "summary": "Only the research.news capability returned data (43 live Longbridge articles, with 10 saved). All other planned sections are unavailable, so no market, valuation, financial, earnings, ratings, capital-flow or portfolio evidence exists in the saved facts. The news set is net constructive: NVIDIA leads the IC design industry with 99% revenue growth and 64% share of the top-ten total, shows 105.85% revenue growth with 28.12% ROE and a low 0.17 debt-to-equity ratio, trades at a P/E of 27.61 below industry average, and GPU economics are supported by strong rental rates and resale premiums. Offsetting this are institutional trimming, insider selling, DOJ antitrust scrutiny over Groq licensing, Michael Burry's bearish options positioning (partially unwound), and a competitive/rotation hit to chip stocks. Stance is therefore modestly bullish on news-only evidence, with low confidence because nine of ten planned keys are missing.",
+    "stance": "bullish",
+    "confidence": 0.42,
+    "sections": [
+      {
+        "key": "company.profile",
+        "title": "Company Profile",
+        "verdict": "unavailable",
+        "summary": "No company profile data was saved; nothing can be stated about business description, segment mix, or corporate structure beyond incidental news references."
+      },
+      {
+        "key": "market.quote",
+        "title": "Market Quote",
+        "verdict": "unavailable",
+        "summary": "No live quote, price, or change data was saved. Directional price moves are only mentioned qualitatively inside news articles and cannot be treated as quotes."
+      },
+      {
+        "key": "market.kline",
+        "title": "Price History (K-Line)",
+        "verdict": "unavailable",
+        "summary": "No candlestick or historical price series was saved, so trend, momentum, and support/resistance cannot be assessed."
+      },
+      {
+        "key": "company.valuation",
+        "title": "Valuation",
+        "verdict": "unavailable",
+        "summary": "No valuation capability data was saved. One news article cites a P/E of 27.61 (below the industry average) but flags higher P/B and P/S as possible overvaluation; this is third-party news content, not a valuation dataset."
+      },
+      {
+        "key": "company.financials",
+        "title": "Financials",
+        "verdict": "unavailable",
+        "summary": "No financial statements were saved. News mentions $96.2B quarterly revenue (+106% YoY), $72.86B EBITDA, 105.85% revenue growth, 28.12% ROE, and 0.17 debt-to-equity, but these figures are unaudited news references and are not confirmed by a financials capability."
+      },
+      {
+        "key": "company.earnings",
+        "title": "Earnings",
+        "verdict": "unavailable",
+        "summary": "No earnings calendar, surprise history, or guidance data was saved. News refers to a strong last quarterly report and conference call, but no earnings dataset is present."
+      },
+      {
+        "key": "company.ratings",
+        "title": "Analyst Ratings",
+        "verdict": "unavailable",
+        "summary": "No ratings capability data was saved. News cites a consensus 'Buy' and an average target of $324.34, but this is news-sourced and not a verified ratings dataset."
+      },
+      {
+        "key": "research.news",
+        "title": "News Flow",
+        "verdict": "positive",
+        "summary": "43 live articles were retrieved and 10 saved. Positives dominate: NVIDIA ranks first among top-ten IC design companies with 99% revenue growth and 64% of the group total; GPU rental rates rose 22% MoM; Oracle's CEO confirmed four-year-old GPUs resell at a 20% premium with 97.9% utilization; some institutions (Drive Wealth, Longfellow) increased positions. Negatives: Franchise GP cut its stake 69.8%, insiders Stevens and Teter sold shares, the DOJ is investigating Groq licensing, chip stocks including NVDA fell over 2% in one premarket session, and Michael Burry closed December 2026 NVDA puts while retaining 2027 puts."
+      },
+      {
+        "key": "market.capitalFlow",
+        "title": "Capital Flow",
+        "verdict": "unavailable",
+        "summary": "No capital-flow data was saved. Only news-level references to institutional buying and selling and insider transactions are available, which are not a substitute for flow data."
+      },
+      {
+        "key": "portfolio.positions",
+        "title": "Portfolio Positions",
+        "verdict": "unavailable",
+        "summary": "No portfolio or position data was saved, so exposure, sizing, and P&L context cannot be evaluated."
+      }
+    ],
+    "bullCase": [
+      "NVIDIA ranks first among the world's top-ten IC design companies with 99% revenue growth and 64% of the group's total revenue, per TrendForce data cited in the news.",
+      "Reported fundamentals cited in news are strong: $96.2B quarterly revenue (+106% YoY), $72.86B EBITDA, 105.85% revenue growth, 28.12% ROE, and a conservative 0.17 debt-to-equity ratio.",
+      "News cites a P/E of 27.61, below the semiconductor industry average, suggesting relative valuation support versus peers.",
+      "GPU economics look durable: 22% MoM rise in rental rates, Oracle reporting 97.9% GPU utilization, and four-year-old GPUs reselling at a 20% premium.",
+      "Several institutions increased NVDA stakes in Q2 (Drive Wealth +5.6% to $20.7M; Longfellow also added), and news notes a consensus 'Buy' with an average target of $324.34.",
+      "CEO and management commentary signals continued momentum from the last quarter and conference call."
+    ],
+    "bearCase": [
+      "Institutional trimming: Franchise GP Ltd cut its NVIDIA position by 69.8% in Q2, leaving 98,619 shares valued at $19.7M.",
+      "Insider selling: EVP Timothy Teter and Director Mark Stevens sold significant shares in June and August under pre-arranged plans.",
+      "Regulatory overhang: DOJ antitrust investigations into Groq licensing are cited as a sentiment headwind.",
+      "Michael Burry closed December 2026 NVDA put options but continues to hold 2027 puts and other tech shorts, keeping a high-profile bear thesis alive.",
+      "Competitive and sector pressure: chip stocks, including NVDA (-2%) and INTC (-5%), sold off in one premarket session as Oracle's capex pushed free cash flow to -$5B, hinting at AI infrastructure spending strain.",
+      "Rising P/B and P/S ratios cited as possible overvaluation, and broad macroeconomic pressures are noted."
+    ],
+    "catalysts": [
+      "Continued AI demand and Microsoft data center expansion referenced in news.",
+      "Sustained GPU rental rate increases (22% MoM) and high utilization (97.9% at Oracle) supporting pricing power.",
+      "Strong resale/renewal economics for older GPUs (20% premium on four-year-old units).",
+      "NVIDIA's dominant 64% share of top-ten IC design revenue and 99% growth versus peers.",
+      "Potential resolution or clarity on the DOJ Groq-licensing investigation.",
+      "Analyst target revisions around the cited $324.34 consensus average."
+    ],
+    "risks": [
+      "Nine of ten planned data capabilities are unavailable, so conclusions rest on news alone and may be incomplete or stale.",
+      "No verified price, valuation, financial, earnings, ratings, or capital-flow data to confirm or refute the news narrative.",
+      "Institutional and insider selling signals possible distribution or reduced conviction.",
+      "DOJ antitrust scrutiny into Groq licensing may expand into broader regulatory risk.",
+      "High-profile bearish positioning (Burry's 2027 puts) and negative chip-sector sentiment could weigh on shares.",
+      "AI infrastructure capex concerns (Oracle FCF of -$5B) could pressure the semiconductor complex if spending normalizes.",
+      "Elevated P/B and P/S ratios leave the stock exposed to multiple compression if growth decelerates."
+    ]
+  },
+  "report": {
+    "id": "report-research-1de3f102-13b4-4261-810e-93e5bff7abde",
+    "symbol": "NVDA.US",
+    "generatedAt": 1789121517226,
+    "locale": "en-US",
+    "summary": "Only the research.news capability returned data (43 live Longbridge articles, with 10 saved). All other planned sections are unavailable, so no market, valuation, financial, earnings, ratings, capital-flow or portfolio evidence exists in the saved facts. The news set is net constructive: NVIDIA leads the IC design industry with 99% revenue growth and 64% share of the top-ten total, shows 105.85% revenue growth with 28.12% ROE and a low 0.17 debt-to-equity ratio, trades at a P/E of 27.61 below industry average, and GPU economics are supported by strong rental rates and resale premiums. Offsetting this are institutional trimming, insider selling, DOJ antitrust scrutiny over Groq licensing, Michael Burry's bearish options positioning (partially unwound), and a competitive/rotation hit to chip stocks. Stance is therefore modestly bullish on news-only evidence, with low confidence because nine of ten planned keys are missing.",
+    "stance": "bullish",
+    "confidence": 0.42,
+    "sections": [
+      {
+        "key": "company.profile",
+        "title": "Company Profile",
+        "verdict": "unavailable",
+        "summary": "No company profile data was saved; nothing can be stated about business description, segment mix, or corporate structure beyond incidental news references.",
+        "evidence": []
+      },
+      {
+        "key": "market.quote",
+        "title": "Market Quote",
+        "verdict": "unavailable",
+        "summary": "No live quote, price, or change data was saved. Directional price moves are only mentioned qualitatively inside news articles and cannot be treated as quotes.",
+        "evidence": []
+      },
+      {
+        "key": "market.kline",
+        "title": "Price History (K-Line)",
+        "verdict": "unavailable",
+        "summary": "No candlestick or historical price series was saved, so trend, momentum, and support/resistance cannot be assessed.",
+        "evidence": []
+      },
+      {
+        "key": "company.valuation",
+        "title": "Valuation",
+        "verdict": "unavailable",
+        "summary": "No valuation capability data was saved. One news article cites a P/E of 27.61 (below the industry average) but flags higher P/B and P/S as possible overvaluation; this is third-party news content, not a valuation dataset.",
+        "evidence": []
+      },
+      {
+        "key": "company.financials",
+        "title": "Financials",
+        "verdict": "unavailable",
+        "summary": "No financial statements were saved. News mentions $96.2B quarterly revenue (+106% YoY), $72.86B EBITDA, 105.85% revenue growth, 28.12% ROE, and 0.17 debt-to-equity, but these figures are unaudited news references and are not confirmed by a financials capability.",
+        "evidence": []
+      },
+      {
+        "key": "company.earnings",
+        "title": "Earnings",
+        "verdict": "unavailable",
+        "summary": "No earnings calendar, surprise history, or guidance data was saved. News refers to a strong last quarterly report and conference call, but no earnings dataset is present.",
+        "evidence": []
+      },
+      {
+        "key": "company.ratings",
+        "title": "Analyst Ratings",
+        "verdict": "unavailable",
+        "summary": "No ratings capability data was saved. News cites a consensus 'Buy' and an average target of $324.34, but this is news-sourced and not a verified ratings dataset.",
+        "evidence": []
+      },
+      {
+        "key": "research.news",
+        "title": "News Flow",
+        "verdict": "positive",
+        "summary": "43 live articles were retrieved and 10 saved. Positives dominate: NVIDIA ranks first among top-ten IC design companies with 99% revenue growth and 64% of the group total; GPU rental rates rose 22% MoM; Oracle's CEO confirmed four-year-old GPUs resell at a 20% premium with 97.9% utilization; some institutions (Drive Wealth, Longfellow) increased positions. Negatives: Franchise GP cut its stake 69.8%, insiders Stevens and Teter sold shares, the DOJ is investigating Groq licensing, chip stocks including NVDA fell over 2% in one premarket session, and Michael Burry closed December 2026 NVDA puts while retaining 2027 puts.",
+        "evidence": [
+          {
+            "capabilityId": "research.news",
+            "runId": "run-research.news-1789121493368-1",
+            "claim": "43 live articles were retrieved and 10 saved. Positives dominate: NVIDIA ranks first among top-ten IC design companies with 99% revenue growth and 64% of the group total; GPU rental rates rose 22% MoM; Oracle's CEO confirmed four-year-old GPUs resell at a 20% premium with 97.9% utilization; some institutions (Drive Wealth, Longfellow) increased positions. Negatives: Franchise GP cut its stake 69.8%, insiders Stevens and Teter sold shares, the DOJ is investigating Groq licensing, chip stocks including NVDA fell over 2% in one premarket session, and Michael Burry closed December 2026 NVDA puts while retaining 2027 puts.",
+            "fetchedAt": 1789121506494,
+            "summary": "Retrieved 43 live Longbridge news articles"
+          }
+        ]
+      },
+      {
+        "key": "market.capitalFlow",
+        "title": "Capital Flow",
+        "verdict": "unavailable",
+        "summary": "No capital-flow data was saved. Only news-level references to institutional buying and selling and insider transactions are available, which are not a substitute for flow data.",
+        "evidence": []
+      },
+      {
+        "key": "portfolio.positions",
+        "title": "Portfolio Positions",
+        "verdict": "unavailable",
+        "summary": "No portfolio or position data was saved, so exposure, sizing, and P&L context cannot be evaluated.",
+        "evidence": []
+      }
+    ],
+    "bullCase": [
+      "NVIDIA ranks first among the world's top-ten IC design companies with 99% revenue growth and 64% of the group's total revenue, per TrendForce data cited in the news.",
+      "Reported fundamentals cited in news are strong: $96.2B quarterly revenue (+106% YoY), $72.86B EBITDA, 105.85% revenue growth, 28.12% ROE, and a conservative 0.17 debt-to-equity ratio.",
+      "News cites a P/E of 27.61, below the semiconductor industry average, suggesting relative valuation support versus peers.",
+      "GPU economics look durable: 22% MoM rise in rental rates, Oracle reporting 97.9% GPU utilization, and four-year-old GPUs reselling at a 20% premium.",
+      "Several institutions increased NVDA stakes in Q2 (Drive Wealth +5.6% to $20.7M; Longfellow also added), and news notes a consensus 'Buy' with an average target of $324.34.",
+      "CEO and management commentary signals continued momentum from the last quarter and conference call."
+    ],
+    "bearCase": [
+      "Institutional trimming: Franchise GP Ltd cut its NVIDIA position by 69.8% in Q2, leaving 98,619 shares valued at $19.7M.",
+      "Insider selling: EVP Timothy Teter and Director Mark Stevens sold significant shares in June and August under pre-arranged plans.",
+      "Regulatory overhang: DOJ antitrust investigations into Groq licensing are cited as a sentiment headwind.",
+      "Michael Burry closed December 2026 NVDA put options but continues to hold 2027 puts and other tech shorts, keeping a high-profile bear thesis alive.",
+      "Competitive and sector pressure: chip stocks, including NVDA (-2%) and INTC (-5%), sold off in one premarket session as Oracle's capex pushed free cash flow to -$5B, hinting at AI infrastructure spending strain.",
+      "Rising P/B and P/S ratios cited as possible overvaluation, and broad macroeconomic pressures are noted."
+    ],
+    "catalysts": [
+      "Continued AI demand and Microsoft data center expansion referenced in news.",
+      "Sustained GPU rental rate increases (22% MoM) and high utilization (97.9% at Oracle) supporting pricing power.",
+      "Strong resale/renewal economics for older GPUs (20% premium on four-year-old units).",
+      "NVIDIA's dominant 64% share of top-ten IC design revenue and 99% growth versus peers.",
+      "Potential resolution or clarity on the DOJ Groq-licensing investigation.",
+      "Analyst target revisions around the cited $324.34 consensus average."
+    ],
+    "risks": [
+      "Nine of ten planned data capabilities are unavailable, so conclusions rest on news alone and may be incomplete or stale.",
+      "No verified price, valuation, financial, earnings, ratings, or capital-flow data to confirm or refute the news narrative.",
+      "Institutional and insider selling signals possible distribution or reduced conviction.",
+      "DOJ antitrust scrutiny into Groq licensing may expand into broader regulatory risk.",
+      "High-profile bearish positioning (Burry's 2027 puts) and negative chip-sector sentiment could weigh on shares.",
+      "AI infrastructure capex concerns (Oracle FCF of -$5B) could pressure the semiconductor complex if spending normalizes.",
+      "Elevated P/B and P/S ratios leave the stock exposed to multiple compression if growth decelerates."
+    ],
+    "capabilityRuns": [
+      {
+        "runId": "missing:company.profile",
+        "capabilityId": "company.profile",
+        "status": "unavailable",
+        "error": "Capability not registered"
+      },
+      {
+        "runId": "missing:market.quote",
+        "capabilityId": "market.quote",
+        "status": "unavailable",
+        "error": "Capability not registered"
+      },
+      {
+        "runId": "missing:market.kline",
+        "capabilityId": "market.kline",
+        "status": "unavailable",
+        "error": "Capability not registered"
+      },
+      {
+        "runId": "missing:company.valuation",
+        "capabilityId": "company.valuation",
+        "status": "unavailable",
+        "error": "Capability not registered"
+      },
+      {
+        "runId": "missing:company.financials",
+        "capabilityId": "company.financials",
+        "status": "unavailable",
+        "error": "Capability not registered"
+      },
+      {
+        "runId": "missing:company.earnings",
+        "capabilityId": "company.earnings",
+        "status": "unavailable",
+        "error": "Capability not registered"
+      },
+      {
+        "runId": "missing:company.ratings",
+        "capabilityId": "company.ratings",
+        "status": "unavailable",
+        "error": "Capability not registered"
+      },
+      {
+        "runId": "run-research.news-1789121493368-1",
+        "capabilityId": "research.news",
+        "status": "success",
+        "fetchedAt": 1789121506494
+      },
+      {
+        "runId": "missing:market.capitalFlow",
+        "capabilityId": "market.capitalFlow",
+        "status": "unavailable",
+        "error": "Capability not registered"
+      },
+      {
+        "runId": "missing:portfolio.positions",
+        "capabilityId": "portfolio.positions",
+        "status": "unavailable",
+        "error": "Capability not registered"
+      }
+    ],
+    "runStatus": "partial"
+  }
+}

@@ -1,4 +1,5 @@
 import { join } from 'node:path';
+import { createHash } from 'node:crypto';
 import { spawn } from 'node:child_process';
 import { app, Notification, shell, type BrowserWindow } from 'electron';
 import type {
@@ -82,7 +83,6 @@ import {
   CapabilityExecutor,
   computeSkillReadiness,
   createAgentEvaluator,
-  createAgentSynthesizer,
   createFullRegistry,
   createLocalThesisEvaluator,
   createRouterFetchers,
@@ -361,11 +361,22 @@ export class AgentKernelHost {
       synthesizer:
         provider === 'local'
           ? new LocalResearchSynthesizer()
-          : createAgentSynthesizer(this.runResearchSynthesis),
+          : { synthesize: this.runResearchSynthesis },
       repository: new ResearchReportRepository(new JsonFileStore(join(userData, 'store'))),
-      onReport: (report) => {
-        void this.outcomeService.createOpinionFromReport(report);
-        void this.saveDiffForReport(report);
+      getIdentity: async () => {
+        const state = provider === 'local' ? undefined : await this.requireLlm().getState();
+        return {
+          provider: state?.model?.provider ?? provider,
+          model: state?.model?.id ?? 'local',
+          config: createHash('sha256').update(JSON.stringify({
+            routing: await this.connectionStore.getRouting(DEFAULT_PROVIDER_ROUTING),
+            api: state?.model?.api, endpoint: state?.model?.baseUrl, thinking: state?.thinkingLevel,
+          })).digest('hex'),
+        };
+      },
+      onReport: async (report) => {
+        await this.outcomeService.createOpinionFromReport(report);
+        await this.saveDiffForReport(report);
       },
       onRunComplete: (result) => this.exportResearchTrace(result),
     });
@@ -665,6 +676,18 @@ export class AgentKernelHost {
     await this.researchService.cancel(requireString(request.runId, 'runId'));
   }
 
+  async researchResume(input: unknown): Promise<ResearchRunSummary> {
+    return this.researchService.resume(requireString(requireObject(input).runId, 'runId'));
+  }
+
+  async researchRestart(input: unknown): Promise<ResearchRunSummary> {
+    return this.researchService.restart(requireString(requireObject(input).runId, 'runId'));
+  }
+
+  async researchDiscard(input: unknown): Promise<void> {
+    return this.researchService.discard(requireString(requireObject(input).runId, 'runId'));
+  }
+
   async researchListRuns(): Promise<ResearchRunSummary[]> {
     return this.researchService.listRuns();
   }
@@ -781,17 +804,24 @@ export class AgentKernelHost {
    * Run one prompt through the agent kernel and resolve the final answer.
    * Creates a throwaway session; the run settles via the event stream.
    */
-  private async runAgentPrompt(content: string, signal?: AbortSignal): Promise<string> {
+  private async runAgentPrompt(content: string, signal?: AbortSignal, recovery?: ResearchSynthesisInput['recovery']): Promise<string> {
     // Keep synthesis runs out of the user's copilot history. The run still
     // uses the normal kernel/runtime contract, but its session is internal.
     const session = await this.kernel.sessions.createSession('__folio_internal_research__');
+    let agentRunId: string | undefined;
+    let cleanup = () => {};
     try {
       const answer = new Promise<string>((resolve, reject) => {
+        const stop = (code: string, message: string) => {
+          cleanup();
+          if (agentRunId) void this.kernel.runs.cancelRun(session.id, agentRunId).catch(() => undefined);
+          reject(createCodeError(code, message));
+        };
         const timer = setTimeout(
-          () => reject(createCodeError('SYNTHESIS_TIMEOUT', 'Agent synthesis timed out.')),
+          () => stop('SYNTHESIS_TIMEOUT', 'Agent synthesis timed out.'),
           240_000
         );
-        const abort = () => reject(createCodeError('SYNTHESIS_CANCELLED', 'Synthesis cancelled.'));
+        const abort = () => stop('SYNTHESIS_CANCELLED', 'Synthesis cancelled.');
         signal?.addEventListener('abort', abort, { once: true });
         const unsubscribe = this.kernel.runs.subscribe((event: AgentEvent) => {
           if (event.sessionId !== session.id) return;
@@ -803,16 +833,30 @@ export class AgentKernelHost {
             reject(createCodeError(event.payload.error.code, event.payload.error.message));
           }
         });
-        const cleanup = () => {
+        cleanup = () => {
           clearTimeout(timer);
           signal?.removeEventListener('abort', abort);
           unsubscribe();
         };
       });
-      await this.kernel.runs.startRun(session.id, content);
+      // A rejection can precede startRun/onAgentRun returning.
+      void answer.catch(() => undefined);
+      if (signal?.aborted) throw createCodeError('SYNTHESIS_CANCELLED', 'Synthesis cancelled.');
+      const run = await this.kernel.runs.startRun(session.id, content);
+      agentRunId = run.id;
+      if (signal?.aborted) {
+        await this.kernel.runs.cancelRun(session.id, run.id);
+        throw createCodeError('SYNTHESIS_CANCELLED', 'Synthesis cancelled.');
+      }
+      await recovery?.onAgentRun(run.id, session.id);
       return await answer;
+    } catch (error) {
+      if (agentRunId) await this.kernel.runs.cancelRun(session.id, agentRunId).catch(() => undefined);
+      throw error;
     } finally {
-      await this.kernel.deleteSession(session.id).catch(() => undefined);
+      cleanup();
+      // Recovery-linked sessions retain their trace and run history.
+      if (!recovery) await this.kernel.deleteSession(session.id).catch(() => undefined);
     }
   }
 
@@ -820,7 +864,7 @@ export class AgentKernelHost {
     input: ResearchSynthesisInput,
     signal?: AbortSignal
   ): Promise<ResearchSynthesis> => {
-    const answer = await this.runAgentPrompt(buildSynthesisPrompt(input), signal);
+    const answer = await this.runAgentPrompt(buildSynthesisPrompt(input), signal, input.recovery);
     return parseSynthesisJson(answer);
   };
 
@@ -2629,6 +2673,8 @@ function isNodeError(error: unknown): error is NodeJS.ErrnoException {
 
 function buildSynthesisPrompt(input: ResearchSynthesisInput): string {
   return [
+    '[FOLIO_CHECKPOINT_SYNTHESIS_V1]',
+    'Use only the saved facts below. Tool calls are disabled for this synthesis.',
     'You are the Folio research synthesizer. Analyze the structured market data below',
     `for ${input.symbol} and produce a JSON research synthesis.`,
     '',

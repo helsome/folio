@@ -54,6 +54,9 @@ export interface ElectronAPI {
     list: () => Promise<unknown>;
   };
   research: {
+    resume: (input: { runId: string }) => Promise<unknown>;
+    restart: (input: { runId: string }) => Promise<unknown>;
+    discard: (input: { runId: string }) => Promise<unknown>;
     start: (input: { symbol: string; strategyId?: string }) => Promise<unknown>;
     cancel: (input: { runId: string }) => Promise<unknown>;
     listRuns: () => Promise<unknown>;
@@ -244,6 +247,9 @@ const electronAPI: ElectronAPI = {
     list: () => ipcRenderer.invoke('capabilities:list'),
   },
   research: {
+    resume: (input: { runId: string }) => ipcRenderer.invoke('research:resume', input),
+    restart: (input: { runId: string }) => ipcRenderer.invoke('research:restart', input),
+    discard: (input: { runId: string }) => ipcRenderer.invoke('research:discard', input),
     start: (input: { symbol: string; strategyId?: string }) => ipcRenderer.invoke('research:start', input),
     cancel: (input: { runId: string }) => ipcRenderer.invoke('research:cancel', input),
     listRuns: () => ipcRenderer.invoke('research:listRuns'),

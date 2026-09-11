@@ -12,6 +12,10 @@ import {
   type StrategyId,
 } from '@finagent/core';
 import { i18nCurrentLocale } from '@finagent/i18n';
+import { randomUUID } from 'node:crypto';
+import { addUsage, checkBudget } from '../kernel/run-budget.ts';
+import { createCodeError } from '../agent/errors.ts';
+import type { ResearchCheckpoint } from './checkpoint.ts';
 import type { SupportedLocale } from '@finagent/core';
 import type { CapabilityRegistry } from '@finagent/core';
 import { CapabilityExecutor, type RunOutcome } from '../capabilities/index.ts';
@@ -32,6 +36,9 @@ export interface ResearchRunnerOptions {
 }
 
 export interface ResearchRunRequest {
+  checkpoint?: ResearchCheckpoint;
+  onCheckpoint?: (checkpoint: ResearchCheckpoint) => Promise<void>;
+  beforeSynthesis?: () => Promise<void>;
   symbol: string;
   runId: string;
   /** V5: research strategy whose plan drives this run (optional, legacy plan otherwise). */
@@ -52,7 +59,7 @@ export interface ResearchRunResult {
  *
  *   queued → fetching → synthesizing → completed | partial | failed | cancelled
  *
- * Capabilities are fetched in parallel via `CapabilityExecutor.runAll`
+ * Capabilities are fetched by bounded workers via `CapabilityExecutor.run`
  * (concurrency 4, 20s timeout, abort-aware). The injected synthesizer turns
  * the structured data bundle into analysis; evidence refs are attached from
  * the real `CapabilityRunRecord` ids so prose is never the source of truth.
@@ -72,8 +79,9 @@ export class ResearchRunner {
 
   async run(request: ResearchRunRequest): Promise<ResearchRunResult> {
     const { symbol, runId, signal } = request;
-    const startedAt = this.now();
-    const plan = planForStrategy(request.strategyId, this.registry);
+    const cp = request.checkpoint;
+    const startedAt = cp?.summary.startedAt ?? this.now();
+    const plan = cp?.plan ?? planForStrategy(request.strategyId, this.registry);
     const plannedIds = plan.map((p) => p.capabilityId);
 
     const base = {
@@ -85,26 +93,74 @@ export class ResearchRunner {
       failedCapabilities: [] as string[],
     };
 
+    let checkpointWrites = Promise.resolve();
+    const checkpoint = (mutate: () => void): Promise<void> => {
+      const next = checkpointWrites.then(async () => {
+        mutate();
+        if (cp) await request.onCheckpoint?.(structuredClone(cp));
+      });
+      checkpointWrites = next.catch(() => undefined);
+      return next;
+    };
+    const charge = (kind: 'toolCalls' | 'modelCalls', stepId?: string) => checkpoint(() => {
+      if (!cp) return;
+      cp.budget.usage.wallClockMs = this.now() - startedAt;
+      const exhausted = checkBudget(cp.budget.limits, cp.budget.usage);
+      if (exhausted) throw createCodeError('RESEARCH_BUDGET_EXHAUSTED', 'Research budget exhausted: ' + exhausted.key);
+      cp.budget.usage = addUsage(cp.budget.usage, {
+        [kind]: 1, ...(stepId?.startsWith('research.') ? { searchIterations: 1 } : {}),
+      });
+      if (stepId) {
+        cp.retry.attempts[stepId] = (cp.retry.attempts[stepId] ?? 0) + 1;
+        cp.inFlight = [...new Set([...cp.inFlight, stepId])];
+      } else {
+        cp.retry.synthesisAttempts += 1;
+      }
+    });
     const emit = async (status: ResearchRunStatus, extra?: Partial<ResearchRunSummary>) => {
-      const summary: ResearchRunSummary = { ...base, status, ...extra };
+      const summary: ResearchRunSummary = { ...base, ...cp?.summary, status, ...extra };
+      await checkpoint(() => { if (cp) cp.summary = summary; });
       await request.onStatus?.(summary);
       return summary;
     };
 
+    // Publication is an idempotent replay of a saved report, never new synthesis.
+    if (cp?.report) return { summary: cp.summary, report: cp.report };
+
     await emit('fetching');
 
     const specs = plan
-      .filter((p) => p.available)
-      .map((p) => ({
-        cap: this.registry.get(p.capabilityId)!,
-        input: buildCapabilityInput(p.capabilityId, symbol),
-      }));
-
-    const outcomes = await this.executor.runAll(specs, {
-      concurrency: CONCURRENCY,
-      timeoutMs: TIMEOUT_MS,
-      signal,
+      .filter((p) => p.available && !cp?.outcomes.some((o) => o.record.capabilityId === p.capabilityId))
+      .map((p) => {
+        const cap = this.registry.get(p.capabilityId);
+        if (!cap || cap.riskLevel !== 'read') {
+          throw createCodeError('RESEARCH_CAPABILITY_UNSAFE', 'Research requires a registered read-only capability: ' + p.capabilityId);
+        }
+        return { cap, input: 'input' in p ? p.input : buildCapabilityInput(p.capabilityId, symbol) };
+      });
+    const outcomes: RunOutcome[] = [...(cp?.outcomes ?? [])];
+    let next = 0;
+    let workerError: unknown;
+    const workers = Array.from({ length: Math.min(CONCURRENCY, specs.length) }, async () => {
+      while (next < specs.length && !signal?.aborted && !workerError) {
+        const spec = specs[next++];
+        try {
+          await charge('toolCalls', spec.cap.id);
+          const outcome = await this.executor.run(spec.cap, spec.input, { timeoutMs: TIMEOUT_MS, signal });
+          outcomes.push(outcome);
+          await checkpoint(() => {
+            if (!cp) return;
+            cp.outcomes.push(outcome);
+            cp.inFlight = cp.inFlight.filter((id) => id !== spec.cap.id);
+            cp.summary.completedCapabilities = cp.outcomes.filter((o) => o.record.status === 'success').map((o) => o.record.capabilityId);
+            cp.summary.failedCapabilities = cp.outcomes.filter((o) => o.record.status !== 'success').map((o) => o.record.capabilityId);
+            cp.events.push({ runId, parentRunId: runId, spanId: randomUUID(), type: 'step', stepId: spec.cap.id, at: this.now() });
+          });
+        } catch (error) { workerError = error; }
+      }
     });
+    await Promise.allSettled(workers);
+    if (workerError) throw workerError;
 
     const successIds = outcomes
       .filter((o) => o.record.status === 'success')
@@ -131,11 +187,27 @@ export class ResearchRunner {
 
     let synthesis: ResearchSynthesis;
     try {
-      synthesis = await this.synthesizer.synthesize(
-        { symbol, plannedCapabilities: plannedIds, runs, dataBundle },
+      if (cp) await checkpoint(() => { cp.phase = 'synthesizing'; });
+      if (!cp?.synthesis) await request.beforeSynthesis?.();
+      if (!cp?.synthesis) await charge('modelCalls');
+      synthesis = cp?.synthesis ?? await this.synthesizer.synthesize(
+        { symbol, plannedCapabilities: plannedIds, runs, dataBundle,
+          ...(cp ? { recovery: {
+            runId, attempt: cp.retry.synthesisAttempts,
+            onAgentRun: (agentRunId: string, sessionId: string) => checkpoint(() => {
+              cp.events.push({ runId, parentRunId: runId, spanId: randomUUID(), type: 'synthesis',
+                at: this.now(), agentRunId, sessionId });
+            }),
+          } } : {}),
+        },
         signal
       );
+      // A section key identifies one report dimension; never append duplicates.
+      synthesis = { ...synthesis, sections: [...new Map(synthesis.sections.map((section) => [section.key, section])).values()] };
+      if (signal?.aborted) throw createCodeError('RESEARCH_CANCELLED', 'Research cancelled.');
+      await checkpoint(() => { if (cp) cp.synthesis = synthesis; });
     } catch (error) {
+      if (cp && !signal?.aborted) throw error;
       if (signal?.aborted) {
         const summary = await emit('cancelled', {
           finishedAt: this.now(),
@@ -147,6 +219,7 @@ export class ResearchRunner {
       const summary = await emit('failed', {
         finishedAt: this.now(),
         failedCapabilities: plannedIds,
+        error: error instanceof Error ? error.message : String(error),
       });
       return { summary };
     }
@@ -162,6 +235,14 @@ export class ResearchRunner {
       locale: request.locale,
     });
 
+    if (cp) {
+      await checkpoint(() => {
+        cp.report = report;
+        cp.phase = 'publishing';
+      });
+      // Service publishes report and derived records before committing terminal status.
+      return { summary: cp.summary, report };
+    }
     const summary = await emit(computeRunStatus(plan, successIds), {
       finishedAt: this.now(),
       reportId: report.id,

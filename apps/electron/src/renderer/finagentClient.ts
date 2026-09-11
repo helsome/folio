@@ -63,6 +63,9 @@ function createElectronClient(): FinagentClient {
       list: () => ipcResult(window.electronAPI.capabilities.list()),
     },
     research: {
+      resume: (input) => ipcResult(window.electronAPI.research.resume(input)),
+      restart: (input) => ipcResult(window.electronAPI.research.restart(input)),
+      discard: (input) => ipcResult(window.electronAPI.research.discard(input)),
       start: (input) => ipcResult(window.electronAPI.research.start(input)),
       cancel: (input) => ipcResult(window.electronAPI.research.cancel(input)),
       listRuns: () => ipcResult(window.electronAPI.research.listRuns()),

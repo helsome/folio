@@ -13,6 +13,8 @@
     "test": "bun test",
     "typecheck": "tsc --noEmit",
     "test:e2e": "node e2e/run.mjs",
+    "test:research-recovery": "node e2e/research-recovery.mjs",
+    "test:research-recovery:kernel": "bun e2e/research-recovery-kernel.ts",
     "test:product-flows": "node e2e/product-flows.mjs",
     "test:interactions": "node e2e/interactions.mjs",
     "test:skills-interactions": "node e2e/skills-interactions.mjs",

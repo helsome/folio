@@ -23,7 +23,7 @@ var __toCommonJS = (from) => {
 };
 var __moduleCache;
 
-// src/preload/index.ts
+// apps/electron/src/preload/index.ts
 var exports_preload = {};
 module.exports = __toCommonJS(exports_preload);
 var import_electron = require("electron");
@@ -81,6 +81,9 @@ var electronAPI = {
     list: () => import_electron.ipcRenderer.invoke("capabilities:list")
   },
   research: {
+    resume: (input) => import_electron.ipcRenderer.invoke("research:resume", input),
+    restart: (input) => import_electron.ipcRenderer.invoke("research:restart", input),
+    discard: (input) => import_electron.ipcRenderer.invoke("research:discard", input),
     start: (input) => import_electron.ipcRenderer.invoke("research:start", input),
     cancel: (input) => import_electron.ipcRenderer.invoke("research:cancel", input),
     listRuns: () => import_electron.ipcRenderer.invoke("research:listRuns"),
