@@ -121,7 +121,7 @@ describe('PerformanceCard', () => {
       />
     )
     expect(text).toContain('65.0%')
-    expect(text).toContain('+2.40%')
+    expect(text).toContain('+2.4%')
     expect(text).toContain('5.0%')
     expect(text).not.toContain('Observational Only')
   })
@@ -199,7 +199,7 @@ describe('PerformanceView', () => {
     // avgReturn is undefined for the skill row → em dash, never '0.00%'.
     expect(text).not.toContain('0.00%')
     expect(text).toContain('—')
-    expect(text).toContain('+1.50%')
+    expect(text).toContain('+1.5%')
   })
 })
 
