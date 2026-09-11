@@ -1,0 +1,204 @@
+{
+  "generatedAt": 1789113452103,
+  "liveAvailability": [
+    {
+      "url": "https://nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2025?utm_source=folio",
+      "status": 200
+    },
+    {
+      "url": "https://www.nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2025?utm_campaign=earnings#financial-highlights",
+      "status": "unreachable"
+    },
+    {
+      "url": "https://data.sec.gov/submissions/CIK0001045810.json",
+      "status": 200
+    },
+    {
+      "url": "https://www.reuters.com/technology/artificial-intelligence/nvidia-forecasts-first-quarter-revenue-above-estimates-2025-02-26/",
+      "status": "unreachable"
+    },
+    {
+      "url": "https://finance.example.test/nvidia-results-copy-a",
+      "status": "unreachable"
+    },
+    {
+      "url": "https://markets.example.test/nvidia-results-copy-b",
+      "status": "unreachable"
+    }
+  ],
+  "sources": [
+    {
+      "id": "nvidia-ir",
+      "url": "https://nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2025?utm_source=folio",
+      "title": "NVIDIA Announces Financial Results for Fourth Quarter and Fiscal 2025",
+      "summary": "Quarterly revenue was $39.3 billion, up 12% from Q3 and up 78% from a year ago.",
+      "publisher": "NVIDIA Newsroom",
+      "publishedAt": 1740603600000,
+      "available": true
+    },
+    {
+      "id": "nvidia-ir-tracked",
+      "url": "https://www.nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2025?utm_campaign=earnings#financial-highlights",
+      "title": "NVIDIA Announces Financial Results for Fourth Quarter and Fiscal 2025",
+      "summary": "Quarterly revenue was $39.3 billion, up 12% from Q3 and up 78% from a year ago.",
+      "publisher": "NVIDIA Newsroom mirror",
+      "publishedAt": 1740603600000,
+      "available": false
+    },
+    {
+      "id": "sec-submissions",
+      "url": "https://data.sec.gov/submissions/CIK0001045810.json",
+      "title": "NVIDIA Corporation SEC submissions",
+      "summary": "Official filing history and accession metadata for NVIDIA Corporation.",
+      "publisher": "U.S. SEC",
+      "publishedAt": 1740607200000,
+      "available": true
+    },
+    {
+      "id": "reuters-original",
+      "url": "https://www.reuters.com/technology/artificial-intelligence/nvidia-forecasts-first-quarter-revenue-above-estimates-2025-02-26/",
+      "title": "Nvidia forecasts first-quarter revenue above estimates",
+      "summary": "Nvidia forecast quarterly revenue above Wall Street estimates as demand for AI chips remained strong.",
+      "publisher": "Reuters",
+      "publishedAt": 1740607800000,
+      "available": false
+    },
+    {
+      "id": "wire-copy-a",
+      "url": "https://finance.example.test/nvidia-results-copy-a",
+      "title": "Nvidia forecasts first quarter revenue above estimates",
+      "summary": "Nvidia forecast quarterly revenue above Wall Street estimates as demand for AI chips remained strong.",
+      "publisher": "Syndication A",
+      "publishedAt": 1740608100000,
+      "available": false
+    },
+    {
+      "id": "wire-copy-b",
+      "url": "https://markets.example.test/nvidia-results-copy-b",
+      "title": "Nvidia forecasts Q1 revenue above estimates",
+      "summary": "Nvidia forecast quarterly revenue above Wall Street estimates as demand for AI chips remained strong.",
+      "publisher": "Syndication B",
+      "publishedAt": 1740608400000,
+      "available": false
+    }
+  ],
+  "context": {
+    "instrumentCount": 5,
+    "snapshotIds": [
+      "ctx-watchlist-ai-watchlist-v1-1789113452103-df109f6b-1c5a-4841-abfb-18014b993e7f",
+      "ctx-portfolio-core-portfolio-v1-1789113452103-039eaef8-32be-4e69-b61e-9909cda12a80"
+    ],
+    "historicalSnapshotVersion": 1,
+    "currentPortfolioVersion": 2
+  },
+  "background": {
+    "jobs": [
+      {
+        "id": "failure-check",
+        "type": "filing-check",
+        "enabled": true,
+        "schedule": {
+          "intervalMs": 86400000
+        },
+        "input": {
+          "symbol": "NVDA.US"
+        },
+        "targetContext": {
+          "kind": "watchlist",
+          "id": "ai-watchlist"
+        },
+        "createdAt": 1789113451103,
+        "nextRunAt": 1789199852103,
+        "status": "failed",
+        "retryPolicy": {
+          "maxAttempts": 2,
+          "initialBackoffMs": 1,
+          "maxBackoffMs": 2
+        },
+        "missedRunPolicy": "catch-up",
+        "notificationPolicy": {
+          "onSuccess": true,
+          "onFailure": true,
+          "sensitivePreview": false
+        },
+        "lastRunAt": 1789113452103,
+        "lastRunId": "6726935d-f906-4953-84f5-1f2df94ebc29"
+      },
+      {
+        "id": "nvda-filing-check",
+        "type": "filing-check",
+        "enabled": true,
+        "schedule": {
+          "intervalMs": 86400000
+        },
+        "input": {
+          "symbol": "NVDA.US"
+        },
+        "targetContext": {
+          "kind": "watchlist",
+          "id": "ai-watchlist"
+        },
+        "createdAt": 1789113451103,
+        "nextRunAt": 1789199852103,
+        "status": "succeeded",
+        "retryPolicy": {
+          "maxAttempts": 2,
+          "initialBackoffMs": 1,
+          "maxBackoffMs": 2
+        },
+        "missedRunPolicy": "catch-up",
+        "notificationPolicy": {
+          "onSuccess": true,
+          "onFailure": true,
+          "sensitivePreview": false
+        },
+        "lastRunAt": 1789113452103,
+        "lastRunId": "9fa476a9-c243-4e2c-bb50-9308f39f5c40"
+      }
+    ],
+    "runs": [
+      {
+        "id": "6726935d-f906-4953-84f5-1f2df94ebc29",
+        "jobId": "failure-check",
+        "status": "failed",
+        "scheduledFor": 1789113452102,
+        "startedAt": 1789113452103,
+        "finishedAt": 1789113452103,
+        "attempts": 2,
+        "error": "simulated provider failure"
+      },
+      {
+        "id": "9fa476a9-c243-4e2c-bb50-9308f39f5c40",
+        "jobId": "nvda-filing-check",
+        "status": "succeeded",
+        "scheduledFor": 1789113452102,
+        "startedAt": 1789113452103,
+        "finishedAt": 1789113452103,
+        "attempts": 1,
+        "productionRunId": "report-nvda-fy2025-e2e"
+      }
+    ],
+    "notifications": [
+      {
+        "id": "notification-6726935d-f906-4953-84f5-1f2df94ebc29",
+        "jobId": "failure-check",
+        "runId": "6726935d-f906-4953-84f5-1f2df94ebc29",
+        "kind": "failed",
+        "title": "Research needs attention",
+        "message": "Open Folio for details.",
+        "createdAt": 1789113452103,
+        "deepLink": "/jobs/failure-check"
+      },
+      {
+        "id": "notification-9fa476a9-c243-4e2c-bb50-9308f39f5c40",
+        "jobId": "nvda-filing-check",
+        "runId": "9fa476a9-c243-4e2c-bb50-9308f39f5c40",
+        "kind": "filing-found",
+        "title": "New filing found",
+        "message": "Open Folio to view the result.",
+        "createdAt": 1789113452103,
+        "deepLink": "/runs/report-nvda-fy2025-e2e"
+      }
+    ]
+  }
+}

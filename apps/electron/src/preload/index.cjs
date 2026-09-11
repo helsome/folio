@@ -208,7 +208,28 @@ var electronAPI = {
   },
   export: {
     markdown: (input) => import_electron.ipcRenderer.invoke("export:markdown", input),
+    html: (input) => import_electron.ipcRenderer.invoke("export:html", input),
+    json: (input) => import_electron.ipcRenderer.invoke("export:json", input),
     shareCard: (input) => import_electron.ipcRenderer.invoke("export:shareCard", input)
+  },
+  background: {
+    listJobs: () => import_electron.ipcRenderer.invoke("background:listJobs"),
+    saveJob: (input) => import_electron.ipcRenderer.invoke("background:saveJob", input),
+    setEnabled: (input) => import_electron.ipcRenderer.invoke("background:setEnabled", input),
+    removeJob: (input) => import_electron.ipcRenderer.invoke("background:removeJob", input),
+    listRuns: (input) => import_electron.ipcRenderer.invoke("background:listRuns", input),
+    listNotifications: () => import_electron.ipcRenderer.invoke("background:listNotifications"),
+    onOpen: (callback) => {
+      const listener = (_event, deepLink) => callback(deepLink);
+      import_electron.ipcRenderer.on("notification:open", listener);
+      return () => import_electron.ipcRenderer.removeListener("notification:open", listener);
+    }
+  },
+  context: {
+    list: () => import_electron.ipcRenderer.invoke("context:list"),
+    saveWatchlist: (input) => import_electron.ipcRenderer.invoke("context:saveWatchlist", input),
+    savePortfolio: (input) => import_electron.ipcRenderer.invoke("context:savePortfolio", input),
+    getRun: (input) => import_electron.ipcRenderer.invoke("context:getRun", input)
   },
   evaluation: {
     getSettings: () => import_electron.ipcRenderer.invoke("evaluation:getSettings"),

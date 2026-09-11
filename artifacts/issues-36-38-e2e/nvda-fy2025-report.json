@@ -1,0 +1,249 @@
+{
+  "schemaVersion": "folio-report-export-v1",
+  "exportedAt": 1789113452103,
+  "report": {
+    "id": "report-nvda-fy2025-e2e",
+    "symbol": "NVDA.US",
+    "generatedAt": 1789113452103,
+    "strategyId": "earnings",
+    "locale": "en-US",
+    "summary": "NVIDIA reported fiscal Q4 2025 revenue of $39.3B, up 78% year over year. The report keeps the live Web and financial evidence references, including source availability and structured period/currency/unit metadata.",
+    "stance": "bullish",
+    "confidence": 0.84,
+    "sections": [
+      {
+        "key": "research.news",
+        "title": "Earnings event",
+        "verdict": "positive",
+        "summary": "| Metric | Value | As of |\n|---|---:|---|\n| Revenue | $39.3B | FY2025 Q4 |\n| YoY growth | 78% | FY2025 Q4 |",
+        "evidence": [
+          {
+            "capabilityId": "research.news",
+            "runId": "live-search-e2e",
+            "claim": "NVIDIA Announces Financial Results for Fourth Quarter and Fiscal 2025",
+            "fetchedAt": 1789113452103,
+            "summary": "Quarterly revenue was $39.3 billion, up 12% from Q3 and up 78% from a year ago.",
+            "sourceId": "nvidia-ir",
+            "sourceUrl": "https://nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2025?utm_source=folio",
+            "provider": "NVIDIA Newsroom",
+            "status": "available"
+          },
+          {
+            "capabilityId": "research.news",
+            "runId": "live-search-e2e",
+            "claim": "NVIDIA Announces Financial Results for Fourth Quarter and Fiscal 2025",
+            "fetchedAt": 1789113452103,
+            "summary": "Quarterly revenue was $39.3 billion, up 12% from Q3 and up 78% from a year ago.",
+            "sourceId": "nvidia-ir-tracked",
+            "sourceUrl": "https://www.nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2025?utm_campaign=earnings#financial-highlights",
+            "provider": "NVIDIA Newsroom mirror",
+            "status": "unavailable"
+          },
+          {
+            "capabilityId": "research.news",
+            "runId": "live-search-e2e",
+            "claim": "NVIDIA Corporation SEC submissions",
+            "fetchedAt": 1789113452103,
+            "summary": "Official filing history and accession metadata for NVIDIA Corporation.",
+            "sourceId": "sec-submissions",
+            "sourceUrl": "https://data.sec.gov/submissions/CIK0001045810.json",
+            "provider": "U.S. SEC",
+            "status": "available"
+          },
+          {
+            "capabilityId": "research.news",
+            "runId": "live-search-e2e",
+            "claim": "Nvidia forecasts first-quarter revenue above estimates",
+            "fetchedAt": 1789113452103,
+            "summary": "Nvidia forecast quarterly revenue above Wall Street estimates as demand for AI chips remained strong.",
+            "sourceId": "reuters-original",
+            "sourceUrl": "https://www.reuters.com/technology/artificial-intelligence/nvidia-forecasts-first-quarter-revenue-above-estimates-2025-02-26/",
+            "provider": "Reuters",
+            "status": "unavailable"
+          }
+        ]
+      },
+      {
+        "key": "company.financials",
+        "title": "Financial evidence",
+        "verdict": "positive",
+        "summary": "Quarterly revenue and growth were checked as structured values with explicit unit and period.",
+        "evidence": [
+          {
+            "capabilityId": "company.financials",
+            "runId": "financial-e2e",
+            "claim": "Fiscal Q4 revenue was $39.3B and grew 78% YoY.",
+            "fetchedAt": 1789113452103,
+            "instrumentId": "NVDA.US",
+            "metric": "quarterly_revenue",
+            "asOf": 1737849600000,
+            "currency": "USD",
+            "unit": "billions",
+            "status": "available"
+          }
+        ]
+      }
+    ],
+    "bullCase": [
+      "AI accelerator demand remained strong."
+    ],
+    "bearCase": [
+      "Supply and customer concentration remain material risks."
+    ],
+    "catalysts": [
+      "Blackwell production ramp."
+    ],
+    "risks": [
+      "Demand normalization and export controls."
+    ],
+    "capabilityRuns": [
+      {
+        "runId": "live-search-e2e",
+        "capabilityId": "research.news",
+        "status": "success",
+        "fetchedAt": 1789113452103
+      },
+      {
+        "runId": "financial-e2e",
+        "capabilityId": "company.financials",
+        "status": "success",
+        "fetchedAt": 1789113452103
+      }
+    ],
+    "runStatus": "completed",
+    "runManifest": {
+      "runId": "e2e-copilot-run",
+      "model": "deterministic-e2e",
+      "configVersion": "issues-36-38-v1",
+      "contextSnapshotIds": [
+        "ctx-watchlist-ai-watchlist-v1-1789113452103-df109f6b-1c5a-4841-abfb-18014b993e7f",
+        "ctx-portfolio-core-portfolio-v1-1789113452103-039eaef8-32be-4e69-b61e-9909cda12a80"
+      ]
+    }
+  },
+  "claims": [
+    {
+      "sectionKey": "research.news",
+      "sectionTitle": "Earnings event",
+      "claim": "| Metric | Value | As of |\n|---|---:|---|\n| Revenue | $39.3B | FY2025 Q4 |\n| YoY growth | 78% | FY2025 Q4 |",
+      "citationNumbers": [
+        1,
+        2,
+        3,
+        4
+      ]
+    },
+    {
+      "sectionKey": "company.financials",
+      "sectionTitle": "Financial evidence",
+      "claim": "Quarterly revenue and growth were checked as structured values with explicit unit and period.",
+      "citationNumbers": [
+        5
+      ]
+    }
+  ],
+  "citations": [
+    {
+      "number": 1,
+      "claim": "NVIDIA Announces Financial Results for Fourth Quarter and Fiscal 2025",
+      "capabilityId": "research.news",
+      "runId": "live-search-e2e",
+      "fetchedAt": 1789113452103,
+      "source": {
+        "id": "nvidia-ir",
+        "url": "https://nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2025?utm_source=folio",
+        "provider": "NVIDIA Newsroom"
+      },
+      "financial": {},
+      "status": "available"
+    },
+    {
+      "number": 2,
+      "claim": "NVIDIA Announces Financial Results for Fourth Quarter and Fiscal 2025",
+      "capabilityId": "research.news",
+      "runId": "live-search-e2e",
+      "fetchedAt": 1789113452103,
+      "source": {
+        "id": "nvidia-ir-tracked",
+        "url": "https://www.nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2025?utm_campaign=earnings#financial-highlights",
+        "provider": "NVIDIA Newsroom mirror"
+      },
+      "financial": {},
+      "status": "unavailable"
+    },
+    {
+      "number": 3,
+      "claim": "NVIDIA Corporation SEC submissions",
+      "capabilityId": "research.news",
+      "runId": "live-search-e2e",
+      "fetchedAt": 1789113452103,
+      "source": {
+        "id": "sec-submissions",
+        "url": "https://data.sec.gov/submissions/CIK0001045810.json",
+        "provider": "U.S. SEC"
+      },
+      "financial": {},
+      "status": "available"
+    },
+    {
+      "number": 4,
+      "claim": "Nvidia forecasts first-quarter revenue above estimates",
+      "capabilityId": "research.news",
+      "runId": "live-search-e2e",
+      "fetchedAt": 1789113452103,
+      "source": {
+        "id": "reuters-original",
+        "url": "https://www.reuters.com/technology/artificial-intelligence/nvidia-forecasts-first-quarter-revenue-above-estimates-2025-02-26/",
+        "provider": "Reuters"
+      },
+      "financial": {},
+      "status": "unavailable"
+    },
+    {
+      "number": 5,
+      "claim": "Fiscal Q4 revenue was $39.3B and grew 78% YoY.",
+      "capabilityId": "company.financials",
+      "runId": "financial-e2e",
+      "fetchedAt": 1789113452103,
+      "financial": {
+        "instrumentId": "NVDA.US",
+        "metric": "quarterly_revenue",
+        "asOf": 1737849600000,
+        "currency": "USD",
+        "unit": "billions"
+      },
+      "status": "available"
+    }
+  ],
+  "sources": [
+    {
+      "id": "nvidia-ir",
+      "url": "https://nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2025?utm_source=folio",
+      "provider": "NVIDIA Newsroom"
+    },
+    {
+      "id": "nvidia-ir-tracked",
+      "url": "https://www.nvidianews.nvidia.com/news/nvidia-announces-financial-results-for-fourth-quarter-and-fiscal-2025?utm_campaign=earnings#financial-highlights",
+      "provider": "NVIDIA Newsroom mirror"
+    },
+    {
+      "id": "sec-submissions",
+      "url": "https://data.sec.gov/submissions/CIK0001045810.json",
+      "provider": "U.S. SEC"
+    },
+    {
+      "id": "reuters-original",
+      "url": "https://www.reuters.com/technology/artificial-intelligence/nvidia-forecasts-first-quarter-revenue-above-estimates-2025-02-26/",
+      "provider": "Reuters"
+    }
+  ],
+  "runManifest": {
+    "runId": "e2e-copilot-run",
+    "model": "deterministic-e2e",
+    "configVersion": "issues-36-38-v1",
+    "contextSnapshotIds": [
+      "ctx-watchlist-ai-watchlist-v1-1789113452103-df109f6b-1c5a-4841-abfb-18014b993e7f",
+      "ctx-portfolio-core-portfolio-v1-1789113452103-039eaef8-32be-4e69-b61e-9909cda12a80"
+    ]
+  }
+}

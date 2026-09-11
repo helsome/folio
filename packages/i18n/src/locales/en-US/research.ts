@@ -236,6 +236,8 @@ export const research = {
   export: {
     copyMarkdown: 'Copy Markdown',
     downloadMarkdown: 'Download .md',
+    downloadHtml: 'Download printable HTML',
+    downloadJson: 'Download archive JSON',
     copyShareText: 'Copy share text',
     downloadShareCard: 'Download share card .svg',
     working: 'Working…',

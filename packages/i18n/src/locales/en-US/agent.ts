@@ -32,6 +32,8 @@ export const agent = {
   context: {
     none: 'No security context',
     clear: 'Clear security context',
+    useWatchlist: 'Use watchlist',
+    usePortfolio: 'Use portfolio',
   },
   model: {
     label: 'Model',

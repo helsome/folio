@@ -68,6 +68,11 @@ import type {
   ToolCall,
   ToolCallRecord,
   TraceReference,
+  BackgroundJob,
+  StoredNotification,
+  ContextSelection,
+  VersionedWatchlist,
+  VersionedPortfolioContext,
 } from '@finagent/core';
 import { STRATEGY_IDS } from '@finagent/core';
 import { isLocalePreference } from '@finagent/i18n';
@@ -126,6 +131,8 @@ import {
   parseCsv,
   parsePaste,
   reportToMarkdown,
+  reportToHtml,
+  reportToJson,
   reportToShareCard,
   redactForShare,
   computeSkillCalibrations,
@@ -147,6 +154,9 @@ import {
   type MarketPulseSnapshot,
   type ShareCard,
   type WatchlistQuote,
+  PortfolioContextRepository,
+  BackgroundJobRepository,
+  BackgroundJobScheduler,
 } from '@finagent/shared';
 import {
   LongbridgeBrokerAccountProvider,
@@ -248,10 +258,13 @@ export class AgentKernelHost {
   private readonly screeningService: ScreeningService;
   private readonly diffRepository: ResearchDiffRepository;
   private readonly importRepository: ManualPortfolioRepository;
+  private readonly contextRepository: PortfolioContextRepository;
   private readonly pulseService: PulseService;
   private readonly performanceService: PerformanceService;
   private readonly automationRules: AutomationRuleRepository;
   private readonly automationRuns: AutomationRunRepository;
+  private readonly backgroundJobs: BackgroundJobRepository;
+  private readonly backgroundScheduler: BackgroundJobScheduler;
   private automationTimer: ReturnType<typeof setInterval> | null = null;
   private readonly lastAutomationRunByRule = new Map<string, string>();
   private readonly thesisRepository: ThesisRepository;
@@ -278,6 +291,7 @@ export class AgentKernelHost {
   private traceCorrelation: TraceCorrelationService;
   private readonly evalRuns = new Map<string, PendingEvalRun>();
   private unsubscribeEval: (() => void) | null = null;
+  private disposed = false;
 
   constructor() {
     // Resource paths come from ResourceLocator: the repo root in dev, the app
@@ -348,6 +362,7 @@ export class AgentKernelHost {
     });
     this.diffRepository = new ResearchDiffRepository(new JsonFileStore(userData));
     this.importRepository = new ManualPortfolioRepository(new JsonFileStore(userData));
+    this.contextRepository = new PortfolioContextRepository(new JsonFileStore(userData));
 
     // V5 market pulse + performance (spec §50–52, §36–38).
     this.pulseService = new PulseService({
@@ -360,6 +375,12 @@ export class AgentKernelHost {
     // V5 scheduled research (spec §21–25): five default rules, seeded once.
     this.automationRules = new AutomationRuleRepository(new JsonFileStore(userData));
     this.automationRuns = new AutomationRunRepository(new JsonFileStore(userData));
+    this.backgroundJobs = new BackgroundJobRepository(new JsonFileStore(userData));
+    this.backgroundScheduler = new BackgroundJobScheduler(this.backgroundJobs, {
+      run: async (job) => this.executeBackgroundJob(job),
+    }, {
+      notify: (notification) => this.dispatchStoredNotification(notification),
+    });
     void this.seedAutomationRules();
 
     this.thesisRepository = new ThesisRepository({ storageDir: join(userData, 'thesis') });
@@ -487,17 +508,58 @@ export class AgentKernelHost {
           entry.toUpperCase()
         );
       }
+      if (typeof context.branchId === 'string' && context.branchId.trim()) {
+        workspaceContext.branchId = context.branchId.trim();
+      }
+      if (Array.isArray(context.contextSelections)) {
+        workspaceContext.contextSelections = context.contextSelections.map((value, index) =>
+          parseSelection(value, `workspaceContext.contextSelections[${index}]`)
+        ).filter((selection): selection is ContextSelection => selection !== undefined);
+      }
     }
     // V8: new agent responses follow the *effective* app locale unless the
     // user explicitly requests another language in the prompt (spec §41–42).
     // Resolved after validation and with a safe fallback so a prefs failure
     // can never block an agent run (failure-isolation, spec §87).
-    return this.kernel.runs.startRun(
-      requireString(request.sessionId, 'sessionId'),
+    const sessionId = requireString(request.sessionId, 'sessionId');
+    const snapshots = [];
+    for (const selection of workspaceContext?.contextSelections ?? []) {
+      snapshots.push(await this.contextRepository.snapshot(selection, workspaceContext?.activeSymbol ? [workspaceContext.activeSymbol] : undefined));
+    }
+    if (snapshots.length > 0 && workspaceContext) workspaceContext.contextSnapshots = snapshots;
+    const run = await this.kernel.runs.startRun(
+      sessionId,
       requireString(request.content, 'content'),
       workspaceContext,
       await this.effectiveRunLocale()
     );
+    if (snapshots.length > 0) {
+      try {
+        await this.contextRepository.bindSnapshots({ runId: run.id, sessionId, branchId: workspaceContext?.branchId ?? 'main', snapshots });
+      } catch (error) {
+        await this.kernel.runs.cancelRun(sessionId, run.id).catch(() => undefined);
+        throw error;
+      }
+    }
+    return run;
+  }
+
+  async contextList(): Promise<{ watchlists: import('@finagent/core').VersionedWatchlist[]; portfolios: import('@finagent/core').VersionedPortfolioContext[] }> {
+    const [watchlists, portfolios] = await Promise.all([this.contextRepository.listWatchlists(), this.contextRepository.listPortfolios()]);
+    return { watchlists, portfolios };
+  }
+
+  async contextSaveWatchlist(input: unknown): Promise<import('@finagent/core').VersionedWatchlist> {
+    return this.contextRepository.saveWatchlist(parseWatchlistInput(input));
+  }
+
+  async contextSavePortfolio(input: unknown): Promise<import('@finagent/core').VersionedPortfolioContext> {
+    return this.contextRepository.savePortfolio(parsePortfolioInput(input));
+  }
+
+  async contextGetRun(input: unknown): Promise<unknown> {
+    const request = requireObject(input);
+    return this.contextRepository.getRunContext(requireString(request.runId, 'runId'), requireString(request.sessionId, 'sessionId'), requireString(request.branchId, 'branchId'));
   }
 
   private async effectiveRunLocale(): Promise<SupportedLocale> {
@@ -1843,6 +1905,76 @@ export class AgentKernelHost {
     return reportToMarkdown(redactForShare(report));
   }
 
+  async backgroundListJobs(): Promise<BackgroundJob[]> { return this.backgroundJobs.listJobs(); }
+  async backgroundSaveJob(input: unknown): Promise<BackgroundJob> { return this.backgroundJobs.saveJob(parseBackgroundJobInput(input)); }
+  async backgroundSetEnabled(input: unknown): Promise<BackgroundJob | undefined> {
+    const request = requireObject(input);
+    return this.backgroundJobs.setEnabled(requireString(request.jobId, 'jobId'), request.enabled === true);
+  }
+  async backgroundRemoveJob(input: unknown): Promise<void> { await this.backgroundJobs.removeJob(requireString(requireObject(input).jobId, 'jobId')); }
+  async backgroundListRuns(input: unknown): Promise<import('@finagent/core').BackgroundJobRun[]> {
+    const request = requireObject(input);
+    return this.backgroundJobs.listRuns(typeof request.jobId === 'string' ? request.jobId : undefined);
+  }
+  async backgroundListNotifications(): Promise<StoredNotification[]> { return this.backgroundJobs.listNotifications(); }
+
+  private async executeBackgroundJob(job: BackgroundJob): Promise<{ productionRunId?: string; notificationKind?: StoredNotification['kind'] }> {
+    const explicitSymbol = typeof job.input.symbol === 'string' ? job.input.symbol.toUpperCase() : undefined;
+    const target = job.targetContext ? await this.contextRepository.get(job.targetContext) : undefined;
+    const contextSymbols = target
+      ? ('instruments' in target ? target.instruments.map((item) => item.instrumentId) : target.positions.map((item) => item.instrumentId))
+      : [];
+    const symbols = [...new Set([...(explicitSymbol ? [explicitSymbol] : []), ...contextSymbols])];
+    if (symbols.length === 0) throw createCodeError('BACKGROUND_INPUT_INVALID', 'A canonical symbol or non-empty target context is required.');
+    let productionRunId: string | undefined;
+    for (const symbol of symbols) {
+      const summary = await this.researchService.start(symbol, undefined, await this.effectiveRunLocale());
+      const finished = await this.waitForResearchRun(summary.id);
+      if (finished.status === 'failed' || finished.status === 'cancelled') throw createCodeError('BACKGROUND_RESEARCH_FAILED', `Research ${finished.status} for ${symbol}.`);
+      productionRunId = finished.reportId ?? finished.id;
+    }
+    return { productionRunId, notificationKind: job.type === 'filing-check' ? 'filing-found' : job.type === 'watchlist-digest' ? 'digest-ready' : 'completed' };
+  }
+
+  private async waitForResearchRun(runId: string): Promise<ResearchRunSummary> {
+    const deadline = Date.now() + 30 * 60_000;
+    while (!this.disposed && Date.now() < deadline) {
+      const summary = await this.researchService.getRun(runId);
+      if (summary && ['completed', 'partial', 'failed', 'cancelled'].includes(summary.status)) return summary;
+      await new Promise((resolve) => setTimeout(resolve, 250));
+    }
+    throw createCodeError(
+      this.disposed ? 'BACKGROUND_RESEARCH_CANCELLED' : 'BACKGROUND_RESEARCH_TIMEOUT',
+      this.disposed ? 'Background research was cancelled during shutdown.' : 'Research exceeded the background task deadline.'
+    );
+  }
+
+  private dispatchStoredNotification(notification: StoredNotification): void {
+    this.dispatchNotification({
+      id: notification.id,
+      source: 'automation',
+      title: notification.title,
+      message: notification.message,
+      at: notification.createdAt,
+      severity: notification.kind === 'failed' ? 'warning' : 'info',
+      payload: { jobId: notification.jobId, runId: notification.runId, deepLink: notification.deepLink },
+    });
+  }
+
+  async exportHtml(input: unknown): Promise<string> {
+    const request = requireObject(input);
+    const report = await this.researchService.getReport(requireString(request.reportId, 'reportId'));
+    if (!report) throw createCodeError('REPORT_NOT_FOUND', 'Unknown research report.');
+    return reportToHtml(redactForShare(report));
+  }
+
+  async exportJson(input: unknown): Promise<string> {
+    const request = requireObject(input);
+    const report = await this.researchService.getReport(requireString(request.reportId, 'reportId'));
+    if (!report) throw createCodeError('REPORT_NOT_FOUND', 'Unknown research report.');
+    return reportToJson(redactForShare(report));
+  }
+
   async exportShareCard(input: unknown): Promise<ShareCard> {
     const request = requireObject(input);
     const report = await this.researchService.getReport(requireString(request.reportId, 'reportId'));
@@ -1915,7 +2047,9 @@ export class AgentKernelHost {
   private startAutomationScheduler(): void {
     this.automationTimer = setInterval(() => {
       void this.tickAutomations();
+      void this.backgroundScheduler.tick().catch(() => undefined);
     }, 60_000);
+    void this.backgroundScheduler.tick().catch(() => undefined);
   }
 
   private async tickAutomations(): Promise<void> {
@@ -1968,7 +2102,15 @@ export class AgentKernelHost {
   private dispatchNotification(event: NotificationEvent): void {
     try {
       if (Notification.isSupported()) {
-        new Notification({ title: event.title, body: event.message }).show();
+        const notification = new Notification({ title: event.title, body: event.message });
+        notification.on('click', () => {
+          if (!this.window || this.window.isDestroyed()) return;
+          this.window.show();
+          this.window.focus();
+          const deepLink = event.payload?.deepLink;
+          if (typeof deepLink === 'string' && deepLink.startsWith('/')) this.window.webContents.send('notification:open', deepLink);
+        });
+        notification.show();
       }
     } catch {
       // OS notification best-effort.
@@ -2135,6 +2277,9 @@ export class AgentKernelHost {
   }
 
   async dispose() {
+    this.disposed = true;
+    if (this.automationTimer) clearInterval(this.automationTimer);
+    this.automationTimer = null;
     this.alertEngine.stop();
     this.unsubscribe?.();
     this.unsubscribe = null;
@@ -2244,6 +2389,98 @@ function requireObject(value: unknown): Record<string, unknown> {
     throw createCodeError('INVALID_ARGUMENT', 'Expected an object payload.');
   }
   return value as Record<string, unknown>;
+}
+
+const CANONICAL_INSTRUMENT = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
+const BACKGROUND_TYPES = new Set<BackgroundJob['type']>(['research', 'watchlist-digest', 'filing-check']);
+const BACKGROUND_STATUSES = new Set<BackgroundJob['status']>(['scheduled', 'running', 'succeeded', 'failed', 'cancelled', 'missed']);
+
+function boundedString(value: unknown, field: string, max = 240): string {
+  const result = requireString(value, field).trim();
+  if (result.length > max) throw createCodeError('INVALID_ARGUMENT', `${field} is too long.`);
+  return result;
+}
+
+function finiteNumber(value: unknown, field: string): number {
+  if (typeof value !== 'number' || !Number.isFinite(value)) throw createCodeError('INVALID_ARGUMENT', `${field} must be a finite number.`);
+  return value;
+}
+
+function canonicalInstrument(value: unknown, field: string): string {
+  const instrument = boundedString(value, field, 32).toUpperCase();
+  if (!CANONICAL_INSTRUMENT.test(instrument)) throw createCodeError('INVALID_ARGUMENT', `${field} must be a canonical instrument id.`);
+  return instrument;
+}
+
+function parseSelection(value: unknown, field = 'targetContext'): ContextSelection | undefined {
+  if (value === undefined) return undefined;
+  const input = requireObject(value);
+  if (input.kind !== 'watchlist' && input.kind !== 'portfolio') throw createCodeError('INVALID_ARGUMENT', `${field}.kind is invalid.`);
+  return { kind: input.kind, id: boundedString(input.id, `${field}.id`, 120) };
+}
+
+function parseWatchlistInput(value: unknown): Omit<VersionedWatchlist, 'version' | 'createdAt' | 'updatedAt'> {
+  const input = requireObject(value);
+  const instruments = input.instruments;
+  if (!Array.isArray(instruments) || instruments.length > 500) throw createCodeError('INVALID_ARGUMENT', 'instruments must contain at most 500 entries.');
+  return {
+    id: boundedString(input.id, 'id', 120),
+    name: boundedString(input.name, 'name'),
+    instruments: instruments.map((entry, index) => {
+      const item = requireObject(entry);
+      return { instrumentId: canonicalInstrument(item.instrumentId, `instruments[${index}].instrumentId`) };
+    }),
+  };
+}
+
+function parsePortfolioInput(value: unknown): Omit<VersionedPortfolioContext, 'version' | 'createdAt' | 'updatedAt'> {
+  const input = requireObject(value);
+  if (!Array.isArray(input.positions) || input.positions.length > 500) throw createCodeError('INVALID_ARGUMENT', 'positions must contain at most 500 entries.');
+  return {
+    id: boundedString(input.id, 'id', 120),
+    name: boundedString(input.name, 'name'),
+    asOf: finiteNumber(input.asOf, 'asOf'),
+    positions: input.positions.map((entry, index) => {
+      const item = requireObject(entry);
+      const optionalNumber = (field: string): number | undefined => item[field] === undefined ? undefined : finiteNumber(item[field], `positions[${index}].${field}`);
+      return {
+        instrumentId: canonicalInstrument(item.instrumentId, `positions[${index}].instrumentId`),
+        nativeCurrency: boundedString(item.nativeCurrency, `positions[${index}].nativeCurrency`, 12),
+        quantity: optionalNumber('quantity'), weight: optionalNumber('weight'), costBasis: optionalNumber('costBasis'),
+      };
+    }),
+  };
+}
+
+function parseBackgroundJobInput(value: unknown): BackgroundJob {
+  const input = requireObject(value);
+  if (typeof input.type !== 'string' || !BACKGROUND_TYPES.has(input.type as BackgroundJob['type'])) throw createCodeError('INVALID_ARGUMENT', 'type is not a supported background job type.');
+  const schedule = requireObject(input.schedule);
+  const retryPolicy = requireObject(input.retryPolicy);
+  const notificationPolicy = requireObject(input.notificationPolicy);
+  const status = input.status;
+  if (typeof status !== 'string' || !BACKGROUND_STATUSES.has(status as BackgroundJob['status'])) throw createCodeError('INVALID_ARGUMENT', 'status is invalid.');
+  if (typeof input.enabled !== 'boolean') throw createCodeError('INVALID_ARGUMENT', 'enabled must be boolean.');
+  if (typeof input.input !== 'object' || input.input === null || Array.isArray(input.input)) throw createCodeError('INVALID_ARGUMENT', 'input must be an object.');
+  const jobInput = input.input as Record<string, unknown>;
+  if (typeof jobInput.symbol === 'string') canonicalInstrument(jobInput.symbol, 'input.symbol');
+  if (JSON.stringify(jobInput).length > 8_192) throw createCodeError('INVALID_ARGUMENT', 'input is too large.');
+  const intervalMs = finiteNumber(schedule.intervalMs, 'schedule.intervalMs');
+  const maxAttempts = finiteNumber(retryPolicy.maxAttempts, 'retryPolicy.maxAttempts');
+  const initialBackoffMs = finiteNumber(retryPolicy.initialBackoffMs, 'retryPolicy.initialBackoffMs');
+  const maxBackoffMs = finiteNumber(retryPolicy.maxBackoffMs, 'retryPolicy.maxBackoffMs');
+  if (intervalMs < 1_000 || intervalMs > 365 * 24 * 60 * 60_000 || !Number.isInteger(maxAttempts) || maxAttempts < 1 || maxAttempts > 10 || initialBackoffMs < 0 || initialBackoffMs > 24 * 60 * 60_000 || maxBackoffMs < initialBackoffMs || maxBackoffMs > 24 * 60 * 60_000) throw createCodeError('INVALID_ARGUMENT', 'schedule/retry policy is outside supported bounds.');
+  if (typeof notificationPolicy.onSuccess !== 'boolean' || typeof notificationPolicy.onFailure !== 'boolean' || typeof notificationPolicy.sensitivePreview !== 'boolean') throw createCodeError('INVALID_ARGUMENT', 'notificationPolicy flags must be boolean.');
+  return {
+    id: boundedString(input.id, 'id', 120), type: input.type as BackgroundJob['type'], enabled: input.enabled,
+    schedule: { intervalMs }, input: jobInput, targetContext: parseSelection(input.targetContext),
+    createdAt: finiteNumber(input.createdAt, 'createdAt'), nextRunAt: finiteNumber(input.nextRunAt, 'nextRunAt'),
+    ...(input.lastRunAt === undefined ? {} : { lastRunAt: finiteNumber(input.lastRunAt, 'lastRunAt') }),
+    ...(input.lastRunId === undefined ? {} : { lastRunId: boundedString(input.lastRunId, 'lastRunId', 120) }),
+    status: status as BackgroundJob['status'], retryPolicy: { maxAttempts, initialBackoffMs, maxBackoffMs },
+    missedRunPolicy: input.missedRunPolicy === 'skip' ? 'skip' : input.missedRunPolicy === 'catch-up' ? 'catch-up' : (() => { throw createCodeError('INVALID_ARGUMENT', 'missedRunPolicy is invalid.'); })(),
+    notificationPolicy: { onSuccess: notificationPolicy.onSuccess, onFailure: notificationPolicy.onFailure, sensitivePreview: notificationPolicy.sensitivePreview },
+  };
 }
 
 function createCodeError(code: string, message: string, action?: string) {

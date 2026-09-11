@@ -526,7 +526,7 @@ describe('PiRuntimeAdapter', () => {
     await adapter.ensureSession({ id: 's2' });
     await adapter.ensureSession({ id: 's1' });
 
-    expect(switched).toEqual(['/tmp/pi/s1.jsonl', '/tmp/pi/s2.jsonl', '/tmp/pi/s1.jsonl']);
+    expect(switched.map((path) => path.replaceAll('\\', '/'))).toEqual(['/tmp/pi/s1.jsonl', '/tmp/pi/s2.jsonl', '/tmp/pi/s1.jsonl']);
   });
 
   it('ends a cancelled run with a RUN_CANCELLED failure event', async () => {

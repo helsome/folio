@@ -223,6 +223,8 @@ export const research = {
   export: {
     copyMarkdown: '复制 Markdown',
     downloadMarkdown: '下载 .md',
+    downloadHtml: '下载可打印 HTML',
+    downloadJson: '下载归档 JSON',
     copyShareText: '复制分享文案',
     downloadShareCard: '下载分享卡片 .svg',
     working: '处理中…',

@@ -11,6 +11,8 @@ let clipboardWrites: string[] = [];
 let lastDownload: { name: string; href: string } | null = null;
 const markdownCalls: Array<{ reportId: string }> = [];
 const shareCardCalls: Array<{ reportId: string }> = [];
+const htmlCalls: Array<{ reportId: string }> = [];
+const jsonCalls: Array<{ reportId: string }> = [];
 const markdownMock = async (input: { reportId: string }) => {
   markdownCalls.push(input);
   return { ok: true as const, data: '**markdown**' };
@@ -19,6 +21,8 @@ const shareCardMock = async (input: { reportId: string }) => {
   shareCardCalls.push(input);
   return { ok: true as const, data: { svg: '<svg xmlns="http://www.w3.org/2000/svg"/>', text: 'share text' } };
 };
+const htmlMock = async (input: { reportId: string }) => { htmlCalls.push(input); return { ok: true as const, data: '<html></html>' }; };
+const jsonMock = async (input: { reportId: string }) => { jsonCalls.push(input); return { ok: true as const, data: '{"schemaVersion":"folio-report-export-v1"}' }; };
 let originalClipboard: Clipboard | undefined;
 let anchorElement: { prototype: { click: () => void } } | undefined;
 let originalClick: (() => void) | undefined;
@@ -27,7 +31,7 @@ let originalRevokeObjectUrl: typeof URL.revokeObjectURL | undefined;
 
 beforeAll(() => {
   restoreDom = installHappyDom().restore;
-  (window as { electronAPI?: unknown }).electronAPI = { export: { markdown: markdownMock, shareCard: shareCardMock } };
+  (window as { electronAPI?: unknown }).electronAPI = { export: { markdown: markdownMock, html: htmlMock, json: jsonMock, shareCard: shareCardMock } };
 
   originalClipboard = navigator.clipboard;
   Object.defineProperty(navigator, 'clipboard', {
@@ -73,6 +77,8 @@ beforeEach(() => {
   lastDownload = null;
   markdownCalls.length = 0;
   shareCardCalls.length = 0;
+  htmlCalls.length = 0;
+  jsonCalls.length = 0;
 });
 
 function report(): ResearchReport {
@@ -115,7 +121,7 @@ function byTestId(container: HTMLElement, testId: string): HTMLElement | null {
 }
 
 describe('ExportMenu', () => {
-  it('opens a menu with all four export actions', async () => {
+  it('opens a menu with all report and share export actions', async () => {
     const { container, root } = renderMenu();
     expect(byTestId(container, 'export-menu-panel')).toBeNull();
     act(() => {
@@ -126,6 +132,8 @@ describe('ExportMenu', () => {
     for (const testId of [
       'export-copy-markdown',
       'export-download-markdown',
+      'export-download-html',
+      'export-download-json',
       'export-copy-share-text',
       'export-download-card',
     ]) {
@@ -135,6 +143,19 @@ describe('ExportMenu', () => {
       root.unmount();
     });
     container.remove();
+  });
+
+  it('downloads printable HTML and archive JSON', async () => {
+    for (const [testId, expectedName] of [['export-download-html', 'AAPL.US-research.html'], ['export-download-json', 'AAPL.US-research.json']] as const) {
+      const { container, root } = renderMenu();
+      act(() => { byTestId(container, 'export-menu-trigger')?.click(); });
+      await act(async () => { byTestId(container, testId)?.click(); await new Promise((resolve) => setTimeout(resolve, 10)); });
+      expect(lastDownload?.name).toBe(expectedName);
+      act(() => { root.unmount(); });
+      container.remove();
+    }
+    expect(htmlCalls).toEqual([{ reportId: 'rpt_ui_1' }]);
+    expect(jsonCalls).toEqual([{ reportId: 'rpt_ui_1' }]);
   });
 
   it('Copy Markdown calls the markdown loader and writes the clipboard', async () => {
@@ -220,7 +241,7 @@ describe('ExportMenu', () => {
     expect(markdownCalls).toEqual([]);
     expect(byTestId(container, 'export-menu-error')?.textContent).toContain('Export unavailable');
     (window as { electronAPI?: unknown }).electronAPI = {
-      export: { markdown: markdownMock, shareCard: shareCardMock },
+      export: { markdown: markdownMock, html: htmlMock, json: jsonMock, shareCard: shareCardMock },
     };
     act(() => {
       root.unmount();

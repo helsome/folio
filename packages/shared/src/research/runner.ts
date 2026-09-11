@@ -8,6 +8,7 @@ import type {
   ResearchSection,
   ResearchSynthesis,
   ResearchSynthesizer,
+  NewsItem,
   StrategyId,
 } from '@finagent/core';
 import { i18nCurrentLocale } from '@finagent/i18n';
@@ -192,10 +193,7 @@ function buildDataBundle(outcomes: RunOutcome[]): string {
   const bundle: Record<string, unknown> = {};
   for (const outcome of outcomes) {
     if (outcome.record.status === 'success' && outcome.result) {
-      bundle[outcome.record.capabilityId] = truncateData(
-        outcome.record.capabilityId,
-        outcome.result.data
-      );
+      bundle[outcome.record.capabilityId] = truncateData(outcome.record.capabilityId, outcome.result.data);
     }
   }
   return JSON.stringify(bundle);
@@ -236,7 +234,21 @@ function assembleReport(args: {
   const sections: ResearchSection[] = synthesis.sections.map((section) => {
     const outcome = outcomeByCapability.get(section.key);
     const evidence: EvidenceRef[] = [];
-    if (outcome && outcome.record.status === 'success') {
+    if (outcome && outcome.record.status === 'success' && section.key === 'research.news' && Array.isArray(outcome.result?.data)) {
+      for (const item of (outcome.result.data as NewsItem[]).slice(0, 10)) {
+        evidence.push({
+          capabilityId: outcome.record.capabilityId,
+          runId: outcome.record.id,
+          claim: item.title,
+          fetchedAt: outcome.record.provenance?.fetchedAt ?? generatedAt,
+          summary: item.summary,
+          sourceId: item.id,
+          sourceUrl: item.url,
+          provider: outcome.result.provenance.providerId ?? outcome.result.provenance.provider,
+          status: 'available',
+        });
+      }
+    } else if (outcome && outcome.record.status === 'success') {
       evidence.push({
         capabilityId: outcome.record.capabilityId,
         runId: outcome.record.id,
@@ -293,5 +305,8 @@ function assembleReport(args: {
     risks: synthesis.risks,
     capabilityRuns,
     runStatus: computeRunStatus(plan, successIds),
+    runManifest: {
+      runId,
+    },
   };
 }

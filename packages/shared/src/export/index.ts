@@ -10,3 +10,12 @@
 export { reportToMarkdown, strategyName, STANCE_LABEL, VERDICT_LABEL, type MarkdownOptions } from './markdown.ts'
 export { escapeXml, pickShareSections, reportToShareCard, wrapText, type ShareCard } from './card.ts'
 export { ACCOUNT_LIKE_KEY, redactForShare } from './privacy.ts'
+export {
+  citationIndex,
+  reportExportBundle,
+  reportToArchive,
+  reportToHtml,
+  reportToJson,
+  type ExportCitation,
+  type ResearchArchive,
+} from './artifact.ts'

@@ -1,6 +1,7 @@
 // Core type definitions for Finagent
 
 import type { SupportedLocale } from './locale.ts';
+import type { ContextSelection, ContextSnapshot } from './portfolio-context.ts';
 
 export type { SupportedLocale, LocalePreference } from './locale.ts';
 
@@ -393,6 +394,12 @@ export interface WorkspaceContext {
   selectedPosition?: string;
   /** Set when the Compare workspace is focused; feeds the compare agent context. */
   comparisonSymbols?: string[];
+  /** Explicit user-selected persistent contexts for this run. */
+  contextSelections?: ContextSelection[];
+  /** Frozen main-process snapshots actually supplied to the model. */
+  contextSnapshots?: ContextSnapshot[];
+  /** Conversation branch scope used to prevent cross-branch context reads. */
+  branchId?: string;
 }
 
 export interface AgentRunInput {
@@ -564,3 +571,5 @@ export * from './evaluation.ts';
 export * from './locale.ts';
 export * from './trace.ts';
 export * from './trace-projection.ts';
+export * from './portfolio-context.ts';
+export * from './background-job.ts';

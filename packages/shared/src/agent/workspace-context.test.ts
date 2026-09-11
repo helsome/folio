@@ -104,6 +104,24 @@ describe('WorkspaceContext → prompt', () => {
     expect(events).toContain('run_completed');
   });
 
+  it('injects only the explicit frozen context snapshot and labels it non-evidence', async () => {
+    const proc = new FakePiProcess();
+    const client = new PiRpcClient({ spawnProcess: createSpawn(proc) });
+    const adapter = new PiRuntimeAdapter({ rpcClient: client, sessionDir: '/tmp/ws-test' });
+    for await (const _event of adapter.run({
+      sessionId: 's-context', runId: 'r-context', content: 'review my holdings',
+      workspaceContext: { branchId: 'main', contextSnapshots: [{
+        id: 'ctx-1', kind: 'portfolio', sourceId: 'portfolio-1', sourceVersion: 3, createdAt: 100,
+        document: { id: 'portfolio-1', name: 'Core', version: 3, asOf: 90, createdAt: 1, updatedAt: 90, positions: [{ instrumentId: 'AAPL.US', quantity: 10, nativeCurrency: 'USD' }] },
+      }] },
+    })) {}
+    const prompt = proc.received.find((line) => line.type === 'prompt');
+    const message = String(prompt?.message ?? '');
+    expect(message).toContain('portfolio:portfolio-1@v3 snapshot=ctx-1');
+    expect(message).toContain('"instrumentId":"AAPL.US"');
+    expect(message).toContain('not external evidence');
+  });
+
   it('omits the workspace section when no context is provided', async () => {
     const proc = new FakePiProcess();
     const client = new PiRpcClient({ spawnProcess: createSpawn(proc) });
