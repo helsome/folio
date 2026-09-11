@@ -24,6 +24,10 @@ import {
   planForStrategy,
   type PlannedCapability,
 } from './planner.ts';
+import {
+  rankRetrievalSources,
+  type RetrievalSourceInput,
+} from '../retrieval/index.ts';
 
 const CONCURRENCY = 4;
 const TIMEOUT_MS = 20000;
@@ -183,7 +187,7 @@ export class ResearchRunner {
     });
 
     const runs = buildRuns(plan, outcomes);
-    const dataBundle = buildDataBundle(outcomes);
+    const dataBundle = buildDataBundle(outcomes, symbol, this.now());
 
     let synthesis: ResearchSynthesis;
     try {
@@ -270,29 +274,106 @@ function buildRuns(plan: PlannedCapability[], outcomes: RunOutcome[]) {
   });
 }
 
-function buildDataBundle(outcomes: RunOutcome[]): string {
+function buildDataBundle(
+  outcomes: RunOutcome[],
+  query: string,
+  now: number
+): string {
   const bundle: Record<string, unknown> = {};
   for (const outcome of outcomes) {
     if (outcome.record.status === 'success' && outcome.result) {
-      const data = truncateData(outcome.record.capabilityId, outcome.result.data);
-      // Security: external-text capabilities (news) are labeled untrusted so
-      // the synthesizer treats their prose as attributed claims, never
-      // instructions. Text was already sanitized at the capability boundary.
-      bundle[outcome.record.capabilityId] = outcome.record.capabilityId === 'research.news'
-        ? { trust: 'untrusted', provider: outcome.result.provenance?.provider ?? 'unknown', items: data }
-        : data;
+      if (
+        outcome.record.capabilityId === 'research.news' &&
+        Array.isArray(outcome.result.data)
+      ) {
+        const sources = toRetrievalSources(
+          outcome.result.data,
+          outcome.result.provenance.provider
+        );
+        const ranking = rankRetrievalSources(sources, {
+          query,
+          now,
+          topK: 10,
+          maxPerDomain: 2,
+        });
+        // Security: preserve the untrusted-content envelope added upstream
+        // while ranking and deduplicating the news items inside it.
+        bundle[outcome.record.capabilityId] = {
+          trust: 'untrusted',
+          provider: outcome.result.provenance?.provider ?? 'unknown',
+          items: ranking.selected.map((item) => ({
+            ...item.source,
+            canonicalUrl: item.canonicalUrl,
+            sourceClass: item.sourceClass,
+            clusterId: item.clusterId,
+            qualityScore: item.qualityScore,
+          })),
+        };
+        bundle['research.news:ranking'] = {
+          policyVersion: ranking.policyVersion,
+          independentSourceCount: ranking.independentSourceCount,
+          clusters: ranking.clusters,
+          decisions: [...ranking.selected, ...ranking.dropped].map((item) => ({
+            sourceId: item.source.id,
+            originalRank: item.originalRank,
+            clusterId: item.clusterId,
+            selected: item.selected,
+            reason: item.decisionReason,
+          })),
+        };
+        continue;
+      }
+      const data = truncateData(
+        outcome.record.capabilityId,
+        outcome.result.data
+      );
+      bundle[outcome.record.capabilityId] = data;
     }
   }
   return JSON.stringify(bundle);
+}
+
+function toRetrievalSources(
+  data: unknown[],
+  provider: string
+): RetrievalSourceInput[] {
+  const sources: RetrievalSourceInput[] = [];
+  for (let index = 0; index < data.length; index += 1) {
+    const item = data[index];
+    if (item === null || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    if (typeof record.title !== 'string' || typeof record.url !== 'string') {
+      continue;
+    }
+    const rawTimestamp =
+      typeof record.timestamp === 'number' ? record.timestamp : undefined;
+    const publishedAt =
+      rawTimestamp === undefined
+        ? undefined
+        : rawTimestamp < 10_000_000_000
+          ? rawTimestamp * 1000
+          : rawTimestamp;
+    sources.push({
+      id:
+        typeof record.id === 'string' && record.id.length > 0
+          ? record.id
+          : provider + ':' + index,
+      title: record.title,
+      url: record.url,
+      excerpt:
+        typeof record.summary === 'string' ? record.summary : undefined,
+      publishedAt,
+      provider,
+      available: true,
+    });
+  }
+  return sources;
 }
 
 function truncateData(capabilityId: string, data: unknown): unknown {
   if (!Array.isArray(data)) return data;
   if (capabilityId === 'market.kline' || capabilityId === 'market.intraday') {
     return data.slice(-60);
-  }
-  if (capabilityId === 'research.news') {
-    return data.slice(0, 10);
   }
   return data;
 }
