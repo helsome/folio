@@ -1,4 +1,4 @@
-// Embedded benchmark datasets (spec §22). Add new datasets here to ship with the app.
+﻿// Embedded benchmark datasets (spec 搂22). Add new datasets here to ship with the app.
 import type { EmbeddedDataset } from '../datasets.ts';
 import { folioAgentV1Dataset } from './folio-agent-v1.ts';
 import { folioAgentV1ZhDataset } from './folio-agent-v1-zh.ts';

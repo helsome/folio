@@ -1,4 +1,4 @@
-{
+﻿{
   "name": "finagent",
   "version": "0.4.0-beta.2",
   "private": true,
@@ -17,6 +17,7 @@
     "test:unit": "bun test --isolate",
     "test:integration": "bun test --isolate && bun run typecheck",
     "eval:smoke": "bun scripts/eval/run.ts --smoke",
+    "eval:gold": "bun scripts/eval/gold-check.ts",
     "eval:full": "bun scripts/eval/run.ts",
     "test:ui": "bun test packages/ui",
     "test:e2e": "cd apps/electron && bun run test:e2e",
