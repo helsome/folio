@@ -28,7 +28,7 @@ export const connections = {
   reconnect: 'Reconnect',
   installSetup: 'Install / Setup',
   byokNote:
-    'Your own key governs usage. Free tiers may return end-of-day data (5 calls/min) and require attribution ("Powered by Polygon.io").',
+    'Your own key governs usage. Massive may return delayed or end-of-day data and may require attribution ("Powered by Polygon.io").',
   dismissError: 'Dismiss error',
   dismiss: 'Dismiss',
   portfolioReady: 'Portfolio ✓',

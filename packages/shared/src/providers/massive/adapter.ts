@@ -25,12 +25,12 @@ import { TtlCache } from './cache.ts'
  *   the `apiKey` query param; legacy Polygon used a `Bearer` header. We try the
  *   documented query-param form first and fall back to the Bearer header on a
  *   401, per the decision doc's risk note.
- * - Freshness: the free "Stocks Basic" tier is end-of-day, so every result is
- *   marked `delayed: true`. A small TTL cache respects the 5 calls/min cap.
+ * - Freshness: Massive responses are treated as delayed, so every result is
+ *   marked `delayed: true`. A small TTL cache helps respect provider limits.
  *
- * LICENSING: the free tier is "Individual use" only; a commercial ship requires
- * a Massive Business plan, and "Powered by Polygon.io" display attribution may
- * be required. See `./index.ts` and report to the Connections UI owner.
+ * LICENSING: Massive usage and attribution requirements depend on the
+ * provider plan and applicable Market Data Terms of Service. Surface any
+ * required attribution in the Connections UI.
  */
 
 const PROVIDER_ID = 'massive'
@@ -117,7 +117,7 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
     return {
       status: 'connected',
       lastCheck: Date.now(),
-      message: 'Connected with your API key (free tier serves end-of-day data)',
+      message: 'Connected with your API key (Massive data may be delayed)',
       permissions: [...DELAYED_PERMISSIONS],
     }
   }
@@ -202,8 +202,19 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
     switch (capabilityId) {
       case 'market.quote': {
         const path = `/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(ticker)}`
-        const payload = await getJson(path, apiKey, signal)
-        const quote = mapQuote(symbol, payload)
+        let quote: Quote
+        try {
+          const payload = await getJson(path, apiKey, signal)
+          quote = mapQuote(symbol, payload)
+        } catch (error) {
+          // Snapshot quotes may be unavailable for some Massive accounts. The
+          // daily aggregate endpoint provides a canonical delayed quote for
+          // the gateway.
+          if (!(error instanceof ProviderHttpError) || error.providerError.code !== 'AUTH_EXPIRED') {
+            throw error
+          }
+          quote = await fetchAggregateQuote(ticker, symbol, apiKey, signal)
+        }
         return { ok: true, data: quote, provenance: provenance(quote.timestamp) }
       }
       case 'market.kline': {
@@ -240,6 +251,37 @@ async function getJson(path: string, apiKey: string, signal?: AbortSignal): Prom
       code: 'PARSE_FAILURE',
       message: 'Unexpected response from the data provider',
     })
+  }
+}
+
+async function fetchAggregateQuote(
+  ticker: string,
+  symbol: string,
+  apiKey: string,
+  signal?: AbortSignal
+): Promise<Quote> {
+  const { from, to } = klineRange(5)
+  const path = `/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/1/day/${from}/${to}`
+  const payload = await getJson(buildAggsUrl(path, 5), apiKey, signal)
+  const bars = mapKlines(symbol, payload)
+  const latest = bars[bars.length - 1]
+  if (!latest) {
+    throw new ProviderHttpError({ code: 'NOT_FOUND', message: 'No data found for this symbol.' })
+  }
+  const previous = bars[bars.length - 2]
+  const prevClose = previous?.close ?? latest.open
+  const change = latest.close - prevClose
+  return {
+    symbol,
+    lastPrice: latest.close,
+    change,
+    changePercent: prevClose === 0 ? 0 : (change / prevClose) * 100,
+    volume: latest.volume,
+    timestamp: latest.timestamp,
+    high: latest.high,
+    low: latest.low,
+    open: latest.open,
+    prevClose,
   }
 }
 
@@ -424,9 +466,9 @@ function mapKlines(symbol: string, payload: unknown): Kline[] {
 }
 
 /**
- * Maps ticker details into the core `StaticInfo` subset the free tier can
- * actually fill: `symbol`, `name`, `exchange` (primary_exchange), and
- * `currency` (currency_name). Left empty on purpose:
+ * Maps ticker details into the core `StaticInfo` subset Massive can fill:
+ * `symbol`, `name`, `exchange` (primary_exchange), and `currency`
+ * (currency_name). Left empty on purpose:
  *   - `description`/`sic_description`/`homepage_url`/`market` have no field on
  *     `StaticInfo` (core is not extended — see decision doc), so they are
  *     dropped rather than smuggled onto the neutral shape.

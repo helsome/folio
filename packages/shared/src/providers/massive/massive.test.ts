@@ -91,7 +91,7 @@ describe('MassiveFinancialDataProvider', () => {
     expect(calls[0].url).toContain('/v2/snapshot/locale/us/markets/stocks/tickers/AAPL')
   })
 
-  it('falls back to the previous close when the free tier omits OHLC', async () => {
+  it('falls back to the previous close when the snapshot omits OHLC', async () => {
     installFetch(() =>
       jsonResponse({
         ticker: {
@@ -112,6 +112,38 @@ describe('MassiveFinancialDataProvider', () => {
     expect(result.data.prevClose).toBe(120.44)
     expect(result.data.lastPrice).toBe(120.42)
     expect(result.data.change).toBeCloseTo(-0.02, 5)
+  })
+
+  it('falls back to daily aggregates when snapshot quotes are not entitled', async () => {
+    const calls = installFetch((url) => {
+      if (url.includes('/snapshot/')) return jsonResponse({ status: 'NOT_AUTHORIZED' }, 403)
+      return jsonResponse({
+        ticker: 'AAPL',
+        results: [
+          { c: 122, h: 123, l: 121, o: 121.5, t: 1699559040000, v: 1000 },
+          { c: 120, h: 121, l: 119, o: 119.5, t: 1699472640000, v: 900 },
+        ],
+      })
+    })
+    const provider = makeProvider('key')
+    const result = await provider.execute<Quote>('market.quote', { symbol: 'AAPL.US' })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data).toEqual({
+      symbol: 'AAPL.US',
+      lastPrice: 122,
+      change: 2,
+      changePercent: (2 / 120) * 100,
+      volume: 1000,
+      timestamp: 1699559040,
+      high: 123,
+      low: 121,
+      open: 121.5,
+      prevClose: 120,
+    })
+    expect(calls).toHaveLength(2)
+    expect(calls[1].url).toContain('/v2/aggs/ticker/AAPL/range/1/day/')
   })
 
   it('maps daily aggregates to ascending Kline[]', async () => {

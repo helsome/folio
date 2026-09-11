@@ -21,6 +21,8 @@
     "test:ui": "bun test packages/ui",
     "test:e2e": "cd apps/electron && bun run test:e2e",
     "test:e2e:visible": "cd apps/electron && FINAGENT_E2E_VISIBLE=1 bun run test:e2e",
+    "test:provider-e2e": "bun run scripts/provider-e2e.ts",
+    "test:provider-e2e:guard": "bun test scripts/provider-e2e.test.ts",
     "test:package-smoke": "cd apps/electron && bun run test:package-smoke",
     "test:release": "bun run release:check",
     "release:check": "bun run scripts/release-check.mjs",
