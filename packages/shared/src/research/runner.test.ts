@@ -5,6 +5,7 @@ import { LocalResearchSynthesizer } from './synthesizer-local.ts';
 import { ResearchRunner } from './runner.ts';
 import { fakeCap } from './test-helpers.ts';
 import { RESEARCH_CAPABILITY_PLAN } from './planner.ts';
+import { claimsForEvidence, evidenceForClaim, findUnbackedClaims } from './claim-evidence.ts';
 
 function makeRunner(capabilities: Array<[string, Parameters<typeof fakeCap>[1]?]>) {
   const registry = createCapabilityRegistry(
@@ -64,6 +65,26 @@ describe('ResearchRunner', () => {
     }
   });
 
+  it('gives every claim an id and a link to the evidence it rests on', async () => {
+    const runner = makeRunner(RESEARCH_CAPABILITY_PLAN.map((id) => [id, 'success' as const]));
+    const result = await runner.run({ symbol: 'NVDA.US', runId: 'run-1' });
+    const report = result.report!;
+
+    // One claim per section today; the link must be walkable both ways.
+    expect(report.claims).toHaveLength(report.sections.length);
+    for (const claim of report.claims!) {
+      const refs = evidenceForClaim(report, claim.id);
+      expect(refs).toHaveLength(1);
+      expect(refs[0]!.id).toBeDefined();
+      expect(refs[0]!.capabilityId).toBe(claim.sectionKey);
+      expect(refs[0]!.claimId).toBe(claim.id);
+      expect(claimsForEvidence(report, refs[0]!.id!).map((c) => c.id)).toEqual([claim.id]);
+    }
+
+    // A clean run leaves nothing unbacked.
+    expect(findUnbackedClaims(report)).toEqual([]);
+  });
+
   it('produces a partial report with explicit unavailable + failed entries', async () => {
     // company.financials registered but fails; company.earnings/company.ratings absent.
     const caps: Array<[string, 'success' | 'fail']> = [
@@ -93,6 +114,25 @@ describe('ResearchRunner', () => {
 
     // Absent capabilities are never silently dropped from the report.
     expect(result.report!.capabilityRuns).toHaveLength(RESEARCH_CAPABILITY_PLAN.length);
+  });
+
+  it('keeps the claim of a failed capability, marked as unbacked', async () => {
+    const runner = makeRunner([
+      ['company.profile', 'success'],
+      ['market.quote', 'fail'],
+    ]);
+    const result = await runner.run({ symbol: 'NVDA.US', runId: 'run-5' });
+    const report = result.report!;
+
+    const unbacked = findUnbackedClaims(report);
+    expect(unbacked.map((claim) => claim.sectionKey)).toContain('market.quote');
+    expect(evidenceForClaim(report, 'claim:market.quote:0')).toEqual([]);
+    expect(claimsForEvidence(report, 'evidence:missing')).toEqual([]);
+
+    // The section still exists, so the gap is visible rather than dropped.
+    const quote = report.sections.find((section) => section.key === 'market.quote')!;
+    expect(quote.evidence).toEqual([]);
+    expect(quote.summary).not.toBe('');
   });
 
   it('fails when no capability succeeds', async () => {
