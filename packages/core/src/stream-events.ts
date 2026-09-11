@@ -48,7 +48,7 @@ export interface StreamEventTypeToPayload {
 export type StreamEventPayload = StreamEventTypeToPayload[StreamEventType];
 
 /**
- * 统一事件信封。
+ * 统一事件信封（参数化版本，供内部组合用）。
  * - 幂等键：runId + messageId + sequence。
  * - sequence 为 run 内单调递增；reconnect 以它为游标（lastSequence 补发）。
  * - timestamp 仅用于展示/排序，不作为身份。
@@ -64,7 +64,13 @@ export interface StreamEventEnvelope<T extends StreamEventType = StreamEventType
   payload: StreamEventTypeToPayload[T];
 }
 
-export type StreamEvent<T extends StreamEventType = StreamEventType> = StreamEventEnvelope<T>;
+/**
+ * 可判别事件联合：type 与 payload 强关联，switch/if 收窄后可直接访问
+ * 对应 payload 字段（非简单的 envelope<T = StreamEventType> 索引联合）。
+ */
+export type StreamEvent<T extends StreamEventType = StreamEventType> = {
+  [P in T]: StreamEventEnvelope<P>;
+}[T];
 
 /** 供完整性检查/测试用的枚举列表，必须与 StreamEventType 一一对应。 */
 export const STREAM_EVENT_TYPES = [
