@@ -64,6 +64,7 @@ import type {
   EvaluationRunStatus,
   EvaluationSettings,
   LangSmithConnectionStatus,
+  LangfuseConnectionStatus,
   PrivacyLevel,
   ToolCall,
   ToolCallRecord,
@@ -133,6 +134,12 @@ import {
   EvaluationStore,
   TraceCorrelationService,
   resolveBackend,
+  resolveLangfuseBackend,
+  LangfuseEvaluationBackend,
+  serializeLangfuseCredential,
+  scoresFromAgentRun,
+  scoresFromResearchReport,
+  currentFolioVersion,
   EvaluationRedactor,
   PiRuntimeAdapter,
   sanitizeSettings,
@@ -223,6 +230,7 @@ interface PendingEvalRun {
   startedAt: number;
   toolCalls: ToolCall[];
   answer: string;
+  input?: string;
   error?: ApiError;
 }
 
@@ -274,6 +282,7 @@ export class AgentKernelHost {
   private readonly appPreferences: AppPreferencesService;
   private evaluationSettings: EvaluationSettings;
   private evaluationBackend: EvaluationBackend;
+  private langfuseBackend: LangfuseEvaluationBackend | undefined;
   private evaluationRedactor: EvaluationRedactor;
   private traceCorrelation: TraceCorrelationService;
   private readonly evalRuns = new Map<string, PendingEvalRun>();
@@ -333,6 +342,7 @@ export class AgentKernelHost {
         void this.outcomeService.createOpinionFromReport(report);
         void this.saveDiffForReport(report);
       },
+      onRunComplete: (result) => this.exportResearchTrace(result),
     });
 
     // V5 outcome evaluation: opinions snapshotted from reports, outcomes
@@ -982,8 +992,13 @@ export class AgentKernelHost {
   async getEvaluationSettings(): Promise<{
     settings: EvaluationSettings;
     connection: LangSmithConnectionStatus;
+    langfuse: LangfuseConnectionStatus;
   }> {
-    return { settings: this.evaluationSettings, connection: await this.testEvaluationConnection() };
+    return {
+      settings: this.evaluationSettings,
+      connection: await this.testEvaluationConnection(),
+      langfuse: await this.testLangfuseConnection(),
+    };
   }
 
   async setEvaluationSettings(input: unknown): Promise<EvaluationSettings> {
@@ -993,6 +1008,8 @@ export class AgentKernelHost {
       sanitized.tracingEnabled !== this.evaluationSettings.tracingEnabled ||
       sanitized.langsmithProject !== this.evaluationSettings.langsmithProject ||
       sanitized.langsmithEndpoint !== this.evaluationSettings.langsmithEndpoint ||
+      sanitized.langfuseTracingEnabled !== this.evaluationSettings.langfuseTracingEnabled ||
+      sanitized.langfuseHost !== this.evaluationSettings.langfuseHost ||
       sanitized.privacyLevel !== this.evaluationSettings.privacyLevel;
     this.evaluationSettings = sanitized;
     await this.evaluationStore.saveSettings(sanitized);
@@ -1023,6 +1040,40 @@ export class AgentKernelHost {
     this.evaluationSettings = { ...this.evaluationSettings, apiKeyConfigured: false, updatedAt: Date.now() };
     await this.evaluationStore.saveSettings(this.evaluationSettings);
     await this.refreshEvaluationBackend();
+  }
+
+  async setLangfuseCredential(input: unknown): Promise<void> {
+    const request = requireObject(input);
+    const publicKey = requireString(request.publicKey, 'publicKey');
+    const secretKey = requireString(request.secretKey, 'secretKey');
+    await this.credentials.setCredential('langfuse', serializeLangfuseCredential(publicKey, secretKey));
+    this.evaluationSettings = { ...this.evaluationSettings, langfuseConfigured: true, updatedAt: Date.now() };
+    await this.evaluationStore.saveSettings(this.evaluationSettings);
+    await this.refreshEvaluationBackend();
+  }
+
+  async removeLangfuseCredential(): Promise<void> {
+    await this.credentials.removeCredential('langfuse');
+    this.evaluationSettings = { ...this.evaluationSettings, langfuseConfigured: false, updatedAt: Date.now() };
+    await this.evaluationStore.saveSettings(this.evaluationSettings);
+    await this.refreshEvaluationBackend();
+  }
+
+  async testLangfuseConnection(): Promise<LangfuseConnectionStatus> {
+    const raw = await this.credentials.getCredential('langfuse');
+    const backend = resolveLangfuseBackend({
+      settings: { ...this.evaluationSettings, langfuseTracingEnabled: true },
+      storedCredential: raw,
+      privacyLevel: this.evaluationSettings.privacyLevel,
+    });
+    const status = await backend.status();
+    return {
+      connected: status.available,
+      configured: Boolean(raw),
+      endpoint: status.endpoint,
+      error: status.available ? undefined : status.message,
+      message: status.message,
+    };
   }
 
   async testEvaluationConnection(): Promise<LangSmithConnectionStatus> {
@@ -1114,12 +1165,14 @@ export class AgentKernelHost {
   async getEvaluationStatus(): Promise<{
     backend: EvaluationBackendKind;
     tracingEnabled: boolean;
+    langfuseTracingEnabled: boolean;
     privacyLevel: PrivacyLevel;
     project: string;
   }> {
     return {
       backend: this.evaluationBackend.kind,
       tracingEnabled: this.evaluationSettings.tracingEnabled,
+      langfuseTracingEnabled: this.evaluationSettings.langfuseTracingEnabled,
       privacyLevel: this.evaluationSettings.privacyLevel,
       project: this.evaluationSettings.langsmithProject,
     };
@@ -1139,10 +1192,17 @@ export class AgentKernelHost {
     this.kernel.runtime.setExtensions(listBundledPiExtensions(extra));
   }
 
-  /** Reload the LangSmith credential so the backend reflects storage changes. */
+  /** Reload LangSmith / Langfuse credentials so the backend reflects storage changes. */
   private async refreshEvaluationBackend(): Promise<void> {
     const key = await this.credentials.getCredential('langsmith');
-    const backend = resolveBackend(this.evaluationSettings, key);
+    const langfuseRaw = await this.credentials.getCredential('langfuse');
+    const langfuse = resolveLangfuseBackend({
+      settings: this.evaluationSettings,
+      storedCredential: langfuseRaw,
+      privacyLevel: this.evaluationSettings.privacyLevel,
+    });
+    this.langfuseBackend = langfuse instanceof LangfuseEvaluationBackend ? langfuse : undefined;
+    const backend = this.langfuseBackend ?? resolveBackend(this.evaluationSettings, key);
     this.evaluationBackend = backend;
     this.traceCorrelation = new TraceCorrelationService({
       backend,
@@ -1159,6 +1219,7 @@ export class AgentKernelHost {
         startedAt: event.timestamp,
         toolCalls: [],
         answer: '',
+        input: event.payload.userMessage?.content,
       });
       return;
     }
@@ -1169,6 +1230,7 @@ export class AgentKernelHost {
     } else if (event.type === 'message_completed') {
       pending.answer = event.payload.answer;
     } else if (event.type === 'run_completed' || event.type === 'run_failed') {
+      if (event.type === 'run_failed') pending.error = event.payload.error;
       const completed = event.type === 'run_completed';
       void this.settleEvaluationRun(event.runId, event.sessionId, completed, event.timestamp);
     }
@@ -1220,18 +1282,166 @@ export class AgentKernelHost {
     }
     const session = await this.kernel.sessions.getSession(sessionId).catch(() => undefined);
     const threadId = session?.runtimeSessionId;
-    const ref = await this.traceCorrelation.recordRun({
-      folioRunId: runId,
-      folioSessionId: sessionId,
+    let ref = await this.exportAgentTrace({
+      runId,
+      sessionId,
       threadId,
       startedAt: pending.startedAt,
       completedAt: endedAt,
+      input: pending.input,
+      answer: run.answer,
+      toolCalls: run.toolCalls,
+      error: pending.error,
+      completed,
     });
+    if (ref) {
+      await this.persistTraceLink(runId, ref);
+    } else {
+      ref = await this.traceCorrelation.recordRun({
+        folioRunId: runId,
+        folioSessionId: sessionId,
+        threadId,
+        startedAt: pending.startedAt,
+        completedAt: endedAt,
+      });
+    }
     if (ref.backend === 'none' && this.evaluationSettings.tracingEnabled) {
       mainErrorLog.push({
         at: Date.now(),
         source: 'main',
         message: 'Trace correlation: no LangSmith trace matched the finished run.',
+        stack: null,
+      });
+    }
+    if (this.evaluationSettings.langfuseTracingEnabled && !this.langfuseBackend) {
+      mainErrorLog.push({
+        at: Date.now(),
+        source: 'main',
+        message: 'Langfuse tracing is enabled but credentials are missing or the exporter failed to initialize.',
+        stack: null,
+      });
+    }
+  }
+
+  private async persistTraceLink(
+    runId: string,
+    ref: import('@finagent/core').TraceReference
+  ): Promise<void> {
+    try {
+      await this.evaluationStore.recordTraceLink({ runId, traceRef: ref, recordedAt: Date.now() });
+    } catch (error) {
+      mainErrorLog.push({
+        at: Date.now(),
+        source: 'main',
+        message: `Trace link persist failed: ${error instanceof Error ? error.message : String(error)}`,
+        stack: null,
+      });
+    }
+  }
+
+  private async exportAgentTrace(input: {
+    runId: string;
+    sessionId: string;
+    threadId?: string;
+    startedAt: number;
+    completedAt: number;
+    input?: string;
+    answer?: string;
+    toolCalls: ToolCallRecord[];
+    error?: ApiError;
+    completed: boolean;
+  }): Promise<import('@finagent/core').TraceReference | undefined> {
+    if (!this.langfuseBackend) return undefined;
+    try {
+      const ref = await this.langfuseBackend.exportAgentRun({
+        folioRunId: input.runId,
+        sessionId: input.sessionId,
+        threadId: input.threadId,
+        startedAt: input.startedAt,
+        completedAt: input.completedAt,
+        input: input.input,
+        output: input.answer,
+        toolCalls: input.toolCalls,
+        error: input.error,
+        metadata: {
+          folioRunId: input.runId,
+          folioSessionId: input.sessionId,
+          threadId: input.threadId,
+          runKind: 'normal',
+          folioVersion: currentFolioVersion(),
+        },
+      });
+      if (ref.traceId) {
+        const scores = scoresFromAgentRun({
+          completed: input.completed,
+          toolCalls: input.toolCalls,
+          latencyMs: Math.max(0, input.completedAt - input.startedAt),
+        });
+        await this.langfuseBackend.submitScores(ref.traceId, scores);
+      }
+      return ref;
+    } catch (error) {
+      mainErrorLog.push({
+        at: Date.now(),
+        source: 'main',
+        message: `Langfuse agent export failed: ${error instanceof Error ? error.message : String(error)}`,
+        stack: null,
+      });
+      return undefined;
+    }
+  }
+
+  private async exportResearchTrace(result: import('@finagent/shared').ResearchRunResult): Promise<void> {
+    if (!this.langfuseBackend) {
+      if (this.evaluationSettings.langfuseTracingEnabled) {
+        mainErrorLog.push({
+          at: Date.now(),
+          source: 'main',
+          message: 'Langfuse tracing is enabled but no exporter is available; Deep Research completed without a remote trace.',
+          stack: null,
+        });
+      }
+      return;
+    }
+    try {
+      const finishedAt = result.summary.finishedAt ?? Date.now();
+      const ref = await this.langfuseBackend.exportResearchRun({
+        folioRunId: result.summary.id,
+        startedAt: result.summary.startedAt,
+        completedAt: finishedAt,
+        symbol: result.summary.symbol,
+        strategyId: result.report?.strategyId,
+        query: `Deep research ${result.summary.symbol}`,
+        capabilities: result.report?.capabilityRuns.map((run) => ({
+          capabilityId: run.capabilityId,
+          status: run.status,
+          startedAt: run.fetchedAt,
+          finishedAt: run.fetchedAt,
+          error: run.error,
+        })) ?? result.summary.plannedCapabilities.map((id) => ({
+          capabilityId: id,
+          status: result.summary.completedCapabilities.includes(id) ? 'success' : 'unavailable',
+        })),
+        report: result.report,
+        model: this.evaluationSettings.langfuseTracingEnabled ? 'folio-synthesizer' : undefined,
+        metadata: {
+          folioRunId: result.summary.id,
+          runKind: 'normal',
+          folioVersion: currentFolioVersion(),
+          symbol: result.summary.symbol,
+          strategyId: result.report?.strategyId,
+        },
+      });
+      const scores = scoresFromResearchReport(result.report, undefined, Math.max(0, finishedAt - result.summary.startedAt));
+      if (ref.traceId && scores.length > 0) {
+        await this.langfuseBackend.submitScores(ref.traceId, scores);
+      }
+      if (ref.traceId) await this.persistTraceLink(result.summary.id, ref);
+    } catch (error) {
+      mainErrorLog.push({
+        at: Date.now(),
+        source: 'main',
+        message: `Langfuse Deep Research export failed: ${error instanceof Error ? error.message : String(error)}`,
         stack: null,
       });
     }

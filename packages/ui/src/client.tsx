@@ -18,6 +18,7 @@ import type {
   Kline,
   KlineRequest,
   LangSmithConnectionStatus,
+  LangfuseConnectionStatus,
   LlmModel,
   LlmRuntimeState,
   LlmTestResult,
@@ -124,12 +125,15 @@ export interface EvaluationExperimentDetail {
 }
 
 export interface EvaluationChannel {
-  getSettings: () => Promise<ApiResult<{ settings: EvaluationSettings; connection: LangSmithConnectionStatus }>>;
+  getSettings: () => Promise<
+    ApiResult<{ settings: EvaluationSettings; connection: LangSmithConnectionStatus; langfuse: LangfuseConnectionStatus }>
+  >;
   /** Diagnostics view: backend/tracing/privacy without credentials (spec §86). */
   status: () => Promise<
     ApiResult<{
-      backend: 'langsmith' | 'local' | 'none';
+      backend: 'langsmith' | 'langfuse' | 'local' | 'none';
       tracingEnabled: boolean;
+      langfuseTracingEnabled?: boolean;
       privacyLevel: EvaluationSettings['privacyLevel'];
       project: string;
     }>
@@ -138,13 +142,22 @@ export interface EvaluationChannel {
     input: Partial<
       Pick<
         EvaluationSettings,
-        'tracingEnabled' | 'langsmithProject' | 'langsmithEndpoint' | 'privacyLevel' | 'onlineEvaluationEnabled'
+        | 'tracingEnabled'
+        | 'langsmithProject'
+        | 'langsmithEndpoint'
+        | 'langfuseTracingEnabled'
+        | 'langfuseHost'
+        | 'privacyLevel'
+        | 'onlineEvaluationEnabled'
       >
     >
   ) => Promise<ApiResult<EvaluationSettings>>;
   setCredential: (apiKey: string) => Promise<ApiResult<void>>;
   removeCredential: () => Promise<ApiResult<void>>;
   testConnection: () => Promise<ApiResult<LangSmithConnectionStatus>>;
+  setLangfuseCredential: (publicKey: string, secretKey: string) => Promise<ApiResult<void>>;
+  removeLangfuseCredential: () => Promise<ApiResult<void>>;
+  testLangfuseConnection: () => Promise<ApiResult<LangfuseConnectionStatus>>;
   listExperiments: () => Promise<ApiResult<EvaluationExperiment[]>>;
   getExperiment: (id: string) => Promise<ApiResult<EvaluationExperimentDetail | undefined>>;
   /** Benchmark case definition (prompt/expectations) for the detail view (spec §69). */
@@ -403,6 +416,9 @@ export const fallbackClient: FinagentClient = {
     setCredential: missingClient('evaluation.setCredential'),
     removeCredential: missingClient('evaluation.removeCredential'),
     testConnection: missingClient('evaluation.testConnection'),
+    setLangfuseCredential: missingClient('evaluation.setLangfuseCredential'),
+    removeLangfuseCredential: missingClient('evaluation.removeLangfuseCredential'),
+    testLangfuseConnection: missingClient('evaluation.testLangfuseConnection'),
     listExperiments: missingClient('evaluation.listExperiments'),
     getExperiment: missingClient('evaluation.getExperiment'),
     getCase: missingClient('evaluation.getCase'),

@@ -203,3 +203,30 @@ export LANGSMITH_PI_API_KEY=lsv2_…   # stored in safeStorage when set via UI
 export TRACE_TO_LANGSMITH=true
 export LANGSMITH_PI_PROJECT=folio-agent
 ```
+
+## 16. Langfuse setup (Agent / Deep Research traces)
+
+Langfuse is a **second, Folio-owned** observability backend. It does not replace
+LangSmith's Pi extension. Folio exports the full run tree (input, retrieval/tool
+spans, synthesis, final report) and writes evaluation scores onto the same trace.
+
+Enable from **Settings → Evaluation**, or via env for the CLI:
+
+```sh
+export LANGFUSE_TRACING=true
+export LANGFUSE_PUBLIC_KEY=pk-lf-…
+export LANGFUSE_SECRET_KEY=sk-lf-…
+# optional self-hosted:
+export LANGFUSE_HOST=https://cloud.langfuse.com
+```
+
+Smoke a Deep Research export (uses the production `ResearchRunner`; writes to
+Langfuse Cloud when keys are set, otherwise a local mock ingestion API):
+
+```sh
+bun run eval:langfuse
+```
+
+Trace shape, score names, and failure isolation are documented in
+[`docs/langfuse-tracing.md`](langfuse-tracing.md)
+([中文](langfuse-tracing.zh-CN.md)).

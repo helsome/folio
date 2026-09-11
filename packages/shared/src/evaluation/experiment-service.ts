@@ -27,6 +27,7 @@ import type {
   EvaluationResultRecord,
   EvaluationRun,
   EvaluationRunStatus,
+  EvaluationScore,
   ExperimentConfig,
   ExperimentMetadata,
   RegressionResult,
@@ -51,6 +52,8 @@ import { registerJudges } from './judges/index.ts';
 import type { JudgeClient } from './judge-client.ts';
 import { DEFAULT_EVALUATION_SETTINGS } from './settings.ts';
 import { EvaluationStore } from './store.ts';
+import { LangfuseEvaluationBackend } from './langfuse/backend.ts';
+import { scoresFromEvaluation } from './langfuse/scores.ts';
 
 /** The kernel surface the runner depends on (AgentKernel satisfies it). */
 export interface ExperimentKernel {
@@ -408,7 +411,14 @@ export class ExperimentService {
         failureModes: outcome.failureModes,
         error: outcome.error,
       };
-      const traceRef = await this.traceRun(evalRun, session.id, caseItem.locale);
+      const traceRef = await this.traceRun(evalRun, session.id, caseItem.locale, {
+        prompt: caseItem.input.prompt,
+        datasetId: dataset.id,
+        datasetVersion: dataset.version,
+        goldCaseId: caseItem.id,
+        model: config.model,
+        provider: config.provider,
+      });
       evalRun.traceRef = traceRef;
       // RunManager clears `activeRun` only after all terminal persistence lands
       // (run update, session idle, messages). Deleting the session or starting
@@ -463,6 +473,7 @@ export class ExperimentService {
         failureModes: evalRun.failureModes,
         verdict: verdictForRun(evalRun),
       };
+      await this.writeLangfuseScores(evalRun, scores);
       return { run: evalRun, result, aborted: false };
     } finally {
       unsubscribe?.();
@@ -473,9 +484,43 @@ export class ExperimentService {
   private async traceRun(
     run: EvaluationRun,
     folioSessionId: string,
-    locale?: SupportedLocale
+    locale?: SupportedLocale,
+    extras?: {
+      prompt?: string;
+      datasetId?: string;
+      datasetVersion?: string;
+      goldCaseId?: string;
+      model?: string;
+      provider?: string;
+    }
   ): Promise<EvaluationRun['traceRef']> {
     try {
+      if (this.backend instanceof LangfuseEvaluationBackend) {
+        return await this.backend.exportAgentRun({
+          folioRunId: run.id,
+          sessionId: folioSessionId,
+          startedAt: run.startedAt,
+          completedAt: run.completedAt ?? this.now(),
+          input: extras?.prompt,
+          output: run.answer,
+          toolCalls: run.toolCalls,
+          error: run.error,
+          model: extras?.model,
+          provider: extras?.provider,
+          metadata: {
+            folioRunId: run.id,
+            folioSessionId,
+            runKind: 'evaluation',
+            goldCaseId: extras?.goldCaseId ?? run.caseId,
+            datasetId: extras?.datasetId ?? run.datasetId,
+            datasetVersion: extras?.datasetVersion,
+            model: extras?.model,
+            provider: extras?.provider,
+            folioVersion: currentFolioVersion(),
+            locale,
+          },
+        });
+      }
       let threadId: string | undefined;
       const llmApi = this.kernel.getLlmApi?.();
       if (llmApi) {
@@ -492,6 +537,21 @@ export class ExperimentService {
       });
     } catch {
       return undefined;
+    }
+  }
+
+  private async writeLangfuseScores(run: EvaluationRun, scores: EvaluationScore[]): Promise<void> {
+    const traceId = run.traceRef?.traceId;
+    if (!traceId || !this.backend.submitScores) return;
+    try {
+      const mapped = scoresFromEvaluation(scores);
+      if (typeof run.latencyMs === 'number' && !mapped.some((score) => score.name === 'latency_ms')) {
+        mapped.push({ name: 'latency_ms', value: run.latencyMs });
+      }
+      if (mapped.length === 0) return;
+      await this.backend.submitScores(traceId, mapped);
+    } catch {
+      // Score writeback is best-effort.
     }
   }
 

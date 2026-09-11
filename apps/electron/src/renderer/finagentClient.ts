@@ -177,6 +177,10 @@ function createElectronClient(): FinagentClient {
       setCredential: (apiKey) => ipcResult(window.electronAPI.evaluation.setCredential({ apiKey })),
       removeCredential: () => ipcResult(window.electronAPI.evaluation.removeCredential()),
       testConnection: () => ipcResult(window.electronAPI.evaluation.testConnection()),
+      setLangfuseCredential: (publicKey, secretKey) =>
+        ipcResult(window.electronAPI.evaluation.setLangfuseCredential({ publicKey, secretKey })),
+      removeLangfuseCredential: () => ipcResult(window.electronAPI.evaluation.removeLangfuseCredential()),
+      testLangfuseConnection: () => ipcResult(window.electronAPI.evaluation.testLangfuseConnection()),
       listExperiments: () => ipcResult(window.electronAPI.evaluation.listExperiments()),
       getExperiment: (id) => ipcResult(window.electronAPI.evaluation.getExperiment({ id })),
       getCase: (id) => ipcResult(window.electronAPI.evaluation.getCase({ id })),

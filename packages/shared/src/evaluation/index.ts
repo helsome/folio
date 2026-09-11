@@ -11,3 +11,5 @@ export * from './datasets.ts';
 export * from './evaluators/index.ts';
 export * from './judges/index.ts';
 export * from './datasets/index.ts';
+export * from './langfuse/index.ts';
+export { currentFolioVersion, currentGitSha } from './experiment-service.ts';

@@ -27,6 +27,7 @@ const SOURCE_BADGE: Record<string, string> = {
   run: 'bg-foreground/6 text-foreground/60',
   evaluation: 'bg-warning/10 text-warning',
   langsmith: 'bg-positive/10 text-positive',
+  langfuse: 'bg-info/10 text-info',
 };
 
 const StepIcon: React.FC<{ step: TraceStep }> = ({ step }) => {

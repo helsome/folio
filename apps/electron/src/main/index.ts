@@ -328,6 +328,18 @@ ipcMain.handle('evaluation:testConnection', async () =>
   toIpcResult(() => agentKernelHost.testEvaluationConnection())
 );
 
+ipcMain.handle('evaluation:setLangfuseCredential', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.setLangfuseCredential(input))
+);
+
+ipcMain.handle('evaluation:removeLangfuseCredential', async () =>
+  toIpcResult(() => agentKernelHost.removeLangfuseCredential())
+);
+
+ipcMain.handle('evaluation:testLangfuseConnection', async () =>
+  toIpcResult(() => agentKernelHost.testLangfuseConnection())
+);
+
 ipcMain.handle('evaluation:listExperiments', async () =>
   toIpcResult(() => agentKernelHost.listEvaluationExperiments())
 );

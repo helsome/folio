@@ -362,7 +362,7 @@ export interface EvaluationRun {
 }
 
 /** Backend the trace lives in; `none` when observability is off (spec §89). */
-export type TraceBackendKind = 'langsmith' | 'local' | 'none';
+export type TraceBackendKind = 'langsmith' | 'langfuse' | 'local' | 'none';
 
 export interface TraceReference {
   backend: TraceBackendKind;
@@ -491,6 +491,12 @@ export interface EvaluationSettings {
   langsmithProject: string;
   /** Custom/self-hosted endpoint (empty = LangSmith cloud). */
   langsmithEndpoint: string;
+  /** Folio-side Langfuse exporter for Agent / Deep Research traces. Independent of LangSmith. */
+  langfuseTracingEnabled: boolean;
+  /** Langfuse host (empty = https://cloud.langfuse.com). */
+  langfuseHost: string;
+  /** Mirror of the Langfuse credential store; renderer never sees keys. */
+  langfuseConfigured: boolean;
   privacyLevel: PrivacyLevel;
   onlineEvaluationEnabled: boolean;
   /** Mirror of the credential store; renderer never sees the key (spec §12). */
@@ -506,6 +512,9 @@ export interface LangSmithConnectionStatus {
   error?: string;
   message?: string;
 }
+
+/** Connection probe for Langfuse (same renderer-safe shape as LangSmith). */
+export type LangfuseConnectionStatus = LangSmithConnectionStatus;
 
 export interface SelectableModel {
   provider: string;

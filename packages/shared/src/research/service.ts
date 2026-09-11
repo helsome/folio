@@ -10,7 +10,7 @@ import type { SupportedLocale } from '@finagent/core';
 import { isStrategyId } from '../strategies/presets.ts';
 import { planForStrategy } from './planner.ts';
 import { ResearchReportRepository } from './repository.ts';
-import { ResearchRunner } from './runner.ts';
+import { ResearchRunner, type ResearchRunResult } from './runner.ts';
 
 export interface ResearchServiceOptions {
   registry: CapabilityRegistry;
@@ -19,6 +19,8 @@ export interface ResearchServiceOptions {
   now?: () => number;
   /** V5: called after a report is persisted (opinion creation hook). */
   onReport?: (report: ResearchReport) => Promise<void> | void;
+  /** Observability hook after a run finishes (never allowed to fail the run). */
+  onRunComplete?: (result: ResearchRunResult) => Promise<void> | void;
 }
 
 interface ActiveRun {
@@ -39,6 +41,7 @@ export class ResearchService {
   private readonly now: () => number;
   private readonly runner: ResearchRunner;
   private readonly onReport?: (report: ResearchReport) => Promise<void> | void;
+  private readonly onRunComplete?: (result: ResearchRunResult) => Promise<void> | void;
 
   private readonly active = new Map<string, ActiveRun>();
   private readonly memory = new Map<string, ResearchRunSummary>();
@@ -50,6 +53,7 @@ export class ResearchService {
     this.repository = options.repository;
     this.now = options.now ?? Date.now;
     this.onReport = options.onReport;
+    this.onRunComplete = options.onRunComplete;
     this.runner = new ResearchRunner({
       registry: this.registry,
       synthesizer: this.synthesizer,
@@ -159,6 +163,11 @@ export class ResearchService {
       if (result.report) {
         await this.repository.saveReport(result.report);
         await this.onReport?.(result.report);
+      }
+      try {
+        await this.onRunComplete?.(result);
+      } catch {
+        // Telemetry failures must not fail the research run.
       }
     } finally {
       this.active.delete(key);

@@ -5,6 +5,9 @@ export const DEFAULT_EVALUATION_SETTINGS: EvaluationSettings = {
   tracingEnabled: false,
   langsmithProject: 'folio-agent',
   langsmithEndpoint: '',
+  langfuseTracingEnabled: false,
+  langfuseHost: '',
+  langfuseConfigured: false,
   privacyLevel: 'standard',
   onlineEvaluationEnabled: false,
   apiKeyConfigured: false,
@@ -33,6 +36,10 @@ export function sanitizeSettings(
         : base.langsmithProject,
     langsmithEndpoint:
       typeof src.langsmithEndpoint === 'string' ? src.langsmithEndpoint.trim().slice(0, 512) : base.langsmithEndpoint,
+    langfuseTracingEnabled:
+      typeof src.langfuseTracingEnabled === 'boolean' ? src.langfuseTracingEnabled : base.langfuseTracingEnabled,
+    langfuseHost: typeof src.langfuseHost === 'string' ? src.langfuseHost.trim().slice(0, 512) : base.langfuseHost,
+    langfuseConfigured: typeof src.langfuseConfigured === 'boolean' ? src.langfuseConfigured : base.langfuseConfigured,
     privacyLevel: isPrivacyLevel(src.privacyLevel) ? src.privacyLevel : base.privacyLevel,
     onlineEvaluationEnabled:
       typeof src.onlineEvaluationEnabled === 'boolean' ? src.onlineEvaluationEnabled : base.onlineEvaluationEnabled,
