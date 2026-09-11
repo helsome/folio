@@ -570,6 +570,7 @@ export interface Skill {
 
 // ── Folio V3 domains ───────────────────────────────────────────────────────
 export * from './answer-blocks.ts';
+export * from './citations.ts';
 export * from './capability.ts';
 export * from './research.ts';
 export * from './thesis.ts';

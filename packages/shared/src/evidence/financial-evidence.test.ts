@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import type { ToolCall } from '@finagent/core';
 import {
   buildFinancialEvidence,
+  computeEnvelopeId,
   financialEvidenceToJson,
   isFinancialEvidenceEnvelope,
 } from './financial-evidence.ts';
@@ -79,5 +80,12 @@ describe('buildFinancialEvidence', () => {
     const exported = financialEvidenceToJson(evidence);
     expect(JSON.parse(exported).schemaVersion).toBe('financial-evidence/v1');
     expect(exported).not.toContain('canary-secret');
+  });
+
+  it('matches computeEnvelopeId so citations can be issued before settle (#30)', () => {
+    const [record] = buildFinancialEvidence({ sessionId: 's', runId: 'r', toolCalls: [call()] });
+    expect(record.id).toBe(computeEnvelopeId('r', record.toolCallId, record.resultHash));
+    expect(record.id.startsWith('fe_')).toBe(true);
+    expect(computeEnvelopeId('r', 'call-1', record.resultHash)).toBe(computeEnvelopeId('r', 'call-1', record.resultHash));
   });
 });

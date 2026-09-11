@@ -31,7 +31,7 @@ export function createCapabilityTools(capabilities: FinanceCapability[]): Capabi
     label: cap.name,
     description: cap.description,
     parameters: cap.inputSchema,
-    async execute(_toolCallId, rawParams, signal) {
+    async execute(toolCallId, rawParams, signal) {
       const input = validateInput(cap.inputSchema, rawParams);
       const result = await cap.execute(input, { signal });
       // Security (defense in depth): external-text payloads such as news are
@@ -40,10 +40,12 @@ export function createCapabilityTools(capabilities: FinanceCapability[]): Capabi
       const data = isNewsItemList(result.data) ? result.data.map(sanitizeNewsItem) : result.data;
       const summary = result.summary ? sanitizeUntrustedText(result.summary).text : undefined;
       const json = JSON.stringify(data);
-      const text = summary ? `${summary}\n\nDATA: ${json}` : `DATA: ${json}`;
+      const base = summary ? `${summary}\n\nDATA: ${json}` : `DATA: ${json}`;
+      // #30: surface the tool-call id so the model can cite this exact origin.
+      const text = `${base}\n\nEVIDENCE: ${toolCallId}`;
       return {
         content: [{ type: 'text', text }],
-        details: result.data,
+        details: data,
         provenance: result.provenance,
         evidence: result.evidence,
       };

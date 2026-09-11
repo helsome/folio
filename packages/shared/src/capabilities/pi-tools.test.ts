@@ -33,7 +33,30 @@ describe('createCapabilityTools', () => {
     });
 
     const out = await tools[0].execute('call-1', { symbol: 'AAPL.US' }, new AbortController().signal);
-    expect(out.content[0].text).toBe('Quote for AAPL.US\n\nDATA: {"symbol":"AAPL.US"}');
+    expect(out.content[0].text).toBe('Quote for AAPL.US\n\nDATA: {"symbol":"AAPL.US"}\n\nEVIDENCE: call-1');
+  });
+
+  it('appends the EVIDENCE line even without a summary (#30)', async () => {
+    const cap = defineCapability({
+      id: 'market.quote',
+      name: 'Quote',
+      description: 'Get a quote.',
+      category: 'market',
+      riskLevel: 'read',
+      auth: 'public',
+      toolName: 'get_quote',
+      inputSchema: Type.Object({ symbol: Type.String() }),
+      async execute(input: { symbol: string }) {
+        return {
+          data: { symbol: input.symbol },
+          provenance: { provider: 'longbridge', fetchedAt: 0, stale: false },
+        };
+      },
+    });
+
+    const tools = createCapabilityTools([cap]);
+    const out = await tools[0].execute('call-9', { symbol: 'AAPL.US' }, new AbortController().signal);
+    expect(out.content[0].text).toBe('DATA: {"symbol":"AAPL.US"}\n\nEVIDENCE: call-9');
   });
 
   it('re-validates raw params inside execute', async () => {

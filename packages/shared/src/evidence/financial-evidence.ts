@@ -67,7 +67,7 @@ export function buildFinancialEvidence(input: BuildFinancialEvidenceInput): Fina
     return [{
       schemaVersion: FINANCIAL_EVIDENCE_SCHEMA_VERSION,
       normalizationVersion: FINANCIAL_NORMALIZATION_VERSION,
-      id: `fe_${hashText(`${input.runId}:${toolCall.id}:${resultHash}`).slice(0, 24)}`,
+      id: computeEnvelopeId(input.runId, toolCall.id, resultHash),
       sessionId: input.sessionId,
       runId: input.runId,
       toolCallId: toolCall.id,
@@ -90,6 +90,14 @@ export function buildFinancialEvidence(input: BuildFinancialEvidenceInput): Fina
       lineage,
     }];
   });
+}
+
+/**
+ * Deterministic evidence-envelope id, computable before the run settles so
+ * tool results can carry their `fe_*` id for inline citations (#30).
+ */
+export function computeEnvelopeId(runId: string, toolCallId: string, resultHash: string): string {
+  return `fe_${hashText(`${runId}:${toolCallId}:${resultHash}`).slice(0, 24)}`;
 }
 
 /** Runtime guard used by claim verifiers and import/export boundaries. */
