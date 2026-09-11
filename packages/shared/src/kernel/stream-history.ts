@@ -53,6 +53,13 @@ export class StreamEventHistory {
       return { recoverable: false, events: [], atEnd: true };
     }
 
+    const last = list[list.length - 1];
+    // 游标超前（lastSequence 超过已知最大 sequence）：客户端状态与历史
+    // 分歧，不可能由正常事件流到达 —— 明确不可恢复，不能静默当作已同步。
+    if (lastSequence > last.sequence) {
+      return { recoverable: false, events: [], atEnd: TERMINAL_TYPES.has(last.type) };
+    }
+
     const tail = list.filter((e) => e.sequence > lastSequence);
     const contiguous =
       tail.length === 0 ||
@@ -62,7 +69,6 @@ export class StreamEventHistory {
       return { recoverable: false, events: [], atEnd: false };
     }
 
-    const last = list[list.length - 1];
     return {
       recoverable: true,
       events: tail,
