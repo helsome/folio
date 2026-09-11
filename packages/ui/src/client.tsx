@@ -188,6 +188,7 @@ export interface FinagentClient {
       workspaceContext?: WorkspaceContext
     ) => Promise<ApiResult<Run>>;
     cancelRun: (sessionId: string, runId: string) => Promise<ApiResult<void>>;
+    streamReplay: (input: { runId: string; lastSequence: number }) => Promise<ApiResult<unknown>>;
     onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
     onStreamEvent: (callback: (payload: { sessionId: string; event: StreamEvent }) => void) => () => void;
   };
@@ -318,6 +319,7 @@ export const fallbackClient: FinagentClient = {
     listRuns: missingClient('kernel.listRuns'),
     startRun: missingClient('kernel.startRun'),
     cancelRun: missingClient('kernel.cancelRun'),
+    streamReplay: missingClient('kernel.streamReplay'),
     onAgentEvent: () => () => undefined,
     onStreamEvent: () => () => undefined,
   },

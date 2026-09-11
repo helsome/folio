@@ -572,6 +572,19 @@ export class AgentKernelHost {
     );
   }
 
+  /** Stream Event replay（ADR 0001 §Reconnect）：按 lastSequence 补发或明确不可恢复。 */
+  streamReplay(input: unknown) {
+    const request = requireObject(input);
+    const lastSequence = request.lastSequence;
+    if (typeof lastSequence !== 'number' || !Number.isFinite(lastSequence)) {
+      throw createCodeError('INVALID_ARGUMENT', 'lastSequence must be a finite number.');
+    }
+    return this.kernel.runs.replayStream(
+      requireString(request.runId, 'runId'),
+      lastSequence
+    );
+  }
+
   getTools(): Promise<ApiResult<ToolDefinition[]>> {
     return this.kernel.getTools();
   }

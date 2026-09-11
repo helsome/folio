@@ -42,6 +42,7 @@ var electronAPI = {
     listRuns: (sessionId) => import_electron.ipcRenderer.invoke("sessions:listRuns", sessionId),
     startRun: (input) => import_electron.ipcRenderer.invoke("runs:start", input),
     cancelRun: (input) => import_electron.ipcRenderer.invoke("runs:cancel", input),
+    streamReplay: (input) => import_electron.ipcRenderer.invoke("runs:stream-replay", input),
     onAgentEvent: (callback) => {
       const listener = (_event, agentEvent) => callback(agentEvent);
       import_electron.ipcRenderer.on("agent:event", listener);

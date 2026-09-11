@@ -35,6 +35,8 @@ function createElectronClient(): FinagentClient {
         ipcResult(window.electronAPI.kernel.startRun({ sessionId, content, workspaceContext })),
       cancelRun: (sessionId: string, runId: string) =>
         ipcResult(window.electronAPI.kernel.cancelRun({ sessionId, runId })),
+      streamReplay: (input: { runId: string; lastSequence: number }) =>
+        ipcResult(window.electronAPI.kernel.streamReplay(input)),
       onAgentEvent: (callback: (event: AgentEvent) => void) =>
         window.electronAPI.kernel.onAgentEvent((event) => callback(event as AgentEvent)),
       onStreamEvent: (callback: (payload: { sessionId: string; event: StreamEvent }) => void) =>
