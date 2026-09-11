@@ -48,6 +48,13 @@ var electronAPI = {
       return () => {
         import_electron.ipcRenderer.removeListener("agent:event", listener);
       };
+    },
+    onStreamEvent: (callback) => {
+      const listener = (_event, payload) => callback(payload);
+      import_electron.ipcRenderer.on("agent:stream", listener);
+      return () => {
+        import_electron.ipcRenderer.removeListener("agent:stream", listener);
+      };
     }
   },
   agent: {

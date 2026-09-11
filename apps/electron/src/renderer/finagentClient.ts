@@ -3,6 +3,7 @@ import type {
   AlertTriggerEvent,
   ApiResult,
   CustomProviderConfig,
+  StreamEvent,
   ThesisImpact,
   WorkspaceContext,
 } from '@finagent/core';
@@ -36,6 +37,10 @@ function createElectronClient(): FinagentClient {
         ipcResult(window.electronAPI.kernel.cancelRun({ sessionId, runId })),
       onAgentEvent: (callback: (event: AgentEvent) => void) =>
         window.electronAPI.kernel.onAgentEvent((event) => callback(event as AgentEvent)),
+      onStreamEvent: (callback: (payload: { sessionId: string; event: StreamEvent }) => void) =>
+        window.electronAPI.kernel.onStreamEvent((payload) =>
+          callback({ sessionId: payload.sessionId, event: payload.event as StreamEvent })
+        ),
     },
     agent: {
       getTools: () => ipcResult(window.electronAPI.agent.getTools()),

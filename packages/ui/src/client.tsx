@@ -47,6 +47,7 @@ import type {
   Skill,
   SkillReadiness,
   StaticInfo,
+  StreamEvent,
   ThesisImpact,
   ToolDefinition,
   WorkspaceContext,
@@ -188,6 +189,7 @@ export interface FinagentClient {
     ) => Promise<ApiResult<Run>>;
     cancelRun: (sessionId: string, runId: string) => Promise<ApiResult<void>>;
     onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
+    onStreamEvent: (callback: (payload: { sessionId: string; event: StreamEvent }) => void) => () => void;
   };
   agent: {
     getTools: () => Promise<ApiResult<ToolDefinition[]>>;
@@ -317,6 +319,7 @@ export const fallbackClient: FinagentClient = {
     startRun: missingClient('kernel.startRun'),
     cancelRun: missingClient('kernel.cancelRun'),
     onAgentEvent: () => () => undefined,
+    onStreamEvent: () => () => undefined,
   },
   agent: {
     getTools: missingClient('agent.getTools'),
