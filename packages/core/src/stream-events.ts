@@ -49,15 +49,22 @@ export type StreamEventPayload = StreamEventTypeToPayload[StreamEventType];
 
 /**
  * 统一事件信封（参数化版本，供内部组合用）。
- * - 幂等键：runId + messageId + sequence。
+ * - 幂等键：runId + sequence（messageId 不作为幂等身份的一部分）。
  * - sequence 为 run 内单调递增；reconnect 以它为游标（lastSequence 补发）。
  * - timestamp 仅用于展示/排序，不作为身份。
+ *
+ * 身份语义（对齐 issue #34 / 维护者 #43 review）：
+ * - runId：一次 generation 的唯一身份，所有事件必填。
+ * - messageId：仅 message 级事件（message_started / text_delta /
+ *   message_completed / cancelled 的部分文本归属）携带到真实、稳定的
+ *   message id；run 级事件（run_started / run_completed / tool_* /
+ *   citation_added / status / error）可省略。message 与 run 是两个身份，
+ *   允许一条 message 跨多次 run（edit/regenerate/fork，见 #34）。
  */
 export interface StreamEventEnvelope<T extends StreamEventType = StreamEventType> {
   protocolVersion: typeof STREAM_EVENT_PROTOCOL_VERSION;
   runId: string;
-  /** v1 与 runId 相同；预留“一条 message 跨多次 run”时拆分。 */
-  messageId: string;
+  messageId?: string;
   sequence: number;
   type: T;
   timestamp: string;

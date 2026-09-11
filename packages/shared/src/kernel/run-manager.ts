@@ -39,6 +39,7 @@ import {
 } from './runaway-detector.ts';
 import { buildFinancialEvidence } from '../evidence/financial-evidence.ts';
 import { toStreamEvents } from './stream-event-adapter.ts';
+import { StreamEventHistory, type StreamReplayResult } from './stream-history.ts';
 
 export interface RunManagerOptions {
   sessions: SessionManager;
@@ -91,6 +92,10 @@ export class RunManager {
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly streamListeners = new Set<(sessionId: string, event: StreamEvent) => void>();
   private activeRun: ActiveRun | null = null;
+  /** 当前 run 对应的 assistant message id（贯穿 message 级事件，见 #34 身份模型）。 */
+  private currentMessageId: string | null = null;
+  /** run 级内存事件历史：为 reconnect replay 提供数据源（ADR 0001）。 */
+  private readonly streamHistory = new StreamEventHistory();
 
   constructor(options: RunManagerOptions) {
     this.sessions = options.sessions;
@@ -115,6 +120,14 @@ export class RunManager {
   subscribeStream(listener: (sessionId: string, event: StreamEvent) => void): () => void {
     this.streamListeners.add(listener);
     return () => this.streamListeners.delete(listener);
+  }
+
+  /**
+   * Reconnect/重连补发（ADR 0001 §Reconnect）：基于运行期内存历史返回
+   * lastSequence 之后的连续段；段缺失或运行未知时明确返回不可恢复。
+   */
+  replayStream(runId: string, lastSequence: number): StreamReplayResult {
+    return this.streamHistory.replay(runId, lastSequence);
   }
 
   /** Whether a run is currently executing (Pi runtime executes one at a time). */
@@ -227,6 +240,11 @@ export class RunManager {
     const toolCalls: ToolCall[] = [];
     let sawTerminal = false;
 
+    // 一次 run = 一次 assistant generation（#34）：在 run 启动时确定稳定的
+    // assistant message id，贯穿 message 级 stream 事件，并作为最终写入的
+    // assistantMessage.id（避免流中与落库两套 id）。
+    this.currentMessageId = randomUUID();
+
     try {
       await this.runtime.ensureSession({
         id: run.sessionId,
@@ -296,7 +314,7 @@ export class RunManager {
     const isInfraFailure = run.status === 'failed' && isRuntimeInfraCode(run.error?.code);
     if (!isInfraFailure) {
       const assistantMessage: Message = {
-        id: randomUUID(),
+        id: this.currentMessageId ?? randomUUID(),
         role: 'assistant',
         content: answer || (run.status === 'failed' ? run.error?.message ?? 'Run failed.' : ''),
         timestamp: now,
@@ -316,6 +334,7 @@ export class RunManager {
 
     // The run is fully settled (persisted) only now; only then allow the next run.
     this.activeRun = null;
+    this.currentMessageId = null;
 
     // Adapters emit the terminal event themselves; synthesize it only when the
     // stream failed before producing one (e.g. runtime spawn failure), so the
@@ -421,10 +440,15 @@ export class RunManager {
     for (const listener of this.listeners) {
       listener(event);
     }
+    const mapped = toStreamEvents(event, { messageId: this.currentMessageId ?? undefined });
+    // 无论是否有实时订阅者，都先记录进内存历史，保证 replay 有数据源。
+    for (const streamEvent of mapped) {
+      this.streamHistory.append(streamEvent);
+    }
     if (this.streamListeners.size > 0) {
-      for (const mapped of toStreamEvents(event)) {
+      for (const streamEvent of mapped) {
         for (const listener of this.streamListeners) {
-          listener(event.sessionId, mapped);
+          listener(event.sessionId, streamEvent);
         }
       }
     }

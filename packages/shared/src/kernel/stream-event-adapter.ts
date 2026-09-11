@@ -8,17 +8,22 @@ import { STREAM_EVENT_PROTOCOL_VERSION } from '@finagent/core';
 /**
  * 把单个 AgentEvent 映射为一条或多条 StreamEvent。
  * - 时间戳：AgentEvent 用 epoch 毫秒 number，协议层用 ISO 8601 UTC string。
- * - messageId 与 runId 合并（v1，见 ADR）。
+ * - 身份（对齐 issue #34）：runId 恒有；messageId 仅注入到 message 级事件
+ *   （message_started / text_delta / message_completed / cancelled），
+ *   取 run 对应的真实 assistant message id；run 级事件不携带 messageId。
  * - run_failed(code=RUN_CANCELLED) 归一为 cancelled 事件；其余失败归一为 error。
  */
-export function toStreamEvents(event: AgentEvent): StreamEvent[] {
+export function toStreamEvents(
+  event: AgentEvent,
+  opts?: { messageId?: string }
+): StreamEvent[] {
   const base = {
     protocolVersion: STREAM_EVENT_PROTOCOL_VERSION,
     runId: event.runId,
-    messageId: event.runId,
     sequence: event.sequence,
     timestamp: new Date(event.timestamp).toISOString(),
   };
+  const messageish = opts?.messageId ? { messageId: opts.messageId } : {};
 
   switch (event.type) {
     case 'run_started':
@@ -33,9 +38,9 @@ export function toStreamEvents(event: AgentEvent): StreamEvent[] {
         },
       ];
     case 'message_started':
-      return [{ ...base, type: 'message_started', payload: {} }];
+      return [{ ...base, ...messageish, type: 'message_started', payload: {} }];
     case 'message_delta':
-      return [{ ...base, type: 'text_delta', payload: { text: event.payload.delta } }];
+      return [{ ...base, ...messageish, type: 'text_delta', payload: { text: event.payload.delta } }];
     case 'tool_started':
       return [
         {
@@ -61,13 +66,20 @@ export function toStreamEvents(event: AgentEvent): StreamEvent[] {
         },
       ];
     case 'message_completed':
-      return [{ ...base, type: 'message_completed', payload: {} }];
+      return [{ ...base, ...messageish, type: 'message_completed', payload: {} }];
     case 'run_completed':
       return [{ ...base, type: 'run_completed', payload: { stopReason: 'completed' } }];
     case 'run_failed': {
       const { error } = event.payload;
       if (error.code === 'RUN_CANCELLED') {
-        return [{ ...base, type: 'cancelled', payload: { reason: 'user', partial: { text: '' } } }];
+        return [
+          {
+            ...base,
+            ...messageish,
+            type: 'cancelled',
+            payload: { reason: 'user', partial: { text: '' } },
+          },
+        ];
       }
       return [
         { ...base, type: 'error', payload: { code: error.code, message: error.message, retryable: false } },

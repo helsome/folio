@@ -1,0 +1,72 @@
+// Stream Event Protocol v1 — 运行期内存事件历史（reconnect/重连补发）。
+//
+// 依据维护者 #43 review 与 ADR 0001：reconnect 需要一个明确的 replay
+// source + “无法恢复”的失败路径。v1 采用 run 级内存缓冲：
+// - append 时按 run 累积（每 run 上限 MAX_EVENTS_PER_RUN，超出截断最旧）；
+// - replay(runId, lastSequence) 只补发“连续且已存在”的段；
+// - 截断/未知 run/段不连续 → recoverable=false，调用方应呈现明确失败。
+
+import type { StreamEvent } from '@finagent/core';
+
+/** 保留的最大 run 数（最早的新增 run 被淘汰）。 */
+const MAX_RUNS = 32;
+/** 单 run 内存缓冲的事件上限（截断后无法从头恢复 → 明确不可恢复）。 */
+const MAX_EVENTS_PER_RUN = 2000;
+
+export interface StreamReplayResult {
+  /** true：补发成功；false：内存中已无连续段/未知 run，明确不可恢复。 */
+  recoverable: boolean;
+  /** 连续补发的事件（lastSequence 之后）。不可恢复时为 []。 */
+  events: StreamEvent[];
+  /** 该 run 是否已结束（最后事件为终端事件：run_completed / cancelled / error）。 */
+  atEnd: boolean;
+}
+
+const TERMINAL_TYPES = new Set<StreamEvent['type']>(['run_completed', 'cancelled', 'error']);
+
+export class StreamEventHistory {
+  private readonly runs = new Map<string, StreamEvent[]>();
+  /** FIFO LRU 顺序，用于淘汰最久未更新的 run。 */
+  private readonly order: string[] = [];
+
+  append(event: StreamEvent): void {
+    const list = this.runs.get(event.runId);
+    if (list) {
+      list.push(event);
+      if (list.length > MAX_EVENTS_PER_RUN) {
+        list.splice(0, list.length - MAX_EVENTS_PER_RUN);
+      }
+      return;
+    }
+    this.runs.set(event.runId, [event]);
+    this.order.push(event.runId);
+    while (this.order.length > MAX_RUNS) {
+      const evicted = this.order.shift();
+      if (evicted) this.runs.delete(evicted);
+    }
+  }
+
+  /** 从 lastSequence 之后的位置补发；段缺失/未知 run 判为不可恢复。 */
+  replay(runId: string, lastSequence: number): StreamReplayResult {
+    const list = this.runs.get(runId);
+    if (!list || list.length === 0) {
+      return { recoverable: false, events: [], atEnd: true };
+    }
+
+    const tail = list.filter((e) => e.sequence > lastSequence);
+    const contiguous =
+      tail.length === 0 ||
+      (tail[0].sequence === lastSequence + 1 &&
+        tail.every((e, i) => i === 0 || e.sequence === tail[i - 1].sequence + 1));
+    if (!contiguous) {
+      return { recoverable: false, events: [], atEnd: false };
+    }
+
+    const last = list[list.length - 1];
+    return {
+      recoverable: true,
+      events: tail,
+      atEnd: TERMINAL_TYPES.has(last.type),
+    };
+  }
+}

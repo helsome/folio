@@ -31,7 +31,8 @@ describe('toStreamEvents', () => {
     expect(ev.type).toBe('run_started');
     if (ev.type === 'run_started') {
       expect(ev.protocolVersion).toBe(1);
-      expect(ev.messageId).toBe('run-1');
+      expect(ev.runId).toBe('run-1');
+      expect(ev.messageId).toBeUndefined();
       expect(ev.sequence).toBe(5);
       expect(ev.payload.input).toBe('AAPL.US');
       expect(ev.payload.startedAt).toBe('2024-09-10T20:26:40.000Z');
@@ -86,6 +87,22 @@ describe('toStreamEvents', () => {
       expect(ev.payload.message).toBe('provider timeout');
       expect(ev.payload.retryable).toBe(false);
     }
+  });
+
+  it('message 级事件携带真实 messageId，run 级事件不携带', () => {
+    const [delta] = toStreamEvents(makeEvent('message_delta', { delta: 'x', answer: 'x' }), {
+      messageId: 'msg-9',
+    });
+    const [done] = toStreamEvents(makeEvent('run_completed', { answer: 'x', toolCalls: [] }), {
+      messageId: 'msg-9',
+    });
+    if (delta.type === 'text_delta') {
+      expect(delta.messageId).toBe('msg-9');
+    }
+    if (done.type === 'run_completed') {
+      expect(done.messageId).toBeUndefined();
+    }
+    expect(done.runId).toBe('run-1');
   });
 
   it('用户取消映射为 cancelled（reason=user）', () => {
