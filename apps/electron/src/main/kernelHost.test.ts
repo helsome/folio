@@ -1,11 +1,38 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { join } from 'node:path';
-import type { AgentEvent } from '@finagent/core';
+import type { AgentEvent, AutomationRule, AutomationRun } from '@finagent/core';
 
 let lastKernelOptions: Record<string, unknown> | null = null;
 let lastMarketData: FakeMarketDataService | null = null;
 let forwardedEvents: unknown[] = [];
 const routerFetchers = { getQuote: async () => ({ symbol: 'AAPL.US' }) };
+const scheduledRule: AutomationRule = {
+  id: 'scheduled-rule',
+  type: 'watchlist-daily-review',
+  enabled: true,
+  notify: 'material-only',
+  createdAt: 1,
+};
+let scheduledRules: AutomationRule[] = [];
+let recordedAutomationRuns: AutomationRun[] = [];
+const scheduledOccurrences = new Map<string, Set<string>>();
+let automationExecutions = 0;
+function automationRun(): AutomationRun {
+  return {
+    id: `run-${automationExecutions}`,
+    ruleId: 'scheduled-rule',
+    ranAt: Date.now(),
+    evaluated: 0,
+    materialChanges: 0,
+    analyzed: 0,
+    notified: false,
+    failures: [],
+  };
+}
+let runAutomationMock: () => Promise<AutomationRun> = async () => {
+  automationExecutions += 1;
+  return automationRun();
+};
 
 class FakeMarketDataService {
   quoteSymbols: string[] = [];
@@ -224,13 +251,22 @@ mock.module('@finagent/shared', () => ({
     strategyPerformance = async () => [];
   },
   AutomationRuleRepository: class {
-    list = async () => [];
+    list = async () => scheduledRules;
     save = async () => undefined;
     remove = async () => undefined;
   },
   AutomationRunRepository: class {
-    list = async () => [];
-    record = async () => undefined;
+    list = async () => recordedAutomationRuns;
+    record = async (run: AutomationRun) => {
+      recordedAutomationRuns = [run, ...recordedAutomationRuns.filter((existing) => existing.id !== run.id)];
+    };
+    claimScheduledOccurrence = async (ruleId: string, occurrence: string) => {
+      const occurrences = scheduledOccurrences.get(ruleId) ?? new Set<string>();
+      if (occurrences.has(occurrence)) return false;
+      occurrences.add(occurrence);
+      scheduledOccurrences.set(ruleId, occurrences);
+      return true;
+    };
   },
   buildBrief: () => ({
     generatedAt: 0,
@@ -238,17 +274,8 @@ mock.module('@finagent/shared', () => ({
     summary: '',
     quiet: { count: 0, message: '' },
   }),
-  runAutomation: async () => ({
-    id: 'run',
-    ruleId: 'rule',
-    ranAt: 0,
-    evaluated: 0,
-    materialChanges: 0,
-    analyzed: 0,
-    notified: false,
-    failures: [],
-  }),
-  runDue: () => [],
+  runAutomation: () => runAutomationMock(),
+  runDue: () => scheduledRules,
   DEFAULT_BRIEF_HOUR: 16.5,
   THESIS_REVIEW_DAY: 0,
   THESIS_REVIEW_HOUR: 9,
@@ -337,6 +364,14 @@ beforeEach(() => {
   lastKernelOptions = null;
   lastMarketData = null;
   forwardedEvents = [];
+  scheduledRules = [];
+  recordedAutomationRuns = [];
+  scheduledOccurrences.clear();
+  automationExecutions = 0;
+  runAutomationMock = async () => {
+    automationExecutions += 1;
+    return automationRun();
+  };
 });
 
 afterEach(() => {
@@ -455,6 +490,62 @@ describe('AgentKernelHost', () => {
       ok: false,
       error: expect.objectContaining({ code: 'INVALID_ARGUMENT' }),
     });
+    host.dispose();
+  });
+
+  it('does not repeat a scheduled occurrence after the host is recreated', async () => {
+    scheduledRules = [scheduledRule];
+    const firstHost = new AgentKernelHost();
+
+    await firstHost['tickAutomations']();
+    firstHost.dispose();
+
+    const recreatedHost = new AgentKernelHost();
+    await recreatedHost['tickAutomations']();
+
+    expect(automationExecutions).toBe(1);
+    expect(recordedAutomationRuns).toHaveLength(1);
+    recreatedHost.dispose();
+  });
+
+  it('claims a scheduled occurrence before execution to prevent overlap', async () => {
+    scheduledRules = [scheduledRule];
+    let resolveRun: ((run: AutomationRun) => void) | undefined;
+    let signalStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      signalStarted = resolve;
+    });
+    runAutomationMock = () => {
+      automationExecutions += 1;
+      signalStarted?.();
+      return new Promise((resolve) => {
+        resolveRun = resolve;
+      });
+    };
+    const host = new AgentKernelHost();
+    const firstTick = host['tickAutomations']();
+    await started;
+
+    await host['tickAutomations']();
+    expect(automationExecutions).toBe(1);
+
+    resolveRun?.(automationRun());
+    await firstTick;
+    host.dispose();
+  });
+
+  it('does not retry a failed scheduled occurrence on the next tick', async () => {
+    scheduledRules = [scheduledRule];
+    runAutomationMock = async () => {
+      automationExecutions += 1;
+      throw new Error('execution failed');
+    };
+    const host = new AgentKernelHost();
+
+    await host['tickAutomations']();
+    await host['tickAutomations']();
+
+    expect(automationExecutions).toBe(1);
     host.dispose();
   });
 });
