@@ -249,9 +249,63 @@ describe('PiRpcClient', () => {
     await stream.abort();
     await consume;
 
-    expect(events).toContain('message_update');
+    expect(events).toEqual(['message_update']);
+    expect(events).not.toContain('response');
+    expect(events).not.toContain('abort');
     expect(result).toMatchObject({ aborted: true });
     expect((result as { answer: string }).answer).toBe('Partial');
+  });
+
+  it('ignores stale prompt responses while a prompt is active', async () => {
+    const client = new PiRpcClient({
+      spawnProcess: createSpawn(() =>
+        new FakePiProcess((line, proc) => {
+          if (line.type !== 'prompt') return;
+
+          proc.writeEvent({
+            id: 'stale-prompt-id',
+            type: 'response',
+            command: 'prompt',
+            success: false,
+            error: 'stale prompt response',
+          });
+          proc.writeEvent({
+            id: line.id,
+            type: 'response',
+            command: 'prompt',
+            success: true,
+          });
+          proc.writeEvent({
+            id: line.id,
+            type: 'agent_end',
+            messages: [{ role: 'assistant', content: [{ type: 'text', text: 'completed' }] }],
+          });
+        })
+      ),
+    });
+
+    await expect(client.prompt('hello')).resolves.toMatchObject({ answer: 'completed' });
+  });
+
+  it('falls back to the only active prompt for id-less agent events', async () => {
+    const client = new PiRpcClient({
+      spawnProcess: createSpawn(() =>
+        new FakePiProcess((line, proc) => {
+          if (line.type !== 'prompt') return;
+
+          proc.writeEvent({
+            type: 'message_update',
+            assistantMessageEvent: { type: 'text_delta', delta: 'id-less ' },
+          });
+          proc.writeEvent({
+            type: 'agent_end',
+            messages: [{ role: 'assistant', content: [{ type: 'text', text: 'event' }] }],
+          });
+        })
+      ),
+    });
+
+    await expect(client.prompt('hello')).resolves.toMatchObject({ answer: 'event' });
   });
 
   it('rejects when Pi refuses a prompt before execution', async () => {
