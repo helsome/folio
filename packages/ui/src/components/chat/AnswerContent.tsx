@@ -30,7 +30,10 @@ export const AnswerContent: React.FC<{
   onOpenSource?: (sourceId: string) => void;
 }> = ({ content, streaming, className = '', message, onOpenSource }) => {
   const segments = useMemo(() => parseAnswerSegments(content), [content]);
-  const hasCitations = content.includes(CITATION_MARKER_START);
+  // Citations resolve whenever the message carries evidence records — not only
+  // when the text contains inline markers: a deterministic local-backend answer
+  // has no markers but its typed blocks still reference real tool calls.
+  const hasCitations = content.includes(CITATION_MARKER_START) || Boolean(message?.toolCalls?.length);
   const baseClass = `break-words text-[14px] leading-relaxed ${className}`;
 
   const citations = useMemo(() => {

@@ -10,6 +10,7 @@ import {
   cancelRunAtom,
   createSessionAtom,
   lastRunSummaryAtom,
+  loadMessagesAtom,
   navSectionAtom,
   runViewAtom,
   settingsTabAtom,
@@ -106,6 +107,19 @@ export const AgentPanel: React.FC = () => {
   const shouldAutoScrollRef = useRef(true);
 
   const isRunning = runView !== null && runView.infraError === undefined;
+
+  // The run_completed event payload does not carry financial evidence (the
+  // envelopes are built when the run settles). Once a run finishes, refresh the
+  // message list from the store so the persisted evidence-backed message — with
+  // resolvable citations — replaces the synthesized live one (#30).
+  const loadMessages = useSetAtom(loadMessagesAtom);
+  const wasRunningRef = useRef(false);
+  useEffect(() => {
+    if (!isRunning && wasRunningRef.current && activeSessionId) {
+      void loadMessages(client, activeSessionId);
+    }
+    wasRunningRef.current = isRunning;
+  }, [isRunning, activeSessionId, client, loadMessages]);
   const agentMotionState: AgentMotionState = runView?.infraError
     ? 'error'
     : runView?.toolCalls.some((toolCall) => toolCall.status === 'running')
