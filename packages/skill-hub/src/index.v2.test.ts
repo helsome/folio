@@ -20,6 +20,25 @@ async function writeFileAt(relativePath: string, contents: string) {
   await writeFile(full, contents, 'utf8');
 }
 
+// Creating symlinks on Windows requires Developer Mode or administrator
+// privileges. Probe once at module load: when the host cannot create
+// symlinks (EPERM), the escape test must SKIP with a reason rather than
+// fail — skipping keeps CI green while the security path still runs
+// everywhere the primitive exists (including Windows dev-mode hosts).
+async function probeSymlinkSupport(): Promise<boolean> {
+  const probeDir = await mkdtemp(join(tmpdir(), 'skill-hub-symlink-probe-'));
+  try {
+    await symlink(join(probeDir, '.'), join(probeDir, 'probe-link'));
+    return true;
+  } catch {
+    return false;
+  } finally {
+    await rm(probeDir, { recursive: true, force: true });
+  }
+}
+
+const symlinkSupported = await probeSymlinkSupport();
+
 const SKILL_MD = [
   '---',
   'name: market-data',
@@ -91,16 +110,21 @@ describe('SkillHub V2', () => {
     await expect(hub.readSkillResource('unknown-skill', 'SKILL.md')).rejects.toThrow('not found');
   });
 
-  it('blocks symlink escapes outside the skill directory', async () => {
-    await writeFileAt('market-data/SKILL.md', SKILL_MD);
-    await writeFileAt('secret.txt', 'top secret');
-    await mkdir(join(dir, 'market-data', 'references'), { recursive: true });
-    await symlink(join(dir, 'secret.txt'), join(dir, 'market-data', 'references', 'leak.md'));
-    const hub = new SkillHub({ skillsDirectory: dir, stateFile: join(dir, 'state.json') });
-    await hub.loadSkills();
+  (symlinkSupported ? it : it.skip)(
+    symlinkSupported
+      ? 'blocks symlink escapes outside the skill directory'
+      : 'blocks symlink escapes outside the skill directory (skipped: host cannot create symlinks — Windows requires Developer Mode or admin)',
+    async () => {
+      await writeFileAt('market-data/SKILL.md', SKILL_MD);
+      await writeFileAt('secret.txt', 'top secret');
+      await mkdir(join(dir, 'market-data', 'references'), { recursive: true });
+      await symlink(join(dir, 'secret.txt'), join(dir, 'market-data', 'references', 'leak.md'));
+      const hub = new SkillHub({ skillsDirectory: dir, stateFile: join(dir, 'state.json') });
+      await hub.loadSkills();
 
-    await expect(hub.readSkillResource('market-data', 'references/leak.md')).rejects.toThrow('escapes');
-  });
+      await expect(hub.readSkillResource('market-data', 'references/leak.md')).rejects.toThrow('escapes');
+    },
+  );
 
   it('does not expose resources of disabled skills', async () => {
     await writeFileAt('market-data/SKILL.md', SKILL_MD);

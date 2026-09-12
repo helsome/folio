@@ -12,6 +12,7 @@ import type {
   StaticInfo,
 } from '@finagent/core'
 import { isRecord } from '../../guards.ts'
+import { bindProviderInput, stampProviderResult } from '../instrument.ts'
 import { TtlCache } from './cache.ts'
 
 /**
@@ -21,7 +22,7 @@ import { TtlCache } from './cache.ts'
  * - Coverage: `market.quote`, `market.kline`, `company.profile` for US stocks
  *   only (`markets(): [US]`), so the router never routes HK/CN/SG symbols here.
  * - Auth: BYOK API key resolved via a caller-provided config getter (the
- *   ConnectionStore holds the key; the Lead wires it). Current Massive docs use
+ *   OS credential store holds the key; the main process wires it). Current Massive docs use
  *   the `apiKey` query param; legacy Polygon used a `Bearer` header. We try the
  *   documented query-param form first and fall back to the Bearer header on a
  *   401, per the decision doc's risk note.
@@ -74,10 +75,12 @@ const CONFIG_MISSING: ProviderError = {
 
 export interface MassiveConfig {
   /**
-   * Resolves the BYOK API key from the ConnectionStore config. Must never log
+   * Resolves the BYOK API key from secure credential storage. Must never log
    * or return the key to the renderer; this adapter only sends it to Massive.
    */
   getApiKey: () => Promise<string | undefined>
+  /** Optional user-selected compatible API endpoint (non-secret setting). */
+  getEndpoint?: () => Promise<string | undefined>
   /** Response cache override (tests inject a short-TTL cache). */
   cache?: TtlCache<ProviderResult<unknown>>
 }
@@ -97,10 +100,12 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
   readonly name = PROVIDER_NAME
 
   private readonly getApiKey: () => Promise<string | undefined>
+  private readonly getEndpoint: () => Promise<string | undefined>
   private readonly cache: TtlCache<ProviderResult<unknown>>
 
   constructor(config: MassiveConfig) {
     this.getApiKey = config.getApiKey
+    this.getEndpoint = config.getEndpoint ?? (async () => undefined)
     this.cache = config.cache ?? new TtlCache<ProviderResult<unknown>>()
   }
 
@@ -115,9 +120,10 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
       }
     }
     return {
-      status: 'connected',
+      status: 'not-connected',
+      diagnostic: 'degraded',
       lastCheck: Date.now(),
-      message: 'Connected with your API key (free tier serves end-of-day data)',
+      message: 'Configured; run Test Connection to verify production data access',
       permissions: [...DELAYED_PERMISSIONS],
     }
   }
@@ -138,8 +144,10 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
     if (signal?.aborted) return { ok: false, error: ABORTED }
     if (!CAPABILITIES.includes(capabilityId)) return { ok: false, error: UNSUPPORTED }
 
-    const symbol = readSymbol(input)
-    if (symbol === undefined) {
+    const bound = bindProviderInput(input, PROVIDER_ID)
+    if (!bound.ok) return { ok: false, error: bound.error }
+    const symbol = bound.symbol || readSymbol(input)
+    if (!symbol) {
       return {
         ok: false,
         error: { code: 'INVALID_INPUT', message: 'A stock symbol is required' },
@@ -157,22 +165,35 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
     const apiKey = (await this.getApiKey())?.trim()
     if (!apiKey) return { ok: false, error: CONFIG_MISSING }
 
-    const cacheKey = `${capabilityId}:${JSON.stringify(input)}`
+    const cacheKey = `${capabilityId}:${bound.instrumentId ?? symbol}:${JSON.stringify(bound.input)}`
     const cached = this.cache.get(cacheKey)
     if (cached) return cached as ProviderResult<T>
 
     try {
+      const endpoint = normalizeEndpoint(await this.getEndpoint())
       const result = await this.fetchAndMap(
         capabilityId,
         ticker.ticker,
         symbol,
         apiKey,
-        input,
-        signal
+        bound.input,
+        signal,
+        endpoint
       )
-      if (result.ok) this.cache.set(cacheKey, result)
-      return result as ProviderResult<T>
+      const stamped = stampProviderResult(result, bound.instrumentId)
+      if (stamped.ok) this.cache.set(cacheKey, stamped)
+      return stamped as ProviderResult<T>
     } catch (error) {
+      if (
+        signal?.aborted &&
+        signal.reason instanceof DOMException &&
+        signal.reason.name === 'TimeoutError'
+      ) {
+        return {
+          ok: false,
+          error: { code: 'TIMEOUT', message: 'The data provider timed out.', retryable: true },
+        }
+      }
       if (signal?.aborted || (error instanceof Error && error.name === 'AbortError')) {
         return { ok: false, error: ABORTED }
       }
@@ -197,12 +218,13 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
     symbol: string,
     apiKey: string,
     input: unknown,
-    signal?: AbortSignal
+    signal?: AbortSignal,
+    endpoint?: string
   ): Promise<ProviderResult<unknown>> {
     switch (capabilityId) {
       case 'market.quote': {
         const path = `/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(ticker)}`
-        const payload = await getJson(path, apiKey, signal)
+        const payload = await getJson(path, apiKey, signal, endpoint)
         const quote = mapQuote(symbol, payload)
         return { ok: true, data: quote, provenance: provenance(quote.timestamp) }
       }
@@ -210,14 +232,14 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
         const { count, timespan } = readKlineOptions(input)
         const { from, to } = klineRange(count)
         const path = `/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/1/${timespan}/${from}/${to}`
-        const payload = await getJson(buildAggsUrl(path, count), apiKey, signal)
+        const payload = await getJson(buildAggsUrl(path, count), apiKey, signal, endpoint)
         const klines = mapKlines(symbol, payload)
         const marketTime = klines.length > 0 ? klines[klines.length - 1].timestamp : undefined
         return { ok: true, data: klines, provenance: provenance(marketTime) }
       }
       case 'company.profile': {
         const path = `/v3/reference/tickers/${encodeURIComponent(ticker)}`
-        const payload = await getJson(path, apiKey, signal)
+        const payload = await getJson(path, apiKey, signal, endpoint)
         const profile = mapProfile(symbol, payload)
         return { ok: true, data: profile, provenance: provenance() }
       }
@@ -229,8 +251,13 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
 
 // ── HTTP ────────────────────────────────────────────────────────────────────
 
-async function getJson(path: string, apiKey: string, signal?: AbortSignal): Promise<unknown> {
-  const response = await request(path, apiKey, signal)
+async function getJson(
+  path: string,
+  apiKey: string,
+  signal?: AbortSignal,
+  endpoint?: string
+): Promise<unknown> {
+  const response = await request(path, apiKey, signal, endpoint)
   if (!response.ok) throw new ProviderHttpError(mapHttpStatus(response.status))
   const text = await response.text()
   try {
@@ -248,13 +275,23 @@ async function getJson(path: string, apiKey: string, signal?: AbortSignal): Prom
  * header, across the canonical and legacy hosts. Returns the first non-401
  * response; propagates abort/network errors to the caller.
  */
-async function request(path: string, apiKey: string, signal?: AbortSignal): Promise<Response> {
-  const attempts: Array<{ base: string; scheme: AuthScheme }> = [
-    { base: MASSIVE_HOST, scheme: 'query' },
-    { base: MASSIVE_HOST, scheme: 'bearer' },
-    { base: LEGACY_POLYGON_HOST, scheme: 'query' },
-    { base: LEGACY_POLYGON_HOST, scheme: 'bearer' },
-  ]
+async function request(
+  path: string,
+  apiKey: string,
+  signal?: AbortSignal,
+  endpoint?: string
+): Promise<Response> {
+  const attempts: Array<{ base: string; scheme: AuthScheme }> = endpoint
+    ? [
+        { base: endpoint, scheme: 'query' },
+        { base: endpoint, scheme: 'bearer' },
+      ]
+    : [
+        { base: MASSIVE_HOST, scheme: 'query' },
+        { base: MASSIVE_HOST, scheme: 'bearer' },
+        { base: LEGACY_POLYGON_HOST, scheme: 'query' },
+        { base: LEGACY_POLYGON_HOST, scheme: 'bearer' },
+      ]
 
   let lastUnauthorized: Response | undefined
   let lastFailure: unknown
@@ -281,6 +318,14 @@ async function request(path: string, apiKey: string, signal?: AbortSignal): Prom
   throw lastFailure instanceof Error ? lastFailure : new Error('Network error')
 }
 
+function normalizeEndpoint(value: string | undefined): string | undefined {
+  const endpoint = value?.trim().replace(/\/$/, '')
+  if (!endpoint) return undefined
+  const url = new URL(endpoint)
+  if (url.protocol !== 'https:') throw new Error('Provider endpoint must use HTTPS')
+  return url.toString().replace(/\/$/, '')
+}
+
 function buildUrl(base: string, path: string, apiKey: string, scheme: AuthScheme): string {
   const url = new URL(base + path)
   if (scheme === 'query') url.searchParams.set('apiKey', apiKey)
@@ -301,7 +346,7 @@ function mapHttpStatus(status: number): ProviderError {
     case 401:
       return { code: 'AUTH_EXPIRED', message: 'Your API key was rejected. Check the key and try again.' }
     case 403:
-      return { code: 'AUTH_EXPIRED', message: 'Your plan does not include access to this data.' }
+      return { code: 'ACCESS_DENIED', message: 'Your plan does not include access to this data.' }
     case 404:
       return { code: 'NOT_FOUND', message: 'No data found for this symbol.' }
     case 429:

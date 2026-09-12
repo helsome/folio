@@ -73,8 +73,22 @@ describe('formatSignedMoney / formatPercent', () => {
   it('prefixes gains with a plus sign', () => {
     expect(formatSignedMoney(10, 'USD')).toContain('+');
     expect(formatSignedMoney(-10, 'USD')).not.toContain('+');
-    expect(formatPercent(2.5)).toBe('+2.50%');
-    expect(formatPercent(-2.5)).toBe('-2.50%');
+    expect(formatPercent(2.5)).toBe('+2.5%');
+    expect(formatPercent(-2.5)).toBe('-2.5%');
     expect(formatPercent(undefined)).toBe('—');
+  });
+});
+
+describe('money formatting follows the UI locale (issue #86)', () => {
+  it('renders USD through the active i18n locale, never the OS locale', async () => {
+    const { i18nSetCurrentLocale } = await import('@finagent/i18n');
+    try {
+      i18nSetCurrentLocale('en-US');
+      expect(formatMoney(12345.67, 'USD')).toBe('$12,345.67');
+      i18nSetCurrentLocale('zh-CN');
+      expect(formatMoney(12345.67, 'USD')).toBe('US$12,345.67');
+    } finally {
+      i18nSetCurrentLocale('en-US');
+    }
   });
 });

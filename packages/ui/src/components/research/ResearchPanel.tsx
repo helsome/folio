@@ -25,6 +25,7 @@ import { NextAction } from '../primitives/NextAction';
 import { semanticCapabilityLabelKey } from '../../lib/agentPresentation';
 import { readPersisted, writePersisted } from '../../lib/persistedPrefs';
 import { ContentReveal } from '../motion/ContentReveal';
+import { useFinagentClient } from '../../client';
 
 const POLL_MS = 900;
 const SYMBOL_REGEX = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
@@ -37,6 +38,7 @@ function lastStrategyKey(symbol: string): string {
 /** Deep Research entry: run history for the focused symbol + start/cancel + report. */
 export const ResearchPanel: React.FC = () => {
   const { t } = useTranslation();
+  const client = useFinagentClient();
   const symbol = useAtomValue(activeSymbolAtom);
   const setActiveSymbol = useSetAtom(activeSymbolAtom);
   const setNavSection = useSetAtom(navSectionAtom);
@@ -70,8 +72,16 @@ export const ResearchPanel: React.FC = () => {
   }, [pendingStrategy, setPendingStrategy, symbol]);
 
   useEffect(() => {
-    void loadResearchRuns().then(setRuns);
-  }, [setRuns]);
+    let alive = true;
+    void loadResearchRuns().then((loaded) => {
+      if (!alive) return;
+      setRuns(loaded);
+      const validRuns = loaded.filter((run) => SYMBOL_REGEX.test(run.symbol));
+      const recent = validRuns.find((run) => run.status === 'interrupted' || !(run.status in TERMINAL_RUN_STATUSES)) ?? validRuns[0];
+      if (recent) setActiveSymbol((current) => current ?? recent.symbol);
+    });
+    return () => { alive = false; };
+  }, [setRuns, setActiveSymbol]);
 
   useEffect(() => {
     if (!symbol) {
@@ -181,6 +191,25 @@ export const ResearchPanel: React.FC = () => {
   };
 
   const symbolRuns = runs.filter((run) => run.symbol === symbol);
+  const recoverableRuns = runs.filter((run) => (!symbol || run.symbol === symbol) &&
+    (run.status === 'interrupted' || (run.status === 'failed' && run.error)));
+
+  const handleRecovery = async (runId: string, action: 'resume' | 'restart' | 'discard') => {
+    setLoading(true);
+    setError(null);
+    try {
+      const method = client.research?.[action];
+      if (!method) throw new Error(t('research.notAvailable'));
+      const result = await method({ runId });
+      if (!result.ok) throw new Error(result.error.message);
+      if (action !== 'discard' && result.data) {
+        setActiveSymbol((result.data as ResearchRunSummary).symbol);
+      }
+      setRuns(await loadResearchRuns());
+    } catch (caught) {
+      setError(caught instanceof Error ? caught.message : String(caught));
+    } finally { setLoading(false); }
+  };
 
   return (
     <div className="folio-pilot-shell flex h-full flex-col" data-testid="research-panel">
@@ -261,6 +290,22 @@ export const ResearchPanel: React.FC = () => {
       )}
 
       <div className="folio-pilot-research-content">
+        {recoverableRuns.map((run) => (
+          <div key={run.id} data-testid="research-recovery" className="mb-3 rounded-xl border border-border bg-surface p-4">
+            <p className="text-sm font-semibold">{t('research.recovery.title', { symbol: run.symbol })}</p>
+            <p className="mt-1 text-xs text-text-muted">{t('research.recovery.saved', { count: run.completedCapabilities.length })}</p>
+            {run.error && <p className="mt-1 text-xs text-destructive">{run.error}</p>}
+            <div className="mt-3 flex gap-2">
+              {(['resume', 'restart', 'discard'] as const).map((action) => (
+                <button key={action} type="button" disabled={loading || Boolean(activeRun) || (action === 'resume' && !run.recoverable)}
+                  onClick={() => void handleRecovery(run.id, action)}
+                  className="mac-secondary-button rounded-lg px-3 py-1.5 text-xs disabled:opacity-45">
+                  {t('research.recovery.' + action)}
+                </button>
+              ))}
+            </div>
+          </div>
+        ))}
         {!symbol && <SymbolEntry error={symbolError} value={symbolInput} onChange={setSymbolInput} onSubmit={handleSymbolEntrySubmit} />}
 
         {symbol && (

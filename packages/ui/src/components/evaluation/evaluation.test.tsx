@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import { fallbackClient, FinagentClientProvider } from '../../client';
+import { fallbackClient, FinagentClientProvider, type EvaluationChannel, type FinagentClient } from '../../client';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { installHappyDom } from '../../test/setupHappyDom';
 import { EvaluationCenter } from './EvaluationCenter';
 import { EvaluationSettingsTab } from '../settings/EvaluationSettingsTab';
+import { TooltipProvider } from '../ui/tooltip';
 
 let restoreDom: (() => void) | undefined;
 
@@ -65,6 +66,99 @@ describe('EvaluationSettingsTab', () => {
     const { container, root } = await render(<EvaluationSettingsTab />);
     await act(async () => {});
     expect(container.textContent).toContain('Evaluation settings aren\u0027t available yet');
+    root.unmount();
+  });
+
+  it('renders the Langfuse connection card when evaluation settings load', async () => {
+    const client: FinagentClient = {
+      ...fallbackClient,
+      evaluation: {
+        ...fallbackClient.evaluation,
+        getSettings: async () => ({
+          ok: true,
+          data: {
+            settings: {
+              tracingEnabled: false,
+              langsmithProject: 'folio-agent',
+              langsmithEndpoint: '',
+              langfuseTracingEnabled: true,
+              langfuseHost: 'https://cloud.langfuse.com',
+              langfuseConfigured: true,
+              privacyLevel: 'standard',
+              onlineEvaluationEnabled: false,
+              apiKeyConfigured: false,
+              updatedAt: 1,
+            },
+            connection: { connected: false, configured: false },
+            langfuse: { connected: true, configured: true, endpoint: 'https://cloud.langfuse.com' },
+          },
+        }),
+      } as EvaluationChannel,
+    };
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <FinagentClientProvider client={client}>
+          <I18nProvider>
+            <TooltipProvider>
+              <EvaluationSettingsTab />
+            </TooltipProvider>
+          </I18nProvider>
+        </FinagentClientProvider>
+      );
+    });
+    await act(async () => {});
+    expect(container.textContent).toContain('Langfuse Connection');
+    expect(container.textContent).toContain('Langfuse tracing');
+    expect(container.querySelector('[data-testid="langfuse-settings"]')).not.toBeNull();
+    root.unmount();
+  });
+
+  it('renders the Langfuse empty state when keys are not configured', async () => {
+    const client: FinagentClient = {
+      ...fallbackClient,
+      evaluation: {
+        ...fallbackClient.evaluation,
+        getSettings: async () => ({
+          ok: true,
+          data: {
+            settings: {
+              tracingEnabled: false,
+              langsmithProject: 'folio-agent',
+              langsmithEndpoint: '',
+              langfuseTracingEnabled: false,
+              langfuseHost: '',
+              langfuseConfigured: false,
+              privacyLevel: 'standard',
+              onlineEvaluationEnabled: false,
+              apiKeyConfigured: false,
+              updatedAt: 1,
+            },
+            connection: { connected: false, configured: false },
+            langfuse: { connected: false, configured: false },
+          },
+        }),
+      } as EvaluationChannel,
+    };
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <FinagentClientProvider client={client}>
+          <I18nProvider>
+            <TooltipProvider>
+              <EvaluationSettingsTab />
+            </TooltipProvider>
+          </I18nProvider>
+        </FinagentClientProvider>
+      );
+    });
+    await act(async () => {});
+    expect(container.textContent).toContain('Langfuse Connection');
+    expect(container.textContent).toContain('Add Langfuse public and secret keys');
     root.unmount();
   });
 });

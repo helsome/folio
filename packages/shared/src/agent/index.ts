@@ -6,3 +6,4 @@ export { PiRpcClient } from './pi-rpc-client.ts';
 export { FinanceToolRegistry } from './finance-tool-registry.ts';
 export { MarketDataService } from './market-data-service.ts';
 export { routeFinanceIntent } from './intent-router.ts';
+export { withDemoDataFallback } from './demo-market-data.ts';

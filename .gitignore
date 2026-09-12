@@ -36,3 +36,6 @@ apps/electron/e2e/.user-data
 apps/electron/e2e/.user-data-interactions
 apps/electron/e2e/.user-data*
 apps/electron/e2e/artifacts/
+
+# Local eval / Langfuse smoke output
+artifacts/

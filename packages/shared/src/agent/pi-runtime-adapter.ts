@@ -518,6 +518,7 @@ function buildPrompt(
     'Never construct LongBridge CLI commands directly.',
     'Plan, call tools, observe results, then provide the final answer.',
     'Keep the final answer concise and include risk/data-gap notes when relevant.',
+    TYPED_BLOCK_INSTRUCTION,
     'When the user asks about market data, technicals, fundamentals, news, or portfolio analysis, consult the available skills below, then load the relevant skill file with read_skill_resource before acting on that subtopic.',
     workspaceSection,
     localeInstruction,
@@ -527,6 +528,22 @@ function buildPrompt(
     `User request: ${content}`,
   ].filter((part) => part.trim().length > 0).join('\n');
 }
+
+/**
+ * #31: teach the model the optional typed-answer-block format. Blocks render
+ * as KPI cards / tables / charts in the Copilot panel; anything malformed
+ * degrades to text on the renderer side, so a wrong block can never break the
+ * message — but the instruction keeps emission conservative.
+ */
+const TYPED_BLOCK_INSTRUCTION = [
+  'Optional typed answer blocks: after your Markdown answer you may append up to two data blocks for concrete tool-returned figures.',
+  'A block is a fenced code block with language folio-block whose body is exactly one JSON object, e.g.',
+  '```folio-block',
+  '{"version":1,"type":"metric_grid","metrics":[{"label":"Last","value":123.45,"unit":"price","currency":"USD","asOf":"2026-01-15T00:00:00Z","evidenceIds":["tool-call-id"]}]}',
+  '```',
+  'Types: metric_grid (KPI cards), data_table (columns with keys/labels/units + rows), time_series_chart (points t=ISO ascending, v=number), comparison_table (columns + labeled rows).',
+  'Rules: version is always 1; unit is price|percent|ratio|count; a price value requires an ISO 4217 currency code; percent values are already ×100 (1.23 means 1.23%); cite evidenceIds with the tool call ids you actually used; only include tool-returned numbers, never invented data; when in doubt use plain Markdown instead.',
+].join('\n');
 
 function buildSkillIndexSection(
   skillHub?: SkillHub,

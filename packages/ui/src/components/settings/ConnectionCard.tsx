@@ -35,7 +35,7 @@ const STATUS_DOT: Record<FinancialProviderStatus, string> = {
   error: 'bg-destructive',
 };
 
-type BusyAction = 'connect' | 'disconnect' | 'test' | 'setConfig';
+type BusyAction = 'connect' | 'disconnect' | 'test' | 'setConfig' | 'settings';
 
 /** A single provider connection card: status, actions, and the device/BYOK flows. */
 export const ConnectionCard: React.FC<{
@@ -53,6 +53,8 @@ export const ConnectionCard: React.FC<{
   // BYOK state (massive).
   const [showApiKey, setShowApiKey] = useState(false);
   const [apiKey, setApiKey] = useState('');
+  const [endpoint, setEndpoint] = useState(entry.endpoint ?? '');
+  const [region, setRegion] = useState(entry.region ?? '');
 
   const [testSummary, setTestSummary] = useState<string | null>(null);
 
@@ -106,12 +108,16 @@ export const ConnectionCard: React.FC<{
 
   const handleSaveKey = useCallback(async () => {
     const key = apiKey.trim();
-    if (!key) {
+    if (!key && !entry.configured) {
       setError(t('connections.enterApiKeyError'));
       return;
     }
     await run('setConfig', async () => {
-      const result = await setProviderConfig(client, entry.providerId, { apiKey: key });
+      const result = await setProviderConfig(client, entry.providerId, {
+        apiKey: key || undefined,
+        endpoint,
+        region,
+      });
       if (result.ok) {
         setApiKey('');
         setShowApiKey(false);
@@ -121,7 +127,18 @@ export const ConnectionCard: React.FC<{
       }
       return { ok: false, error: result.error?.message ?? t('connections.saveApiKeyFailed') };
     });
-  }, [apiKey, client, entry.providerId, onChanged, run, t]);
+  }, [apiKey, client, endpoint, entry.configured, entry.providerId, onChanged, region, run, t]);
+
+  const updateSetting = useCallback(async (config: { enabled?: boolean; routingRole?: 'primary' | 'fallback' }) => {
+    await run('settings', async () => {
+      const result = await setProviderConfig(client, entry.providerId, config);
+      if (result.ok) {
+        onChanged();
+        return { ok: true, error: null };
+      }
+      return { ok: false, error: result.error?.message ?? t('connections.saveSettingsFailed') };
+    });
+  }, [client, entry.providerId, onChanged, run, t]);
 
   const handleDisconnect = useCallback(() => {
     void run('disconnect', async () => {
@@ -190,6 +207,16 @@ export const ConnectionCard: React.FC<{
     if (status === 'connected') {
       return (
         <>
+          {byok && (
+            <Button
+              size="sm"
+              variant="ghost"
+              onClick={() => setShowApiKey(true)}
+              disabled={busy !== null}
+            >
+              {t('connections.configure')}
+            </Button>
+          )}
           <Button
             size="sm"
             variant="outline"
@@ -256,6 +283,37 @@ export const ConnectionCard: React.FC<{
         </div>
       </div>
 
+      <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3 text-[11px] text-foreground/60">
+        <label className="flex items-center gap-1.5">
+          <input
+            type="checkbox"
+            checked={entry.enabled !== false}
+            disabled={busy !== null}
+            data-testid={`enabled-${entry.providerId}`}
+            onChange={(event) => void updateSetting({ enabled: event.target.checked })}
+          />
+          {t('connections.enabled')}
+        </label>
+        <button
+          type="button"
+          className={entry.routingRole === 'primary' ? 'text-accent' : 'hover:text-foreground'}
+          disabled={busy !== null}
+          data-testid={`primary-${entry.providerId}`}
+          onClick={() => void updateSetting({ routingRole: 'primary' })}
+        >
+          {t('connections.useAsPrimary')}
+        </button>
+        <button
+          type="button"
+          className={entry.routingRole === 'fallback' ? 'text-accent' : 'hover:text-foreground'}
+          disabled={busy !== null}
+          data-testid={`fallback-${entry.providerId}`}
+          onClick={() => void updateSetting({ routingRole: 'fallback' })}
+        >
+          {t('connections.useAsFallback')}
+        </button>
+      </div>
+
       {(accountLabel || quoteAccess || portfolioReady || lastCheck != null) && (
         <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 border-t border-border pt-3 text-[11px] text-foreground/54">
           {accountLabel && <span>{accountLabel}</span>}
@@ -264,6 +322,14 @@ export const ConnectionCard: React.FC<{
           {lastCheck != null && (
             <span className="tabular-nums">{new Date(lastCheck).toLocaleString()}</span>
           )}
+        </div>
+      )}
+
+      {entry.recentResult && (
+        <div className="mt-2 text-[10px] text-foreground/48">
+          {t('connections.recentRuntime')}: {entry.recentResult.capabilityId} ·{' '}
+          {entry.recentResult.ok ? t('connections.runtimeSucceeded') : entry.recentResult.errorCode}
+          {entry.recentResult.fallbackUsed ? ` · ${t('connections.fallbackUsed')}` : ''}
         </div>
       )}
 
@@ -287,6 +353,18 @@ export const ConnectionCard: React.FC<{
             value={apiKey}
             onChange={(event) => setApiKey(event.target.value)}
             placeholder={t('connections.apiKey')}
+            autoComplete="off"
+          />
+          <Input
+            value={endpoint}
+            onChange={(event) => setEndpoint(event.target.value)}
+            placeholder={t('connections.endpointOptional')}
+            autoComplete="off"
+          />
+          <Input
+            value={region}
+            onChange={(event) => setRegion(event.target.value)}
+            placeholder={t('connections.regionOptional')}
             autoComplete="off"
           />
           <div className="flex items-center gap-2">

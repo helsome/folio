@@ -1,5 +1,6 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import type { Kline, ProviderResult, Quote, StaticInfo } from '@finagent/core'
+import { DEFAULT_INSTRUMENT_CATALOG } from '@finagent/core'
 import { MassiveFinancialDataProvider } from './adapter.ts'
 import { TtlCache } from './cache.ts'
 
@@ -89,6 +90,33 @@ describe('MassiveFinancialDataProvider', () => {
     expect(calls[0].url).toContain('https://api.massive.com')
     expect(calls[0].url).toContain('apiKey=testkey')
     expect(calls[0].url).toContain('/v2/snapshot/locale/us/markets/stocks/tickers/AAPL')
+  })
+
+  it('converts a canonical instrument to the Massive ticker and stamps instrumentId', async () => {
+    const apple = DEFAULT_INSTRUMENT_CATALOG.find((item) => item.instrumentId === 'XNAS:AAPL')!
+    const calls = installFetch(() => jsonResponse(snapshotPayload()))
+    const provider = makeProvider('testkey')
+    const result = await provider.execute<Quote>('market.quote', { instrument: apple })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.instrumentId).toBe('XNAS:AAPL')
+    expect(result.provenance.instrumentId).toBe('XNAS:AAPL')
+    expect(calls[0].url).toContain('/v2/snapshot/locale/us/markets/stocks/tickers/AAPL')
+    expect(calls[0].url).not.toContain('AAPL.US')
+  })
+
+  it('uses an HTTPS endpoint override without exposing the API key in provider state', async () => {
+    const calls = installFetch(() => jsonResponse(snapshotPayload()))
+    const provider = new MassiveFinancialDataProvider({
+      getApiKey: async () => 'canary-secret-123',
+      getEndpoint: async () => 'https://proxy.example.test/',
+    })
+
+    const result = await provider.execute<Quote>('market.quote', { symbol: 'AAPL.US' })
+    expect(result.ok).toBe(true)
+    expect(calls[0].url).toStartWith('https://proxy.example.test/')
+    expect(JSON.stringify(await provider.status())).not.toContain('canary-secret-123')
   })
 
   it('falls back to the previous close when the free tier omits OHLC', async () => {
@@ -243,7 +271,37 @@ describe('MassiveFinancialDataProvider', () => {
     expect(calls[1].init?.headers).toEqual({ Authorization: 'Bearer key' })
   })
 
-  it('reports not-connected without a key and connected with one', async () => {
+  it.each([
+    [401, 'AUTH_EXPIRED'],
+    [403, 'ACCESS_DENIED'],
+    [429, 'RATE_LIMITED'],
+  ] as const)('maps HTTP %s to the stable diagnostic code %s', async (status, code) => {
+    installFetch(() => jsonResponse({}, status))
+    const result = await makeProvider('canary-secret-123').execute('market.quote', { symbol: 'AAPL.US' })
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe(code)
+    expect(result.error.message).not.toContain('canary-secret-123')
+  })
+
+  it('distinguishes a timed-out production request from a user abort', async () => {
+    globalThis.fetch = ((_input: unknown, init?: RequestInit) =>
+      new Promise((_resolve, reject) => {
+        init?.signal?.addEventListener('abort', () => reject(init.signal?.reason), { once: true })
+      })) as typeof fetch
+    const result = await makeProvider('key').execute(
+      'market.quote',
+      { symbol: 'AAPL.US' },
+      AbortSignal.timeout(1)
+    )
+
+    expect(result.ok).toBe(false)
+    if (result.ok) return
+    expect(result.error.code).toBe('TIMEOUT')
+  })
+
+  it('does not claim a configured key is connected before a production-path test', async () => {
     const withoutKey = await makeProvider(undefined).status()
     expect(withoutKey.status).toBe('not-connected')
     expect(withoutKey.message).toBe('Add an API key to connect')
@@ -251,9 +309,10 @@ describe('MassiveFinancialDataProvider', () => {
       { id: 'realtime', label: 'Real-time data', granted: false },
     ])
 
-    const connected = await makeProvider('key').status()
-    expect(connected.status).toBe('connected')
-    expect(connected.permissions).toEqual([
+    const configured = await makeProvider('key').status()
+    expect(configured.status).toBe('not-connected')
+    expect(configured.diagnostic).toBe('degraded')
+    expect(configured.permissions).toEqual([
       { id: 'realtime', label: 'Real-time data', granted: false },
     ])
   })

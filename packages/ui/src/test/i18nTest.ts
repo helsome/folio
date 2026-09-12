@@ -16,6 +16,7 @@ import { portfolio as enPortfolio } from '../../../i18n/src/locales/en-US/portfo
 import { events as enEvents } from '../../../i18n/src/locales/en-US/events'
 import { profile as enProfile } from '../../../i18n/src/locales/en-US/profile'
 import { demo as enDemo } from '../../../i18n/src/locales/en-US/demo'
+import { agent as enAgent } from '../../../i18n/src/locales/en-US/agent'
 import { common as zhCommon } from '../../../i18n/src/locales/zh-CN/common'
 import { navigation as zhNavigation } from '../../../i18n/src/locales/zh-CN/navigation'
 import { today as zhToday } from '../../../i18n/src/locales/zh-CN/today'
@@ -24,8 +25,9 @@ import { portfolio as zhPortfolio } from '../../../i18n/src/locales/zh-CN/portfo
 import { events as zhEvents } from '../../../i18n/src/locales/zh-CN/events'
 import { profile as zhProfile } from '../../../i18n/src/locales/zh-CN/profile'
 import { demo as zhDemo } from '../../../i18n/src/locales/zh-CN/demo'
+import { agent as zhAgent } from '../../../i18n/src/locales/zh-CN/agent'
 
-const NAMESPACES = ['common', 'navigation', 'today', 'discover', 'portfolio', 'events', 'profile', 'demo'] as const
+const NAMESPACES = ['common', 'navigation', 'today', 'discover', 'portfolio', 'events', 'profile', 'demo', 'agent'] as const
 
 const resources = {
   'en-US': {
@@ -37,6 +39,7 @@ const resources = {
     events: enEvents,
     profile: enProfile,
     demo: enDemo,
+    agent: enAgent,
   },
   'zh-CN': {
     common: zhCommon,
@@ -47,6 +50,7 @@ const resources = {
     events: zhEvents,
     profile: zhProfile,
     demo: zhDemo,
+    agent: zhAgent,
   },
 }
 

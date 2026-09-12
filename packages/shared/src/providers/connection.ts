@@ -1,4 +1,4 @@
-import type { FinancialProviderStatus } from '@finagent/core';
+import type { FinancialProviderStatus, ProviderRoutingConfig } from '@finagent/core';
 import type { JsonFileStore } from '../storage/json-file-store.ts';
 
 /**
@@ -19,11 +19,14 @@ export interface ConnectionState {
 interface ConnectionsFile {
   connections: ConnectionState[];
   configs?: Record<string, ProviderConfig>;
+  routing?: ProviderRoutingConfig;
 }
 
-/** Per-provider user configuration (BYOK API keys etc.). Never exported in diagnostics. */
+/** Non-secret provider settings. Credentials belong in the OS-backed CredentialStore. */
 export interface ProviderConfig {
-  apiKey?: string;
+  enabled?: boolean;
+  endpoint?: string;
+  region?: string;
 }
 
 /**
@@ -72,8 +75,25 @@ export class ConnectionStore {
   async setConfig(providerId: string, config: ProviderConfig): Promise<void> {
     const file = await this.store.read<ConnectionsFile>(ConnectionStore.FILE, { connections: [] });
     const configs = { ...(file.configs ?? {}) };
-    configs[providerId] = config;
+    // Copy only the allowlisted non-secret fields. This prevents accidental
+    // credential persistence even when an untyped caller supplies apiKey.
+    configs[providerId] = {
+      enabled: config.enabled,
+      endpoint: config.endpoint,
+      region: config.region,
+    };
     await this.store.write(ConnectionStore.FILE, { ...file, configs });
+    this.notify(file.connections);
+  }
+
+  async getRouting(defaults: ProviderRoutingConfig): Promise<ProviderRoutingConfig> {
+    const file = await this.store.read<ConnectionsFile>(ConnectionStore.FILE, { connections: [] });
+    return file.routing ? { ...file.routing } : { ...defaults };
+  }
+
+  async setRouting(routing: ProviderRoutingConfig): Promise<void> {
+    const file = await this.store.read<ConnectionsFile>(ConnectionStore.FILE, { connections: [] });
+    await this.store.write(ConnectionStore.FILE, { ...file, routing: { ...routing } });
     this.notify(file.connections);
   }
 

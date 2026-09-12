@@ -35,6 +35,7 @@ import type {
   GetKlineOptions,
 } from '@finagent/longbridge-tools';
 import { isRecord } from '../../guards.ts';
+import { bindProviderInput, stampProviderResult } from '../instrument.ts';
 import { LongbridgeHealthProbe, type LongbridgeExec } from './health.ts';
 
 /**
@@ -318,6 +319,9 @@ export class LongbridgeFinancialDataProvider implements FinancialDataProvider {
         error: { code: 'UNSUPPORTED_CAPABILITY', message: `Longbridge does not support "${capabilityId}".` },
       };
     }
-    return runProviderCall<T>(() => dispatch(input), signal);
+    const bound = bindProviderInput(input, LONGBRIDGE_PROVIDER_ID);
+    if (!bound.ok) return { ok: false, error: bound.error };
+    const result = await runProviderCall<T>(() => dispatch(bound.input), signal);
+    return stampProviderResult(result, bound.instrumentId);
   }
 }

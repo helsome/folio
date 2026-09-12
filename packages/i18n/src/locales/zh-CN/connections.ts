@@ -4,6 +4,16 @@ import type { connections as enConnections } from '../en-US/connections.ts';
 /** Connections / providers surface — Simplified Chinese. Provider & model ids stay untranslated (§11). */
 export const connections = {
   title: '连接',
+  enabled: '已启用',
+  configure: '配置',
+  useAsPrimary: '设为主数据源',
+  useAsFallback: '设为备用数据源',
+  endpointOptional: 'API 地址（可选，须为 HTTPS）',
+  regionOptional: '区域（可选）',
+  saveSettingsFailed: '无法保存数据源设置。',
+  recentRuntime: '最近运行结果',
+  runtimeSucceeded: '成功',
+  fallbackUsed: '已使用备用源',
   providerCount: '{{count}} 个提供方',
   notWired:
     '此版本尚未接入提供方连接——连接 IPC 上线后这里才会显示列表。',

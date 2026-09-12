@@ -7,7 +7,7 @@
 // throwing into agent execution paths.
 import type { TraceReference } from '@finagent/core';
 
-export type EvaluationBackendKind = 'langsmith' | 'local' | 'none';
+export type EvaluationBackendKind = 'langsmith' | 'langfuse' | 'local' | 'none';
 
 export interface TraceQuery {
   /** Pi session id = LangSmith thread_id when known. */
@@ -45,6 +45,8 @@ export interface EvaluationBackend {
   traceUrl?(traceId: string): string | undefined;
   /** Record human/automated feedback for a trace (spec §82). */
   submitFeedback?(traceId: string, feedback: { score: number; comment?: string; runId?: string }): Promise<void>;
+  /** Write named evaluation scores back onto a trace (Langfuse / future backends). */
+  submitScores?(traceId: string, scores: Array<{ name: string; value: number; comment?: string }>): Promise<void>;
 }
 
 // ── Disabled / local backends ───────────────────────────────────────────────

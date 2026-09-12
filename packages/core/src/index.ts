@@ -2,11 +2,14 @@
 
 import type { SupportedLocale } from './locale.ts';
 import type { ContextSelection, ContextSnapshot } from './portfolio-context.ts';
+import type { FinancialEvidenceEnvelope } from './financial-evidence.ts';
 
 export type { SupportedLocale, LocalePreference } from './locale.ts';
 
 export interface Quote {
   symbol: string;
+  /** Folio canonical instrument id when the quote was resolved through the catalog. */
+  instrumentId?: string;
   lastPrice: number;
   change: number;
   changePercent: number;
@@ -62,11 +65,15 @@ export interface NewsItem {
   url: string;
   timestamp: number;
   symbols: string[];
+  /** Folio canonical instrument id when news was fetched for a resolved listing. */
+  instrumentId?: string;
 }
 
 /** Static reference info for a security. */
 export interface StaticInfo {
   symbol: string;
+  /** Folio canonical instrument id when profile data was resolved through the catalog. */
+  instrumentId?: string;
   name: string;
   exchange?: string;
   currency?: string;
@@ -82,6 +89,7 @@ export interface StaticInfo {
 /** Calculated financial indexes (PE, PB, dividend yield, market value…). */
 export interface CalcIndex {
   symbol: string;
+  instrumentId?: string;
   pe?: number;
   pb?: number;
   dpsRate?: number;
@@ -137,6 +145,8 @@ export interface Message {
   toolName?: string;
   toolCalls?: ToolCallRecord[];
   trace?: AgentTraceEvent[];
+  /** Persisted structured financial facts produced by this assistant turn. */
+  financialEvidence?: FinancialEvidenceEnvelope[];
 }
 
 export type RunStatus = 'running' | 'completed' | 'failed' | 'cancelled';
@@ -225,6 +235,8 @@ export interface ToolResultProvenance {
   fetchedAt: number;
   marketTime?: number;
   stale?: boolean;
+  /** Canonical instrument id when the tool ran against a resolved listing. */
+  instrumentId?: string;
 }
 
 /** Structured tool result: raw data plus optional provenance. */
@@ -548,6 +560,7 @@ export interface Skill {
 }
 
 // ── Folio V3 domains ───────────────────────────────────────────────────────
+export * from './answer-blocks.ts';
 export * from './capability.ts';
 export * from './research.ts';
 export * from './thesis.ts';
@@ -573,3 +586,6 @@ export * from './trace.ts';
 export * from './trace-projection.ts';
 export * from './portfolio-context.ts';
 export * from './background-job.ts';
+export * from './instrument.ts';
+export * from './instrument-catalog.ts';
+export * from './financial-evidence.ts';

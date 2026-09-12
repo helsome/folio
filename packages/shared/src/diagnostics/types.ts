@@ -53,7 +53,7 @@ export interface DiagnosticsInput {
   };
   /** V7 evaluation/observability status (spec §86) — never a secret. */
   evaluation: {
-    backend: 'langsmith' | 'local' | 'none' | null;
+    backend: 'langsmith' | 'langfuse' | 'local' | 'none' | null;
     tracingEnabled: boolean;
     privacyLevel: string | null;
     project: string | null;
@@ -118,7 +118,7 @@ export interface DiagnosticsBundle {
   };
   /** V7 evaluation/observability status (spec §86) — state only, never secrets. */
   evaluation: {
-    backend: 'langsmith' | 'local' | 'none' | null;
+    backend: 'langsmith' | 'langfuse' | 'local' | 'none' | null;
     tracingEnabled: boolean;
     privacyLevel: string | null;
     project: string | null;

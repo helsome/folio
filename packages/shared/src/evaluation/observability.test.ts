@@ -69,7 +69,7 @@ describe('observability settle pipeline', () => {
         startedAt: 1_000,
         completedAt: 1_500,
       });
-      expect(ref.backend).toBe('none');
+      expect(ref.backend).toBe('local');
       const link = await store.lookupTraceLink('run-1');
       expect(link?.traceRef.runId).toBe('run-1');
     });

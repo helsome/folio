@@ -3,6 +3,16 @@ import type { NamespaceResource } from '../keys.ts';
 /** Connections / providers surface (spec §11, §14). Provider & model ids stay untranslated (§11). */
 export const connections = {
   title: 'Connections',
+  enabled: 'Enabled',
+  configure: 'Configure',
+  useAsPrimary: 'Use as primary',
+  useAsFallback: 'Use as fallback',
+  endpointOptional: 'API endpoint (optional, HTTPS)',
+  regionOptional: 'Region (optional)',
+  saveSettingsFailed: 'Could not save provider settings.',
+  recentRuntime: 'Recent runtime result',
+  runtimeSucceeded: 'succeeded',
+  fallbackUsed: 'fallback used',
   providerCount: '{{count}} provider(s)',
   notWired:
     "Provider connections aren't wired into this build yet — this list will populate once the Connections IPC lands.",

@@ -1,5 +1,13 @@
 import { contextBridge, ipcRenderer } from 'electron';
 
+interface ProviderSettingsInput {
+  apiKey?: string;
+  enabled?: boolean;
+  endpoint?: string;
+  region?: string;
+  routingRole?: 'primary' | 'fallback';
+}
+
 export interface ElectronAPI {
   window: {
     minimize: () => Promise<void>;
@@ -46,6 +54,9 @@ export interface ElectronAPI {
     list: () => Promise<unknown>;
   };
   research: {
+    resume: (input: { runId: string }) => Promise<unknown>;
+    restart: (input: { runId: string }) => Promise<unknown>;
+    discard: (input: { runId: string }) => Promise<unknown>;
     start: (input: { symbol: string; strategyId?: string }) => Promise<unknown>;
     cancel: (input: { runId: string }) => Promise<unknown>;
     listRuns: () => Promise<unknown>;
@@ -108,7 +119,7 @@ export interface ElectronAPI {
     cancelConnect: (input: { providerId: string }) => Promise<unknown>;
     disconnect: (input: { providerId: string }) => Promise<unknown>;
     test: (input: { providerId: string }) => Promise<unknown>;
-    setConfig: (input: { providerId: string; config: { apiKey?: string } }) => Promise<unknown>;
+    setConfig: (input: { providerId: string; config: ProviderSettingsInput }) => Promise<unknown>;
     coverage: () => Promise<unknown>;
     onChanged: (callback: (entries: unknown) => void) => () => void;
   };
@@ -180,6 +191,9 @@ export interface ElectronAPI {
     setCredential: (input: { apiKey: string }) => Promise<unknown>;
     removeCredential: () => Promise<unknown>;
     testConnection: () => Promise<unknown>;
+    setLangfuseCredential: (input: { publicKey: string; secretKey: string }) => Promise<unknown>;
+    removeLangfuseCredential: () => Promise<unknown>;
+    testLangfuseConnection: () => Promise<unknown>;
     listExperiments: () => Promise<unknown>;
     getExperiment: (input: { id: string }) => Promise<unknown>;
     getCase: (input: { id: string }) => Promise<unknown>;
@@ -250,6 +264,9 @@ const electronAPI: ElectronAPI = {
     list: () => ipcRenderer.invoke('capabilities:list'),
   },
   research: {
+    resume: (input: { runId: string }) => ipcRenderer.invoke('research:resume', input),
+    restart: (input: { runId: string }) => ipcRenderer.invoke('research:restart', input),
+    discard: (input: { runId: string }) => ipcRenderer.invoke('research:discard', input),
     start: (input: { symbol: string; strategyId?: string }) => ipcRenderer.invoke('research:start', input),
     cancel: (input: { runId: string }) => ipcRenderer.invoke('research:cancel', input),
     listRuns: () => ipcRenderer.invoke('research:listRuns'),
@@ -319,7 +336,7 @@ const electronAPI: ElectronAPI = {
     cancelConnect: (input: { providerId: string }) => ipcRenderer.invoke('connections:cancelConnect', input),
     disconnect: (input: { providerId: string }) => ipcRenderer.invoke('connections:disconnect', input),
     test: (input: { providerId: string }) => ipcRenderer.invoke('connections:test', input),
-    setConfig: (input: { providerId: string; config: { apiKey?: string } }) =>
+    setConfig: (input: { providerId: string; config: ProviderSettingsInput }) =>
       ipcRenderer.invoke('connections:setConfig', input),
     coverage: () => ipcRenderer.invoke('connections:coverage'),
     onChanged: (callback: (entries: unknown) => void) => {
@@ -409,6 +426,9 @@ const electronAPI: ElectronAPI = {
     setCredential: (input) => ipcRenderer.invoke('evaluation:setCredential', input),
     removeCredential: () => ipcRenderer.invoke('evaluation:removeCredential'),
     testConnection: () => ipcRenderer.invoke('evaluation:testConnection'),
+    setLangfuseCredential: (input) => ipcRenderer.invoke('evaluation:setLangfuseCredential', input),
+    removeLangfuseCredential: () => ipcRenderer.invoke('evaluation:removeLangfuseCredential'),
+    testLangfuseConnection: () => ipcRenderer.invoke('evaluation:testLangfuseConnection'),
     listExperiments: () => ipcRenderer.invoke('evaluation:listExperiments'),
     getExperiment: (input) => ipcRenderer.invoke('evaluation:getExperiment', input),
     getCase: (input) => ipcRenderer.invoke('evaluation:getCase', input),

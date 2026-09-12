@@ -125,6 +125,7 @@ export {
   FinanceToolRegistry,
   MarketDataService,
   routeFinanceIntent,
+  withDemoDataFallback,
 } from './agent/index.ts';
 export type { PiPromptStream, PiPromptResult, PiState, PiStreamEvent } from './agent/pi-rpc-client.ts';
 
@@ -152,5 +153,6 @@ export * from './performance/index.ts';
 export * from './calibration/index.ts';
 export * from './pulse/index.ts';
 export * from './export/index.ts';
+export * from './evidence/index.ts';
 export * from './evaluation/index.ts';
 export * from './context/index.ts';

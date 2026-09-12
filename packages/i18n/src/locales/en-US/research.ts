@@ -67,6 +67,8 @@ export const research = {
   failedCount: '({{failed}} failed)',
   empty: 'No research yet. Pick a symbol and start Deep Research.',
   runStatus: {
+    interrupted: 'Interrupted',
+    recovering: 'Recovering',
     queued: 'Queued',
     fetching: 'Fetching',
     synthesizing: 'Synthesizing',
@@ -76,6 +78,13 @@ export const research = {
     cancelled: 'Cancelled',
   },
   reportFor: '{{symbol}} · Research Report',
+  recovery: {
+    title: '{{symbol}} · Research needs attention',
+    saved: '{{count}} completed results saved. Resume keeps the original evidence.',
+    resume: 'Resume',
+    restart: 'Restart from scratch',
+    discard: 'Discard run',
+  },
   confidence: 'Confidence',
   partialRun: 'Partial run — unavailable data is marked explicitly.',
   allCompleted: 'All planned capabilities completed.',

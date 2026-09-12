@@ -51,6 +51,7 @@ export const agent = {
     analyzedSources_one: 'Analyzed {{count}} source',
     analyzedSources_other: 'Analyzed {{count}} sources',
     statusRunning: 'running',
+    failed: 'Tool failed',
     label: 'Tool: {{name}}',
     calls: 'Tool calls',
     names: {
@@ -74,6 +75,23 @@ export const agent = {
     prevClose: 'Prev close',
     volume: 'Volume',
     updated: 'Updated',
+  },
+  blocks: {
+    loading: 'Building data block…',
+    invalid: 'Malformed data block — degraded to text.',
+    evidence: 'Evidence',
+    evidenceTip: 'Evidence record: {{id}}',
+    asOf: 'As of {{time}}',
+    copy: 'Copy table',
+    copied: 'Copied',
+    sourceLabel: 'Source',
+    sortHint: 'Sort by this column',
+    titles: {
+      metric_grid: 'Key metrics',
+      data_table: 'Data',
+      time_series_chart: 'Time series',
+      comparison_table: 'Comparison',
+    },
   },
   risk: {
     title: 'Portfolio risk',

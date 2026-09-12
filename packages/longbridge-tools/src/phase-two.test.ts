@@ -294,4 +294,31 @@ describe('phase-2 error handling', () => {
       /parse depth response/
     );
   });
+
+  it('rejects invalid calendar symbols before invoking the CLI', async () => {
+    await expect(
+      getCalendarEvents({ eventType: 'dividend', symbols: ['NVDA.US', 'not-a-symbol'] })
+    ).rejects.toMatchObject({ code: 'INVALID_SYMBOL' });
+    expect(execaMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects calendar dates that are not YYYY-MM-DD', async () => {
+    await expect(
+      getCalendarEvents({ eventType: 'dividend', start: '--symbol' })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    await expect(
+      getCalendarEvents({ eventType: 'dividend', end: '2026/01/01' })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    expect(execaMock).not.toHaveBeenCalled();
+  });
+
+  it('rejects a non-positive or non-integer calendar count', async () => {
+    await expect(
+      getCalendarEvents({ eventType: 'dividend', count: -1 })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    await expect(
+      getCalendarEvents({ eventType: 'dividend', count: 1.5 })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    expect(execaMock).not.toHaveBeenCalled();
+  });
 });
