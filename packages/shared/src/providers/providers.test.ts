@@ -453,6 +453,51 @@ describe('ConnectionStore', () => {
     const raw = await store.read<Record<string, unknown>>('connections.json', {});
     expect(JSON.stringify(raw)).not.toContain('canary-secret-123');
   });
+
+  it('persists endpoints without cleartext userinfo credentials (issue #93)', async () => {
+    const connections = new ConnectionStore(store);
+    await connections.setConfig('massive', {
+      enabled: true,
+      endpoint: 'https://folio_user:sup3rsecret@db.host.internal:5432/api',
+    });
+
+    // At-rest file must not carry the password.
+    const raw = await store.read<Record<string, unknown>>('connections.json', {});
+    expect(JSON.stringify(raw)).not.toContain('sup3rsecret');
+    expect(JSON.stringify(raw)).not.toContain('folio_user:');
+    // Host/path survive so the target stays readable.
+    expect(JSON.stringify(raw)).toContain('db.host.internal:5432/api');
+    expect(JSON.stringify(raw)).toContain('[REDACTED]');
+
+    // Read side never surfaces the credential either.
+    const config = await connections.getConfig('massive');
+    expect(config?.endpoint).toBe('https://[REDACTED]@db.host.internal:5432/api');
+  });
+
+  it('sanitizes legacy cleartext-userinfo configs on read (issue #93)', async () => {
+    // Simulate a file written before the fix.
+    await store.write('connections.json', {
+      connections: [],
+      configs: {
+        massive: { enabled: true, endpoint: 'https://user:legacy-pass@old.host/api' },
+      },
+    });
+    const connections = new ConnectionStore(store);
+    expect((await connections.getConfig('massive'))?.endpoint).toBe(
+      'https://[REDACTED]@old.host/api'
+    );
+  });
+
+  it('leaves endpoints without userinfo untouched (issue #93)', async () => {
+    const connections = new ConnectionStore(store);
+    await connections.setConfig('massive', {
+      enabled: true,
+      endpoint: 'https://api.example.com/v1?symbol=AAPL',
+    });
+    expect((await connections.getConfig('massive'))?.endpoint).toBe(
+      'https://api.example.com/v1?symbol=AAPL'
+    );
+  });
 });
 
 describe('createRouterFetchers', () => {

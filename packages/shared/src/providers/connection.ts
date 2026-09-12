@@ -2,6 +2,20 @@ import type { FinancialProviderStatus, ProviderRoutingConfig } from '@finagent/c
 import type { JsonFileStore } from '../storage/json-file-store.ts';
 
 /**
+ * Strip URL userinfo credentials (`scheme://user:pass@host`) from an
+ * endpoint before it reaches disk or the UI (issue #93). `ProviderConfig`
+ * is the non-secret settings channel — credentials belong in the OS-backed
+ * CredentialStore — and userinfo is a credential shape. Scheme, host and
+ * path are preserved so the endpoint stays readable; hosts without
+ * userinfo pass through untouched.
+ */
+const ENDPOINT_USERINFO = /(^[a-z][a-z0-9+.-]*:\/\/)[^/@\s]+@/i;
+
+export function sanitizeEndpoint(endpoint: string): string {
+  return endpoint.replace(ENDPOINT_USERINFO, '$1[REDACTED]@');
+}
+
+/**
  * Connection lifecycle state for ONE provider (spec §8). Provider-agnostic:
  * any financial-data or broker-account provider records the same shape.
  */
@@ -69,7 +83,14 @@ export class ConnectionStore {
 
   async getConfig(providerId: string): Promise<ProviderConfig | undefined> {
     const file = await this.store.read<ConnectionsFile>(ConnectionStore.FILE, { connections: [] });
-    return file.configs?.[providerId];
+    const config = file.configs?.[providerId];
+    // Lazy sanitization: files written before issue #93 may still carry
+    // cleartext userinfo in endpoints — never surface it, even at rest.
+    if (!config) return config;
+    return {
+      ...config,
+      endpoint: config.endpoint !== undefined ? sanitizeEndpoint(config.endpoint) : undefined,
+    };
   }
 
   async setConfig(providerId: string, config: ProviderConfig): Promise<void> {
@@ -77,9 +98,10 @@ export class ConnectionStore {
     const configs = { ...(file.configs ?? {}) };
     // Copy only the allowlisted non-secret fields. This prevents accidental
     // credential persistence even when an untyped caller supplies apiKey.
+    // Endpoints additionally lose userinfo credentials (issue #93).
     configs[providerId] = {
       enabled: config.enabled,
-      endpoint: config.endpoint,
+      endpoint: config.endpoint !== undefined ? sanitizeEndpoint(config.endpoint) : undefined,
       region: config.region,
     };
     await this.store.write(ConnectionStore.FILE, { ...file, configs });
