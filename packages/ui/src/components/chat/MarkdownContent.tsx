@@ -3,6 +3,7 @@ import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
 
 const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
+const CodeBlockContext = React.createContext(false);
 
 /**
  * Keep agent-authored URLs useful without allowing navigation to executable
@@ -79,6 +80,22 @@ function useStreamingContent(content: string, streaming: boolean): string {
  * is intentional. GFM adds the table, task-list, strike-through, and URL
  * behaviours people expect from a research answer.
  */
+const MarkdownCode: NonNullable<Components['code']> = ({ className, children, ...props }) => {
+  const isBlock = React.useContext(CodeBlockContext) || Boolean(className?.includes('language-'));
+  return (
+    <code
+      className={
+        isBlock
+          ? 'font-mono text-[11.5px] leading-relaxed text-foreground/82'
+          : 'rounded-[4px] bg-foreground/[0.07] px-1 py-0.5 font-mono text-[11.5px] text-foreground/82'
+      }
+      {...props}
+    >
+      {isBlock ? String(children).replace(/\n$/, '') : children}
+    </code>
+  );
+};
+
 const components: Components = {
   h1: ({ children }) => (
     <h1 className="mb-3 mt-1 text-[18px] font-bold tracking-tight text-foreground">{children}</h1>
@@ -116,25 +133,13 @@ const components: Components = {
       </a>
     );
   },
-  code: ({ className, children, ...props }) => {
-    const isBlock = Boolean(className?.includes('language-'));
-    return (
-      <code
-        className={
-          isBlock
-            ? 'font-mono text-[11.5px] leading-relaxed text-foreground/82'
-            : 'rounded-[4px] bg-foreground/[0.07] px-1 py-0.5 font-mono text-[11.5px] text-foreground/82'
-        }
-        {...props}
-      >
-        {isBlock ? String(children).replace(/\n$/, '') : children}
-      </code>
-    );
-  },
+  code: MarkdownCode,
   pre: ({ children }) => (
-    <pre className="my-2 max-w-full overflow-x-auto rounded-[8px] border mac-section-divider bg-foreground/[0.045] p-3">
-      {children}
-    </pre>
+    <CodeBlockContext.Provider value>
+      <pre className="my-2 max-w-full overflow-x-auto rounded-[8px] border mac-section-divider bg-foreground/[0.045] p-3">
+        {children}
+      </pre>
+    </CodeBlockContext.Provider>
   ),
   table: ({ children }) => (
     <div className="my-2 max-w-full overflow-x-auto">

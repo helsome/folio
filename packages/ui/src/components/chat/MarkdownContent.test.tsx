@@ -34,6 +34,19 @@ describe('MarkdownContent', () => {
     expect(container.querySelector('pre code')?.textContent).toContain('{"ok":true}');
   });
 
+  it('renders untyped fenced code as a block rather than inline code', async () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(<MarkdownContent content={'```\nplain block\n```\n\nInline `value`.'} />);
+    });
+
+    expect(container.querySelector('pre code')?.className).toContain('font-mono');
+    expect(container.querySelector('pre code')?.className).not.toContain('rounded-[4px]');
+    expect(container.querySelector('p code')?.className).toContain('rounded-[4px]');
+  });
+
   it('renders GFM tables and removes unsafe links', async () => {
     const container = document.createElement('div');
     const root = createRoot(container);
