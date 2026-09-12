@@ -54,6 +54,25 @@ describe('MarkdownContent', () => {
     expect(container.textContent).toContain('Unsafe');
   });
 
+  it('blocks protocol-relative URLs that bypass the scheme allowlist', async () => {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+
+    await act(async () => {
+      root.render(
+        <MarkdownContent
+          content={'[Phish](//evil.com/steal) [Also](//github.com/helsome/folio) [Ok](https://example.com)'}
+        />
+      );
+    });
+
+    // Protocol-relative links must not produce a clickable //host href; the
+    // label is still shown as plain text so the answer stays readable.
+    expect(container.querySelector('a[href^="//"]')).toBeNull();
+    expect(container.querySelector('a[href="https://example.com"]')?.textContent).toBe('Ok');
+    expect(container.textContent).toContain('Phish');
+  });
+
   it('does not render raw HTML from agent output', async () => {
     const container = document.createElement('div');
     const root = createRoot(container);
