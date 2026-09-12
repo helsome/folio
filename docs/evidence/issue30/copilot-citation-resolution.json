@@ -1,0 +1,20 @@
+[
+  {
+    "citationId": "call_d6be090b9a534ab18409acd8",
+    "toolName": "get_quote",
+    "resolved": true,
+    "envelopeId": "fe_d9c0df2dc507a1a80afd21cd",
+    "provider": "longbridge",
+    "kind": "quote",
+    "values": [
+      "lastPrice=118",
+      "change=1.06",
+      "changePercent=0.9063999999999999"
+    ]
+  },
+  {
+    "citationId": "call_26e2cba66e9142fead65bdc5",
+    "toolName": "get_news",
+    "resolved": false
+  }
+]
