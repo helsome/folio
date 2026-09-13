@@ -42,6 +42,20 @@ describe('reduceStreamLog', () => {
     expect(s2.anomalies).toBe(2);
   });
 
+  it('重复 sequence 落在序列中间也幂等丢弃', () => {
+    let state = s0;
+    for (const sequence of [1, 2, 3]) {
+      state = reduceStreamLog(state, { sessionId: 's1', event: make({ sequence, type: 'text_delta' }) });
+    }
+    const replayed = reduceStreamLog(state, {
+      sessionId: 's1',
+      event: make({ sequence: 2, type: 'text_delta' }),
+    });
+    expect(replayed.byRun.get('run-1')?.map((e) => e.sequence)).toEqual([1, 2, 3]);
+    expect(replayed.drops).toBe(1);
+    expect(replayed.anomalies).toBe(0);
+  });
+
   it('不同 run 互不干扰', () => {
     const s1 = reduceStreamLog(s0, { sessionId: 's1', event: make({ runId: 'run-a', sequence: 1, type: 'run_started' }) });
     const s2 = reduceStreamLog(s1, { sessionId: 's1', event: make({ runId: 'run-b', sequence: 1, type: 'run_started' }) });

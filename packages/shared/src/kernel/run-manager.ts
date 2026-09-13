@@ -82,6 +82,8 @@ interface ActiveRun {
 interface RunProtocol {
   sequence: number;
   messageId: string;
+  /** 已生成的 assistant 文本快照，cancelled.partial.text 的数据源。 */
+  text: string;
 }
 
 /**
@@ -217,7 +219,7 @@ export class RunManager {
     };
     // 一次 run = 一次 assistant generation（#34）：run 启动时确定稳定的
     // assistant message id 与协议 sequence 计数器，随 run 全程传递。
-    const protocol: RunProtocol = { sequence: 0, messageId: randomUUID() };
+    const protocol: RunProtocol = { sequence: 0, messageId: randomUUID(), text: '' };
     this.emit(
       {
         id: randomUUID(),
@@ -250,7 +252,7 @@ export class RunManager {
     session: SessionMeta,
     workspaceContext?: WorkspaceContext,
     locale?: SupportedLocale,
-    protocol: RunProtocol = { sequence: 0, messageId: randomUUID() }
+    protocol: RunProtocol = { sequence: 0, messageId: randomUUID(), text: '' }
   ): Promise<void> {
     let failure: ApiError | undefined;
     let answer = '';
@@ -275,6 +277,8 @@ export class RunManager {
         this.emit(event, protocol);
         if (event.type === 'message_delta' || event.type === 'message_completed') {
           answer = event.payload.answer;
+          // 保留最新文本快照，使 cancelled 事件能带出部分回答（ADR 0001）。
+          protocol.text = answer;
         } else if (event.type === 'tool_completed') {
           toolCalls.push(event.payload.toolCall);
         } else if (event.type === 'run_failed') {
@@ -366,7 +370,7 @@ export class RunManager {
     }
   }
 
-/**
+  /**
    * Account for one runtime event and decide whether the run must stop. A stop
    * requests cancellation, so the caller stops consuming events and the run
    * settles as `cancelled` — never as an ordinary success — carrying its partial
@@ -461,7 +465,10 @@ export class RunManager {
     for (const listener of this.listeners) {
       listener(stamped);
     }
-    const mapped = toStreamEvents(stamped, { messageId: protocol.messageId });
+    const mapped = toStreamEvents(stamped, {
+      messageId: protocol.messageId,
+      partialText: protocol.text,
+    });
     // 无论是否有实时订阅者，都先记录进内存历史，保证 replay 有数据源。
     for (const streamEvent of mapped) {
       this.streamHistory.append(streamEvent);

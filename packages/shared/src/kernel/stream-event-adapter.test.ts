@@ -105,14 +105,46 @@ describe('toStreamEvents', () => {
     expect(done.runId).toBe('run-1');
   });
 
-  it('用户取消映射为 cancelled（reason=user）', () => {
+  it('用户取消映射为 cancelled（reason=user，带出部分文本与 messageId）', () => {
     const [ev] = toStreamEvents(
-      makeEvent('run_failed', { error: { code: 'RUN_CANCELLED', message: 'Run cancelled by user.' } })
+      makeEvent('run_failed', { error: { code: 'RUN_CANCELLED', message: 'Run cancelled by user.' } }),
+      { messageId: 'msg-9', partialText: 'Apple 已回复一半' }
     );
     expect(ev.type).toBe('cancelled');
     if (ev.type === 'cancelled') {
       expect(ev.payload.reason).toBe('user');
-      expect(ev.payload.partial).toEqual({ text: '' });
+      expect(ev.payload.partial).toEqual({ text: 'Apple 已回复一半' });
+      expect(ev.messageId).toBe('msg-9');
+    }
+  });
+
+  it('预算/runaway 终止映射为 cancelled（reason=budget / runtime）', () => {
+    const [budget] = toStreamEvents(
+      makeEvent('run_failed', { error: { code: 'BUDGET_EXHAUSTED', message: 'Run stopped.' } })
+    );
+    const [loop] = toStreamEvents(
+      makeEvent('run_failed', { error: { code: 'LOOP_DETECTED', message: 'Run stopped.' } })
+    );
+    expect(budget.type).toBe('cancelled');
+    if (budget.type === 'cancelled') expect(budget.payload.reason).toBe('budget');
+    expect(loop.type).toBe('cancelled');
+    if (loop.type === 'cancelled') expect(loop.payload.reason).toBe('runtime');
+  });
+
+  it('run 级事件（tool_*）不携带 messageId', () => {
+    const toolCall = {
+      id: 'tc-1',
+      toolName: 'get_quote',
+      args: { symbol: 'AAPL.US' },
+      startedAt: 1,
+      status: 'success' as const,
+      result: { lastPrice: 220 },
+    };
+    const [result] = toStreamEvents(makeEvent('tool_completed', { toolCall }), {
+      messageId: 'msg-9',
+    });
+    if (result.type === 'tool_result') {
+      expect(result.messageId).toBeUndefined();
     }
   });
 });

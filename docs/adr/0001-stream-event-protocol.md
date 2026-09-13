@@ -63,7 +63,8 @@ Key behavior change: `message_delta` (full-answer snapshot) becomes `text_delta`
 | Capability | Contract |
 |---|---|
 | Idempotency | Consumers dedupe on `runId + sequence`; replayed events never re-insert text, tool cards, or citations |
-| Cancel | renderer `cancelRun` → runtime propagates → runtime **explicitly emits `cancelled`**; partial answer preserved |
+| Cancel | renderer `cancelRun` → runtime propagates → runtime **explicitly emits `cancelled`**; partial answer preserved (`payload.partial.text` carries the text produced so far) |
+| `run_failed` normalization | `RUN_CANCELLED` → `cancelled{reason:'user'}`; `BUDGET_EXHAUSTED` → `cancelled{reason:'budget'}`; `RETRY_STORM` / `LOOP_DETECTED` → `cancelled{reason:'runtime'}`; everything else → `error` (see `stream-event-adapter`) |
 | Reconnect | **Implemented (v1, in-memory):** `RunManager.replayStream(runId, lastSequence)` returns the contiguous tail from `StreamEventHistory` (`packages/shared/src/kernel/stream-history.ts`); when the run is unknown or the tail is non-contiguous (buffer eviction), it returns `recoverable: false` — an explicit unrecoverable path the renderer must surface. IPC: `runs:stream-replay` |
 | Final-state parity | UI `stopReason` and persisted `run.status` come from the same single final state in run-manager (aligns with #18) |
 | Security (#19) | `status` never exposes chain-of-thought; tool payloads pass redaction before reaching the UI; renderer never executes model-returned code |

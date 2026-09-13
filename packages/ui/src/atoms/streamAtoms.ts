@@ -29,12 +29,13 @@ export function reduceStreamLog(state: StreamLogState, input: StreamLogInput): S
   const { event } = input;
   const prev = state.byRun.get(event.runId) ?? [];
 
-  // 幂等：同一 run 内相同 sequence 的事件直接丢弃（重放/重复投递）。
-  if (prev.some((e) => e.sequence === event.sequence)) {
+  const lastSeq = prev.length > 0 ? prev[prev.length - 1].sequence : 0;
+  // 幂等：prev 按 sequence 有序，重复只可能落在已见过的区间内，因此仅在
+  // sequence <= lastSeq 时做一次扫描，避免每条事件都全量遍历（长 run 下的 O(n²)）。
+  if (event.sequence <= lastSeq && prev.some((e) => e.sequence === event.sequence)) {
     return { ...state, drops: state.drops + 1, last: input };
   }
 
-  const lastSeq = prev.length > 0 ? prev[prev.length - 1].sequence : 0;
   const isAnomaly = event.sequence <= lastSeq || event.sequence !== lastSeq + 1;
   const next = isAnomaly
     ? [...prev, event].sort((a, b) => a.sequence - b.sequence)

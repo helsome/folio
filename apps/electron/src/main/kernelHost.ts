@@ -577,8 +577,9 @@ export class AgentKernelHost {
   streamReplay(input: unknown): StreamReplayResult {
     const request = requireObject(input);
     const lastSequence = request.lastSequence;
-    if (typeof lastSequence !== 'number' || !Number.isFinite(lastSequence)) {
-      throw createCodeError('INVALID_ARGUMENT', 'lastSequence must be a finite number.');
+    // 游标必须是非负整数：0 表示从头补发，负数/小数/NaN 都是非法客户端状态。
+    if (typeof lastSequence !== 'number' || !Number.isInteger(lastSequence) || lastSequence < 0) {
+      throw createCodeError('INVALID_ARGUMENT', 'lastSequence must be a non-negative integer.');
     }
     return this.kernel.runs.replayStream(
       requireString(request.runId, 'runId'),
@@ -2571,6 +2572,8 @@ export class AgentKernelHost {
     this.unsubscribe = null;
     this.unsubscribeEval?.();
     this.unsubscribeEval = null;
+    this.streamUnsubscribe?.();
+    this.streamUnsubscribe = null;
     this.window = null;
     await this.kernel.dispose();
   }

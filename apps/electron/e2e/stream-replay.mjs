@@ -177,16 +177,21 @@ async function main() {
       fail('S3: unknown run reports the explicit unrecoverable path', error);
     }
 
-    // S4. 非法 lastSequence → INVALID_ARGUMENT。
+    // S4. 非法 lastSequence（非整数 / 负数 / 非数字）→ INVALID_ARGUMENT。
     try {
-      const invalid = await page.evaluate(async () => {
-        return window.electronAPI.kernel.streamReplay({ runId: 'some-run', lastSequence: 'not-a-number' });
-      });
-      assert(invalid.ok === false, 'invalid lastSequence should fail');
-      assert(
-        invalid.error && invalid.error.code === 'INVALID_ARGUMENT',
-        `expected INVALID_ARGUMENT, got ${JSON.stringify(invalid.error)}`
-      );
+      const cursors = ['not-a-number', -1, 1.5];
+      for (const lastSequence of cursors) {
+        const invalid = await page.evaluate(
+          async (cursor) =>
+            window.electronAPI.kernel.streamReplay({ runId: 'some-run', lastSequence: cursor }),
+          lastSequence
+        );
+        assert(invalid.ok === false, `invalid lastSequence ${lastSequence} should fail`);
+        assert(
+          invalid.error && invalid.error.code === 'INVALID_ARGUMENT',
+          `expected INVALID_ARGUMENT for ${lastSequence}, got ${JSON.stringify(invalid.error)}`
+        );
+      }
       pass('S4: invalid lastSequence is rejected with INVALID_ARGUMENT');
     } catch (error) {
       fail('S4: invalid lastSequence is rejected with INVALID_ARGUMENT', error);
