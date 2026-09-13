@@ -6,6 +6,7 @@ export {
 } from './financial-evidence.ts';
 export {
   buildEvidenceBundle,
+  buildReportEvidenceBundle,
   isEvidenceBundle,
   parseEvidenceBundle,
   projectEvidenceRefs,

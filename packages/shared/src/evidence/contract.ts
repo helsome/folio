@@ -7,6 +7,7 @@ import type {
   EvidenceSource,
   FinancialEvidenceEnvelope,
   NewsItem,
+  ResearchReport,
 } from '@finagent/core';
 import {
   EVIDENCE_CONTRACT_SCHEMA_VERSION,
@@ -243,6 +244,19 @@ export interface EvidenceBundlePart {
   sources?: EvidenceSource[];
   evidence?: EvidenceItem[];
   claims?: EvidenceClaim[];
+}
+
+/**
+ * Project a persisted Deep Research report into the unified contract: every
+ * section evidence ref becomes a tool_result evidence item plus an
+ * `unverified` claim. Deterministic in the report alone, so repositories can
+ * derive and persist it next to the report on save and reload it unchanged.
+ */
+export function buildReportEvidenceBundle(report: ResearchReport): EvidenceBundle {
+  const projection = projectEvidenceRefs(
+    report.sections.flatMap((section) => section.evidence)
+  );
+  return buildEvidenceBundle(projection);
 }
 
 /**
