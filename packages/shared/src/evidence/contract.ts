@@ -96,6 +96,7 @@ export function projectFinancialEvidence(
           toolName: envelope.toolName,
           ...(envelope.capabilityId ? { capabilityId: envelope.capabilityId } : {}),
           provider: envelope.provider,
+          envelopeId: envelope.id,
         },
       });
     }

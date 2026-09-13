@@ -116,6 +116,12 @@ export interface EvidenceItem {
     provider?: string;
     /** Scoping instrument for non-financial evidence (news about a listing). */
     instrumentId?: string;
+    /**
+     * Original producer-side evidence record id (e.g. the `fe_` envelope id of
+     * a Copilot turn), so pre-contract citations can be joined to contract
+     * items deterministically.
+     */
+    envelopeId?: string;
   };
 }
 
