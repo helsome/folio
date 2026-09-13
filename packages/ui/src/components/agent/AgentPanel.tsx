@@ -14,6 +14,10 @@ import {
   runViewAtom,
   settingsTabAtom,
   workspaceContextAtom,
+  watchlistAtom,
+  portfolioViewAtom,
+  agentContextChoicesAtom,
+  syncSelectedAgentContext,
   type LastRunSummary,
   type NavSection,
 } from '../../atoms';
@@ -96,6 +100,9 @@ export const AgentPanel: React.FC = () => {
   const cancelRun = useSetAtom(cancelRunAtom);
   const [lastRun, setLastRun] = useAtom(lastRunSummaryAtom);
   const workspaceContext = useAtomValue(workspaceContextAtom);
+  const watchlist = useAtomValue(watchlistAtom);
+  const portfolioView = useAtomValue(portfolioViewAtom);
+  const contextChoices = useAtomValue(agentContextChoicesAtom);
 
   const [input, setInput] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
@@ -128,12 +135,17 @@ export const AgentPanel: React.FC = () => {
     shouldAutoScrollRef.current = distanceFromBottom <= 24;
   };
 
-  const handleSend = async () => {
-    const text = input.trim();
-    if (!text || !activeSessionId || isRunning) return;
-
-    setInput('');
-    setSendError(null);
+  const startAgentRun = async (text: string, restoreInputOnError: boolean): Promise<void> => {
+    if (!activeSessionId) return;
+    let contextSelections;
+    try {
+      contextSelections = await syncSelectedAgentContext(contextChoices, watchlist, portfolioView);
+    } catch (error) {
+      setSendError(error instanceof Error ? error.message : 'Could not save the selected context.');
+      if (restoreInputOnError) setInput(text);
+      return;
+    }
+    const runContext = { ...workspaceContext, branchId: 'main', ...(contextSelections.length > 0 ? { contextSelections } : {}) };
     // V9.1 §2: capture the ACTUAL context this live run starts with so the
     // run footer's trace can show it as 'Live' — never guessed later.
     setLastRun((previous) => ({
@@ -142,13 +154,21 @@ export const AgentPanel: React.FC = () => {
       status: 'running',
       startedAt: previous?.startedAt ?? Date.now(),
       toolCount: 0,
-      workspaceContext,
+      workspaceContext: runContext,
     }));
-    const result = await client.kernel.startRun(activeSessionId, text, workspaceContext);
+    const result = await client.kernel.startRun(activeSessionId, text, runContext);
     if (!result.ok) {
       setSendError(result.error.message);
-      setInput(text);
+      if (restoreInputOnError) setInput(text);
     }
+  };
+
+  const handleSend = async () => {
+    const text = input.trim();
+    if (!text || !activeSessionId || isRunning) return;
+    setInput('');
+    setSendError(null);
+    await startAgentRun(text, true);
   };
 
   /** V9.1 §8/§12: open the Trace Inspector for the last finished run. */
@@ -186,10 +206,7 @@ export const AgentPanel: React.FC = () => {
     const lastUser = [...messages].reverse().find((message) => message.role === 'user');
     if (!lastUser || !activeSessionId) return;
     setSendError(null);
-    const result = await client.kernel.startRun(activeSessionId, lastUser.content, workspaceContext);
-    if (!result.ok) {
-      setSendError(result.error.message);
-    }
+    await startAgentRun(lastUser.content, false);
   };
 
   const handleStop = async () => {

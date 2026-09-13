@@ -50,6 +50,10 @@ describe('ResearchRunner', () => {
     // The report records which locale produced it (V8 §44–46); default en-US
     // in this process.
     expect(result.report!.locale).toBe('en-US');
+    expect(result.report!.runManifest).toMatchObject({ runId: 'run-1' });
+    const newsEvidence = result.report!.sections.find((section) => section.key === 'research.news')?.evidence ?? [];
+    expect(newsEvidence).toHaveLength(2);
+    expect(newsEvidence[0]?.sourceUrl).toBe('https://nvidia.com/news/results?utm_source=test');
 
     // Status transitions observed.
     expect(statuses).toEqual(['fetching', 'synthesizing', 'completed']);

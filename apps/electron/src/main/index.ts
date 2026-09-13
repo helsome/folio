@@ -554,9 +554,29 @@ ipcMain.handle('export:markdown', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.exportMarkdown(input))
 );
 
+ipcMain.handle('background:listJobs', async () => toIpcResult(() => agentKernelHost.backgroundListJobs()));
+ipcMain.handle('background:saveJob', async (_event, input: unknown) => toIpcResult(() => agentKernelHost.backgroundSaveJob(input)));
+ipcMain.handle('background:setEnabled', async (_event, input: unknown) => toIpcResult(() => agentKernelHost.backgroundSetEnabled(input)));
+ipcMain.handle('background:removeJob', async (_event, input: unknown) => toIpcResult(() => agentKernelHost.backgroundRemoveJob(input)));
+ipcMain.handle('background:listRuns', async (_event, input: unknown) => toIpcResult(() => agentKernelHost.backgroundListRuns(input)));
+ipcMain.handle('background:listNotifications', async () => toIpcResult(() => agentKernelHost.backgroundListNotifications()));
+
+ipcMain.handle('export:html', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.exportHtml(input))
+);
+
+ipcMain.handle('export:json', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.exportJson(input))
+);
+
 ipcMain.handle('export:shareCard', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.exportShareCard(input))
 );
+
+ipcMain.handle('context:list', async () => toIpcResult(() => agentKernelHost.contextList()));
+ipcMain.handle('context:saveWatchlist', async (_event, input: unknown) => toIpcResult(() => agentKernelHost.contextSaveWatchlist(input)));
+ipcMain.handle('context:savePortfolio', async (_event, input: unknown) => toIpcResult(() => agentKernelHost.contextSavePortfolio(input)));
+ipcMain.handle('context:getRun', async (_event, input: unknown) => toIpcResult(() => agentKernelHost.contextGetRun(input)));
 
 // Controlled external open (spec §10): http/https only, never a shell.
 ipcMain.handle('openExternal', async (_event, url: unknown) =>

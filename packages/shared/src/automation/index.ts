@@ -33,3 +33,8 @@ export {
   formatAutomationNotification,
   type AutomationNotification,
 } from './notifications.ts'
+export {
+  BackgroundJobRepository,
+  BackgroundJobScheduler,
+  type BackgroundJobExecutor,
+} from './job-engine.ts'

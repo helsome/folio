@@ -32,6 +32,8 @@ export const agent = {
   context: {
     none: '暂无证券上下文',
     clear: '清除证券上下文',
+    useWatchlist: '使用关注列表',
+    usePortfolio: '使用投资组合',
   },
   model: {
     label: '模型',

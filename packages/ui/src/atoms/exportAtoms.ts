@@ -20,6 +20,8 @@ export interface ShareCardPayload {
 interface ExportElectronApi {
   export?: {
     markdown?: (input: { reportId: string }) => Promise<unknown>;
+    html?: (input: { reportId: string }) => Promise<unknown>;
+    json?: (input: { reportId: string }) => Promise<unknown>;
     shareCard?: (input: { reportId: string }) => Promise<unknown>;
   };
 }
@@ -35,6 +37,26 @@ export async function loadExportMarkdown(reportId: string): Promise<string | nul
     const channel = api();
     if (!channel?.markdown) return null;
     return unwrapIpcResult<string>(await channel.markdown({ reportId })) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadExportHtml(reportId: string): Promise<string | null> {
+  try {
+    const channel = api();
+    if (!channel?.html) return null;
+    return unwrapIpcResult<string>(await channel.html({ reportId })) ?? null;
+  } catch {
+    return null;
+  }
+}
+
+export async function loadExportJson(reportId: string): Promise<string | null> {
+  try {
+    const channel = api();
+    if (!channel?.json) return null;
+    return unwrapIpcResult<string>(await channel.json({ reportId })) ?? null;
   } catch {
     return null;
   }

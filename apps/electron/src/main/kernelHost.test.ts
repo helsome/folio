@@ -254,8 +254,31 @@ mock.module('@finagent/shared', () => ({
   THESIS_REVIEW_HOUR: 9,
   WEEKDAYS: [1, 2, 3, 4, 5],
   reportToMarkdown: () => '',
+  reportToHtml: () => '<html></html>',
+  reportToJson: () => '{}',
   reportToShareCard: () => ({ svg: '', text: '' }),
   redactForShare: (report: unknown) => report,
+  PortfolioContextRepository: class {
+    listWatchlists = async () => [];
+    listPortfolios = async () => [];
+    saveWatchlist = async (input: unknown) => input;
+    savePortfolio = async (input: unknown) => input;
+    snapshot = async () => ({ id: 'ctx-1', kind: 'watchlist', sourceId: 'wl', sourceVersion: 1, createdAt: 1, document: {} });
+    bindSnapshots = async () => ({ runId: 'r1', sessionId: 's1', branchId: 'main', snapshotIds: [], boundAt: 1 });
+    getRunContext = async () => undefined;
+    get = async () => undefined;
+  },
+  BackgroundJobRepository: class {
+    listJobs = async () => [];
+    listRuns = async () => [];
+    listNotifications = async () => [];
+    saveJob = async (input: unknown) => input;
+    setEnabled = async () => undefined;
+    removeJob = async () => undefined;
+  },
+  BackgroundJobScheduler: class {
+    tick = async () => undefined;
+  },
   computeSkillCalibrations: () => [],
   computeStrategyCalibrations: () => [],
   // V7 evaluation/observability (kernelHost constructor wiring; spec §15).
@@ -455,6 +478,13 @@ describe('AgentKernelHost', () => {
       ok: false,
       error: expect.objectContaining({ code: 'INVALID_ARGUMENT' }),
     });
+    host.dispose();
+  });
+
+  it('validates context and background job payloads at the IPC boundary', async () => {
+    const host = new AgentKernelHost();
+    await expect(host.contextSaveWatchlist({ id: 'wl', name: 'Bad', instruments: [{ instrumentId: 'AAPL' }] })).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    await expect(host.backgroundSaveJob({ id: 'job', type: 'research' })).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
     host.dispose();
   });
 });

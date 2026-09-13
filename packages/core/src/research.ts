@@ -35,8 +35,17 @@ export interface EvidenceRef {
   fetchedAt: number;
   /** Short factual summary of the data point (from CapabilityResult.summary). */
   summary?: string;
-  /** Canonical instrument id linking this evidence to one listing. */
+  /** Web source identity, when the evidence came from an online source. */
+  sourceId?: string;
+  sourceUrl?: string;
+  provider?: string;
+  /** Structured financial provenance. These fields intentionally do not imply a URL. */
   instrumentId?: string;
+  metric?: string;
+  asOf?: number;
+  currency?: string;
+  unit?: string;
+  status?: 'available' | 'unavailable' | 'drifted' | 'stale' | 'conflicted';
 }
 
 /** Condensed outcome of one capability run, embedded in the report. */
@@ -88,6 +97,13 @@ export interface ResearchReport {
    * failed or were unavailable — the report still stands, gaps are explicit.
    */
   runStatus: ResearchRunStatus;
+  /** Durable run/config reference used to reproduce or audit the report. */
+  runManifest?: {
+    runId: string;
+    model?: string;
+    configVersion?: string;
+    contextSnapshotIds?: string[];
+  };
 }
 
 /** Lightweight progress record for the Research UI. */

@@ -6,6 +6,7 @@ import {
   activeViewAtom,
   navSectionAtom,
   type NavSection,
+  agentContextChoicesAtom,
 } from '../../atoms';
 import { compareSymbolsAtom } from '../../atoms/compareAtoms';
 
@@ -35,6 +36,7 @@ export const ContextChip: React.FC = () => {
   const [navSection] = useAtom(navSectionAtom);
   const [compareSymbols] = useAtom(compareSymbolsAtom);
   const setActiveSymbol = useSetAtom(activeSymbolAtom);
+  const [contextChoices, setContextChoices] = useAtom(agentContextChoicesAtom);
 
   const workspaceSection = navSection === 'sessions' || navSection === 'watchlist';
   const sectionLabel = workspaceSection
@@ -74,6 +76,7 @@ export const ContextChip: React.FC = () => {
   else if (workspaceSection && !activeSymbol) parts.push(activeView);
 
   return (
+    <div className="flex flex-wrap items-center gap-1.5">
     <div
       data-testid="context-chip"
       className="inline-flex items-center gap-1.5 rounded-full border border-[rgba(var(--accent-rgb),0.22)] bg-[var(--mac-blue-soft)] px-2.5 py-1 text-[11px] font-medium"
@@ -99,6 +102,15 @@ export const ContextChip: React.FC = () => {
           </svg>
         </button>
       )}
+    </div>
+      <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-[var(--mac-border)] px-2 py-1 text-[10px] text-foreground/60">
+        <input type="checkbox" checked={contextChoices.watchlist} onChange={(event) => setContextChoices((value) => ({ ...value, watchlist: event.target.checked }))} />
+        {t('agent.context.useWatchlist')}
+      </label>
+      <label className="inline-flex cursor-pointer items-center gap-1 rounded-full border border-[var(--mac-border)] px-2 py-1 text-[10px] text-foreground/60">
+        <input type="checkbox" checked={contextChoices.portfolio} onChange={(event) => setContextChoices((value) => ({ ...value, portfolio: event.target.checked }))} />
+        {t('agent.context.usePortfolio')}
+      </label>
     </div>
   );
 };

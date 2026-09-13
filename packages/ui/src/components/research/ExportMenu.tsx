@@ -1,7 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ResearchReport } from '@finagent/core';
-import { loadExportMarkdown, loadShareCard } from '../../atoms/exportAtoms';
+import { loadExportHtml, loadExportJson, loadExportMarkdown, loadShareCard } from '../../atoms/exportAtoms';
 
 /**
  * Export & share menu for a research report (spec §54–55).
@@ -16,11 +16,13 @@ interface ExportMenuProps {
   report: ResearchReport;
 }
 
-type MenuAction = 'markdown-copy' | 'markdown-download' | 'share-copy' | 'share-download';
+type MenuAction = 'markdown-copy' | 'markdown-download' | 'html-download' | 'json-download' | 'share-copy' | 'share-download';
 
 const MENU_ITEMS: ReadonlyArray<{ id: MenuAction; labelKey: string; testId: string }> = [
   { id: 'markdown-copy', labelKey: 'copyMarkdown', testId: 'export-copy-markdown' },
   { id: 'markdown-download', labelKey: 'downloadMarkdown', testId: 'export-download-markdown' },
+  { id: 'html-download', labelKey: 'downloadHtml', testId: 'export-download-html' },
+  { id: 'json-download', labelKey: 'downloadJson', testId: 'export-download-json' },
   { id: 'share-copy', labelKey: 'copyShareText', testId: 'export-copy-share-text' },
   { id: 'share-download', labelKey: 'downloadShareCard', testId: 'export-download-card' },
 ];
@@ -101,6 +103,14 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ report }) => {
         if (markdown == null) return false;
         if (action === 'markdown-copy') return copyText(markdown);
         return downloadFile(`${safeFileName(report)}-research.md`, markdown, 'text/markdown');
+      }
+      if (action === 'html-download') {
+        const html = await loadExportHtml(report.id);
+        return html == null ? false : downloadFile(`${safeFileName(report)}-research.html`, html, 'text/html');
+      }
+      if (action === 'json-download') {
+        const json = await loadExportJson(report.id);
+        return json == null ? false : downloadFile(`${safeFileName(report)}-research.json`, json, 'application/json');
       }
       const card = await loadShareCard(report.id);
       if (card == null) return false;

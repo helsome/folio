@@ -166,7 +166,24 @@ export interface ElectronAPI {
   };
   export: {
     markdown: (input: { reportId: string }) => Promise<unknown>;
+    html: (input: { reportId: string }) => Promise<unknown>;
+    json: (input: { reportId: string }) => Promise<unknown>;
     shareCard: (input: { reportId: string }) => Promise<unknown>;
+  };
+  background: {
+    listJobs: () => Promise<unknown>;
+    saveJob: (input: unknown) => Promise<unknown>;
+    setEnabled: (input: { jobId: string; enabled: boolean }) => Promise<unknown>;
+    removeJob: (input: { jobId: string }) => Promise<unknown>;
+    listRuns: (input: { jobId?: string }) => Promise<unknown>;
+    listNotifications: () => Promise<unknown>;
+    onOpen: (callback: (deepLink: string) => void) => () => void;
+  };
+  context: {
+    list: () => Promise<unknown>;
+    saveWatchlist: (input: unknown) => Promise<unknown>;
+    savePortfolio: (input: unknown) => Promise<unknown>;
+    getRun: (input: { runId: string; sessionId: string; branchId: string }) => Promise<unknown>;
   };
   evaluation: {
     getSettings: () => Promise<unknown>;
@@ -380,7 +397,28 @@ const electronAPI: ElectronAPI = {
   },
   export: {
     markdown: (input: { reportId: string }) => ipcRenderer.invoke('export:markdown', input),
+    html: (input: { reportId: string }) => ipcRenderer.invoke('export:html', input),
+    json: (input: { reportId: string }) => ipcRenderer.invoke('export:json', input),
     shareCard: (input: { reportId: string }) => ipcRenderer.invoke('export:shareCard', input),
+  },
+  background: {
+    listJobs: () => ipcRenderer.invoke('background:listJobs'),
+    saveJob: (input: unknown) => ipcRenderer.invoke('background:saveJob', input),
+    setEnabled: (input: { jobId: string; enabled: boolean }) => ipcRenderer.invoke('background:setEnabled', input),
+    removeJob: (input: { jobId: string }) => ipcRenderer.invoke('background:removeJob', input),
+    listRuns: (input: { jobId?: string }) => ipcRenderer.invoke('background:listRuns', input),
+    listNotifications: () => ipcRenderer.invoke('background:listNotifications'),
+    onOpen: (callback: (deepLink: string) => void) => {
+      const listener = (_event: unknown, deepLink: string) => callback(deepLink);
+      ipcRenderer.on('notification:open', listener);
+      return () => ipcRenderer.removeListener('notification:open', listener);
+    },
+  },
+  context: {
+    list: () => ipcRenderer.invoke('context:list'),
+    saveWatchlist: (input: unknown) => ipcRenderer.invoke('context:saveWatchlist', input),
+    savePortfolio: (input: unknown) => ipcRenderer.invoke('context:savePortfolio', input),
+    getRun: (input: { runId: string; sessionId: string; branchId: string }) => ipcRenderer.invoke('context:getRun', input),
   },
   evaluation: {
     getSettings: () => ipcRenderer.invoke('evaluation:getSettings'),

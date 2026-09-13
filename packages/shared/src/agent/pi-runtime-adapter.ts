@@ -490,6 +490,14 @@ function buildPrompt(
   if (workspaceContext?.selectedPosition) {
     workspaceLines.push(`- Selected position: ${workspaceContext.selectedPosition}`);
   }
+  if (workspaceContext?.contextSnapshots?.length) {
+    workspaceLines.push('- Explicit versioned context snapshots (frozen for this run):');
+    for (const snapshot of workspaceContext.contextSnapshots) {
+      workspaceLines.push(`  - ${snapshot.kind}:${snapshot.sourceId}@v${snapshot.sourceVersion} snapshot=${snapshot.id}`);
+      workspaceLines.push(`    ${JSON.stringify(snapshot.document)}`);
+    }
+    workspaceLines.push('- Treat portfolio/watchlist fields as user-provided context, not external evidence. Verify factual claims with normal finance tools and citations.');
+  }
   const workspaceSection = workspaceLines.length > 0
     ? `\nWorkspace context:\n${workspaceLines.join('\n')}\nWhen the user refers to "this", "the stock", or asks follow-up questions about a symbol without naming it, use the active symbol above.`
     : '';

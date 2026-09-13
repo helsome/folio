@@ -52,6 +52,11 @@ function sampleData(id: string): unknown {
       ];
     case 'company.valuation':
       return { pe: 25 };
+    case 'research.news':
+      return [
+        { id: 'news-original', title: 'NVDA announces results', summary: 'NVDA quarterly revenue rose on data-center demand', url: 'https://nvidia.com/news/results?utm_source=test', timestamp: 1_699_999_000, symbols: ['NVDA.US'] },
+        { id: 'news-copy', title: 'NVDA announces results', summary: 'NVDA quarterly revenue rose on data-center demand', url: 'https://aggregator.example/nvda-results', timestamp: 1_699_999_100, symbols: ['NVDA.US'] },
+      ];
     default:
       return { present: true };
   }
