@@ -12,6 +12,13 @@ const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 function safeUrl(value: string): string {
   const candidate = value.trim();
   if (!candidate) return '';
+  // Reject protocol-relative URLs (//host/path). They slip past the relative
+  // prefix check below and `new URL` then resolves them to an
+  // attacker-controlled host over https, which is exactly the link-injection
+  // vector tracked in #16 (prompt injection from untrusted sources). External
+  // links must go through the scheme allowlist, so there is no safe reason to
+  // keep a protocol-relative URL here.
+  if (candidate.startsWith('//')) return '';
   if (candidate.startsWith('#') || candidate.startsWith('/') || candidate.startsWith('./') || candidate.startsWith('../')) {
     return candidate;
   }

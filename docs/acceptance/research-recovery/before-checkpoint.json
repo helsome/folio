@@ -1,0 +1,287 @@
+{
+  "version": 1,
+  "summary": {
+    "id": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+    "symbol": "NVDA.US",
+    "startedAt": 1789121493351,
+    "plannedCapabilities": [
+      "company.profile",
+      "market.quote",
+      "market.kline",
+      "company.valuation",
+      "company.financials",
+      "company.earnings",
+      "company.ratings",
+      "research.news",
+      "market.capitalFlow",
+      "portfolio.positions"
+    ],
+    "completedCapabilities": [
+      "research.news"
+    ],
+    "failedCapabilities": [
+      "company.profile",
+      "market.quote",
+      "market.kline",
+      "company.valuation",
+      "company.financials",
+      "company.earnings",
+      "company.ratings",
+      "market.capitalFlow",
+      "portfolio.positions"
+    ],
+    "status": "synthesizing",
+    "locale": "en-US",
+    "recoveryCount": 0
+  },
+  "plan": [
+    {
+      "capabilityId": "company.profile",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "market.quote",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "market.kline",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "company.valuation",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "company.financials",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "company.earnings",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "company.ratings",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "research.news",
+      "available": true,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "market.capitalFlow",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    },
+    {
+      "capabilityId": "portfolio.positions",
+      "available": false,
+      "input": {
+        "symbol": "NVDA.US"
+      }
+    }
+  ],
+  "outcomes": [
+    {
+      "record": {
+        "id": "run-research.news-1789121493368-1",
+        "capabilityId": "research.news",
+        "startedAt": 1789121493368,
+        "finishedAt": 1789121506494,
+        "durationMs": 13126,
+        "status": "success",
+        "provenance": {
+          "provider": "longbridge",
+          "fetchedAt": 1789121506494,
+          "stale": false
+        }
+      },
+      "result": {
+        "data": [
+          {
+            "id": "298712839",
+            "title": "Nvidia CEO signals strong momentum for shareholders",
+            "description": "Nvidia's last quarterly report and conference call provided plenty for investors to be excited about.",
+            "url": "https://longbridge.com/news/298712839",
+            "published_at": "2026-09-11T10:00:10Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298712927",
+            "title": "Performance Comparison: NVIDIA And Competitors In Semiconductors & Semiconductor Equipment Industry",
+            "description": "This article compares NVIDIA with competitors in the Semiconductors & Semiconductor Equipment industry. Key metrics show NVIDIA has a lower P/E ratio (27.61) than the industry average, suggesting favorable growth potential, while higher P/B and P/S ratios indicate possible overvaluation. NVIDIA demonstrates strong financial health with an ROE of 28.12%, significantly above peers, and robust profitability driven by $72.86B EBITDA and 105.85% revenue growth. Its low debt-to-equity ratio of 0.17 highlights a conservative capital structure compared to top peers.",
+            "url": "https://longbridge.com/news/298712927",
+            "published_at": "2026-09-11T09:58:20Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298708551",
+            "title": "Premarket: Oracle Slides After Earnings, Chip Stocks Sink While Apple Jumps Over 3%",
+            "description": "Oracle OCI revenue surged 121% but $28B capex pushed FCF to -$5B; NVDA fell over 2%, INTC dropped over 5%, AAPL gained over 3%.",
+            "url": "https://longbridge.com/news/298708551",
+            "published_at": "2026-09-11T09:24:02Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298704149",
+            "title": "Michael Burry Dumps NVDA, PLTR December Puts While Touting Fine Wine as a ‘Short’ on the Dollar",
+            "description": "Investor Michael Burry sold his December 2026 put options on Nvidia and Palantir to reduce portfolio risk. He is shifting focus to a macro thesis of 'shorting the dollar' by investing in bonded European fine wine as a hedge against currency debasement and technological disruption. Burry views physical assets like wine, which face supply destruction, as superior to digital holdings vulnerable to AI and quantum computing threats.",
+            "url": "https://longbridge.com/news/298704149",
+            "published_at": "2026-09-11T07:48:22Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298696945",
+            "title": "GPU/CPU stocks rise in overnight trading, Dell up 1%, CBRS up 0.7%",
+            "description": "GPU/CPU stocks edged higher in overnight trading. Dell gained 1.26% to $513, CBRS rose 0.74% to $192.75, while NVDA, AMD and peers posted modest gains in a broadly positive session.",
+            "url": "https://longbridge.com/news/298696945",
+            "published_at": "2026-09-11T07:47:43Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298694248",
+            "title": "NVIDIA Corporation $NVDA Holdings Lowered by Franchise GP Ltd",
+            "description": "Franchise GP Ltd reduced its NVIDIA stake by 69.8% in Q2, leaving it with 98,619 shares valued at $19.7 million. Meanwhile, other institutions like Longfellow increased holdings. NVIDIA reported $96.2 billion quarterly revenue, up 106% YoY, driven by strong AI demand and Microsoft's data center expansion. However, sentiment faces headwinds from DOJ antitrust investigations into Groq licensing, insider selling by directors Mark Stevens and Timothy Teter, and broader macroeconomic pressures.",
+            "url": "https://longbridge.com/news/298694248",
+            "published_at": "2026-09-11T07:22:32Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298694242",
+            "title": "Drive Wealth Management LLC Has $20.70 Million Holdings in NVIDIA Corporation $NVDA",
+            "description": "Drive Wealth Management LLC increased its NVIDIA holdings by 5.6% in Q2, reaching $20.7 million. Other institutions like Longfellow also boosted stakes. Analysts maintain a consensus 'Buy' rating with an average target of $324.34. Meanwhile, insiders EVP Timothy Teter and Director Mark Stevens sold significant shares in August and June respectively, reducing their positions under pre-arranged plans.",
+            "url": "https://longbridge.com/news/298694242",
+            "published_at": "2026-09-11T07:22:32Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298692946",
+            "title": "Retreat Signal? \"The Big Short\" Closes NVIDIA and Palantir Put Options",
+            "description": "\"The Big Short\" Michael Burry has comprehensively reduced risk exposure by closing his December 2026 put options on NVIDIA and Palantir, citing the avoidance of time value decay. However, he continues to hold put options on both stocks expiring in 2027, along with short positions in several other tech stocks. Meanwhile, Jensen Huang reposted data showing a 22% month-over-month increase in GPU rental rates, countering Burry's core bearish argument that chip depreciation periods are overestimated",
+            "url": "https://longbridge.com/news/298692946",
+            "published_at": "2026-09-11T07:21:10Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298691467",
+            "title": "In Q2 2026, the revenue of the world's top ten IC design companies increased by 73% year-on-year, with AMD breaking into the top three",
+            "description": "TrendForce data shows that in the second quarter of 2026, the revenue of the world's top ten IC design companies will increase by 73% year-on-year to USD 141.45 billion. NVIDIA ranks first with a 99% increase, accounting for 64%; AMD benefits from AI driving CPU demand, rising to third; Broadcom ranks second due to growth in ASIC shipments and communications business; Qualcomm falls to fourth due to weakness in its mobile business",
+            "url": "https://longbridge.com/news/298691467",
+            "published_at": "2026-09-11T06:53:13Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          },
+          {
+            "id": "298695447",
+            "title": "Nvidia CEO Jensen Huang Said Nvidia Compute Is 'Fungible, Durable and Highly Rentable' — Now Oracle CEO Stands Impressed as 4-Year Old GPUs Fetch 20% Premium",
+            "description": "Oracle CEO Clay Magouyrk echoed Nvidia's Jensen Huang, stating four-year-old GPUs are renewed or resold at a 20% premium, highlighting AI hardware longevity. Oracle reported Q1 earnings of $1.92 per share and revenue of $19.35 billion, beating estimates. The company delivered 850MW of AI capacity with 97.9% GPU utilization. Oracle expects strong Q2 growth, though shares dipped initially before rising in after-hours trading.",
+            "url": "https://longbridge.com/news/298695447",
+            "published_at": "2026-09-11T06:47:52Z",
+            "comments_count": 0,
+            "likes_count": 0,
+            "shares_count": 0
+          }
+        ],
+        "provenance": {
+          "provider": "longbridge",
+          "fetchedAt": 1789121506494,
+          "stale": false
+        },
+        "summary": "Retrieved 43 live Longbridge news articles"
+      }
+    }
+  ],
+  "phase": "synthesizing",
+  "identity": {
+    "provider": "deepseek",
+    "model": "deepseek-chat",
+    "config": "live-http-news-v1"
+  },
+  "budget": {
+    "limits": {},
+    "usage": {
+      "wallClockMs": 13160,
+      "modelCalls": 1,
+      "toolCalls": 1,
+      "searchIterations": 1,
+      "inputTokens": 0,
+      "outputTokens": 0,
+      "costUsd": 0
+    }
+  },
+  "retry": {
+    "attempts": {
+      "research.news": 1
+    },
+    "synthesisAttempts": 1
+  },
+  "inFlight": [],
+  "events": [
+    {
+      "runId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "parentRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "spanId": "bf6cbb1a-575f-4b72-a1a1-e0dade93447d",
+      "type": "started",
+      "at": 1789121493352
+    },
+    {
+      "runId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "parentRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "spanId": "85238e75-6a1c-4f49-bfcc-702296d5b1ba",
+      "type": "step",
+      "stepId": "research.news",
+      "at": 1789121506494
+    },
+    {
+      "runId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "parentRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+      "spanId": "8d859107-be1a-4e15-ab39-26a771e4f821",
+      "type": "synthesis",
+      "at": 1789121506538,
+      "agentRunId": "2f91d332-859d-439f-8461-7fcff8aba38a",
+      "sessionId": "33db05b2-736b-4424-bf98-fd7a43ee40ab"
+    }
+  ]
+}

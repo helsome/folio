@@ -25,9 +25,11 @@ import { createFullRegistry } from '../../packages/shared/src/capabilities/index
 import { JsonFileStore } from '../../packages/shared/src/storage/json-file-store.ts';
 import { EvaluationStore } from '../../packages/shared/src/evaluation/store.ts';
 import { LocalEvaluationBackend, resolveBackend } from '../../packages/shared/src/evaluation/backend.ts';
+import { resolveLangfuseBackend } from '../../packages/shared/src/evaluation/langfuse/resolve.ts';
 import { TraceCorrelationService } from '../../packages/shared/src/evaluation/correlation.ts';
 import { createJudgeClient, resolveJudgeConfig } from '../../packages/shared/src/evaluation/judge-client.ts';
 import { embeddedDatasets } from '../../packages/shared/src/evaluation/datasets/index.ts';
+import { validateGoldCaseDataset } from '../../packages/core/src/evaluation.ts';
 import {
   createBaselineFromExperiment,
   ExperimentService,
@@ -37,6 +39,7 @@ import type {
   EvaluationBaseline,
   EvaluationCase,
   EvaluationDataset,
+  EvaluationGoldDataset,
   EvaluationExperiment,
   EvaluationRun,
   ExperimentConfig,
@@ -87,8 +90,9 @@ Flags:
   --help                  Show this help
 
 Env: FINAGENT_JUDGE_PROVIDER/FINAGENT_JUDGE_MODEL/FINAGENT_JUDGE_API_KEY,
-TRACE_TO_LANGSMITH + LANGSMITH_PI_API_KEY (live tracing), ANTHROPIC_API_KEY or
-FINAGENT_PROVIDER_OVERRIDES (live agent), FINAGENT_PI_VERSION.`;
+TRACE_TO_LANGSMITH + LANGSMITH_PI_API_KEY (live LangSmith tracing),
+LANGFUSE_TRACING + LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY (+ optional LANGFUSE_HOST),
+ANTHROPIC_API_KEY or FINAGENT_PROVIDER_OVERRIDES (live agent), FINAGENT_PI_VERSION.`;
 
 function parseFlags(argv: string[]): CliOptions {
   const options: CliOptions = {
@@ -651,6 +655,14 @@ async function main(): Promise<number> {
     return 1;
   }
   const dataset = datasetEntry.load();
+  if ((dataset as Partial<EvaluationGoldDataset>).schemaVersion === 'gold-case/v1') {
+    const issues = validateGoldCaseDataset(dataset as EvaluationGoldDataset);
+    if (issues.length > 0) {
+      console.error(`Invalid Gold Case dataset ${dataset.id}@${dataset.version}:`);
+      for (const issue of issues) console.error(`  ${issue.path}: ${issue.message}`);
+      return 1;
+    }
+  }
   const cases = selectCases(dataset, options.smoke, options.maxCases);
   if (cases.length === 0) {
     console.error('No cases selected.');
@@ -680,17 +692,33 @@ async function main(): Promise<number> {
   await mkdir(options.storeDir, { recursive: true });
   const store = new EvaluationStore(new JsonFileStore(options.storeDir));
   const tracingEnabled = process.env.TRACE_TO_LANGSMITH === 'true' || process.env.TRACE_TO_LANGSMITH === '1';
+  const langfuseBackend = resolveLangfuseBackend({
+    settings: {
+      langfuseTracingEnabled:
+        process.env.LANGFUSE_TRACING === 'true' ||
+        process.env.LANGFUSE_TRACING === '1' ||
+        process.env.LANGFUSE_TRACING === 'yes',
+      langfuseHost: process.env.LANGFUSE_HOST ?? '',
+      privacyLevel: 'standard',
+    },
+    env: process.env,
+  });
   const backend =
-    options.mode === 'fixture'
-      ? new LocalEvaluationBackend()
-      : resolveBackend(
-          {
-            tracingEnabled,
-            langsmithProject: process.env.LANGSMITH_PI_PROJECT ?? 'folio-agent',
-            langsmithEndpoint: process.env.LANGSMITH_PI_ENDPOINT,
-          },
-          process.env.LANGSMITH_PI_API_KEY ?? process.env.LANGSMITH_API_KEY,
-        );
+    langfuseBackend.kind === 'langfuse'
+      ? langfuseBackend
+      : options.mode === 'fixture'
+        ? new LocalEvaluationBackend()
+        : resolveBackend(
+            {
+              tracingEnabled,
+              langsmithProject: process.env.LANGSMITH_PI_PROJECT ?? 'folio-agent',
+              langsmithEndpoint: process.env.LANGSMITH_PI_ENDPOINT,
+            },
+            process.env.LANGSMITH_PI_API_KEY ?? process.env.LANGSMITH_API_KEY,
+          );
+  if (backend.kind === 'langfuse') {
+    console.log('Observability: Langfuse tracing enabled.');
+  }
 
   // Kernel: fixture uses the deterministic local runtime; live uses Pi.
   const runtimeDir = await mkdtemp(join(tmpdir(), 'folio-eval-'));

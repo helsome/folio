@@ -5,6 +5,25 @@ The `folio-agent-v1` dataset ships embedded with the app as
 in `packages/shared/src/evaluation/datasets/index.ts` (id `folio-agent-v1`,
 version `1.0.0`).
 
+## Deep Research Gold Cases
+
+`deep-research-gold-v1` is a separate `gold-case/v1` dataset for research-quality
+evaluation. It contains ten versioned cases covering single facts, cross-source
+verification, citation mapping, causal claims, conflicting values, insufficient
+evidence, multi-step retrieval, long synthesis, and unsupported conclusions.
+Each case declares `expectedFacts`, evidence requirements, forbidden conditions,
+and a weighted rubric. The deterministic contract validator runs before the
+dataset is used by the regular evaluation runner:
+
+```sh
+bun test packages/shared/src/evaluation/datasets/deep-research-gold-v1.test.ts
+bun run scripts/eval/run.ts -- --dataset deep-research-gold-v1 --mode fixture
+```
+
+This dataset is intentionally compatible with the existing `EvaluationCase`
+runner. Real-model execution, source retrieval, and Langfuse trace linkage are
+follow-up work in the broader #15/#14 scope.
+
 ## Case sources
 
 | Source | Count | Meaning |

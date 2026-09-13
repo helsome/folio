@@ -1,7 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink, Info } from 'lucide-react';
-import type { EvaluationSettings, LangSmithConnectionStatus, PrivacyLevel } from '@finagent/core';
+import type { EvaluationSettings, LangSmithConnectionStatus, LangfuseConnectionStatus, PrivacyLevel } from '@finagent/core';
 import { useFinagentClient } from '../../client';
 import { Button } from '../primitives/Button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -15,7 +15,9 @@ import { Tooltip, TooltipContent, TooltipTrigger } from '../ui/tooltip';
  */
 
 const DEFAULT_LANGSMITH_UI = 'https://smith.langchain.com';
+const DEFAULT_LANGFUSE_UI = 'https://cloud.langfuse.com';
 const ENDPOINT_PLACEHOLDER = 'https://api.smith.langchain.com';
+const LANGFUSE_HOST_PLACEHOLDER = 'https://cloud.langfuse.com';
 
 const PRIVACY_LEVELS: Array<{ id: PrivacyLevel; labelKey: string; hintKey: string }> = [
   { id: 'minimal', labelKey: 'settings.evaluation.privacyMinimal', hintKey: 'settings.evaluation.privacyMinimalHint' },
@@ -48,12 +50,14 @@ export const EvaluationSettingsTab: React.FC = () => {
 
   const [settings, setSettings] = useState<EvaluationSettings | null>(null);
   const [connection, setConnection] = useState<LangSmithConnectionStatus | null>(null);
+  const [langfuseConnection, setLangfuseConnection] = useState<LangfuseConnectionStatus | null>(null);
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
   const [unavailable, setUnavailable] = useState(false);
 
   const [project, setProject] = useState('');
   const [endpoint, setEndpoint] = useState('');
+  const [langfuseHost, setLangfuseHost] = useState('');
   const [privacyLevel, setPrivacyLevel] = useState<PrivacyLevel>('standard');
 
   const [tracingBusy, setTracingBusy] = useState(false);
@@ -67,6 +71,13 @@ export const EvaluationSettingsTab: React.FC = () => {
   const [apiKey, setApiKey] = useState('');
   const [keyBusy, setKeyBusy] = useState(false);
   const [keyError, setKeyError] = useState<string | null>(null);
+  const [langfusePublicKey, setLangfusePublicKey] = useState('');
+  const [langfuseSecretKey, setLangfuseSecretKey] = useState('');
+  const [langfuseKeyBusy, setLangfuseKeyBusy] = useState(false);
+  const [langfuseKeyError, setLangfuseKeyError] = useState<string | null>(null);
+  const [langfuseTracingBusy, setLangfuseTracingBusy] = useState(false);
+  const [langfuseTestBusy, setLangfuseTestBusy] = useState(false);
+  const [langfuseTestResult, setLangfuseTestResult] = useState<{ ok: boolean; message: string } | null>(null);
 
   const refresh = useCallback(async () => {
     setLoading(true);
@@ -84,8 +95,10 @@ export const EvaluationSettingsTab: React.FC = () => {
     setUnavailable(false);
     setSettings(result.data.settings);
     setConnection(result.data.connection);
+    setLangfuseConnection(result.data.langfuse ?? null);
     setProject(result.data.settings.langsmithProject);
     setEndpoint(result.data.settings.langsmithEndpoint);
+    setLangfuseHost(result.data.settings.langfuseHost ?? '');
     setPrivacyLevel(result.data.settings.privacyLevel);
     setLoading(false);
   }, [client, t]);
@@ -114,6 +127,7 @@ export const EvaluationSettingsTab: React.FC = () => {
     const result = await client.evaluation?.setSettings({
       langsmithProject: project.trim(),
       langsmithEndpoint: endpoint.trim(),
+      langfuseHost: langfuseHost.trim(),
       privacyLevel,
     });
     if (result?.ok) {
@@ -180,6 +194,77 @@ export const EvaluationSettingsTab: React.FC = () => {
       setKeyError(result?.error.message ?? t('settings.evaluation.couldNotRemoveApiKey'));
     }
     setKeyBusy(false);
+  };
+
+  const setLangfuseTracing = async (enabled: boolean) => {
+    if (!settings) return;
+    setLangfuseTracingBusy(true);
+    setSaveError(null);
+    const result = await client.evaluation?.setSettings({ langfuseTracingEnabled: enabled });
+    if (result?.ok) {
+      setSettings(result.data);
+    } else {
+      setSaveError(result?.error.message ?? t('settings.evaluation.couldNotUpdateTracing'));
+    }
+    setLangfuseTracingBusy(false);
+  };
+
+  const testLangfuse = async () => {
+    setLangfuseTestBusy(true);
+    setLangfuseTestResult(null);
+    const result = await client.evaluation?.testLangfuseConnection();
+    if (result?.ok) {
+      const status = result.data;
+      setLangfuseConnection(status);
+      setLangfuseTestResult({
+        ok: status.connected,
+        message: status.connected
+          ? t('settings.evaluation.connectedShort')
+          : status.error ?? status.message ?? t('settings.evaluation.notConnected'),
+      });
+    } else {
+      setLangfuseTestResult({
+        ok: false,
+        message: result?.error.message ?? t('settings.evaluation.connectionTestFailed'),
+      });
+    }
+    setLangfuseTestBusy(false);
+  };
+
+  const openLangfuse = async () => {
+    const target = langfuseConnection?.endpoint?.trim() || langfuseHost.trim() || DEFAULT_LANGFUSE_UI;
+    await client.openExternal?.(target);
+  };
+
+  const saveLangfuseKeys = async () => {
+    const publicKey = langfusePublicKey.trim();
+    const secretKey = langfuseSecretKey.trim();
+    if (!publicKey || !secretKey) return;
+    setLangfuseKeyBusy(true);
+    setLangfuseKeyError(null);
+    const result = await client.evaluation?.setLangfuseCredential(publicKey, secretKey);
+    if (result?.ok) {
+      setLangfusePublicKey('');
+      setLangfuseSecretKey('');
+      await refresh();
+    } else {
+      setLangfuseKeyError(result?.error.message ?? t('settings.evaluation.couldNotSaveApiKey'));
+    }
+    setLangfuseKeyBusy(false);
+  };
+
+  const removeLangfuseKeys = async () => {
+    setLangfuseKeyBusy(true);
+    setLangfuseKeyError(null);
+    const result = await client.evaluation?.removeLangfuseCredential();
+    if (result?.ok) {
+      setLangfusePublicKey('');
+      setLangfuseSecretKey('');
+      await refresh();
+    } else {
+      setLangfuseKeyError(result?.error.message ?? t('settings.evaluation.couldNotRemoveApiKey'));
+    }
+    setLangfuseKeyBusy(false);
   };
 
   if (!channelAvailable) {
@@ -375,6 +460,139 @@ export const EvaluationSettingsTab: React.FC = () => {
           </Button>
         </div>
         {keyError && <div className="mt-3 text-[11px] text-destructive">{keyError}</div>}
+      </div>
+
+      <div className="mac-stock-tile rounded-[14px] p-5" data-testid="langfuse-settings">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-[14px] font-semibold text-foreground">{t('settings.evaluation.langfuseConnection')}</h2>
+            <p className="mt-1 text-[12px] text-foreground/48">{t('settings.evaluation.langfuseDesc')}</p>
+          </div>
+          <span
+            className={`shrink-0 rounded-full border px-2.5 py-0.5 text-[11px] font-semibold ${
+              langfuseConnection?.connected
+                ? 'border-[var(--mac-green)]/30 bg-[var(--mac-green)]/10 text-[var(--mac-green)]'
+                : settings.langfuseConfigured
+                  ? 'border-[var(--mac-yellow)]/40 bg-[var(--mac-yellow)]/10 text-[var(--mac-yellow)]'
+                  : 'border-foreground/12 bg-foreground/4 text-foreground/48'
+            }`}
+          >
+            {langfuseConnection?.connected
+              ? t('settings.evaluation.connected')
+              : settings.langfuseConfigured
+                ? t('settings.evaluation.configured')
+                : t('settings.evaluation.notConfigured')}
+          </span>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between gap-4">
+          <div>
+            <div className="text-[13px] font-medium text-foreground">{t('settings.evaluation.langfuseTracing')}</div>
+            <div className="mt-0.5 text-[11px] text-foreground/48">
+              {settings.langfuseConfigured
+                ? t('settings.evaluation.langfuseTracingEnabledDesc')
+                : t('settings.evaluation.langfuseTracingDisabledDesc')}
+            </div>
+          </div>
+          <Switch
+            checked={settings.langfuseTracingEnabled}
+            disabled={langfuseTracingBusy || !settings.langfuseConfigured}
+            onCheckedChange={(value) => void setLangfuseTracing(value)}
+            aria-label={t('settings.evaluation.toggleLangfuseTracingAria')}
+          />
+        </div>
+
+        <label className="mt-5 flex flex-col gap-1.5">
+          <span className="text-[11px] font-medium text-foreground/54">
+            {t('settings.evaluation.langfuseHost')}{' '}
+            <span className="text-foreground/36">{t('settings.evaluation.optional')}</span>
+          </span>
+          <input
+            className={fieldClass}
+            value={langfuseHost}
+            onChange={(e) => setLangfuseHost(e.target.value)}
+            placeholder={LANGFUSE_HOST_PLACEHOLDER}
+            spellCheck={false}
+          />
+        </label>
+
+        <div className="mt-4 flex gap-2">
+          <Button variant="secondary" size="sm" disabled={saveBusy} onClick={() => void saveSettings()}>
+            {saveBusy ? <Spinner /> : null}
+            {t('settings.evaluation.saveSettings')}
+          </Button>
+          <Button variant="secondary" size="sm" disabled={langfuseTestBusy} onClick={() => void testLangfuse()}>
+            {langfuseTestBusy ? <Spinner /> : null}
+            {t('settings.evaluation.testConnection')}
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => void openLangfuse()}>
+            <ExternalLink className="h-3.5 w-3.5" />
+            {t('settings.evaluation.openLangfuse')}
+          </Button>
+        </div>
+        {langfuseTestResult && (
+          <div className={`mt-3 text-[11px] ${langfuseTestResult.ok ? 'text-[var(--mac-green)]' : 'text-destructive'}`}>
+            {langfuseTestResult.ok ? '✓' : '✗'} {langfuseTestResult.message}
+          </div>
+        )}
+      </div>
+
+      <div className="mac-stock-tile rounded-[14px] p-5">
+        <div className="flex items-center justify-between gap-4">
+          <div>
+            <h2 className="text-[14px] font-semibold text-foreground">{t('settings.evaluation.langfuseKeys')}</h2>
+            <p className="mt-1 text-[12px] text-foreground/48">{t('settings.evaluation.langfuseKeysHint')}</p>
+          </div>
+          <span
+            className={`shrink-0 text-[11px] font-semibold ${
+              settings.langfuseConfigured ? 'text-[var(--mac-green)]' : 'text-foreground/44'
+            }`}
+          >
+            {settings.langfuseConfigured
+              ? t('settings.evaluation.configured')
+              : t('settings.evaluation.notConfiguredLower')}
+          </span>
+        </div>
+        <div className="mt-4 grid grid-cols-1 gap-2 sm:grid-cols-2">
+          <input
+            type="password"
+            className={fieldClass}
+            value={langfusePublicKey}
+            onChange={(e) => setLangfusePublicKey(e.target.value)}
+            placeholder="pk-lf-…"
+            autoComplete="off"
+            aria-label={t('settings.evaluation.langfusePublicKey')}
+          />
+          <input
+            type="password"
+            className={fieldClass}
+            value={langfuseSecretKey}
+            onChange={(e) => setLangfuseSecretKey(e.target.value)}
+            placeholder="sk-lf-…"
+            autoComplete="off"
+            aria-label={t('settings.evaluation.langfuseSecretKey')}
+          />
+        </div>
+        <div className="mt-3 flex gap-2">
+          <Button
+            variant="default"
+            size="sm"
+            disabled={langfuseKeyBusy || !langfusePublicKey.trim() || !langfuseSecretKey.trim()}
+            onClick={() => void saveLangfuseKeys()}
+          >
+            {langfuseKeyBusy ? <Spinner /> : null}
+            {t('settings.evaluation.save')}
+          </Button>
+          <Button
+            variant="secondary"
+            size="sm"
+            disabled={langfuseKeyBusy || !settings.langfuseConfigured}
+            onClick={() => void removeLangfuseKeys()}
+          >
+            {t('settings.evaluation.remove')}
+          </Button>
+        </div>
+        {langfuseKeyError && <div className="mt-3 text-[11px] text-destructive">{langfuseKeyError}</div>}
       </div>
     </div>
   );

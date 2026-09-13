@@ -1,0 +1,24 @@
+{
+  "mode": "live AgentKernel + ResearchService; DeepSeek HTTP runtime; Longbridge news",
+  "transport": "live MCP relay",
+  "killedPid": 29600,
+  "killPoint": "first real model stream delta after durable news retrieval",
+  "beforeRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+  "afterRunId": "research-1de3f102-13b4-4261-810e-93e5bff7abde",
+  "beforeAgentRunId": "2f91d332-859d-439f-8461-7fcff8aba38a",
+  "afterAgentRunIds": [
+    "2f91d332-859d-439f-8461-7fcff8aba38a",
+    "71b0bc03-8f18-4425-b08d-44e4b6e0da9c"
+  ],
+  "recoveryCount": 1,
+  "checkpointVersion": 1,
+  "savedRetrievalCount": 1,
+  "newsAttempts": 1,
+  "synthesisAttempts": 2,
+  "evidenceCount": 1,
+  "noDuplicateEvidence": true,
+  "noRepeatedCompletedSteps": true,
+  "reportCount": 1,
+  "reportId": "report-research-1de3f102-13b4-4261-810e-93e5bff7abde",
+  "status": "partial"
+}

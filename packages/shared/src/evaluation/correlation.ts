@@ -9,8 +9,8 @@
 //
 // Failures are isolated: any backend/network error degrades to `none` and is
 // recorded as an observability error instead of breaking the agent (§87).
-import type { SupportedLocale, TraceReference } from '@finagent/core';
-import type { EvaluationBackend, TraceMatch } from './backend.ts';
+import type { SupportedLocale, TraceBackendKind, TraceReference } from '@finagent/core';
+import type { EvaluationBackend, EvaluationBackendKind, TraceMatch } from './backend.ts';
 import { type TraceLinkRecord, EvaluationStore } from './store.ts';
 
 export interface TraceCorrelationOptions {
@@ -44,7 +44,7 @@ export class TraceCorrelationService {
   /** Resolve and persist the trace link for a finished run. Never throws. */
   async recordRun(input: TraceCorrelationInput): Promise<TraceReference> {
     const fallback: TraceReference = {
-      backend: this.backend.kind === 'langsmith' ? 'langsmith' : 'none',
+      backend: toTraceBackend(this.backend.kind),
       sessionId: input.folioSessionId,
       threadId: input.threadId,
       runId: input.folioRunId,
@@ -66,7 +66,7 @@ export class TraceCorrelationService {
       const match = this.pickMatch(matches, input);
       const ref: TraceReference = match
         ? {
-            backend: 'langsmith',
+            backend: toTraceBackend(this.backend.kind),
             traceId: match.traceId,
             url: this.backend.traceUrl?.(match.traceId),
             sessionId: input.folioSessionId,
@@ -100,4 +100,9 @@ export class TraceCorrelationService {
   private async persist(runId: string, ref: TraceReference): Promise<void> {
     await this.store.recordTraceLink({ runId, traceRef: ref, recordedAt: this.now() });
   }
+}
+
+function toTraceBackend(kind: EvaluationBackendKind): TraceBackendKind {
+  if (kind === 'langsmith' || kind === 'langfuse' || kind === 'local') return kind;
+  return 'none';
 }

@@ -122,8 +122,8 @@ describe('MarketPulse', () => {
     // indices line
     expect(text).toContain('S&P 500')
     expect(text).toContain('SPX.US')
-    expect(text).toContain('+0.50%')
-    expect(text).toContain('-0.30%')
+    expect(text).toContain('+0.5%')
+    expect(text).toContain('-0.3%')
     // market status + temperature
     expect(text).toContain('US · Open')
     expect(text).toContain('62/100')
@@ -131,8 +131,8 @@ describe('MarketPulse', () => {
     // top movers columns
     expect(text).toContain('Top gainers')
     expect(text).toContain('Top losers')
-    expect(text).toContain('+6.20%')
-    expect(text).toContain('-3.40%')
+    expect(text).toContain('+6.2%')
+    expect(text).toContain('-3.4%')
     // personal impact
     expect(text).toContain('What matters to me')
     expect(text).toContain('33.3%')

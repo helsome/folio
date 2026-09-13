@@ -136,6 +136,33 @@ describe('ProviderRegistry', () => {
 });
 
 describe('ProviderRouter.execute', () => {
+  it('uses persisted routing and skips disabled providers at execution time', async () => {
+    let primary = 'fallback';
+    const disabled = new Set<string>();
+    const router = new ProviderRouter({
+      resolveRouting: async () => ({ primary, fallback: 'primary' }),
+      isEnabled: async (providerId) => !disabled.has(providerId),
+    });
+    router.register(
+      new FakeFinancialDataProvider('primary', 'Primary', ['market.quote'], async () =>
+        success('primary', 'Primary', 'primary')
+      )
+    );
+    router.register(
+      new FakeFinancialDataProvider('fallback', 'Fallback', ['market.quote'], async () =>
+        success('fallback', 'Fallback', 'fallback')
+      )
+    );
+
+    const first = await router.execute<string>('market.quote', {});
+    expect(first.ok && first.provenance.providerId).toBe('fallback');
+
+    primary = 'primary';
+    disabled.add('primary');
+    const second = await router.execute<string>('market.quote', {});
+    expect(second.ok && second.provenance.providerId).toBe('fallback');
+  });
+
   it('returns the primary result on success', async () => {
     const router = new ProviderRouter();
     let fallbackCalls = 0;
@@ -401,6 +428,30 @@ describe('ConnectionStore', () => {
     unsubscribe();
     await connections.update({ providerId: 'c', status: 'connected', lastCheck: 3 });
     expect(seen).toHaveLength(2);
+  });
+
+  it('restores non-secret settings and routing without persisting a credential canary', async () => {
+    const connections = new ConnectionStore(store);
+    await connections.setConfig('massive', {
+      enabled: false,
+      endpoint: 'https://example.test',
+      region: 'US',
+      ...({ apiKey: 'canary-secret-123' } as unknown as Record<string, never>),
+    });
+    await connections.setRouting({ primary: 'massive', fallback: 'longbridge' });
+
+    const reloaded = new ConnectionStore(new JsonFileStore(dir));
+    expect(await reloaded.getConfig('massive')).toEqual({
+      enabled: false,
+      endpoint: 'https://example.test',
+      region: 'US',
+    });
+    expect(await reloaded.getRouting({ primary: 'longbridge' })).toEqual({
+      primary: 'massive',
+      fallback: 'longbridge',
+    });
+    const raw = await store.read<Record<string, unknown>>('connections.json', {});
+    expect(JSON.stringify(raw)).not.toContain('canary-secret-123');
   });
 });
 

@@ -103,7 +103,18 @@ function completedScript(answer: string): (input: AgentRunInput) => AsyncIterabl
       toolCall: { id: 't1', toolName: 'get_portfolio', args: {}, startedAt: clock, status: 'running' },
     });
     yield event(input.sessionId, input.runId, 'tool_completed', {
-      toolCall: { id: 't1', toolName: 'get_portfolio', args: {}, startedAt: clock, completedAt: clock, status: 'success', result: {} },
+      toolCall: {
+        id: 't1',
+        toolName: 'get_portfolio',
+        args: {},
+        startedAt: clock,
+        completedAt: clock,
+        status: 'success',
+        result: {
+          data: { totalAssets: 120_000, currency: 'USD' },
+          provenance: { provider: 'longbridge', fetchedAt: clock, stale: false },
+        },
+      },
     });
     yield event(input.sessionId, input.runId, 'message_started');
     yield event(input.sessionId, input.runId, 'message_delta', { delta: answer, answer });
@@ -114,7 +125,7 @@ function completedScript(answer: string): (input: AgentRunInput) => AsyncIterabl
 
 describe('RunManager', () => {
   it('runs a full loop: run_started → tools → deltas → run_completed, persisted', async () => {
-    const { sessions, runs, runtime } = makeKernel(completedScript('Portfolio risk is moderate.'));
+    const { sessions, runs, runtime, store } = makeKernel(completedScript('Portfolio risk is moderate.'));
     const session = await sessions.createSession('Portfolio Review');
 
     const run = await runs.startRun(session.id, '分析一下我当前持仓最大的风险');
@@ -131,6 +142,15 @@ describe('RunManager', () => {
     expect(messages.map((message) => message.role)).toEqual(['user', 'assistant']);
     expect(messages[0]).toMatchObject({ content: '分析一下我当前持仓最大的风险' });
     expect(messages[1]).toMatchObject({ content: 'Portfolio risk is moderate.' });
+    expect(messages[1].financialEvidence?.[0]).toMatchObject({
+      toolCallId: 't1',
+      capabilityId: 'portfolio.summary',
+      provider: 'longbridge',
+    });
+
+    // A fresh repository instance proves the evidence survives process/reload boundaries.
+    const reloaded = await new MessageRepository(store).list(session.id);
+    expect(reloaded[1].financialEvidence).toEqual(messages[1].financialEvidence);
 
     const updated = await sessions.getSession(session.id);
     expect(updated?.status).toBe('idle');

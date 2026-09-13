@@ -34,6 +34,7 @@ export interface FinanceToolResult {
   content: Array<{ type: 'text'; text: string }>;
   details: unknown;
   provenance?: ToolResultProvenance;
+  evidence?: unknown;
 }
 
 export interface ExecuteToolInput {
@@ -89,6 +90,7 @@ export class FinanceToolRegistry {
       content: [{ type: 'text', text: result.summary ?? JSON.stringify(result.data) }],
       details: result.data,
       provenance: result.provenance,
+      evidence: result.evidence,
     };
   }
 }

@@ -2,9 +2,9 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import type { PortfolioSnapshot, Quote } from '@finagent/core'
+import { formatCurrency } from '@finagent/i18n'
 import { fallbackClient, FinagentClientProvider, type FinagentClient } from '../../client'
 import { installHappyDom } from '../../test/setupHappyDom'
-import { formatMoney } from '../../lib/money'
 import { makeTestI18n, I18nextProvider } from '../../test/i18nTest'
 import { TodayView } from './TodayView'
 
@@ -100,8 +100,12 @@ describe('TodayView', () => {
     expect(text).toContain('Today')
     expect(text).toContain('Portfolio')
     expect(text).toContain('Watchlist movers')
-    // Real portfolio value renders through the currency formatter.
-    expect(text).toContain(formatMoney(SNAPSHOT.totalAssets, SNAPSHOT.baseCurrency))
+    // Real portfolio value renders through the currency formatter — the same
+    // one the PortfolioCard uses (@finagent/i18n formatCurrency, locale
+    // pinned to the i18n default). Comparing against lib/money's
+    // system-locale formatMoney made this assertion host-dependent
+    // ("US$12,345.67" on zh-CN Windows vs "$12,345.67" in the card).
+    expect(text).toContain(formatCurrency(SNAPSHOT.totalAssets, SNAPSHOT.baseCurrency))
     // Top absolute mover (TSLA -3.1%) surfaces with its symbol.
     expect(text).toContain('TSLA.US')
     // Numerics are optional-domain values — nothing may render as JS garbage.

@@ -34,6 +34,9 @@ interface ProviderConfig {
 interface AgentApi {
   registerTool: (tool: Tool) => void;
   registerProvider?: (name: string, config: ProviderConfig) => void;
+  on?: (event: string, handler: (event: { prompt?: string }) => unknown) => void;
+  getActiveTools?: () => string[];
+  setActiveTools?: (tools: string[]) => void;
 }
 
 import { createCapabilityTools as buildCapabilityTools, fullCapabilities } from '@finagent/shared/capabilities';
@@ -127,9 +130,33 @@ export { listSkillResourcesTool, readSkillResourceTool };
 
 // Register all tools with Pi Agent
 export function registerTools(agent: AgentApi) {
+  registerResearchSynthesisGuard(agent);
   for (const tool of tools) {
     agent.registerTool(tool);
   }
+}
+
+/** Synthesis replays only checkpointed facts; no tool, including built-ins, may run. */
+export function registerResearchSynthesisGuard(agent: AgentApi): void {
+  let synthesis = false;
+  let previousTools: string[] | undefined;
+  agent.on?.('before_agent_start', (event) => {
+    if (previousTools) agent.setActiveTools?.(previousTools);
+    previousTools = undefined;
+    synthesis = event.prompt?.includes('User request: [FOLIO_CHECKPOINT_SYNTHESIS_V1]') === true;
+    if (synthesis) {
+      previousTools = agent.getActiveTools?.();
+      agent.setActiveTools?.([]);
+    }
+  });
+  agent.on?.('tool_call', () => synthesis
+    ? { block: true, reason: 'Research synthesis must use the saved evidence only; tool calls are disabled.' }
+    : undefined);
+  agent.on?.('agent_end', () => {
+    if (previousTools) agent.setActiveTools?.(previousTools);
+    previousTools = undefined;
+    synthesis = false;
+  });
 }
 
 interface ProviderOverride {

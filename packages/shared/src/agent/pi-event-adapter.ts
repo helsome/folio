@@ -156,6 +156,19 @@ function parseToolStart(event: Record<string, unknown>, now: () => number): Tool
 
 function parseToolEnd(event: Record<string, unknown>, now: () => number): ToolCall {
   const errorValue = event.error;
+  const rawResult = event.result ?? event.output;
+  const resultRecord = readRecord(rawResult);
+  const result = 'details' in resultRecord
+    ? {
+        data: resultRecord.details,
+        ...(Object.keys(readRecord(resultRecord.provenance)).length > 0
+          ? { provenance: resultRecord.provenance }
+          : {}),
+        ...(Object.keys(readRecord(resultRecord.evidence)).length > 0
+          ? { evidence: resultRecord.evidence }
+          : {}),
+      }
+    : rawResult;
   return {
     id: String(event.toolCallId ?? event.callId ?? event.id ?? `tool-${now()}`),
     toolName: String(event.toolName ?? event.name ?? 'unknown'),
@@ -163,7 +176,7 @@ function parseToolEnd(event: Record<string, unknown>, now: () => number): ToolCa
     startedAt: now(),
     completedAt: now(),
     status: event.isError || errorValue ? 'error' : 'success',
-    result: event.result ?? event.output,
+    result,
     error: errorValue
       ? { code: 'PI_TOOL_ERROR', message: String(errorValue) }
       : undefined,

@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Message } from '@finagent/core';
-import { MarkdownContent } from './MarkdownContent';
+import { AnswerContent } from './AnswerContent';
 import { ToolActivity } from '../agent/ToolActivity';
 
 interface TurnCardProps {
@@ -35,7 +35,7 @@ export const TurnCard: React.FC<TurnCardProps> = ({ message }) => {
         {isUser ? (
           <div className="max-w-none whitespace-pre-wrap text-[14px] leading-relaxed">{message.content}</div>
         ) : (
-          <MarkdownContent content={message.content} />
+          <AnswerContent content={message.content} />
         )}
         {!isUser && toolCalls.length > 0 && (
           <div className="mt-3 border-t mac-section-divider pt-3">

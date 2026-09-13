@@ -11,7 +11,12 @@ export interface CapabilityTool {
     toolCallId: string,
     params: unknown,
     signal: AbortSignal
-  ): Promise<{ content: Array<{ type: 'text'; text: string }> }>;
+  ): Promise<{
+    content: Array<{ type: 'text'; text: string }>;
+    details?: unknown;
+    provenance?: unknown;
+    evidence?: unknown;
+  }>;
 }
 
 /**
@@ -30,7 +35,12 @@ export function createCapabilityTools(capabilities: FinanceCapability[]): Capabi
       const result = await cap.execute(input, { signal });
       const json = JSON.stringify(result.data);
       const text = result.summary ? `${result.summary}\n\nDATA: ${json}` : `DATA: ${json}`;
-      return { content: [{ type: 'text', text }] };
+      return {
+        content: [{ type: 'text', text }],
+        details: result.data,
+        provenance: result.provenance,
+        evidence: result.evidence,
+      };
     },
   }));
 }

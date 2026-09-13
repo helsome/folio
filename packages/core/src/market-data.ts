@@ -115,6 +115,7 @@ export interface FinancialStatement {
 /** Financial statements (IS/BS/CF) for a symbol. */
 export interface FinancialReport {
   symbol: string;
+  instrumentId?: string;
   /** Period code the report was generated for (e.g. `qf`). */
   report: string;
   statements: {

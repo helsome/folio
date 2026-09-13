@@ -1,5 +1,6 @@
 import type { CapabilityProvenance, CapabilityRunStatus } from './capability.ts';
 import type { SupportedLocale } from './locale.ts';
+import type { StrategyId } from './strategy.ts';
 
 /**
  * Research domain — Deep Research runs, evidence-backed reports, and the
@@ -10,6 +11,8 @@ export type ResearchStance = 'bullish' | 'bearish' | 'neutral';
 
 export type ResearchRunStatus =
   | 'queued'
+  | 'interrupted'
+  | 'recovering'
   | 'fetching'
   | 'synthesizing'
   | 'completed'
@@ -32,6 +35,8 @@ export interface EvidenceRef {
   fetchedAt: number;
   /** Short factual summary of the data point (from CapabilityResult.summary). */
   summary?: string;
+  /** Canonical instrument id linking this evidence to one listing. */
+  instrumentId?: string;
 }
 
 /** Condensed outcome of one capability run, embedded in the report. */
@@ -57,6 +62,8 @@ export interface ResearchSection {
 export interface ResearchReport {
   id: string;
   symbol: string;
+  /** Canonical instrument id when the run was bound to a catalog listing. */
+  instrumentId?: string;
   generatedAt: number;
   /** V5: research strategy that produced this report (spec §100). */
   strategyId?: string;
@@ -95,6 +102,18 @@ export interface ResearchRunSummary {
   completedCapabilities: string[];
   failedCapabilities: string[];
   cancelled?: boolean;
+  strategyId?: StrategyId;
+  locale?: SupportedLocale;
+  recoveryCount?: number;
+  recoverable?: boolean;
+  error?: string;
+}
+
+/** Non-secret identity pinned at the start of a research workflow. */
+export interface ResearchExecutionIdentity {
+  provider: string;
+  model: string;
+  config: string;
 }
 
 /**
@@ -102,6 +121,12 @@ export interface ResearchRunSummary {
  * not prose) plus the per-capability run outcomes.
  */
 export interface ResearchSynthesisInput {
+  /** Links new synthesis spans to the original durable research run. */
+  recovery?: {
+    runId: string;
+    attempt: number;
+    onAgentRun: (runId: string, sessionId: string) => Promise<void>;
+  };
   symbol: string;
   plannedCapabilities: string[];
   runs: Array<{

@@ -1,4 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { join } from 'node:path';
 import type { AgentEvent } from '@finagent/core';
 
 let lastKernelOptions: Record<string, unknown> | null = null;
@@ -152,6 +153,12 @@ mock.module('@finagent/shared', () => ({
   parseSynthesisJson: (text: string) => JSON.parse(text),
   parseImpactJson: (text: string) => JSON.parse(text),
   createRouterFetchers: () => routerFetchers,
+  withDemoDataFallback: (fetchers: unknown) => fetchers,
+  InstrumentCatalogStore: class {
+    load = async () => {
+      throw new Error('skip instrument catalog persist in unit tests');
+    };
+  },
   MassiveFinancialDataProvider: class {
     clearCache = () => undefined;
   },
@@ -257,6 +264,9 @@ mock.module('@finagent/shared', () => ({
       tracingEnabled: false,
       langsmithProject: 'folio-agent',
       langsmithEndpoint: '',
+      langfuseTracingEnabled: false,
+      langfuseHost: '',
+      langfuseConfigured: false,
       privacyLevel: 'standard',
       onlineEvaluationEnabled: false,
       apiKeyConfigured: false,
@@ -285,6 +295,17 @@ mock.module('@finagent/shared', () => ({
     status: async () => ({ kind: 'none', available: true }),
     findTraces: async () => [],
   }),
+  resolveLangfuseBackend: () => ({
+    kind: 'none',
+    status: async () => ({ kind: 'none', available: true }),
+    findTraces: async () => [],
+  }),
+  LangfuseEvaluationBackend: class {},
+  serializeLangfuseCredential: (publicKey: string, secretKey: string) =>
+    JSON.stringify({ publicKey, secretKey }),
+  scoresFromResearchReport: () => [],
+  scoresFromAgentRun: () => [],
+  currentFolioVersion: () => 'test',
   EvaluationRedactor: class {
     redactAnswer = (answer: string | undefined) => answer;
     redactToolCall = (toolCall: unknown) => toolCall;
@@ -331,8 +352,8 @@ describe('AgentKernelHost', () => {
     const host = new AgentKernelHost();
 
     expect(lastKernelOptions).toMatchObject({
-      storageDir: '/tmp/finagent-test/store',
-      piSessionDir: '/tmp/finagent-test/pi-sessions',
+      storageDir: join('/tmp/finagent-test', 'store'),
+      piSessionDir: join('/tmp/finagent-test', 'pi-sessions'),
     });
     host.dispose();
   });

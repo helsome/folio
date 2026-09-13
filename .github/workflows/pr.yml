@@ -1,66 +1,147 @@
 name: PR checks
 
-# Deterministic-only CI gate for pull requests and pushes to main.
-# Typecheck, unit tests and a secret scan — no API credits, no market data,
-# no Electron E2E (those stay on the release tag pipeline).
+# PR 只阻塞高信号检查：类型、变更工作区测试、Secret Scan。
+# 全仓测试在 PR 中仅作提示，在 main 上仍然是硬门禁。
+# Live eval / Electron E2E 保留在 nightly / release 流程，避免贡献 PR 被外部环境噪音阻塞。
 
 on:
   pull_request:
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'artifacts/**'
   push:
     branches: [main]
+    paths-ignore:
+      - '**/*.md'
+      - 'docs/**'
+      - 'artifacts/**'
 
 concurrency:
   group: pr-checks-${{ github.event.pull_request.number || github.ref }}
   cancel-in-progress: true
 
+env:
+  # 固定已在当前 main 验证通过的版本，避免 latest 漂移导致随机 CI 回归。
+  BUN_VERSION: '1.4.2'
+
 jobs:
   typecheck:
     name: Typecheck
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: ${{ env.BUN_VERSION }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
       - name: Typecheck
         run: bun run typecheck
 
-  unit-tests:
-    name: Unit tests
+  focused-tests:
+    name: Focused tests
+    if: github.event_name == 'pull_request'
     runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Run tests for changed workspaces
+        shell: bash
+        run: |
+          set -euo pipefail
+
+          BASE='${{ github.event.pull_request.base.sha }}'
+          HEAD='${{ github.event.pull_request.head.sha }}'
+          git diff --name-only "$BASE" "$HEAD" > /tmp/changed-files.txt
+
+          echo 'Changed files:'
+          cat /tmp/changed-files.txt
+
+          mapfile -t TARGETS < <(
+            awk -F/ '
+              /^packages\/[^/]+\// { print $1 "/" $2 }
+              /^apps\/electron\// { print "apps/electron" }
+            ' /tmp/changed-files.txt | sort -u
+          )
+
+          if [ "${#TARGETS[@]}" -eq 0 ]; then
+            echo 'No package/app workspace changed; skipping focused tests.'
+            exit 0
+          fi
+
+          for target in "${TARGETS[@]}"; do
+            if find "$target" -type f \( -name '*.test.ts' -o -name '*.test.tsx' -o -name '*.spec.ts' -o -name '*.spec.tsx' \) -print -quit | grep -q .; then
+              echo "::group::bun test $target"
+              bun test "$target" --isolate
+              echo '::endgroup::'
+            else
+              echo "$target has no detected test files; skipping."
+            fi
+          done
+
+  full-unit-advisory:
+    name: Full unit tests (advisory)
+    if: github.event_name == 'pull_request'
+    continue-on-error: true
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
       - uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: ${{ env.BUN_VERSION }}
       - name: Install dependencies
         run: bun install --frozen-lockfile
-      - name: Run tests
+      - name: Run full unit suite
+        run: bun test --isolate
+
+  full-unit-main:
+    name: Full unit tests
+    if: github.event_name == 'push'
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: ${{ env.BUN_VERSION }}
+      - name: Install dependencies
+        run: bun install --frozen-lockfile
+      - name: Run full unit suite
         run: bun test --isolate
 
   secret-scan:
     name: Secret scan
     runs-on: ubuntu-latest
+    timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
       - name: Scan for high-signal secret patterns
+        shell: bash
         run: |
           set -uo pipefail
-          # Fake values in test fixtures (e.g. packages/*/src/**/*.test.ts) and
-          # canonical fake examples quoted in docs prose are excluded on
-          # purpose; this scan targets accidental real secrets in source,
-          # scripts and configuration.
-          MATCHES=$(grep -rInE \
+          # 测试 fixture、文档示例和 lockfile 不参与扫描。
+          # 若命中，只打印文件名，不把疑似 secret 原文写入 Actions 日志。
+          MATCHED_FILES=$(grep -rIlE \
             --exclude-dir=node_modules \
             --exclude-dir=docs \
             --exclude='*.test.ts' --exclude='*.test.tsx' --exclude='bun.lock' \
             'ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----' \
             . || true)
-          if [ -n "$MATCHES" ]; then
-            echo "::error::Possible secrets found:"
-            echo "$MATCHES"
+
+          if [ -n "$MATCHED_FILES" ]; then
+            echo '::error::Possible secret patterns found in the following files:'
+            printf '%s\n' "$MATCHED_FILES"
             exit 1
           fi
-          echo "No secret patterns found."
+
+          echo 'No secret patterns found.'

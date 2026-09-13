@@ -19,7 +19,7 @@ import {
 } from '../../atoms';
 import { useFinagentClient } from '../../client';
 import { MessageList } from '../chat/MessageList';
-import { MarkdownContent } from '../chat/MarkdownContent';
+import { AnswerContent } from '../chat/AnswerContent';
 import { ModelSelector } from './ModelSelector';
 import { ThinkingSelector } from './ThinkingSelector';
 import { ToolActivity } from './ToolActivity';
@@ -452,7 +452,7 @@ const StreamingBlock: React.FC<{ answer: string }> = ({ answer }) => {
         {t('agent.panel.agentRunning')}
       </div>
       {answer.length > 0 ? (
-        <MarkdownContent content={answer} streaming className="text-[13px] text-foreground/72" />
+        <AnswerContent content={answer} streaming className="text-[13px] text-foreground/72" />
       ) : (
         <div className="text-[13px] italic text-foreground/40">{t('agent.panel.thinking')}</div>
       )}

@@ -184,6 +184,9 @@ bun run dev
 
 # 确定性本地 Agent 路径——无需外部 LLM
 FINAGENT_AGENT_PROVIDER=local bun run dev
+
+# 离线演示模式：真实供应商不可用时回退到内置示例数据（Copilot 回答带 Sample data 标注）
+FINAGENT_AGENT_PROVIDER=local FINAGENT_DEMO_DATA=1 bun run dev
 ```
 
 ### 命令
@@ -195,6 +198,7 @@ FINAGENT_AGENT_PROVIDER=local bun run dev
 | `bun run typecheck` | 对所有工作区包执行类型检查 |
 | `bun run build` | 构建包、渲染进程、预加载与主进程 |
 | `bun run test:e2e` | 运行 Electron 黄金路径 E2E 套件 |
+| `bun run test:typed-blocks` | 运行 typed answer blocks 的真实应用 Copilot E2E（apps/electron） |
 | `bun run eval:smoke` | 运行 PR 级确定性 Agent 回归评测 |
 | `bun run eval:full` | 运行完整 Agent benchmark 与实验流程 |
 | `bun run release:check` | 运行发布门槛检查 |

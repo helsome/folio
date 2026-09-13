@@ -106,4 +106,32 @@ describe('ConnectionsCenter', () => {
     expect(banner?.getAttribute('role')).toBe('alert');
     expect(banner?.textContent).toContain('timed out');
   });
+
+  it('persists enable and routing changes through the settings channel', async () => {
+    const updates: unknown[] = [];
+    const client = clientWith({
+      setConfig: async (providerId, config) => {
+        updates.push({ providerId, config });
+        return { ok: true, data: ENTRY };
+      },
+    });
+    const { container } = await render(client);
+
+    await act(async () => {
+      container
+        .querySelector<HTMLInputElement>('[data-testid="enabled-longbridge"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    await act(async () => {
+      container
+        .querySelector<HTMLButtonElement>('[data-testid="fallback-longbridge"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(updates).toContainEqual({ providerId: 'longbridge', config: { enabled: false } });
+    expect(updates).toContainEqual({
+      providerId: 'longbridge',
+      config: { routingRole: 'fallback' },
+    });
+  });
 });

@@ -63,6 +63,9 @@ function createElectronClient(): FinagentClient {
       list: () => ipcResult(window.electronAPI.capabilities.list()),
     },
     research: {
+      resume: (input) => ipcResult(window.electronAPI.research.resume(input)),
+      restart: (input) => ipcResult(window.electronAPI.research.restart(input)),
+      discard: (input) => ipcResult(window.electronAPI.research.discard(input)),
       start: (input) => ipcResult(window.electronAPI.research.start(input)),
       cancel: (input) => ipcResult(window.electronAPI.research.cancel(input)),
       listRuns: () => ipcResult(window.electronAPI.research.listRuns()),
@@ -177,6 +180,10 @@ function createElectronClient(): FinagentClient {
       setCredential: (apiKey) => ipcResult(window.electronAPI.evaluation.setCredential({ apiKey })),
       removeCredential: () => ipcResult(window.electronAPI.evaluation.removeCredential()),
       testConnection: () => ipcResult(window.electronAPI.evaluation.testConnection()),
+      setLangfuseCredential: (publicKey, secretKey) =>
+        ipcResult(window.electronAPI.evaluation.setLangfuseCredential({ publicKey, secretKey })),
+      removeLangfuseCredential: () => ipcResult(window.electronAPI.evaluation.removeLangfuseCredential()),
+      testLangfuseConnection: () => ipcResult(window.electronAPI.evaluation.testLangfuseConnection()),
       listExperiments: () => ipcResult(window.electronAPI.evaluation.listExperiments()),
       getExperiment: (id) => ipcResult(window.electronAPI.evaluation.getExperiment({ id })),
       getCase: (id) => ipcResult(window.electronAPI.evaluation.getCase({ id })),

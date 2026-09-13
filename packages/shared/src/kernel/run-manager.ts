@@ -35,6 +35,7 @@ import {
   type RunawayPolicy,
   type RunawayState,
 } from './runaway-detector.ts';
+import { buildFinancialEvidence } from '../evidence/financial-evidence.ts';
 
 export interface RunManagerOptions {
   sessions: SessionManager;
@@ -286,6 +287,11 @@ export class RunManager {
         content: answer || (run.status === 'failed' ? run.error?.message ?? 'Run failed.' : ''),
         timestamp: now,
         toolCalls: toolCalls.map(toRecord),
+        financialEvidence: buildFinancialEvidence({
+          sessionId: run.sessionId,
+          runId: run.id,
+          toolCalls,
+        }),
       };
       await this.sessions.appendMessage(run.sessionId, assistantMessage);
     }

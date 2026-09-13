@@ -37,6 +37,26 @@ export interface ConnectionEntry {
   hasAccount: boolean;
   accountLabel: string | null;
   error: ConnectionError | null;
+  enabled?: boolean;
+  endpoint?: string | null;
+  region?: string | null;
+  routingRole?: 'primary' | 'fallback' | null;
+  recentResult?: {
+    capabilityId: string;
+    providerId: string;
+    ok: boolean;
+    fallbackUsed: boolean;
+    at: number;
+    errorCode?: string;
+  } | null;
+}
+
+export interface ProviderSettingsInput {
+  apiKey?: string;
+  enabled?: boolean;
+  endpoint?: string;
+  region?: string;
+  routingRole?: 'primary' | 'fallback';
 }
 
 export interface ConnectResult {
@@ -64,7 +84,7 @@ export interface ConnectionsChannel {
   cancelConnect: (providerId: string) => Promise<ApiResult<void>>;
   disconnect: (providerId: string) => Promise<ApiResult<ConnectionEntry | null>>;
   test: (providerId: string) => Promise<ApiResult<ProviderHealth>>;
-  setConfig: (providerId: string, config: { apiKey?: string }) => Promise<ApiResult<ConnectionEntry>>;
+  setConfig: (providerId: string, config: ProviderSettingsInput) => Promise<ApiResult<ConnectionEntry>>;
   coverage: () => Promise<ApiResult<ProviderCoverage[]>>;
   onChanged: (callback: (entries: ConnectionEntry[]) => void) => () => void;
 }
@@ -203,7 +223,7 @@ export async function testProvider(
 export async function setProviderConfig(
   client: FinagentClient,
   providerId: string,
-  config: { apiKey?: string }
+  config: ProviderSettingsInput
 ): Promise<ConnectionActionResult<ConnectionEntry>> {
   const setConfig = client.connections?.setConfig;
   if (typeof setConfig !== 'function') return { ok: false, data: null, error: UNAVAILABLE };

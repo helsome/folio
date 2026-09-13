@@ -108,7 +108,9 @@ describe('score formatting', () => {
   it('renders short shas and dates', () => {
     expect(shortSha('abcdef1234567890')).toBe('abcdef1');
     expect(shortSha(undefined)).toBe('—');
-    expect(formatDate(1_700_000_000_000)).toMatch(/^\w{3} \d{1,2}, \d{4}$/);
+    // Pin the locale: the default follows the host system (zh-CN Windows
+    // yields "2023年11月14日"), which would make the regex host-dependent.
+    expect(formatDate(1_700_000_000_000, 'en-US')).toMatch(/^[A-Z][a-z]{2} \d{1,2}, \d{4}$/);
     expect(formatDate(undefined)).toBe('—');
   });
 });

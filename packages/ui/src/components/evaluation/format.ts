@@ -75,9 +75,14 @@ export function shortSha(sha: string | undefined): string {
   return sha && sha.length > 7 ? sha.slice(0, 7) : sha || '—';
 }
 
-export function formatDate(timestamp: number | undefined): string {
+/**
+ * Locale-aware short date, e.g. "Nov 14, 2023" (en-US) / "2023年11月14日"
+ * (zh-CN). Follows the system locale by default; `locale` lets callers and
+ * tests pin the output deterministically.
+ */
+export function formatDate(timestamp: number | undefined, locale?: string): string {
   if (typeof timestamp !== 'number') return '—';
-  return new Date(timestamp).toLocaleDateString(undefined, {
+  return new Date(timestamp).toLocaleDateString(locale, {
     year: 'numeric',
     month: 'short',
     day: 'numeric',

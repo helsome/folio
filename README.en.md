@@ -184,6 +184,10 @@ bun run dev
 
 # Deterministic local agent path — no external LLM required
 FINAGENT_AGENT_PROVIDER=local bun run dev
+
+# Offline demo mode: fall back to built-in sample data when no real provider
+# is available (Copilot answers are labeled "Sample data")
+FINAGENT_AGENT_PROVIDER=local FINAGENT_DEMO_DATA=1 bun run dev
 ```
 
 ### Commands
@@ -195,6 +199,7 @@ FINAGENT_AGENT_PROVIDER=local bun run dev
 | `bun run typecheck` | Typecheck every workspace package |
 | `bun run build` | Build packages, renderer, preload, and main process |
 | `bun run test:e2e` | Run the Electron golden-path E2E suite |
+| `bun run test:typed-blocks` | Run the real-app typed answer blocks Copilot E2E (apps/electron) |
 | `bun run eval:smoke` | Run the deterministic PR-level Agent regression eval |
 | `bun run eval:full` | Run the full Agent benchmark and experiment flow |
 | `bun run release:check` | Run the release gates |
