@@ -1,4 +1,4 @@
-# 修改文档：Issue #30 统一行内引用与来源检查器 + Deep Research 提示注入防御
+# 修改文档：Issue #30 Part 1 统一行内引用与来源检查器 + Deep Research 提示注入防御
 
 > 性质：修改（变更）文档，含审核结论
 > 日期：2026-09-12
@@ -11,13 +11,15 @@
 
 | Issue | 判定 | 测试验证 | 遗留缺陷 |
 |---|---|---|---|
-| #30 `[Copilot Evidence] Add unified inline citations and a source inspector` | **已解决** | `bun test --isolate`（core/chat/lib/agent/i18n 分组）101 + 137 + 102 + 25 全部通过；五包 `tsc --noEmit` 零错误 | 0 个 P0/P1，3 个 P2 |
+| #30 `[Copilot Evidence] Add unified inline citations and a source inspector` | **Part 1 已完成，Issue 保持开放** | `bun test --isolate`（core/chat/lib/agent/i18n 分组）101 + 137 + 102 + 25 全部通过；五包 `tsc --noEmit` 零错误 | 缺少真实 Web 来源与真实金融 API 事实的联合验收；0 个 P0/P1，3 个 P2 |
 | `[Security] Defend Deep Research against prompt injection from untrusted sources` | **已解决** | `bun test --isolate`（research/capabilities/evaluation/pi-extension/electron main）306 通过；数据集契约 4 通过 | 0 个 P0/P1，6 个 P2 |
 | 全量回归 | 通过 | 1392 pass / 0 fail / 157 files | — |
 
 ---
 
 ## 二、Issue #30 变更清单（统一行内引用 + 来源检查器）
+
+本次变更仅声明完成 citation plumbing、渲染与 inspector 增量，关联方式为 `Refs #30`。Issue 要求的“真实 Copilot 回答同时包含至少一个 Web 来源与一个金融 API 事实”尚未完成，因此不关闭 #30。
 
 ### 核心契约（packages/core）
 
