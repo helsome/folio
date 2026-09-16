@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { useTranslation } from 'react-i18next';
+import { Trash2 } from 'lucide-react';
 import type { SkillReadiness } from '@finagent/core';
 import { useFinagentClient, type SkillListItem, type SkillResourceItem } from '../../client';
 import { SkillReadinessBadge } from './SkillReadinessBadge';
@@ -14,6 +15,7 @@ export interface SkillDetailDrawerProps {
   togglingId: string | null;
   toggleError: SkillToggleError | null;
   onToggle: (skill: SkillListItem) => void;
+  onRemoved: (skillId: string) => void;
 }
 
 type AdvancedDoc = { status: 'loading' | 'error' | 'ready'; text?: string; error?: string };
@@ -39,6 +41,7 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
   togglingId,
   toggleError,
   onToggle,
+  onRemoved,
 }) => {
   const { t } = useTranslation();
   const client = useFinagentClient();
@@ -56,6 +59,8 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
   const [advancedOpen, setAdvancedOpen] = useState(false);
   const [advancedDocs, setAdvancedDocs] = useState<Record<string, AdvancedDoc>>({});
   const loadedAdvancedRef = useRef(new Set<string>());
+  const [removing, setRemoving] = useState(false);
+  const [removeError, setRemoveError] = useState<string | null>(null);
 
   // Esc closes; focus lands in the dialog on open.
   useEffect(() => {
@@ -135,6 +140,20 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
     const next = !advancedOpen;
     setAdvancedOpen(next);
     if (next) void loadAdvanced();
+  };
+
+  const removeSkill = async () => {
+    if (skill.source !== 'user') return;
+    if (!window.confirm(t('settings.skills.removeDescription', { name: skill.name }))) return;
+    setRemoving(true);
+    setRemoveError(null);
+    const result = await client.skills.remove(skill.id);
+    setRemoving(false);
+    if (!result.ok) {
+      setRemoveError(result.error.message);
+      return;
+    }
+    onRemoved(skill.id);
   };
 
   const referenceResources = resources.filter((resource) => resource.kind === 'reference');
@@ -265,8 +284,30 @@ export const SkillDetailDrawer: React.FC<SkillDetailDrawerProps> = ({
                   <dt className="text-foreground/44">{t('settings.skills.tier')}</dt>
                   <dd className="text-foreground/72">{skill.tier ?? '—'}</dd>
                 </div>
+                <div>
+                  <dt className="text-foreground/44">{t('settings.skills.source')}</dt>
+                  <dd className="text-foreground/72">
+                    {skill.source === 'user' ? t('settings.skills.sourceUser') : t('settings.skills.sourceBundled')}
+                  </dd>
+                </div>
               </dl>
             </section>
+
+            {skill.source === 'user' && (
+              <section className="border-t border-border pt-4">
+                <button
+                  type="button"
+                  data-testid="skill-remove"
+                  onClick={() => void removeSkill()}
+                  disabled={removing}
+                  className="inline-flex items-center gap-1.5 rounded-[7px] border border-destructive/30 px-2.5 py-1.5 text-[12px] font-medium text-destructive transition-smooth hover:bg-destructive/5 disabled:cursor-wait disabled:opacity-55 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-destructive"
+                >
+                  <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
+                  {removing ? t('settings.skills.removing') : t('settings.skills.remove')}
+                </button>
+                {removeError && <p role="alert" className="mt-1.5 text-[12px] text-destructive">{removeError}</p>}
+              </section>
+            )}
 
             <section className="rounded-[10px] border border-[var(--mac-border)] px-3 py-2.5">
               <div className="flex items-center justify-between gap-3">
