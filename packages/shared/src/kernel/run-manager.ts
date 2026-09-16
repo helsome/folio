@@ -38,11 +38,28 @@ import {
 } from './runaway-detector.ts';
 import { buildFinancialEvidence } from '../evidence/financial-evidence.ts';
 
+export interface RunManagerTimer {
+  cancel(): void;
+}
+
+export interface RunManagerScheduler {
+  setTimeout(callback: () => void, delayMs: number): RunManagerTimer;
+}
+
+const DEFAULT_SCHEDULER: RunManagerScheduler = {
+  setTimeout(callback, delayMs) {
+    const handle = setTimeout(callback, delayMs);
+    return { cancel: () => clearTimeout(handle) };
+  },
+};
+
 export interface RunManagerOptions {
   sessions: SessionManager;
   runs: RunRepository;
   runtime: AgentRuntime;
   now?: () => number;
+  /** Timer implementation for deterministic tests; production uses setTimeout. */
+  scheduler?: RunManagerScheduler;
   /**
    * Budget defaults and the system ceiling applied to every run (#17). A run
    * may override the defaults but never the ceiling; with no `budgets` option a
@@ -67,6 +84,8 @@ interface ActiveRun {
   runaway: RunawayState;
   /** Set when a budget or a runaway detector stopped the run. */
   stop?: RunStop;
+  /** Active wall-clock deadline; absent when the limit is unset or already cleared. */
+  wallClockTimer?: RunManagerTimer;
 }
 
 /**
@@ -83,6 +102,7 @@ export class RunManager {
   private readonly runs: RunRepository;
   private readonly runtime: AgentRuntime;
   private readonly now: () => number;
+  private readonly scheduler: RunManagerScheduler;
   private readonly budgetInput: ResolveBudgetInput;
   private readonly searchToolPatterns: readonly string[];
   private readonly runawayPolicy: Partial<RunawayPolicy>;
@@ -94,6 +114,7 @@ export class RunManager {
     this.runs = options.runs;
     this.runtime = options.runtime;
     this.now = options.now ?? Date.now;
+    this.scheduler = options.scheduler ?? DEFAULT_SCHEDULER;
     this.budgetInput = options.budgets ?? {};
     this.searchToolPatterns = options.searchTools ?? [];
     this.runawayPolicy = options.runaway ?? {};
@@ -170,7 +191,7 @@ export class RunManager {
       ceiling: this.budgetInput.ceiling,
       overrides: budgetOverrides,
     });
-    this.activeRun = {
+    const active: ActiveRun = {
       sessionId,
       runId: run.id,
       cancelRequested: false,
@@ -179,6 +200,8 @@ export class RunManager {
       usage: createUsage(),
       runaway: createRunawayState(),
     };
+    this.activeRun = active;
+    this.armWallClockBudget(active);
     this.emit({
       id: randomUUID(),
       sessionId,
@@ -200,6 +223,7 @@ export class RunManager {
       return;
     }
     active.cancelRequested = true;
+    this.clearWallClockTimer(active);
     await this.runtime.cancel({ sessionId, runId });
   }
 
@@ -222,29 +246,33 @@ export class RunManager {
         recentSymbols: session.recentSymbols,
       });
 
-      for await (const event of this.runtime.run({
-        sessionId: run.sessionId,
-        runId: run.id,
-        content: run.input,
-        workspaceContext,
-        locale,
-      })) {
-        this.emit(event);
-        if (event.type === 'message_delta' || event.type === 'message_completed') {
-          answer = event.payload.answer;
-        } else if (event.type === 'tool_completed') {
-          toolCalls.push(event.payload.toolCall);
-        } else if (event.type === 'run_failed') {
-          failure = event.payload.error;
-          sawTerminal = true;
-        } else if (event.type === 'run_completed') {
-          answer = event.payload.answer;
-          sawTerminal = true;
-        }
+      // A wall-clock deadline can expire while ensureSession is still pending.
+      // Never start a runtime run that was already cancelled before it began.
+      if (!this.activeRun?.cancelRequested) {
+        for await (const event of this.runtime.run({
+          sessionId: run.sessionId,
+          runId: run.id,
+          content: run.input,
+          workspaceContext,
+          locale,
+        })) {
+          this.emit(event);
+          if (event.type === 'message_delta' || event.type === 'message_completed') {
+            answer = event.payload.answer;
+          } else if (event.type === 'tool_completed') {
+            toolCalls.push(event.payload.toolCall);
+          } else if (event.type === 'run_failed') {
+            failure = event.payload.error;
+            sawTerminal = true;
+          } else if (event.type === 'run_completed') {
+            answer = event.payload.answer;
+            sawTerminal = true;
+          }
 
-        // Budgets and detectors are evaluated after the event is accounted for,
-        // so a run that stops keeps the evidence it had already produced.
-        if (await this.applyBudget(event)) break;
+          // Budgets and detectors are evaluated after the event is accounted for,
+          // so a run that stops keeps the evidence it had already produced.
+          if (await this.applyBudget(event)) break;
+        }
       }
     } catch (error) {
       failure = toApiError(error);
@@ -300,6 +328,8 @@ export class RunManager {
       status: 'idle',
       recentSymbols: collectSymbols(toolCalls),
     });
+
+    if (active) this.clearWallClockTimer(active);
 
     // The run is fully settled (persisted) only now; only then allow the next run.
     this.activeRun = null;
@@ -369,11 +399,50 @@ export class RunManager {
     }
 
     if (stop === undefined) return false;
+    return this.requestSafeguardStop(stop);
+  }
+
+  /** Schedule the wall-clock safeguard for one active run. */
+  private armWallClockBudget(active: ActiveRun): void {
+    const limit = active.limits.wallClockMs;
+    if (limit === undefined) return;
+
+    active.wallClockTimer = this.scheduler.setTimeout(() => {
+      void this.handleWallClockExpiry(active.runId).catch(() => undefined);
+    }, limit);
+  }
+
+  /** Stop once from a timer callback, even if the callback is accidentally fired twice. */
+  private async handleWallClockExpiry(runId: string): Promise<void> {
+    const active = this.activeRun;
+    if (!active || active.runId !== runId) return;
+
+    const limit = active.limits.wallClockMs;
+    if (limit === undefined) return;
+
+    const used = Math.max(this.now() - active.startedAt, limit);
+    active.usage = { ...active.usage, wallClockMs: used };
+    await this.requestSafeguardStop(budgetStop({ key: 'wallClockMs', limit, used }));
+  }
+
+  /**
+   * Shared idempotent stop path for event-driven budgets and timer deadlines.
+   * The first caller owns cancellation; later callers are no-ops.
+   */
+  private async requestSafeguardStop(stop: RunStop): Promise<boolean> {
+    const active = this.activeRun;
+    if (!active || active.stop !== undefined || active.cancelRequested) return false;
 
     active.stop = stop;
     active.cancelRequested = true;
+    this.clearWallClockTimer(active);
     await this.runtime.cancel({ sessionId: active.sessionId, runId: active.runId });
     return true;
+  }
+
+  private clearWallClockTimer(active: ActiveRun): void {
+    active.wallClockTimer?.cancel();
+    active.wallClockTimer = undefined;
   }
 
   /**
