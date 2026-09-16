@@ -155,6 +155,7 @@ import {
   type BriefPortfolioSummary,
   type MarketPulseSnapshot,
   type ShareCard,
+  type StreamReplayResult,
   type WatchlistQuote,
   withDemoDataFallback,
 } from '@finagent/shared';
@@ -284,6 +285,7 @@ export class AgentKernelHost {
   private instrumentResolver: InstrumentResolver;
   private activeLogin: { cancel: () => void } | null = null;
   private unsubscribe: (() => void) | null = null;
+  private streamUnsubscribe: (() => void) | null = null;
   private connectionsUnsubscribe: (() => void) | null = null;
   private window: BrowserWindow | null = null;
 
@@ -480,6 +482,14 @@ export class AgentKernelHost {
         window.webContents.send('agent:event', event);
       }
     });
+    // Stream Event Protocol v1 (issue #27): parallel transport for the
+    // protocol channel, alongside the legacy agent:event delivery.
+    this.streamUnsubscribe?.();
+    this.streamUnsubscribe = this.kernel.runs.subscribeStream((sessionId, event) => {
+      if (!window.isDestroyed()) {
+        window.webContents.send('agent:stream', { sessionId, event });
+      }
+    });
     this.connectionsUnsubscribe?.();
     this.connectionsUnsubscribe = this.connectionStore.subscribe(() => {
       void this.pushConnections();
@@ -561,6 +571,20 @@ export class AgentKernelHost {
     await this.kernel.runs.cancelRun(
       requireString(request.sessionId, 'sessionId'),
       requireString(request.runId, 'runId')
+    );
+  }
+
+  /** Stream Event replay（ADR 0001 §Reconnect）：按 lastSequence 补发或明确不可恢复。 */
+  streamReplay(input: unknown): StreamReplayResult {
+    const request = requireObject(input);
+    const lastSequence = request.lastSequence;
+    // 游标必须是非负整数：0 表示从头补发，负数/小数/NaN 都是非法客户端状态。
+    if (typeof lastSequence !== 'number' || !Number.isInteger(lastSequence) || lastSequence < 0) {
+      throw createCodeError('INVALID_ARGUMENT', 'lastSequence must be a non-negative integer.');
+    }
+    return this.kernel.runs.replayStream(
+      requireString(request.runId, 'runId'),
+      lastSequence
     );
   }
 
@@ -2549,6 +2573,8 @@ export class AgentKernelHost {
     this.unsubscribe = null;
     this.unsubscribeEval?.();
     this.unsubscribeEval = null;
+    this.streamUnsubscribe?.();
+    this.streamUnsubscribe = null;
     this.window = null;
     await this.kernel.dispose();
   }
