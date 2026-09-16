@@ -133,6 +133,8 @@ export const TARGET_CAPABILITY_IDS = [
   'company.ratings',
   // research
   'research.news',
+  'research.documents',
+  'research.documentEvidence',
   'research.events',
   // portfolio
   'portfolio.summary',

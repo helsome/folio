@@ -2,6 +2,7 @@ import { createCapabilityRegistry } from './registry.ts';
 import { createPhaseOneCapabilities } from './manifests/index.ts';
 import { createPhaseTwoCapabilities } from './manifests/phase-two.ts';
 import type { CapabilityFetchers } from './fetchers.ts';
+import { createResearchDocumentCapabilities } from './manifests/research-documents.ts';
 
 /** Phase-1 registry built from the default (real) Longbridge fetchers. */
 export function createPhaseOneRegistry(fetchers?: CapabilityFetchers) {
@@ -21,6 +22,7 @@ export function createFullRegistry(fetchers?: CapabilityFetchers) {
   return createCapabilityRegistry([
     ...createPhaseOneCapabilities(fetchers),
     ...createPhaseTwoCapabilities(fetchers),
+    ...createResearchDocumentCapabilities(),
   ]);
 }
 
@@ -44,5 +46,7 @@ export { createPhaseOneCapabilities, phaseOneCapabilities } from './manifests/in
 export const fullCapabilities = [
   ...createPhaseOneCapabilities(),
   ...createPhaseTwoCapabilities(),
+  ...createResearchDocumentCapabilities(),
 ];
+export { createResearchDocumentCapabilities };
 export { createPhaseTwoCapabilities } from './manifests/phase-two.ts';
