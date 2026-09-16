@@ -7,6 +7,7 @@ import type {
   Message,
   Run,
   SessionMeta,
+  StreamEvent,
   TokenUsage,
   ToolCall,
   ToolCallRecord,
@@ -37,6 +38,7 @@ import {
   type RunawayState,
 } from './runaway-detector.ts';
 import { buildFinancialEvidence } from '../evidence/financial-evidence.ts';
+import { toStreamEvents } from './stream-event-adapter.ts';
 
 export interface RunManagerOptions {
   sessions: SessionManager;
@@ -87,6 +89,7 @@ export class RunManager {
   private readonly searchToolPatterns: readonly string[];
   private readonly runawayPolicy: Partial<RunawayPolicy>;
   private readonly listeners = new Set<(event: AgentEvent) => void>();
+  private readonly streamListeners = new Set<(sessionId: string, event: StreamEvent) => void>();
   private activeRun: ActiveRun | null = null;
 
   constructor(options: RunManagerOptions) {
@@ -102,6 +105,16 @@ export class RunManager {
   subscribe(listener: (event: AgentEvent) => void): () => void {
     this.listeners.add(listener);
     return () => this.listeners.delete(listener);
+  }
+
+  /**
+   * Stream Event Protocol v1 channel (issue #27). Parallel to `subscribe`;
+   * every AgentEvent is additionally mapped to StreamEvents. The sessionId is
+   * passed along since the envelope intentionally does not carry it.
+   */
+  subscribeStream(listener: (sessionId: string, event: StreamEvent) => void): () => void {
+    this.streamListeners.add(listener);
+    return () => this.streamListeners.delete(listener);
   }
 
   /** Whether a run is currently executing (Pi runtime executes one at a time). */
@@ -407,6 +420,13 @@ export class RunManager {
   private emit(event: AgentEvent): void {
     for (const listener of this.listeners) {
       listener(event);
+    }
+    if (this.streamListeners.size > 0) {
+      for (const mapped of toStreamEvents(event)) {
+        for (const listener of this.streamListeners) {
+          listener(event.sessionId, mapped);
+        }
+      }
     }
   }
 }
