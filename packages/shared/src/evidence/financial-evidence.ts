@@ -10,6 +10,7 @@ import type {
 import {
   FINANCIAL_EVIDENCE_SCHEMA_VERSION,
   FINANCIAL_NORMALIZATION_VERSION,
+  readInstrumentId,
 } from '@finagent/core';
 
 const SECRET_KEY = /(authorization|api[-_]?key|access[-_]?token|refresh[-_]?token|password|cookie|secret|credential)/i;
@@ -51,7 +52,7 @@ export function buildFinancialEvidence(input: BuildFinancialEvidenceInput): Fina
     const provider = stringValue(provenance.providerId) ?? stringValue(provenance.provider) ?? 'unknown';
     const retrievedAt = numberValue(provenance.fetchedAt) ?? toolCall.completedAt ?? toolCall.startedAt;
     const asOf = numberValue(provenance.marketTime) ?? inferAsOf(result.data);
-    const instrumentId = canonicalInstrument(toolCall.args.symbol ?? inferSymbol(result.data));
+    const instrumentId = readInstrumentId(provenance) ?? canonicalInstrument(toolCall.args.symbol ?? inferSymbol(result.data));
     const values = collectValues(result.data, result.evidence);
     const snapshot = redact(result.data);
     const resultHash = hashJson(snapshot);
@@ -82,6 +83,7 @@ export function buildFinancialEvidence(input: BuildFinancialEvidenceInput): Fina
       retrievedAt,
       ...(asOf !== undefined ? { asOf } : {}),
       stale: provenance.stale === true,
+      ...(provenance.delayed === true ? { delayed: true } : {}),
       cacheHit: result.evidence?.cacheHit === true,
       ...(result.evidence?.fallback ? { fallback: result.evidence.fallback } : {}),
       ...(result.evidence?.reconciliation ? { reconciliation: result.evidence.reconciliation } : {}),

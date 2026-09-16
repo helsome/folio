@@ -16,6 +16,7 @@ import type {
   MarketTemperature,
   NewsItem,
   PortfolioSnapshot,
+  ProviderProvenance,
   Quote,
   StaticInfo,
   TradeTick,
@@ -47,13 +48,27 @@ import {
 } from '@finagent/longbridge-tools';
 
 /**
+ * Opt-in enriched fetch result for capability paths that need the router's
+ * actual-provider provenance in addition to the normalized payload.
+ */
+export interface CapabilityFetchResult<T> {
+  data: T;
+  provenance: ProviderProvenance;
+}
+
+/**
  * Provider fetchers consumed by the capability manifests. Production uses the
  * raw Longbridge fetchers; tests and the local backend can substitute a
  * `MarketDataService` (which satisfies this shape structurally) to inject
  * cached or stubbed data.
+ *
+ * Raw methods deliberately remain payload-only for renderer and legacy
+ * consumers. A capability can opt into a matching `*Result` method when it
+ * needs source provenance for a traceable product flow.
  */
 export interface CapabilityFetchers {
   getQuote: (symbol: string) => Promise<Quote>;
+  getQuoteResult?: (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<Quote>>;
   getKline: (options: GetKlineOptions) => Promise<Kline[]>;
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
   getMarketStatus: () => Promise<MarketStatus[]>;
