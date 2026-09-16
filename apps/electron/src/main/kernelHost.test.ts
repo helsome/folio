@@ -51,6 +51,7 @@ const fakeSessions = {
 
 const fakeRuns = {
   subscribe: (_listener: (event: AgentEvent) => void) => () => undefined,
+  subscribeStream: (_listener: (sessionId: string, event: unknown) => void) => () => undefined,
   startRun: async (sessionId: string, content: string) => ({
     id: 'r1',
     sessionId,
@@ -59,6 +60,7 @@ const fakeRuns = {
     startedAt: 1,
   }),
   cancelRun: async () => undefined,
+  replayStream: (_runId: string, _lastSequence: number) => ({ recoverable: false, events: [], atEnd: true }),
 };
 
 class FakeAgentKernel {
@@ -388,6 +390,29 @@ describe('AgentKernelHost', () => {
       input: 'AAPL.US quote',
     });
     await expect(host.cancelRun({ sessionId: 's1', runId: 'r1' })).resolves.toBeUndefined();
+    host.dispose();
+  });
+
+  it('rejects non-integer or negative stream replay cursors', () => {
+    const host = new AgentKernelHost();
+    const expectInvalid = (input: unknown) => {
+      try {
+        host.streamReplay(input);
+      } catch (error) {
+        expect(error).toMatchObject({ code: 'INVALID_ARGUMENT' });
+        return;
+      }
+      throw new Error('expected streamReplay to reject the cursor');
+    };
+
+    for (const lastSequence of [-1, 1.5, Number.NaN, Number.POSITIVE_INFINITY, '3', undefined]) {
+      expectInvalid({ runId: 'r1', lastSequence });
+    }
+    expect(host.streamReplay({ runId: 'r1', lastSequence: 0 })).toEqual({
+      recoverable: false,
+      events: [],
+      atEnd: true,
+    });
     host.dispose();
   });
 

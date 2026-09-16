@@ -48,7 +48,9 @@ function makeClient(): FinagentClient {
       listRuns: async () => ({ ok: true as const, data: [] as Run[] }),
       startRun: async () => ({ ok: false as const, error: { code: 'TEST', message: 'no-op' } }),
       cancelRun: async () => ({ ok: true as const, data: undefined }),
+      streamReplay: async () => ({ ok: true as const, data: { recoverable: false, events: [], atEnd: true } }),
       onAgentEvent: () => () => undefined,
+      onStreamEvent: () => () => undefined,
     },
     agent: {
       getTools: async () => ({ ok: true as const, data: [] }),
