@@ -1,5 +1,6 @@
 import type { TSchema } from '@sinclair/typebox';
 import type { FinancialEvidenceMetadata } from './financial-evidence.ts';
+import type { ProviderFailoverStep } from './provider.ts';
 
 /**
  * Finance Capability domain — the single source of truth for every piece of
@@ -34,6 +35,8 @@ export interface CapabilityProvenance {
   provider: string;
   /** Provider id of the ACTUAL answering adapter (fallback-aware). */
   providerId?: string;
+  /** Human-readable name of the actual answering adapter, when available. */
+  providerName?: string;
   /** Canonical instrument id when the capability ran against a resolved listing. */
   instrumentId?: string;
   /** Epoch ms at which the data was fetched. */
@@ -44,6 +47,8 @@ export interface CapabilityProvenance {
   delayed?: boolean;
   /** True when the data may be outdated relative to the market. */
   stale: boolean;
+  /** Failed provider attempts before this result was produced. */
+  failoverTrail?: ProviderFailoverStep[];
 }
 
 export interface CapabilityResult<T> {
