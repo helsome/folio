@@ -576,17 +576,22 @@ export class PiRpcClient {
       return;
     }
 
-    const pending = this.findPending(event);
     const control = this.findControl(event);
     if (control) {
       clearTimeout(control.timeout);
       this.pendingControls.delete(control.id);
-      if (event.type === 'error') {
-        control.reject(createCodeError('PI_RUNTIME_ERROR', String(event.message ?? 'Pi runtime error.')));
+      if (event.type === 'error' || event.success === false) {
+        control.reject(createCodeError(
+          'PI_RUNTIME_ERROR',
+          String(event.error ?? event.message ?? 'Pi runtime error.')
+        ));
       } else {
         control.resolve(event.data);
       }
+      return;
     }
+
+    const pending = this.findPending(event);
 
     if (!pending) return;
 
@@ -684,6 +689,7 @@ export class PiRpcClient {
   private findPending(event: Record<string, unknown>) {
     const id = typeof event.id === 'string' ? event.id : typeof event.requestId === 'string' ? event.requestId : undefined;
     if (id && this.pendingPrompts.has(id)) return this.pendingPrompts.get(id);
+    if (event.type === 'response') return undefined;
     if (this.pendingPrompts.size === 1) return Array.from(this.pendingPrompts.values())[0];
     return undefined;
   }
