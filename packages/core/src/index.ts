@@ -47,6 +47,30 @@ export interface Kline {
   volume: number;
 }
 
+/** Provider-neutral query options for historical OHLCV bars. */
+export interface KlineQueryOptions {
+  symbol: string;
+  period?: '1m' | '5m' | '15m' | '1h' | '1d' | '1w';
+  start?: number;
+  end?: number;
+  limit?: number;
+}
+
+/** Provider-neutral query options for finance-calendar events. */
+export interface CalendarEventsQueryOptions {
+  eventType: 'financial' | 'report' | 'dividend' | 'ipo' | 'macrodata' | 'closed';
+  symbols?: string[];
+  start?: string;
+  end?: string;
+  count?: number;
+}
+
+/** Provider-neutral query options for account cash-flow records. */
+export interface CashFlowQueryOptions {
+  start?: string;
+  end?: string;
+}
+
 export interface IntradayData {
   symbol: string;
   timestamp: number;

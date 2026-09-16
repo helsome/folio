@@ -39,7 +39,7 @@ export const connections = {
   reconnect: '重新连接',
   installSetup: '安装 / 设置',
   byokNote:
-    '你自己的密钥决定使用情况。免费套餐可能返回当日结束后的数据（每分钟 5 次调用）并要求注明来源（“Powered by Polygon.io”）。',
+    '你自己的密钥决定使用情况。Massive 可能返回延迟或日终数据，并可能要求注明来源（“Powered by Polygon.io”）。',
   dismissError: '关闭错误',
   dismiss: '关闭',
   portfolioReady: '投资组合 ✓',

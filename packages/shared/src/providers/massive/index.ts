@@ -5,11 +5,9 @@
  * `FinancialDataProvider` serving US quotes, daily klines, and ticker profiles.
  * No broker interface.
  *
- * LICENSING / ATTRIBUTION: this adapter targets Massive's free "Stocks Basic"
- * tier for development only (end-of-day data, 5 calls/min, "Individual use").
- * A commercial ship requires a Massive Business plan, and display attribution
- * ("Powered by Polygon.io") may be required per the Market Data Terms of
- * Service. Surface this copy in the Connections UI — do not silently omit it.
+ * LICENSING / ATTRIBUTION: Massive usage and display-attribution requirements
+ * depend on the provider plan and applicable Market Data Terms of Service.
+ * Surface any required attribution in the Connections UI.
  */
 export { MassiveFinancialDataProvider } from './adapter.ts'
 export type { MassiveConfig } from './adapter.ts'

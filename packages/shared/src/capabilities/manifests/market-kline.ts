@@ -4,7 +4,7 @@ import type { FinanceCapability } from '@finagent/core';
 import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
-import { defaultCapabilityFetchers } from '../fetchers.ts';
+import { defaultCapabilityFetchers, resolveCapabilityFetch } from '../fetchers.ts';
 
 const KlinePeriod = Type.Union([
   Type.Literal('1m'),
@@ -42,15 +42,19 @@ export function createMarketKlineCapability(
       const symbol = normalizeSymbol(input.symbol);
       const period = input.period ?? '1d';
       const limit = input.limit ?? 100;
-      const klines = await fetchers.getKline({ symbol, period, limit });
+      const resolved = await resolveCapabilityFetch(
+        fetchers,
+        'market.kline',
+        { symbol, period, limit },
+        () => fetchers.getKline({ symbol, period, limit }),
+        ctx?.now ?? Date.now,
+        undefined,
+        ctx?.signal
+      );
+      const klines = resolved.data;
       return {
         data: klines,
-        provenance: {
-          provider: 'longbridge',
-          fetchedAt: (ctx?.now ?? Date.now)(),
-          marketTime: klines[klines.length - 1]?.timestamp,
-          stale: false,
-        },
+        provenance: { ...resolved.provenance, marketTime: resolved.provenance.marketTime ?? klines[klines.length - 1]?.timestamp },
         summary: formatKline(symbol, period, klines),
       };
     },

@@ -4,7 +4,7 @@ import type { FinanceCapability } from '@finagent/core';
 import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
-import { defaultCapabilityFetchers } from '../fetchers.ts';
+import { defaultCapabilityFetchers, resolveCapabilityFetch } from '../fetchers.ts';
 
 export function createMarketQuoteCapability(
   fetchers: CapabilityFetchers = defaultCapabilityFetchers
@@ -26,16 +26,19 @@ export function createMarketQuoteCapability(
     }),
     async execute(input, ctx) {
       const symbol = normalizeSymbol(input.symbol);
-      const quote = await fetchers.getQuote(symbol);
+      const resolved = await resolveCapabilityFetch(
+        fetchers,
+        'market.quote',
+        { symbol },
+        () => fetchers.getQuote(symbol),
+        ctx?.now ?? Date.now,
+        undefined,
+        ctx?.signal
+      );
       return {
-        data: quote,
-        provenance: {
-          provider: 'longbridge',
-          fetchedAt: (ctx?.now ?? Date.now)(),
-          marketTime: quote.timestamp,
-          stale: false,
-        },
-        summary: formatQuote(quote),
+        data: resolved.data,
+        provenance: { ...resolved.provenance, marketTime: resolved.provenance.marketTime ?? resolved.data.timestamp },
+        summary: formatQuote(resolved.data),
       };
     },
   });
