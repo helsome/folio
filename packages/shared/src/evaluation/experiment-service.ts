@@ -70,6 +70,8 @@ export interface ExperimentKernel {
     ): Promise<Run>;
     /** True while a run's terminal persistence is still landing (AgentKernel). */
     isRunning?(): boolean;
+    /** Idempotently cancel the given run (RunManager.cancelRun; no-op on id mismatch). */
+    cancelRun?(sessionId: string, runId: string): Promise<void> | void;
   };
   deleteSession(sessionId: string): Promise<void>;
   getLlmApi?(): { getState(): Promise<{ sessionId?: string }> } | undefined;
@@ -81,6 +83,13 @@ export interface ExperimentServiceOptions {
   backend: EvaluationBackend;
   correlation: TraceCorrelationService;
   now?: () => number;
+  /** Test/ops overrides for the runner's wait budgets (§79 guardrails). */
+  timing?: {
+    /** Grace on top of the case budget before the runner gives up waiting. */
+    terminalGraceMs?: number;
+    /** Bounded wait for terminal persistence / runtime teardown after a settle. */
+    teardownMs?: number;
+  };
 }
 
 export interface RunExperimentInput {
@@ -106,6 +115,8 @@ export interface GateEvaluation {
 const DEFAULT_TIMEOUT_MS = 120_000;
 /** Grace margin on top of the runtime budget before the runner gives up waiting. */
 const TERMINAL_GRACE_MS = 30_000;
+/** Bounded wait for the runtime to finish terminal persistence after a settle. */
+const RUNTIME_TEARDOWN_MS = 10_000;
 
 /** Mapped by the runner: rpc timeout → run status `timeout` (spec §44). */
 const TIMEOUT_ERROR_CODE = 'PI_REQUEST_TIMEOUT';
@@ -134,6 +145,24 @@ function sleep(ms: number): Promise<void> {
   const { promise, resolve } = Promise.withResolvers<void>();
   setTimeout(resolve, ms);
   return promise;
+}
+
+/** A `sleep` whose timer is cleared once the race it arbitrates has settled. */
+function deadline(ms: number): { promise: Promise<'timeout'>; clear(): void } {
+  const { promise, resolve } = Promise.withResolvers<'timeout'>();
+  const timer = setTimeout(() => resolve('timeout'), ms);
+  return { promise, clear: () => clearTimeout(timer) };
+}
+
+/** Last terminal event for `runId` in the collected stream, if one landed. */
+function findTerminalEvent(events: AgentEvent[], runId: string): AgentEvent | undefined {
+  for (let index = events.length - 1; index >= 0; index -= 1) {
+    const event = events[index];
+    if (event.runId === runId && (event.type === 'run_completed' || event.type === 'run_failed')) {
+      return event;
+    }
+  }
+  return undefined;
 }
 
 /** Repo git sha; undefined when the command fails (e.g. not a git checkout). */
@@ -196,6 +225,8 @@ export class ExperimentService {
   private readonly backend: EvaluationBackend;
   private readonly correlation: TraceCorrelationService;
   private readonly now: () => number;
+  private readonly terminalGraceMs: number;
+  private readonly teardownMs: number;
 
   constructor(options: ExperimentServiceOptions) {
     this.store = options.store;
@@ -203,6 +234,8 @@ export class ExperimentService {
     this.backend = options.backend;
     this.correlation = options.correlation;
     this.now = options.now ?? Date.now;
+    this.terminalGraceMs = options.timing?.terminalGraceMs ?? TERMINAL_GRACE_MS;
+    this.teardownMs = options.timing?.teardownMs ?? RUNTIME_TEARDOWN_MS;
   }
 
   /**
@@ -248,6 +281,7 @@ export class ExperimentService {
 
     const results: EvaluationResultRecord[] = [];
     let aborted = signal?.aborted ?? false;
+    let runtimeUnusable = false;
 
     for (let index = 0; index < selectedCases.length; index += 1) {
       if (aborted || signal?.aborted) {
@@ -258,11 +292,6 @@ export class ExperimentService {
       input.onProgress?.({ kind: 'case_started', caseId: caseItem.id, index, total: selectedCases.length });
 
       const outcome = await this.runCase(caseItem, dataset, experiment, config, input.judgeClient, signal);
-      if (outcome.aborted) {
-        aborted = true;
-        await this.store.updateExperiment(experiment);
-        break;
-      }
       if (outcome.run) {
         experiment.runIds.push(outcome.run.id);
         await this.store.addRun(outcome.run);
@@ -273,11 +302,26 @@ export class ExperimentService {
         await this.store.addResult(outcome.result);
       }
       await this.store.updateExperiment(experiment);
+      if (outcome.aborted) {
+        aborted = true;
+        break;
+      }
+      if (outcome.runtimeUnusable) {
+        // The runtime ignored cancellation and never settled: do not start the
+        // next case into a kernel that still owns an active run.
+        runtimeUnusable = true;
+        input.onProgress?.({ kind: 'case_completed', caseId: caseItem.id, index, total: selectedCases.length });
+        break;
+      }
 
       input.onProgress?.({ kind: 'case_completed', caseId: caseItem.id, index, total: selectedCases.length });
     }
 
-    if (aborted) {
+    if (runtimeUnusable && !aborted) {
+      // Infra breakdown: the experiment ends explicitly while everything already
+      // produced stays persisted and readable.
+      experiment.status = 'failed';
+    } else if (aborted) {
       experiment.status = 'cancelled';
     } else {
       experiment.status = 'completed';
@@ -322,7 +366,7 @@ export class ExperimentService {
     config: ExperimentConfig,
     judgeClient: JudgeClient | undefined,
     signal?: AbortSignal,
-  ): Promise<{ run?: EvaluationRun; result?: EvaluationResultRecord; aborted: boolean }> {
+  ): Promise<{ run?: EvaluationRun; result?: EvaluationResultRecord; aborted: boolean; runtimeUnusable: boolean }> {
     const session = await this.kernel.sessions.createSession(caseItem.id);
     const timeoutMs = config.timeoutMs ?? DEFAULT_TIMEOUT_MS;
     const startedAt = this.now();
@@ -369,33 +413,52 @@ export class ExperimentService {
         };
         await this.traceRun(failedRun, session.id, caseItem.locale);
         await this.kernel.deleteSession(session.id).catch(() => undefined);
-        return { run: failedRun, aborted: false };
+        return { run: failedRun, aborted: false, runtimeUnusable: false };
       }
       if (!runId) runId = run.id;
 
       const abortResolved = Promise.withResolvers<'abort'>();
       const abortPromise = abortResolved.promise;
+      const onAbort = (): void => abortResolved.resolve('abort');
       if (signal?.aborted) {
         abortResolved.resolve('abort');
       } else {
-        signal?.addEventListener('abort', () => abortResolved.resolve('abort'), { once: true });
+        signal?.addEventListener('abort', onAbort, { once: true });
       }
-      const waitTimer = sleep(timeoutMs + TERMINAL_GRACE_MS).then(() => 'timeout' as const);
+      const waitTimer = deadline(timeoutMs + this.terminalGraceMs);
 
-      const settled = await Promise.race([terminal, waitTimer, abortPromise]);
+      const settled = await Promise.race([terminal, waitTimer.promise, abortPromise]);
+      waitTimer.clear();
+      signal?.removeEventListener('abort', onAbort);
       const completedAt = this.now();
 
-      if (settled === 'abort') {
-        await this.kernel.deleteSession(session.id).catch(() => undefined);
-        return { aborted: true };
+      // Exactly one settlement wins the race; a late terminal event must not
+      // re-open the case. From here the runner owns the outcome.
+      const userAborted = settled === 'abort';
+      const hardTimeout = settled === 'timeout';
+      if ((userAborted || hardTimeout) && runId) {
+        // Idempotent: RunManager no-ops when the run already settled or the ids
+        // do not match its currently active run.
+        await Promise.resolve(this.kernel.runs.cancelRun?.(session.id, runId)).catch(() => undefined);
       }
 
-      const hardTimeout = settled === 'timeout';
+      // RunManager clears `activeRun` only after all terminal persistence lands
+      // (run update, session idle, messages). Deleting the session or starting
+      // the next case before that races on the same session-store files, so wait
+      // for the kernel to go idle first — but never forever (§55).
+      const idle = await this.waitForIdle();
+
+      const terminalEvent = hardTimeout
+        ? undefined
+        : userAborted
+          ? findTerminalEvent(collected, runId)
+          : (settled as AgentEvent);
       const outcome = this.deriveOutcome(
-        hardTimeout ? undefined : (settled as AgentEvent),
+        terminalEvent,
         collected,
         runId,
         run,
+        userAborted ? { status: 'cancelled', failureModes: [] as EvaluationFailureMode[] } : undefined
       );
       const evalRun: EvaluationRun = {
         id: outcome.runId,
@@ -411,6 +474,17 @@ export class ExperimentService {
         failureModes: outcome.failureModes,
         error: outcome.error,
       };
+      if (!idle) {
+        // The runtime ignored cancellation (or never settled): isolate it.
+        // Session files are still owned by the active run and must not be
+        // touched; the caller stops the experiment instead of reusing the
+        // still-active context for the next case.
+        evalRun.error ??= {
+          code: 'RUNTIME_TEARDOWN_TIMEOUT',
+          message: `Runtime did not finish terminal persistence within ${this.teardownMs}ms after the case settled.`,
+        };
+        evalRun.failureModes = [...evalRun.failureModes, 'runtime_error'];
+      }
       const traceRef = await this.traceRun(evalRun, session.id, caseItem.locale, {
         prompt: caseItem.input.prompt,
         datasetId: dataset.id,
@@ -420,14 +494,15 @@ export class ExperimentService {
         provider: config.provider,
       });
       evalRun.traceRef = traceRef;
-      // RunManager clears `activeRun` only after all terminal persistence lands
-      // (run update, session idle, messages). Deleting the session or starting
-      // the next case before that races on the same session-store files, so
-      // wait for the kernel to go idle first (§55 — one prompt at a time).
-      while (this.kernel.runs.isRunning?.() ?? false) {
-        await sleep(5);
+      if (idle) {
+        await this.kernel.deleteSession(session.id).catch(() => undefined);
       }
-      await this.kernel.deleteSession(session.id).catch(() => undefined);
+
+      if (userAborted) {
+        // User-cancelled case: the partial evidence stays on the record instead
+        // of silently dropping the case from the experiment statistics.
+        return { run: evalRun, aborted: true, runtimeUnusable: !idle };
+      }
 
       // ── Evaluation (spec §27-38): deterministic first, judges when a client
       // is configured. Evaluator-returned failures append to the run's modes.
@@ -462,7 +537,7 @@ export class ExperimentService {
       );
       const allFailures: EvaluationFailureMode[] =
         judgeErrors.length > 0 && !failures.includes('judge_error') ? [...failures, 'judge_error'] : failures;
-      evalRun.failureModes = [...outcome.failureModes, ...allFailures];
+      evalRun.failureModes = [...new Set([...evalRun.failureModes, ...allFailures])];
 
       const result: EvaluationResultRecord = {
         id: `result-${randomSuffix(8)}`,
@@ -474,10 +549,24 @@ export class ExperimentService {
         verdict: verdictForRun(evalRun),
       };
       await this.writeLangfuseScores(evalRun, scores);
-      return { run: evalRun, result, aborted: false };
+      return { run: evalRun, result, aborted: false, runtimeUnusable: !idle };
     } finally {
       unsubscribe?.();
     }
+  }
+
+  /**
+   * Bounded wait for the kernel to finish terminal persistence (§55 — one
+   * prompt at a time). Returns false when the runtime is still running after
+   * the teardown budget, i.e. cancellation was ignored or never landed.
+   */
+  private async waitForIdle(): Promise<boolean> {
+    const giveUpAt = this.now() + this.teardownMs;
+    while (this.kernel.runs.isRunning?.() ?? false) {
+      if (this.now() >= giveUpAt) return false;
+      await sleep(5);
+    }
+    return true;
   }
 
   /** Persist the trace link for a finished run; never throws. */
@@ -564,6 +653,7 @@ export class ExperimentService {
     collected: AgentEvent[],
     runId: string,
     runRecord: Run,
+    fallback?: { status: EvaluationRunStatus; failureModes: EvaluationFailureMode[] },
   ): {
     runId: string;
     status: EvaluationRunStatus;
@@ -592,8 +682,16 @@ export class ExperimentService {
     }
 
     if (terminalEvent === undefined) {
-      // Only reached when the wait budget expired without a terminal event.
-      return { runId, status: 'timeout', answer, toolCalls, failureModes: ['timeout'], error };
+      // Only reached when the wait budget expired or the user aborted without a
+      // terminal event; the partial evidence stays on the record.
+      return {
+        runId,
+        status: fallback?.status ?? 'timeout',
+        answer,
+        toolCalls,
+        failureModes: fallback?.failureModes ?? ['timeout'],
+        error,
+      };
     }
     const code = error?.code;
     if (sawCompleted) {

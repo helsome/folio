@@ -204,6 +204,128 @@ function scoreMap(result: { scores: Array<{ metric: string; score: number | null
   return Object.fromEntries(result.scores.map((score) => [score.metric, score.score]));
 }
 
+// ── Stalled kernel (#115): a runtime that stops emitting mid-run ───────────
+
+interface StalledScript {
+  /** Last answer emitted before the stall (partial evidence). */
+  partialAnswer?: string;
+  toolCalls?: ToolCallRecord[];
+  /** Emit a terminal `run_completed` this many ms after startRun (race tests). */
+  lateCompleteMs?: number;
+  lateCompleteAnswer?: string;
+}
+
+class StalledKernel implements ExperimentKernel {
+  startedRuns = 0;
+  cancelCalls = 0;
+  deletedSessions = 0;
+  /** When false, cancellation is requested but the runtime never settles. */
+  cancelResponds = true;
+
+  private readonly listeners = new Set<(event: AgentEvent) => void>();
+  private readonly sessionCase = new Map<string, string>();
+  private readonly scripts = new Map<string, StalledScript>();
+  private running = false;
+  private activeRunId: string | undefined;
+  private activeSessionId: string | undefined;
+  private sequence = 0;
+
+  script(caseId: string, script: StalledScript): void {
+    this.scripts.set(caseId, script);
+  }
+
+  sessions = {
+    createSession: async (title?: string): Promise<{ id: string }> => {
+      const id = `sess-${this.sessionCase.size + 1}`;
+      this.sessionCase.set(id, title ?? '');
+      return { id };
+    },
+  };
+
+  deleteSession = async (): Promise<void> => {
+    this.deletedSessions += 1;
+  };
+
+  runs = {
+    subscribe: (listener: (event: AgentEvent) => void): (() => void) => {
+      this.listeners.add(listener);
+      return () => this.listeners.delete(listener);
+    },
+    startRun: async (sessionId: string, content: string): Promise<Run> => {
+      this.startedRuns += 1;
+      const runId = `run-${this.startedRuns}`;
+      const now = Date.now();
+      const run: Run = { id: runId, sessionId, status: 'running', input: content, startedAt: now };
+      this.running = true;
+      this.activeRunId = runId;
+      this.activeSessionId = sessionId;
+      const emit = (type: AgentEvent['type'], payload?: AgentEventPayload): void => {
+        this.sequence += 1;
+        const event = {
+          id: crypto.randomUUID(),
+          sessionId,
+          runId,
+          type,
+          timestamp: now,
+          sequence: this.sequence,
+          payload,
+        } as AgentEvent;
+        for (const listener of this.listeners) listener(event);
+      };
+      emit('run_started', { run, userMessage: { id: 'msg-user', role: 'user', content, timestamp: now } });
+      const script = this.scripts.get(this.sessionCase.get(sessionId) ?? '');
+      for (const toolCall of script?.toolCalls ?? []) {
+        emit('tool_started', { toolCall: toToolCall(toolCall) });
+        emit('tool_completed', { toolCall: toToolCall(toolCall) });
+      }
+      if (script?.partialAnswer !== undefined) {
+        emit('message_started');
+        emit('message_delta', { delta: script.partialAnswer, answer: script.partialAnswer });
+        emit('message_completed', { answer: script.partialAnswer });
+      }
+      if (script?.lateCompleteMs !== undefined) {
+        const answer = script.lateCompleteAnswer ?? 'late completion';
+        setTimeout(() => emit('run_completed', { answer, toolCalls: [] }), script.lateCompleteMs);
+      }
+      // …and then the runtime stalls: no terminal event, isRunning stays true.
+      return run;
+    },
+    isRunning: (): boolean => this.running,
+    cancelRun: async (): Promise<void> => {
+      this.cancelCalls += 1;
+      if (!this.cancelResponds) return;
+      this.running = false;
+      // Mirror RunManager: a cancelled run settles with a synthesized
+      // run_failed RUN_CANCELLED terminal event.
+      if (this.activeRunId) {
+        this.sequence += 1;
+        const event = {
+          id: crypto.randomUUID(),
+          sessionId: this.activeSessionId,
+          runId: this.activeRunId,
+          type: 'run_failed' as const,
+          timestamp: Date.now(),
+          sequence: this.sequence,
+          payload: { error: { code: 'RUN_CANCELLED', message: 'Run cancelled by user.' } },
+        } as AgentEvent;
+        for (const listener of this.listeners) listener(event);
+      }
+    },
+  };
+
+  getLlmApi(): undefined {
+    return undefined;
+  }
+}
+
+function createStalledService(
+  kernel: StalledKernel,
+  timing: { terminalGraceMs?: number; teardownMs?: number }
+): ExperimentService {
+  const correlation = new TraceCorrelationService({ backend, store });
+  return new ExperimentService({ store, kernel, backend, correlation, timing });
+}
+
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('ExperimentService.runExperiment', () => {
@@ -586,5 +708,108 @@ describe('JudgeClient wiring', () => {
     });
     const reply = await client.complete('sys', 'user');
     expect(reply).toContain('0.5');
+  });
+});
+
+describe('ExperimentService case timeout teardown (#115)', () => {
+  it('times out, cancels the underlying run, and records the partial answer', async () => {
+    const kernel = new StalledKernel();
+    kernel.script('a1', { partialAnswer: 'partial answer', toolCalls: [QUOTE_TOOLCALL] });
+    const service = createStalledService(kernel, { terminalGraceMs: 30, teardownMs: 200 });
+
+    const experiment = await service.runExperiment({
+      dataset: makeDataset([makeCase('a1')]),
+      config: makeConfig({ timeoutMs: 20 }),
+    });
+
+    expect(experiment.status).toBe('completed');
+    expect(kernel.cancelCalls).toBe(1);
+    expect(kernel.deletedSessions).toBe(1);
+    const [run] = await store.listRuns(experiment.id);
+    expect(run).toMatchObject({ status: 'timeout', answer: 'partial answer' });
+    expect(run?.failureModes).toContain('timeout');
+    expect(run?.toolCalls).toHaveLength(1);
+  });
+
+  it('stalls before its first output and still records a timeout outcome', async () => {
+    const kernel = new StalledKernel();
+    const service = createStalledService(kernel, { terminalGraceMs: 30, teardownMs: 200 });
+
+    const experiment = await service.runExperiment({
+      dataset: makeDataset([makeCase('a1')]),
+      config: makeConfig({ timeoutMs: 20 }),
+    });
+
+    expect(experiment.status).toBe('completed');
+    expect(kernel.cancelCalls).toBe(1);
+    const [run] = await store.listRuns(experiment.id);
+    expect(run?.status).toBe('timeout');
+    expect(run?.answer).toBeUndefined();
+    expect(await store.listResults(experiment.id)).toHaveLength(1);
+  });
+
+  it('isolates a runtime that ignores cancellation and fails the experiment', async () => {
+    const kernel = new StalledKernel();
+    kernel.cancelResponds = false;
+    kernel.script('a1', { partialAnswer: 'partial answer' });
+    const service = createStalledService(kernel, { terminalGraceMs: 20, teardownMs: 30 });
+
+    const experiment = await service.runExperiment({
+      dataset: makeDataset([makeCase('a1'), makeCase('a2')]),
+      config: makeConfig({ timeoutMs: 20 }),
+    });
+
+    expect(experiment.status).toBe('failed');
+    expect(kernel.startedRuns).toBe(1); // a2 never starts on the stuck runtime
+    expect(experiment.runIds).toHaveLength(1);
+    expect(kernel.deletedSessions).toBe(0); // session files still owned by the active run
+    const [run] = await store.listRuns(experiment.id);
+    expect(run?.status).toBe('timeout');
+    expect(run?.error?.code).toBe('RUNTIME_TEARDOWN_TIMEOUT');
+    expect(run?.failureModes).toContain('runtime_error');
+    expect(await store.listResults(experiment.id)).toHaveLength(1); // artifacts stay readable
+  });
+
+  it('records a completion that loses the race against the timeout only once', async () => {
+    const kernel = new StalledKernel();
+    kernel.script('a1', { partialAnswer: 'partial', lateCompleteMs: 90, lateCompleteAnswer: 'late answer' });
+    const service = createStalledService(kernel, { terminalGraceMs: 30, teardownMs: 200 });
+
+    const experiment = await service.runExperiment({
+      dataset: makeDataset([makeCase('a1')]),
+      config: makeConfig({ timeoutMs: 20 }),
+    });
+
+    // The timeout won the race; the late completion must not re-open the case.
+    expect(experiment.status).toBe('completed');
+    expect(experiment.runIds).toHaveLength(1);
+    const [run] = await store.listRuns(experiment.id);
+    expect(run?.status).toBe('timeout');
+    expect(await store.listResults(experiment.id)).toHaveLength(1);
+  });
+
+  it('user abort cancels the active run and keeps the case outcome', async () => {
+    const kernel = new StalledKernel();
+    kernel.script('a1', { partialAnswer: 'partial answer' });
+    const service = createStalledService(kernel, { terminalGraceMs: 30, teardownMs: 200 });
+    const controller = new AbortController();
+
+    const experiment = await service.runExperiment({
+      dataset: makeDataset([makeCase('a1'), makeCase('a2')]),
+      config: makeConfig({ timeoutMs: 60_000 }),
+      signal: controller.signal,
+      onProgress: (event) => {
+        if (event.kind === 'case_started' && event.caseId === 'a1') controller.abort();
+      },
+    });
+
+    expect(experiment.status).toBe('cancelled');
+    expect(kernel.startedRuns).toBe(1);
+    expect(kernel.cancelCalls).toBe(1);
+    expect(kernel.deletedSessions).toBe(1);
+    expect(experiment.runIds).toHaveLength(1); // the aborted case keeps its outcome
+    const [run] = await store.listRuns(experiment.id);
+    expect(run?.status).toBe('cancelled');
+    expect(run?.answer).toBe('partial answer');
   });
 });
