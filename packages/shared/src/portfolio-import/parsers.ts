@@ -10,11 +10,15 @@
  */
 import type { ImportSource, PortfolioImportRow } from '@finagent/core'
 
-/** Canonical symbol: 1–8 alphanumerics plus a known market suffix. */
-export const SYMBOL_RE = /^[A-Z0-9]{1,8}\.(US|HK|SG|SH|SZ|HAS)$/
+/**
+ * Canonical symbol: 1–6 alphanumerics plus a known market suffix.
+ * Matches `symbolSchema` / Longbridge validation. A-share codes are 6 digits;
+ * 7–8 character bodies are not canonical and must not import as clean rows.
+ */
+export const SYMBOL_RE = /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/
 
 /** Bare ticker with no market suffix — usable, but ambiguous (review). */
-export const BARE_TICKER_RE = /^[A-Z0-9]{1,8}$/
+export const BARE_TICKER_RE = /^[A-Z0-9]{1,6}$/
 
 export type HeaderField = 'symbol' | 'name' | 'quantity' | 'cost' | 'currency' | 'account'
 

@@ -46,6 +46,24 @@ describe('checkSymbol', () => {
   it('rejects unknown market suffixes', () => {
     expect(checkSymbol('AAPL.XX').ambiguous).toBe(true)
   })
+
+  it('does not treat over-long codes as canonical symbols', () => {
+    for (const symbol of ['6005191.SH', 'TOOLONG.US', 'DELISTED.US']) {
+      const check = checkSymbol(symbol)
+      expect(check.ambiguous).toBe(true)
+      expect(check.issue).toContain('not a recognized ticker')
+    }
+    const bare = checkSymbol('6005191')
+    expect(bare.ambiguous).toBe(true)
+    expect(bare.issue).toContain('not a recognized ticker')
+    expect(bare.issue).not.toContain('6005191.US')
+  })
+
+  it('still hints a market suffix for a 6-character bare ticker', () => {
+    const check = checkSymbol('600519')
+    expect(check.ambiguous).toBe(true)
+    expect(check.issue).toContain('600519.US')
+  })
 })
 
 describe('toFiniteNumber', () => {
@@ -218,6 +236,14 @@ describe('parseCsv', () => {
   it('returns an empty array for empty input', () => {
     expect(parseCsv('')).toEqual([])
     expect(parseCsv('\n\n')).toEqual([])
+  })
+
+  it('keeps an over-long symbol for review instead of importing it as clean', () => {
+    const [row] = parseCsv('Symbol,Quantity,Cost\nTOOLONG.US,100,180.5\n600519.SH,10,1600')
+    expect(row.confidence).toBe(0.3)
+    expect(row.issues.some((issue) => issue.includes('not a recognized ticker'))).toBe(true)
+    const valid = parseCsv('Symbol,Quantity,Cost\n600519.SH,10,1600')[0]
+    expect(valid).toMatchObject({ symbol: '600519.SH', quantity: 10, costPrice: 1600, confidence: 1, issues: [] })
   })
 
   it('keeps a row when a required column is missing (review required)', () => {
