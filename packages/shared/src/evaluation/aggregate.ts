@@ -2,16 +2,24 @@
 // comparison (spec §69, §75-78, §111). Composite scores are always shown next
 // to their per-metric breakdown — a single number must never mask a critical
 // metric regression (§111).
+//
+// Execution validity is kept separate from quality (issue #113): a run that
+// never executed (spawn/config/credential failure, timeout) is not evidence
+// about the agent, so it is excluded from pass rate, composite, and metric
+// aggregates. Only `validity: 'valid'` experiments may gate against a
+// baseline; `invalid`/`inconclusive` results keep per-case diagnostics but no
+// headline benchmark score.
 import type {
   EvaluationBaseline,
   EvaluationCase,
-  EvaluationExperiment,
   EvaluationFailureMode,
   EvaluationMetricId,
   EvaluationResultRecord,
   EvaluationRun,
   EvaluationScore,
+  ExperimentExecutionCounts,
   ExperimentSummary,
+  ExperimentValidity,
   FailureModeCount,
   MetricAggregate,
   RegressionResult,
@@ -109,24 +117,100 @@ export function compositeScore(results: EvaluationResultRecord[]): number | null
 }
 
 export function summarizeExperiment(
-  experiment: EvaluationExperiment,
+  runs: EvaluationRun[],
   results: EvaluationResultRecord[],
   cases: EvaluationCase[],
 ): ExperimentSummary {
-  const verdicts = results.map((result) => result.verdict);
-  const passed = verdicts.filter((v) => v === 'pass').length;
-  const applicable = verdicts.filter((v) => v !== 'not-applicable').length;
+  const runById = new Map(runs.map((run) => [run.id, run]));
+  const execution = executionCounts(runs, cases.length);
+  const validResults = results.filter((result) => runById.get(result.runId)?.status === 'completed');
+  const judgeError = results.some((result) => result.failureModes.includes('judge_error'));
+
+  const verdicts = validResults.map((result) => result.verdict);
+  const passed = verdicts.filter((verdict) => verdict === 'pass').length;
+  const applicable = verdicts.filter((verdict) => verdict !== 'not-applicable').length;
   const metrics = EVALUATION_METRICS.map((m) => m.id).filter((id) =>
-    results.some((result) => result.scores.some((score) => score.metric === id))
+    validResults.some((result) => result.scores.some((score) => score.metric === id))
   );
+
   return {
-    passRate: applicable > 0 ? passed / applicable : 0,
-    compositeScore: compositeScore(results),
-    metricAggregates: aggregateScores(results, metrics),
+    passRate: applicable > 0 ? passed / applicable : null,
+    compositeScore: compositeScore(validResults),
+    metricAggregates: aggregateScores(validResults, metrics),
     failureModes: countFailureModes(results),
-    totalRuns: experiment.runIds.length,
-    completedRuns: results.length,
+    totalRuns: execution.requested,
+    completedRuns: execution.evaluated,
+    validity: validityFor(execution, judgeError, applicable),
+    execution,
+    validityReasons: validityReasonsFor(runs, execution.requested, judgeError, applicable),
   };
+}
+
+/**
+ * A run is infrastructure-invalid when it never executed (`not-started`, a
+ * spawn/config/credential rejection) or did not reach a terminal completion
+ * (failed/timeout). A completed run with a bad answer is a *valid* negative
+ * result and stays in the quality aggregates.
+ */
+function isInfrastructureRun(run: EvaluationRun): boolean {
+  if (run.execution === 'not-started') return true;
+  return run.status === 'failed' || run.status === 'timeout';
+}
+
+function isSkippedRun(run: EvaluationRun): boolean {
+  return run.status === 'cancelled' || run.status === 'skipped';
+}
+
+function executionCounts(runs: EvaluationRun[], requested: number): ExperimentExecutionCounts {
+  return {
+    requested,
+    started: runs.filter((run) => run.execution !== 'not-started').length,
+    evaluated: runs.filter((run) => run.status === 'completed').length,
+    infraFailed: runs.filter((run) => isInfrastructureRun(run)).length,
+    skipped:
+      runs.filter((run) => isSkippedRun(run)).length +
+      Math.max(0, requested - runs.length),
+  };
+}
+
+/** Validity: no valid run at all is `invalid`; any infrastructure loss or unmeasurable run is `inconclusive`. */
+function validityFor(
+  execution: ExperimentExecutionCounts,
+  judgeError: boolean,
+  applicable: number,
+): ExperimentValidity {
+  if (execution.evaluated === 0) return 'invalid';
+  if (execution.infraFailed > 0 || execution.skipped > 0 || judgeError || applicable === 0) {
+    return 'inconclusive';
+  }
+  return 'valid';
+}
+
+/** Distinct, machine-readable reasons (error codes — never messages/secrets). */
+function validityReasonsFor(
+  runs: EvaluationRun[],
+  requested: number,
+  judgeError: boolean,
+  applicable: number,
+): string[] {
+  const reasons: string[] = [];
+  const add = (reason: string): void => {
+    if (!reasons.includes(reason)) reasons.push(reason);
+  };
+  if (runs.length < requested) add('skipped');
+  for (const run of runs) {
+    if (isSkippedRun(run)) {
+      add(run.status === 'skipped' ? 'skipped' : 'cancelled');
+      continue;
+    }
+    if (isInfrastructureRun(run)) {
+      add(run.error?.code ?? run.failureModes[0] ?? run.status);
+    }
+  }
+  if (judgeError) add('judge_error');
+  if (runs.some((run) => run.status === 'completed') && applicable === 0) add('no_applicable_runs');
+  if (runs.length === 0 && requested === 0) add('no_valid_runs');
+  return reasons;
 }
 
 export interface MetricBaselineEntry {

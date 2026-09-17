@@ -7,7 +7,6 @@ import { describe, expect, it } from 'bun:test';
 import type {
   EvaluationBaseline,
   EvaluationCase,
-  EvaluationExperiment,
   EvaluationFailureMode,
   EvaluationMetricId,
   EvaluationResultRecord,
@@ -44,6 +43,19 @@ function makeRun(overrides: Partial<EvaluationRun> = {}): EvaluationRun {
   };
 }
 
+function makeCase(id: string): EvaluationCase {
+  return {
+    id,
+    name: id,
+    category: 'market',
+    difficulty: 'golden',
+    input: { prompt: `Prompt for ${id}` },
+    expected: {},
+    tags: [],
+    source: 'hand-authored',
+  };
+}
+
 function makeScore(
   metric: EvaluationMetricId,
   value: number | null,
@@ -64,24 +76,6 @@ function makeResult(
     scores,
     failureModes: [],
     verdict: 'pass',
-    ...overrides,
-  };
-}
-
-function makeExperiment(overrides: Partial<EvaluationExperiment> = {}): EvaluationExperiment {
-  return {
-    id: 'exp-1',
-    name: 'fixture',
-    datasetId: 'dataset-1',
-    datasetVersion: '1.0.0',
-    status: 'completed',
-    mode: 'fixture',
-    config: { mode: 'fixture' },
-    metadata: { timestamp: NOW },
-    startedAt: NOW,
-    completedAt: NOW + 5_000,
-    runIds: ['run-1', 'run-2', 'run-3'],
-    resultIds: [],
     ...overrides,
   };
 }
@@ -272,32 +266,46 @@ describe('compositeScore (spec §111)', () => {
 });
 
 describe('summarizeExperiment', () => {
-  const experiment = makeExperiment();
   const cases: EvaluationCase[] = [];
 
   it('excludes not-applicable runs from the pass rate denominator', () => {
-    const results = [
-      makeResult([makeScore('task_completion', 1)], { verdict: 'pass' }),
-      makeResult([makeScore('task_completion', 0)], { verdict: 'fail' }),
-      makeResult([], { verdict: 'not-applicable' }),
+    const runs = [
+      makeRun({ id: 'run-1' }),
+      makeRun({ id: 'run-2' }),
+      makeRun({ id: 'run-3', failureModes: ['judge_error'] }),
     ];
-    const summary = summarizeExperiment(experiment, results, cases);
+    const results = [
+      makeResult([makeScore('task_completion', 1)], { id: 'result-1', runId: 'run-1', verdict: 'pass' }),
+      makeResult([makeScore('task_completion', 0)], { id: 'result-2', runId: 'run-2', verdict: 'fail' }),
+      makeResult([], { id: 'result-3', runId: 'run-3', verdict: 'not-applicable', failureModes: ['judge_error'] }),
+    ];
+    const summary = summarizeExperiment(runs, results, [
+      makeCase('case-1'),
+      makeCase('case-2'),
+      makeCase('case-3'),
+    ]);
     expect(summary.passRate).toBe(0.5);
     expect(summary.completedRuns).toBe(3);
     expect(summary.totalRuns).toBe(3);
+    // A judge that produced no scores is a measurement gap, not a pass.
+    expect(summary.validity).toBe('inconclusive');
+    expect(summary.validityReasons).toContain('judge_error');
   });
 
-  it('excludes a judge-only run from pass rate but still counts judge_error', () => {
-    const judgeRun = makeRun({ failureModes: ['judge_error'] });
+  it('counts a judge-only run out of the pass rate but still records judge_error', () => {
+    const judgeRun = makeRun({ id: 'run-3', failureModes: ['judge_error'] });
+    const runs = [makeRun({ id: 'run-1' }), makeRun({ id: 'run-2' }), judgeRun];
     const results = [
-      makeResult([], { verdict: 'pass' }),
-      makeResult([], { verdict: 'fail' }),
+      makeResult([], { id: 'result-1', runId: 'run-1', verdict: 'pass' }),
+      makeResult([], { id: 'result-2', runId: 'run-2', verdict: 'fail' }),
       makeResult([], {
+        id: 'result-3',
+        runId: 'run-3',
         failureModes: judgeRun.failureModes,
         verdict: verdictForRun(judgeRun),
       }),
     ];
-    const summary = summarizeExperiment(experiment, results, cases);
+    const summary = summarizeExperiment(runs, results, cases);
     expect(summary.passRate).toBe(0.5);
     expect(summary.failureModes).toContainEqual({
       mode: 'judge_error',
@@ -306,9 +314,126 @@ describe('summarizeExperiment', () => {
     });
   });
 
-  it('reports a zero pass rate rather than NaN when every run is not-applicable', () => {
-    const summary = summarizeExperiment(experiment, [makeResult([], { verdict: 'not-applicable' })], cases);
+  it('reports a null pass rate and inconclusive validity when nothing was applicable', () => {
+    const runs = [makeRun({ id: 'run-1' })];
+    const results = [makeResult([], { id: 'result-1', runId: 'run-1', verdict: 'not-applicable' })];
+    const summary = summarizeExperiment(runs, results, cases);
+    expect(summary.passRate).toBeNull();
+    expect(summary.validity).toBe('inconclusive');
+    expect(summary.validityReasons).toContain('no_applicable_runs');
+  });
+
+  it('is invalid with no headline score when every run failed at infrastructure level', () => {
+    // Regression for the nightly incident (issue #113): 0 measured cases must
+    // never read as a comparable composite score or a valid benchmark.
+    const runs = [
+      makeRun({ id: 'run-1', status: 'failed', error: { code: 'PI_RUNTIME_ERROR', message: 'no key' } }),
+      makeRun({ id: 'run-2', status: 'failed', error: { code: 'PI_HEALTH_TIMEOUT', message: 'timeout' } }),
+    ];
+    const results = [
+      makeResult([makeScore('task_completion', 0)], {
+        id: 'result-1',
+        runId: 'run-1',
+        verdict: 'fail',
+        failureModes: ['runtime_error'],
+      }),
+      makeResult([makeScore('task_completion', 0)], {
+        id: 'result-2',
+        runId: 'run-2',
+        verdict: 'fail',
+        failureModes: ['runtime_error'],
+      }),
+    ];
+    const summary = summarizeExperiment(runs, results, []);
+    expect(summary.validity).toBe('invalid');
+    expect(summary.compositeScore).toBeNull();
+    expect(summary.passRate).toBeNull();
+    expect(summary.execution).toEqual({
+      requested: 0,
+      started: 2,
+      evaluated: 0,
+      infraFailed: 2,
+      skipped: 0,
+    });
+    expect(summary.validityReasons).toEqual(['PI_RUNTIME_ERROR', 'PI_HEALTH_TIMEOUT']);
+    // Diagnostics survive: the failure modes are still counted.
+    expect(summary.failureModes.length).toBeGreaterThan(0);
+  });
+
+  it('is inconclusive on partial infrastructure failure and keeps valid-run quality', () => {
+    const runs = [
+      makeRun({ id: 'run-1' }),
+      makeRun({ id: 'run-2', status: 'failed', error: { code: 'PI_RUNTIME_EXITED', message: 'exited' } }),
+      makeRun({ id: 'run-3', status: 'failed', error: { code: 'PI_RUNTIME_ERROR', message: 'no key' } }),
+    ];
+    const results = [
+      makeResult([makeScore('task_completion', 1)], { id: 'result-1', runId: 'run-1', verdict: 'pass' }),
+      makeResult([makeScore('task_completion', 0)], { id: 'result-2', runId: 'run-2', verdict: 'fail' }),
+      makeResult([makeScore('task_completion', 0)], { id: 'result-3', runId: 'run-3', verdict: 'fail' }),
+    ];
+    const summary = summarizeExperiment(runs, results, cases);
+    expect(summary.validity).toBe('inconclusive');
+    expect(summary.passRate).toBe(1); // 1 pass out of 1 valid, applicable run
+    expect(summary.compositeScore).toBe(1); // failed runs contribute no scores
+    expect(summary.execution.infraFailed).toBe(2);
+    expect(summary.execution.evaluated).toBe(1);
+    expect(summary.metricAggregates).toContainEqual({
+      metric: 'task_completion',
+      score: 1,
+      sampleCount: 1,
+    });
+  });
+
+  it('keeps a completed negative case valid and failed', () => {
+    const runs = [makeRun({ id: 'run-1', failureModes: ['missing_tool'] })];
+    const results = [
+      makeResult([makeScore('task_completion', 0)], { id: 'result-1', runId: 'run-1', verdict: 'fail' }),
+    ];
+    const summary = summarizeExperiment(runs, results, [makeCase('case-1')]);
+    expect(summary.validity).toBe('valid');
     expect(summary.passRate).toBe(0);
+    expect(summary.compositeScore).toBe(0);
+    expect(summary.execution).toEqual({
+      requested: 1,
+      started: 1,
+      evaluated: 1,
+      infraFailed: 0,
+      skipped: 0,
+    });
+  });
+
+  it('counts never-started runs as infra failures and unrun cases as skipped', () => {
+    const runs = [
+      makeRun({ id: 'run-1', status: 'failed', execution: 'not-started', error: { code: 'PI_RUNTIME_NOT_FOUND', message: 'missing' } }),
+    ];
+    const summary = summarizeExperiment(runs, [], [makeCase('a'), makeCase('b'), makeCase('c')]);
+    expect(summary.validity).toBe('invalid');
+    expect(summary.execution).toEqual({
+      requested: 3,
+      started: 0,
+      evaluated: 0,
+      infraFailed: 1,
+      skipped: 2,
+    });
+    expect(summary.validityReasons).toContain('PI_RUNTIME_NOT_FOUND');
+    // Unrun cases appear as skipped, not as a separate 'not_run' reason.
+    expect(summary.validityReasons).toContain('skipped');
+  });
+
+  it('is invalid when every case was skipped — all-skipped can never earn a green light', () => {
+    const runs = [makeRun({ id: 'run-1', status: 'skipped' }), makeRun({ id: 'run-2', status: 'skipped' })];
+    const summary = summarizeExperiment(runs, [], [makeCase('a'), makeCase('b')]);
+    expect(summary.validity).toBe('invalid');
+    expect(summary.compositeScore).toBeNull();
+    expect(summary.passRate).toBeNull();
+    expect(summary.execution).toEqual({
+      requested: 2,
+      started: 2,
+      evaluated: 0,
+      infraFailed: 0,
+      skipped: 2,
+    });
+    expect(summary.validityReasons).toContain('skipped');
   });
 });
 
@@ -319,8 +444,9 @@ describe('compareToBaseline / gatePassed (spec §76-77)', () => {
   });
 
   function summaryWith(score: number) {
-    const results = [makeResult([makeScore('task_completion', score)])];
-    return summarizeExperiment(makeExperiment({ runIds: ['run-1'] }), results, []);
+    const runs = [makeRun({ id: 'run-1' })];
+    const results = [makeResult([makeScore('task_completion', score)], { id: 'result-1', runId: 'run-1' })];
+    return summarizeExperiment(runs, results, []);
   }
 
   it('passes a regression within the threshold', () => {

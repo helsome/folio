@@ -415,9 +415,10 @@ export class PiRuntimeAdapter implements AgentRuntime {
         throw createCodeError('PI_RUNTIME_ERROR', `Model ${provider}/${modelId} is not available.`);
       }
       const result = await this.rpcClient.prompt('Reply with the single word OK.');
+      const answer = result.answer.trim();
       return {
-        ok: result.answer.trim().length > 0,
-        message: 'Connection verified.',
+        ok: answer.length > 0,
+        message: answer.length > 0 ? 'Connection verified.' : 'The model returned an empty answer.',
         provider,
         modelId,
         latencyMs: Date.now() - startedAt,

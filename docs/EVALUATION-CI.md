@@ -49,14 +49,29 @@ dashboard and baseline promotion.
 - Triggers: `schedule` (daily `17 3 * * *` UTC) and `workflow_dispatch`
   (for release/manual experiments).
 - Steps: checkout → setup Bun → install → `bun run eval:full -- --mode live
-  --judge-provider anthropic --out artifacts/eval-full.json`, with
+  --model <provider>/<id> --judge-provider anthropic --judge-model <id>
+  --out artifacts/eval-full.json`, with
   `LANGSMITH_PI_API_KEY`, `ANTHROPIC_API_KEY`, and `FINAGENT_JUDGE_API_KEY`
-  passed through from repo secrets (never echoed, never logged).
-- `continue-on-error` on the eval step: a regression is a signal to review,
-  not a page. The run is still reported.
+  passed through from repo secrets (never echoed, never logged). The model
+  defaults to `anthropic/claude-sonnet-4-5` and can be overridden via the
+  `FINAGENT_EVAL_MODEL` / `FINAGENT_JUDGE_MODEL` repository variables.
+- Before any case runs, the CLI executes a **live preflight** (issue #113):
+  Pi runtime health, model availability, a one-token credential probe, the
+  LongBridge data source, and judge readiness. A missing install or credential
+  is an explicit `invalid` state (exit `2`), never a suite that "ran" with
+  zero tool calls.
+- No `continue-on-error`, and the step runs under `set -o pipefail`: the
+  `| tee` pipeline keeps the CLI's real exit code (`0` valid · `1` quality
+  regression/usage · `2` invalid or inconclusive execution · `3` cancelled),
+  so a failed run fails the job while the summary and artifacts still upload.
 - Report steps (no issue automation): a summary step greps the printed
-  summary table into `$GITHUB_STEP_SUMMARY`, and the JSON artifact plus run
-  log are uploaded.
+  validity/execution table into `$GITHUB_STEP_SUMMARY`, and the JSON artifact
+  plus run log are uploaded (both on success and failure).
+
+Note: the runner does not currently install or authenticate the LongBridge
+CLI, so the preflight correctly reports `invalid` (exit 2) until the data
+source is provisioned in CI. That is the intended failure mode: no fake
+composite score, no green light on an unmeasurable suite.
 
 ## Baselines & promotion
 
@@ -69,8 +84,9 @@ from the first smoke baseline run.
 To promote a new/updated baseline:
 
 1. Run the full benchmark locally:
-   `bun run eval:full -- --mode live --judge-provider anthropic --save-baseline <name>`
-   (see the CLI `--help` for exact flags).
+   `bun run eval:full -- --mode live --model <provider>/<id> --judge-provider anthropic --judge-model <id> --save-baseline <name>`
+   (only `valid` experiments can seed a baseline — invalid/inconclusive runs
+   are refused; see the CLI `--help` for exact flags).
 2. Copy the saved JSON into `scripts/eval/ci-baselines/<datasetVersion>.json`.
 3. Review `thresholds` before committing: tight enough to catch real
    regressions, loose enough for evaluator noise at the dataset sample size.

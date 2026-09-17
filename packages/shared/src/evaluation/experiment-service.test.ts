@@ -93,6 +93,8 @@ class FakeKernel implements ExperimentKernel {
   createdSessions = 0;
   deletedSessions = 0;
   startedRuns = 0;
+  /** When set, `startRun` rejects with this error (infra start failure). */
+  startRunError?: ApiError;
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly sessionTitles = new Map<string, string>();
   private readonly scripts = new Map<string, ScriptedRun>();
@@ -121,6 +123,9 @@ class FakeKernel implements ExperimentKernel {
       return () => this.listeners.delete(listener);
     },
     startRun: async (sessionId: string, content: string): Promise<Run> => {
+      if (this.startRunError) {
+        throw Object.assign(new Error(this.startRunError.message), { code: this.startRunError.code });
+      }
       this.startedRuns += 1;
       const runId = `run-${this.startedRuns}`;
       const title = this.sessionTitles.get(sessionId) ?? '';
@@ -244,7 +249,7 @@ describe('ExperimentService.runExperiment', () => {
     expect(kernel.deletedSessions).toBe(1);
   });
 
-  it('computes summary aggregates (passRate, metricAggregates) and records failure modes', async () => {
+  it('computes summary aggregates and records failure modes, excluding infra failures from quality', async () => {
     const dataset = makeDataset([
       makeCase('case-pass', { expected: { mustHaveEvidence: true } }),
       makeCase('case-fail'),
@@ -261,14 +266,21 @@ describe('ExperimentService.runExperiment', () => {
 
     const experiment = await service.runExperiment({ dataset, config: makeConfig() });
 
+    // Two runs never completed: their 0-scores must not dilute the quality
+    // aggregate, and the experiment is not valid for gating (issue #113).
     expect(experiment.summary).toMatchObject({
       totalRuns: 3,
-      completedRuns: 3,
-      passRate: 1 / 3,
+      completedRuns: 1,
+      passRate: 1,
+      validity: 'inconclusive',
+      execution: { requested: 3, started: 3, evaluated: 1, infraFailed: 2, skipped: 0 },
     });
     const aggregate = experiment.summary!.metricAggregates.find((entry) => entry.metric === 'task_completion');
-    expect(aggregate?.score).toBeCloseTo(1 / 3);
-    expect(aggregate?.sampleCount).toBe(3);
+    expect(aggregate?.score).toBe(1);
+    expect(aggregate?.sampleCount).toBe(1);
+    expect(experiment.summary!.validityReasons).toEqual(
+      expect.arrayContaining(['RUNTIME_CRASH', 'PI_REQUEST_TIMEOUT'])
+    );
 
     const results = await store.listResults(experiment.id);
     const byCase = Object.fromEntries(results.map((result) => [result.caseId, result]));
@@ -277,12 +289,76 @@ describe('ExperimentService.runExperiment', () => {
     expect(byCase['case-fail'].failureModes).toContain('runtime_error');
     expect(byCase['case-timeout'].verdict).toBe('fail');
     expect(byCase['case-timeout'].failureModes).toContain('timeout');
+    // Non-completed runs are not evaluated: no phantom rule-metric passes.
+    expect(byCase['case-fail'].scores).toEqual([]);
+    expect(byCase['case-timeout'].scores).toEqual([]);
 
     const runs = await store.listRuns(experiment.id);
     expect(runs.find((run) => run.caseId === 'case-timeout')?.status).toBe('timeout');
     const failureModes = experiment.summary!.failureModes.map((entry) => entry.mode);
     expect(failureModes).toContain('timeout');
     expect(failureModes).toContain('runtime_error');
+  });
+
+  it('marks the experiment invalid when no run can start (issue #113)', async () => {
+    const dataset = makeDataset([makeCase('n1'), makeCase('n2')]);
+    const kernel = new FakeKernel();
+    kernel.startRunError = { code: 'PI_RUNTIME_NOT_FOUND', message: 'Pi runtime is not available.' };
+    const service = createService(kernel);
+
+    const experiment = await service.runExperiment({ dataset, config: makeConfig() });
+
+    expect(experiment.summary).toMatchObject({
+      validity: 'invalid',
+      passRate: null,
+      compositeScore: null,
+      execution: { requested: 2, started: 0, evaluated: 0, infraFailed: 2, skipped: 0 },
+      validityReasons: ['PI_RUNTIME_NOT_FOUND'],
+    });
+    const runs = await store.listRuns(experiment.id);
+    expect(runs).toHaveLength(2);
+    expect(runs.every((run) => run.execution === 'not-started')).toBe(true);
+    expect(await store.listResults(experiment.id)).toHaveLength(0);
+    expect(kernel.startedRuns).toBe(0);
+  });
+
+  it('keeps completed negative runs valid and aggregates only measured runs on partial infra failure', async () => {
+    const dataset = makeDataset([makeCase('ok'), makeCase('bad'), makeCase('infra')]);
+    const kernel = new FakeKernel();
+    scriptSuccess(kernel, 'ok');
+    kernel.script('bad', { status: 'completed', answer: '' });
+    kernel.script('infra', { status: 'failed', error: { code: 'PI_RUNTIME_ERROR', message: 'no key' } });
+    const service = createService(kernel);
+
+    const experiment = await service.runExperiment({ dataset, config: makeConfig() });
+
+    expect(experiment.summary?.validity).toBe('inconclusive');
+    expect(experiment.summary?.validityReasons).toContain('PI_RUNTIME_ERROR');
+    const aggregate = experiment.summary?.metricAggregates.find((entry) => entry.metric === 'task_completion');
+    expect(aggregate?.score).toBe(0.5);
+    expect(aggregate?.sampleCount).toBe(2);
+  });
+
+  it('does not call the judge for non-completed runs', async () => {
+    const dataset = makeDataset([makeCase('infra')]);
+    const kernel = new FakeKernel();
+    kernel.script('infra', { status: 'failed', error: { code: 'PI_RUNTIME_ERROR', message: 'no key' } });
+    let judgedCalls = 0;
+    const judge: JudgeClient = {
+      provider: 'anthropic',
+      model: 'judge-test',
+      complete: async () => {
+        judgedCalls += 1;
+        return JSON.stringify({ score: 1, reason: 'x' });
+      },
+    };
+    const service = createService(kernel);
+
+    const experiment = await service.runExperiment({ dataset, config: makeConfig(), judgeClient: judge });
+
+    expect(judgedCalls).toBe(0);
+    const results = await store.listResults(experiment.id);
+    expect(results[0].scores).toEqual([]);
   });
 
   it('records a tool failure run with its failure-recovery scores', async () => {
@@ -403,6 +479,10 @@ describe('ExperimentService.runExperiment', () => {
     expect(experiment.status).toBe('cancelled');
     expect(experiment.runIds).toHaveLength(1);
     expect(kernel.startedRuns).toBe(1);
+    // A cancelled run is not acceptable evidence: skipped cases make the
+    // summary inconclusive and the CLI exits non-zero (issue #113).
+    expect(experiment.summary?.validity).toBe('inconclusive');
+    expect(experiment.summary?.execution.skipped).toBe(1);
   });
 
   it('reports per-case progress events in order', async () => {
@@ -474,12 +554,13 @@ function makeBaseline(overrides: Partial<EvaluationBaseline> = {}): EvaluationBa
 
 describe('ExperimentService gate evaluation (spec §109)', () => {
   it('fails the gate when critical tool accuracy regresses past maxDelta', async () => {
-    // Baseline tool accuracy 0.95 vs current 0.5 (one perfect run, one failed
-    // run), critical task_completion maxDelta 0.03 → delta -0.45 → gate FAIL.
+    // Baseline task_completion 0.95 vs current 0.5: one perfect run and one
+    // valid negative run (completed with no answer). Valid negatives stay in
+    // the quality denominator — only infrastructure failures are excluded.
     const dataset = makeDataset([makeCase('g-pass', { expected: { mustHaveEvidence: true } }), makeCase('g-fail')]);
     const kernel = new FakeKernel();
     scriptSuccess(kernel, 'g-pass');
-    kernel.script('g-fail', { status: 'failed', error: { code: 'RUNTIME_CRASH', message: 'crashed' } });
+    kernel.script('g-fail', { status: 'completed', answer: '' });
     const service = createService(kernel);
     const experiment = await service.runExperiment({ dataset, config: makeConfig() });
     expect(
@@ -506,7 +587,7 @@ describe('ExperimentService gate evaluation (spec §109)', () => {
     const dataset = makeDataset([makeCase('ok1', { expected: { requiredCapabilities: ['market.quote'] } }), makeCase('ok2')]);
     const kernel = new FakeKernel();
     scriptSuccess(kernel, 'ok1');
-    kernel.script('ok2', { status: 'failed', error: { code: 'RUNTIME_CRASH', message: 'crashed' } });
+    kernel.script('ok2', { status: 'completed', answer: '' });
     const service = createService(kernel);
     const experiment = await service.runExperiment({ dataset, config: makeConfig() });
 
@@ -570,6 +651,18 @@ describe('ExperimentService gate evaluation (spec §109)', () => {
     expect(experiment2.baselineId).toBe(stored.id);
     expect(experiment2.summary?.passRate).toBe(1);
   });
+
+  it('refuses to create a baseline from an invalid experiment (issue #113)', async () => {
+    const dataset = makeDataset([makeCase('i1')]);
+    const kernel = new FakeKernel();
+    kernel.startRunError = { code: 'PI_RUNTIME_NOT_FOUND', message: 'missing' };
+    const service = createService(kernel);
+    const experiment = await service.runExperiment({ dataset, config: makeConfig() });
+
+    expect(experiment.summary?.validity).toBe('invalid');
+    await expect(service.createBaselineFromExperiment(experiment, 'bad')).rejects.toThrow(/validity/);
+    expect(await store.listBaselines()).toHaveLength(0);
+  });
 });
 
 describe('JudgeClient wiring', () => {
@@ -586,5 +679,27 @@ describe('JudgeClient wiring', () => {
     });
     const reply = await client.complete('sys', 'user');
     expect(reply).toContain('0.5');
+  });
+
+  it('sends extra judge headers over provider defaults (relay routing)', async () => {
+    let captured: Record<string, string> = {};
+    const client = createJudgeClient({
+      provider: 'openai-compatible',
+      model: 'deepseek-v4.1-flash',
+      apiKey: 'sk-test',
+      baseUrl: 'https://relay.invalid/v1',
+      headers: { 'x-opencode-session': 'folio-eval-judge' },
+      fetchImpl: (async (_url: string, init: RequestInit) => {
+        captured = (init.headers ?? {}) as Record<string, string>;
+        return new Response(JSON.stringify({ choices: [{ message: { content: '{"score": 0.5, "reason": "ok"}' } }] }), {
+          status: 200,
+          headers: { 'content-type': 'application/json' },
+        });
+      }) as unknown as typeof fetch,
+    });
+
+    await client.complete('sys', 'user');
+    expect(captured['x-opencode-session']).toBe('folio-eval-judge');
+    expect(captured.authorization).toBe('Bearer sk-test');
   });
 });
