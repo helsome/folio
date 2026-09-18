@@ -1,4 +1,5 @@
-import type { ResearchReport, ResearchRunSummary, ResearchStance } from '@finagent/core';
+import type { EvidenceBundle, ResearchReport, ResearchRunSummary, ResearchStance } from '@finagent/core';
+import { buildReportEvidenceBundle, isEvidenceBundle } from '../evidence/contract.ts';
 import type { JsonFileStore } from '../storage/json-file-store.ts';
 import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
@@ -12,11 +13,13 @@ import { decodeCheckpoint, encodeCheckpoint, type ResearchCheckpoint } from './c
  *
  *   research/index.json            — per-symbol report summary index
  *   research/reports/<id>.json     — full ResearchReport
+ *   research/evidence/<id>.json    — unified evidence bundle projected from the report
  *   research/runs.json             — ResearchRunSummary progress records
  */
 const INDEX_FILE = 'research/index.json';
 const RUNS_FILE = 'research/runs.json';
 const reportFile = (id: string) => `research/reports/${id}.json`;
+const evidenceFile = (id: string) => `research/evidence/${id}.json`;
 
 export interface ReportSummary {
   id: string;
@@ -112,6 +115,11 @@ export class ResearchReportRepository {
   async saveReport(report: ResearchReport): Promise<void> {
     return this.serialize(async () => {
       await this.store.write(reportFile(report.id), report);
+      // The bundle is a deterministic projection of the report, so it is
+      // re-derived on every save and can never drift from the report text.
+      // Evidence consumers (eval, source inspector) read it without parsing
+      // the report; reports saved before this file existed simply have none.
+      await this.store.write(evidenceFile(report.id), buildReportEvidenceBundle(report));
       const index = await this.store.read<IndexFile>(INDEX_FILE, { reports: [] });
       const entry: ReportSummary = {
         id: report.id,
@@ -128,6 +136,21 @@ export class ResearchReportRepository {
 
   async getReport(reportId: string): Promise<ResearchReport | undefined> {
     return this.store.read<ResearchReport | undefined>(reportFile(reportId), undefined);
+  }
+
+  /**
+   * Unified evidence bundle for a report, if one was persisted. Returns
+   * undefined for reports saved before bundles existed or with a corrupt
+   * file — the bundle is always re-derivable from the authoritative report.
+   */
+  async getEvidenceBundle(reportId: string): Promise<EvidenceBundle | undefined> {
+    if (!/^[a-zA-Z0-9_-]+$/.test(reportId)) throw new Error('Invalid research report id.');
+    try {
+      const data = await this.store.read<unknown>(evidenceFile(reportId), undefined);
+      return isEvidenceBundle(data) ? data : undefined;
+    } catch {
+      return undefined;
+    }
   }
 
   async listBySymbol(symbol: string): Promise<ResearchReport[]> {
