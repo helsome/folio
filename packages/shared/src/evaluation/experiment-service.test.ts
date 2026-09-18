@@ -218,9 +218,12 @@ interface StalledScript {
 class StalledKernel implements ExperimentKernel {
   startedRuns = 0;
   cancelCalls = 0;
+  cancelRequests: Array<{ sessionId: string; runId: string }> = [];
   deletedSessions = 0;
   /** When false, cancellation is requested but the runtime never settles. */
   cancelResponds = true;
+  /** When true, cancelRun never resolves (runtime never answers cancellation). */
+  hangCancel = false;
 
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly sessionCase = new Map<string, string>();
@@ -291,8 +294,10 @@ class StalledKernel implements ExperimentKernel {
       return run;
     },
     isRunning: (): boolean => this.running,
-    cancelRun: async (): Promise<void> => {
+    cancelRun: async (sessionId: string, runId: string): Promise<void> => {
       this.cancelCalls += 1;
+      this.cancelRequests.push({ sessionId, runId });
+      if (this.hangCancel) return new Promise<void>(() => undefined);
       if (!this.cancelResponds) return;
       this.running = false;
       // Mirror RunManager: a cancelled run settles with a synthesized
@@ -767,6 +772,30 @@ describe('ExperimentService case timeout teardown (#115)', () => {
     expect(run?.status).toBe('timeout');
     expect(run?.error?.code).toBe('RUNTIME_TEARDOWN_TIMEOUT');
     expect(run?.failureModes).toContain('runtime_error');
+    expect(await store.listResults(experiment.id)).toHaveLength(1); // artifacts stay readable
+  });
+
+  it('bounds the cancellation round-trip itself when the runtime never answers', async () => {
+    const kernel = new StalledKernel();
+    kernel.hangCancel = true;
+    kernel.script('a1', { partialAnswer: 'partial answer' });
+    const service = createStalledService(kernel, { terminalGraceMs: 20, teardownMs: 30 });
+
+    const experiment = await service.runExperiment({
+      dataset: makeDataset([makeCase('a1'), makeCase('a2')]),
+      config: makeConfig({ timeoutMs: 20 }),
+    });
+
+    // The cancel promise never resolves, yet the experiment still ends inside
+    // the short teardown budget and the stuck runtime is isolated.
+    expect(experiment.status).toBe('failed');
+    expect(kernel.startedRuns).toBe(1); // a2 never starts on the stuck runtime
+    expect(kernel.deletedSessions).toBe(0); // session files still owned by the active run
+    expect(kernel.cancelRequests).toEqual([{ sessionId: 'sess-1', runId: 'run-1' }]); // exact ids
+    const [run] = await store.listRuns(experiment.id);
+    expect(run?.status).toBe('timeout');
+    expect(run?.answer).toBe('partial answer');
+    expect(run?.error?.code).toBe('RUNTIME_TEARDOWN_TIMEOUT');
     expect(await store.listResults(experiment.id)).toHaveLength(1); // artifacts stay readable
   });
 

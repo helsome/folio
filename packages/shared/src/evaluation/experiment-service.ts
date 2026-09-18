@@ -436,17 +436,15 @@ export class ExperimentService {
       // re-open the case. From here the runner owns the outcome.
       const userAborted = settled === 'abort';
       const hardTimeout = settled === 'timeout';
-      if ((userAborted || hardTimeout) && runId) {
-        // Idempotent: RunManager no-ops when the run already settled or the ids
-        // do not match its currently active run.
-        await Promise.resolve(this.kernel.runs.cancelRun?.(session.id, runId)).catch(() => undefined);
-      }
+      const cancelRequested = (userAborted || hardTimeout) && runId !== undefined;
 
       // RunManager clears `activeRun` only after all terminal persistence lands
       // (run update, session idle, messages). Deleting the session or starting
-      // the next case before that races on the same session-store files, so wait
-      // for the kernel to go idle first — but never forever (§55).
-      const idle = await this.waitForIdle();
+      // the next case before that races on the same session-store files (§55).
+      // The cancellation round-trip and the idle wait share ONE bounded window:
+      // RunManager.cancelRun awaits runtime.cancel, so a runtime that never
+      // answers cancellation must not extend the hang past the teardown budget.
+      const idle = await this.settleTeardown(session.id, runId, cancelRequested);
 
       const terminalEvent = hardTimeout
         ? undefined
@@ -556,17 +554,33 @@ export class ExperimentService {
   }
 
   /**
-   * Bounded wait for the kernel to finish terminal persistence (§55 — one
-   * prompt at a time). Returns false when the runtime is still running after
-   * the teardown budget, i.e. cancellation was ignored or never landed.
+   * Bounded teardown (§55 — one prompt at a time): issue the idempotent
+   * cancellation when requested and wait for the kernel to finish terminal
+   * persistence inside ONE window. Returns false when the runtime is still
+   * running — or the cancellation round-trip is still pending — after the
+   * budget, i.e. cancellation was ignored or never landed.
    */
-  private async waitForIdle(): Promise<boolean> {
+  private async settleTeardown(sessionId: string, runId: string, cancel: boolean): Promise<boolean> {
     const giveUpAt = this.now() + this.teardownMs;
-    while (this.kernel.runs.isRunning?.() ?? false) {
-      if (this.now() >= giveUpAt) return false;
-      await sleep(5);
-    }
-    return true;
+    // A late rejection must never escape: it is swallowed at the source and the
+    // race below simply keeps waiting for the idle deadline. RunManager no-ops
+    // when the run already settled or the ids do not match its active run.
+    const cancellation = cancel
+      ? Promise.resolve(this.kernel.runs.cancelRun?.(sessionId, runId)).catch(() => undefined)
+      : undefined;
+
+    const idle = (async (): Promise<boolean> => {
+      while (this.kernel.runs.isRunning?.() ?? false) {
+        if (this.now() >= giveUpAt) return false;
+        await sleep(5);
+      }
+      return true;
+    })();
+    if (!cancellation) return idle;
+
+    const settled = await Promise.race([idle, cancellation.then(() => 'cancel' as const)]);
+    // Cancellation settled first: keep waiting for the (still bounded) idle.
+    return settled === 'cancel' ? idle : settled;
   }
 
   /** Persist the trace link for a finished run; never throws. */
