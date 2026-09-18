@@ -7,6 +7,7 @@ export * from './correlation.ts';
 export * from './evaluator.ts';
 export * from './judge-client.ts';
 export * from './aggregate.ts';
+export * from './model-selection.ts';
 export * from './datasets.ts';
 export * from './evaluators/index.ts';
 export * from './judges/index.ts';

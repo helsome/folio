@@ -27,7 +27,9 @@ export interface ElectronAPI {
       workspaceContext?: unknown;
     }) => Promise<unknown>;
     cancelRun: (input: { sessionId: string; runId: string }) => Promise<unknown>;
+    streamReplay: (input: { runId: string; lastSequence: number }) => Promise<unknown>;
     onAgentEvent: (callback: (event: unknown) => void) => () => void;
+    onStreamEvent: (callback: (payload: { sessionId: string; event: unknown }) => void) => () => void;
   };
   agent: {
     getTools: () => Promise<unknown>;
@@ -207,11 +209,21 @@ const electronAPI: ElectronAPI = {
       workspaceContext?: unknown;
     }) => ipcRenderer.invoke('runs:start', input),
     cancelRun: (input: { sessionId: string; runId: string }) => ipcRenderer.invoke('runs:cancel', input),
+    streamReplay: (input: { runId: string; lastSequence: number }) =>
+      ipcRenderer.invoke('runs:stream-replay', input),
     onAgentEvent: (callback: (event: unknown) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, agentEvent: unknown) => callback(agentEvent);
       ipcRenderer.on('agent:event', listener);
       return () => {
         ipcRenderer.removeListener('agent:event', listener);
+      };
+    },
+    onStreamEvent: (callback: (payload: { sessionId: string; event: unknown }) => void) => {
+      const listener = (_event: Electron.IpcRendererEvent, payload: { sessionId: string; event: unknown }) =>
+        callback(payload);
+      ipcRenderer.on('agent:stream', listener);
+      return () => {
+        ipcRenderer.removeListener('agent:stream', listener);
       };
     },
   },

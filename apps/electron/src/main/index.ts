@@ -134,6 +134,9 @@ ipcMain.handle('runs:start', async (_event, input: unknown) =>
 ipcMain.handle('runs:cancel', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.cancelRun(input))
 );
+ipcMain.handle('runs:stream-replay', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.streamReplay(input))
+);
 
 ipcMain.handle('agent:getTools', async () =>
   toIpcResult(() => agentKernelHost.getTools())

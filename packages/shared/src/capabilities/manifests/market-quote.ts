@@ -1,10 +1,19 @@
 import { Type } from '@sinclair/typebox';
-import type { Quote } from '@finagent/core';
-import type { FinanceCapability } from '@finagent/core';
+import {
+  DEFAULT_INSTRUMENT_CATALOG,
+  InstrumentResolver,
+  readInstrumentId,
+} from '@finagent/core';
+import type {
+  FinanceCapability,
+  Quote,
+} from '@finagent/core';
 import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
 import { defaultCapabilityFetchers } from '../fetchers.ts';
+
+const DEFAULT_INSTRUMENT_RESOLVER = new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG);
 
 export function createMarketQuoteCapability(
   fetchers: CapabilityFetchers = defaultCapabilityFetchers
@@ -24,21 +33,33 @@ export function createMarketQuoteCapability(
         examples: ['AAPL.US', '0700.HK'],
       }),
     }),
-    async execute(input, ctx) {
+    async execute(input, ctx, reportProvider) {
       const symbol = normalizeSymbol(input.symbol);
-      const quote = await fetchers.getQuote(symbol);
+      const fetched = fetchers.getQuoteResult
+        ? await fetchers.getQuoteResult(symbol, ctx?.signal)
+        : undefined;
+      const quote = fetched?.data ?? await fetchers.getQuote(symbol);
+      if (fetched) reportProvider?.(fetched.provenance);
+      const instrumentId = readInstrumentId(quote) ?? resolveCanonicalInstrumentId(symbol);
       return {
         data: quote,
         provenance: {
           provider: 'longbridge',
+          providerName: 'Longbridge',
+          ...(instrumentId ? { instrumentId } : {}),
           fetchedAt: (ctx?.now ?? Date.now)(),
-          marketTime: quote.timestamp,
+          marketTime: quote.timestamp * 1000,
           stale: false,
         },
         summary: formatQuote(quote),
       };
     },
   });
+}
+
+function resolveCanonicalInstrumentId(symbol: string): string | undefined {
+  const resolution = DEFAULT_INSTRUMENT_RESOLVER.resolve(symbol, { providerId: 'longbridge' });
+  return resolution.status === 'resolved' ? resolution.instrument.instrumentId : undefined;
 }
 
 function formatQuote(quote: Quote) {

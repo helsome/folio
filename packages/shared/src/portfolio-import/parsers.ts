@@ -99,6 +99,10 @@ export function toFiniteNumber(value: unknown): number | undefined {
     return undefined
   }
   const cleaned = trimmed.replace(/[,$\s]/g, '')
+  // Number('') is zero, but formatting alone does not supply a numeric value.
+  if (cleaned === '') {
+    return undefined
+  }
   const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? parsed : undefined
 }
