@@ -309,6 +309,7 @@ export class ExperimentService {
     await this.store.createExperiment(experiment);
 
     const results: EvaluationResultRecord[] = [];
+    const runs: EvaluationRun[] = [];
     let aborted = signal?.aborted ?? false;
     let runtimeUnusable = false;
 
@@ -323,6 +324,7 @@ export class ExperimentService {
       const outcome = await this.runCase(caseItem, dataset, experiment, config, input.judgeClient, signal);
       if (outcome.run) {
         experiment.runIds.push(outcome.run.id);
+        runs.push(outcome.run);
         await this.store.addRun(outcome.run);
       }
       if (outcome.result) {
@@ -356,7 +358,7 @@ export class ExperimentService {
       experiment.status = 'completed';
     }
     experiment.completedAt = this.now();
-    experiment.summary = summarizeExperiment(experiment, results, selectedCases);
+    experiment.summary = summarizeExperiment(runs, results, selectedCases);
     await this.store.updateExperiment(experiment);
     return experiment;
   }
@@ -528,10 +530,13 @@ export class ExperimentService {
         failureModes: ['runtime_error'],
         error: applied.error,
         toolCalls: [],
+        // The agent never ran: a config failure is infra-invalid, not a
+        // measurable zero (#113).
+        execution: 'not-started',
       };
       await this.traceRun(failedRun, session.id, caseItem.locale);
       await this.kernel.deleteSession(session.id).catch(() => undefined);
-      return { run: failedRun, aborted: false };
+      return { run: failedRun, aborted: false, runtimeUnusable: false };
     }
 
     const collected: AgentEvent[] = [];
@@ -573,6 +578,7 @@ export class ExperimentService {
           failureModes: ['runtime_error'],
           error: toApiErrorLike(error),
           toolCalls: [],
+          execution: 'not-started',
         };
         await this.traceRun(failedRun, session.id, caseItem.locale);
         await this.kernel.deleteSession(session.id).catch(() => undefined);
@@ -673,39 +679,51 @@ export class ExperimentService {
       }
 
       // ── Evaluation (spec §27-38): deterministic first, judges when a client
-      // is configured. Evaluator-returned failures append to the run's modes.
-      const registry = new EvaluatorRegistry();
-      registerDeterministicEvaluators(registry);
-      if (judgeClient) {
-        registerJudges(registry, judgeClient);
+      // is configured. Only completed runs are measurable: a failed/timeout
+      // run never produced a finished agent trajectory, so rule metrics would
+      // emit phantom passes (e.g. "no tool calls made" = 1.0) and judge calls
+      // would waste credits on an empty answer (issue #113). Such runs still
+      // carry a verdict (`fail`) and stay in the quality aggregates as real
+      // negative results when they started; only not-started config failures
+      // and explicit runtime/process failures are infrastructure.
+      let scores: EvaluationScore[] = [];
+      if (evalRun.status === 'completed') {
+        const registry = new EvaluatorRegistry();
+        registerDeterministicEvaluators(registry);
+        if (judgeClient) {
+          registerJudges(registry, judgeClient);
+        }
+        const context: EvaluationContext = {
+          case: caseItem,
+          dataset,
+          run: evalRun,
+          settings: DEFAULT_EVALUATION_SETTINGS,
+          toolCalls: evalRun.toolCalls,
+          now: this.now,
+        };
+        const evaluated = await registry.evaluateAll(context, { includeJudges: judgeClient !== undefined });
+        scores = evaluated.scores;
+        // Judge harnesses never throw (spec §107): a null score whose reason
+        // carries `judge_error` IS the failure signal — surface it as a mode.
+        const judgeMetrics = new Set(
+          registry
+            .list()
+            .filter((definition) => definition.kind === 'llm-judge')
+            .map((definition) => definition.metric)
+        );
+        const judgeErrors = scores.filter(
+          (score) =>
+            judgeMetrics.has(score.metric) &&
+            score.score === null &&
+            typeof score.reason === 'string' &&
+            score.reason.includes('judge_error')
+        );
+        const allFailures: EvaluationFailureMode[] =
+          judgeErrors.length > 0 && !evaluated.failures.includes('judge_error')
+            ? [...evaluated.failures, 'judge_error']
+            : evaluated.failures;
+        evalRun.failureModes = [...new Set([...evalRun.failureModes, ...allFailures])];
       }
-      const context: EvaluationContext = {
-        case: caseItem,
-        dataset,
-        run: evalRun,
-        settings: DEFAULT_EVALUATION_SETTINGS,
-        toolCalls: evalRun.toolCalls,
-        now: this.now,
-      };
-      const { scores, failures } = await registry.evaluateAll(context, { includeJudges: judgeClient !== undefined });
-      // Judge harnesses never throw (spec §107): a null score whose reason
-      // carries `judge_error` IS the failure signal — surface it as a mode.
-      const judgeMetrics = new Set(
-        registry
-          .list()
-          .filter((definition) => definition.kind === 'llm-judge')
-          .map((definition) => definition.metric)
-      );
-      const judgeErrors = scores.filter(
-        (score) =>
-          judgeMetrics.has(score.metric) &&
-          score.score === null &&
-          typeof score.reason === 'string' &&
-          score.reason.includes('judge_error')
-      );
-      const allFailures: EvaluationFailureMode[] =
-        judgeErrors.length > 0 && !failures.includes('judge_error') ? [...failures, 'judge_error'] : failures;
-      evalRun.failureModes = [...new Set([...evalRun.failureModes, ...allFailures])];
 
       const result: EvaluationResultRecord = {
         id: `result-${randomSuffix(8)}`,
@@ -914,6 +932,10 @@ export class ExperimentService {
  * Build a durable baseline from a finished experiment (spec §75). Metrics are
  * the per-metric aggregate means from `summarizeMetricsForComparison`; missing
  * thresholds fall back to the metric definition defaults during comparison.
+ *
+ * Refuses experiments whose execution validity is not `valid` (issue #113):
+ * a baseline built from infrastructure failures would be a misleading
+ * benchmark floor, and once stored it is compared against silently.
  */
 export async function createBaselineFromExperiment(
   store: EvaluationStore,
@@ -921,6 +943,14 @@ export async function createBaselineFromExperiment(
   name?: string,
   thresholds?: EvaluationBaseline['thresholds'],
 ): Promise<EvaluationBaseline> {
+  const validity = experiment.summary?.validity;
+  if (validity !== 'valid') {
+    throw new Error(
+      `Cannot create a baseline from experiment ${experiment.id}: execution validity is ` +
+        `'${validity ?? 'unknown'}' (reasons: ${experiment.summary?.validityReasons.join(', ') || 'n/a'}). ` +
+        'Only a fully valid experiment may seed a baseline.'
+    );
+  }
   const results = await store.listResults(experiment.id);
   const baseline: EvaluationBaseline = {
     id: `baseline-${Date.now()}-${randomSuffix(6)}`,

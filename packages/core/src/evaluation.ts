@@ -486,11 +486,20 @@ export interface EvaluationRun {
   traceRef?: TraceReference;
   error?: ApiError;
   /**
+   * How the run started. `not-started` is written when the kernel rejected
+   * `startRun` outright (spawn/config failure) — the agent never executed, so
+   * the run cannot be read as an agent-quality signal. Absent on records
+   * persisted before this field existed; treat those as `started`.
+   */
+  execution?: EvaluationRunExecution;
+  /**
    * Runtime config actually in effect for this run, confirmed by readback
    * (#114). `undefined` on historical records = unknown, not "default".
    */
   effectiveConfig?: EffectiveRuntimeConfig;
 }
+
+export type EvaluationRunExecution = 'started' | 'not-started';
 
 /** Backend the trace lives in; `none` when observability is off (spec §89). */
 export type TraceBackendKind = 'langsmith' | 'langfuse' | 'local' | 'none';
@@ -561,12 +570,59 @@ export interface FailureModeCount {
 }
 
 export interface ExperimentSummary {
-  passRate: number;
+  /**
+   * Pass rate over valid, applicable runs; null when no run produced a valid,
+   * applicable measurement (an invalid experiment must not read as 0%).
+   */
+  passRate: number | null;
+  /**
+   * Mean of measurable scores from valid runs only; null when no valid run
+   * exists. Never a headline benchmark score on its own — see `validity`.
+   */
   compositeScore: number | null;
   metricAggregates: MetricAggregate[];
   failureModes: FailureModeCount[];
+  /** Cases requested (selected for the experiment). */
   totalRuns: number;
+  /** Cases that produced an interpretable agent-quality outcome (evaluated). */
   completedRuns: number;
+  /**
+   * Execution validity, separate from quality: `invalid` means no case
+   * produced a valid run (missing runtime/credentials/data source), so no
+   * quality claim can be made; `inconclusive` means some cases were
+   * invalidated by infrastructure; `valid` means every requested case ran and
+   * produced a quality outcome (completed, or started then failed the task).
+   * Negative case outcomes stay `valid` — they are quality failures, not
+   * execution failures.
+   */
+  validity: ExperimentValidity;
+  /** Requested/started/evaluated/infra-failed/skipped run counts. */
+  execution: ExperimentExecutionCounts;
+  /** Distinct machine-readable reasons behind a non-valid outcome. */
+  validityReasons: string[];
+}
+
+export type ExperimentValidity = 'valid' | 'inconclusive' | 'invalid';
+
+export interface ExperimentExecutionCounts {
+  /** Cases selected for the experiment. */
+  requested: number;
+  /** Cases whose agent run was accepted and began executing. */
+  started: number;
+  /**
+   * Cases that produced an interpretable quality result: completed runs and
+   * runs that started and then failed the task (timeout, tool loop, budget
+   * exhaustion). Infrastructure failures and skipped runs are excluded.
+   */
+  evaluated: number;
+  /**
+   * Cases invalidated by infrastructure: the run never started (spawn/config/
+   * credential rejection) or failed for an explicit runtime/process reason.
+   * A started task failure is a quality result, not an infrastructure failure.
+   */
+  infraFailed: number;
+  /** Cases never run: cancelled mid-flight or skipped after an abort. */
+  skipped: number;
 }
 
 export interface EvaluationExperiment {

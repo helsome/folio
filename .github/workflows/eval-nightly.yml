@@ -38,22 +38,36 @@ jobs:
       # set from the same secret so either credential convention the CLI
       # checks is satisfied. FINAGENT_ENV_FILE_CONTENT is optional; an absent
       # secret resolves to an empty string.
+      #
+      # A failure is never swallowed: the step carries the CLI's real exit
+      # code through the `| tee` pipeline (`set -o pipefail`, issue #113).
+      # Codes: 0 valid · 1 quality regression/usage · 2 invalid or
+      # inconclusive execution (live preflight/infra failures) · 3 cancelled.
+      # The model must be explicit — live runs never rely on ambient runtime
+      # defaults, and the preflight verifies model, credentials, data source,
+      # and judge readiness before any case runs.
       - name: Run full live eval
         id: eval-full
-        # continue-on-error: a metric regression is a signal to review, not a
-        # reason to page — the run is still reported via the artifact.
-        continue-on-error: true
+        shell: bash
         run: |
-          bun run eval:full -- --mode live --judge-provider anthropic \
+          set -o pipefail
+          bun run eval:full -- --mode live \
+            --model "${FINAGENT_EVAL_MODEL:-anthropic/claude-sonnet-4-5}" \
+            --judge-provider anthropic \
+            --judge-model "${FINAGENT_JUDGE_MODEL:-claude-sonnet-4-5}" \
             --out artifacts/eval-full.json 2>&1 | tee artifacts/eval-full.log
         env:
           LANGSMITH_PI_API_KEY: ${{ secrets.LANGSMITH_PI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           FINAGENT_JUDGE_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
           FINAGENT_ENV_FILE_CONTENT: ${{ secrets.FINAGENT_ENV_FILE_CONTENT }}
+          FINAGENT_EVAL_MODEL: ${{ vars.FINAGENT_EVAL_MODEL }}
+          FINAGENT_JUDGE_MODEL: ${{ vars.FINAGENT_JUDGE_MODEL }}
 
       # Report artifact: printed summary table (grep from the CLI output) plus
-      # the JSON artifact. No issue automation — keep this a report only.
+      # the JSON artifact. No issue automation — keep this a report only. The
+      # step runs even after a failed eval so the failure is visible with its
+      # diagnostics, and a failed step fails the job (real signal, no wrapper).
       - name: Summarize eval results
         if: always()
         run: |
@@ -61,12 +75,12 @@ jobs:
             echo '## Nightly full eval'
             echo ''
             echo "Run status: **${{ steps.eval-full.outcome }}**"
-            echo '(failure means the CLI exited non-zero, e.g. a gate regression or run error)'
+            echo '(0 valid · 1 quality regression/usage · 2 invalid or inconclusive execution · 3 cancelled)'
             echo ''
             echo '### Summary table'
             echo '```'
-            grep -Ei 'metric|score|pass|fail|total|sample|threshold' \
-              artifacts/eval-full.log | tail -n 60 || true
+            grep -Ei 'validity|execution|metric|score|pass|fail|total|sample|threshold|infra|judge' \
+              artifacts/eval-full.log | tail -n 80 || true
             echo '```'
           } >> "$GITHUB_STEP_SUMMARY"
 

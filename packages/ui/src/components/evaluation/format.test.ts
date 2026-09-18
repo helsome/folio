@@ -69,6 +69,9 @@ function experiment(
       failureModes: [],
       totalRuns: 10,
       completedRuns: 10,
+      validity: 'valid',
+      execution: { requested: 10, started: 10, evaluated: 10, infraFailed: 0, skipped: 0 },
+      validityReasons: [],
     },
     ...overrides,
   };

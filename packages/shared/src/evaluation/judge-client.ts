@@ -24,23 +24,29 @@ export interface JudgeClientOptions {
   model: string;
   apiKey: string;
   baseUrl?: string;
+  /**
+   * Extra HTTP headers merged over the provider defaults — relays/gateways
+   * that require routing or session headers (e.g. `x-opencode-session`).
+   */
+  headers?: Record<string, string>;
   fetchImpl?: FetchLike;
 }
 
 const ANTHROPIC_DEFAULT = 'https://api.anthropic.com/v1/messages';
 
 function buildHeaders(options: JudgeClientOptions): Record<string, string> {
-  if (options.provider === 'anthropic') {
-    return {
-      'x-api-key': options.apiKey,
-      'anthropic-version': '2023-06-01',
-      'content-type': 'application/json',
-    };
-  }
-  return {
-    authorization: `Bearer ${options.apiKey}`,
-    'content-type': 'application/json',
-  };
+  const providerHeaders: Record<string, string> =
+    options.provider === 'anthropic'
+      ? {
+          'x-api-key': options.apiKey,
+          'anthropic-version': '2023-06-01',
+          'content-type': 'application/json',
+        }
+      : {
+          authorization: `Bearer ${options.apiKey}`,
+          'content-type': 'application/json',
+        };
+  return { ...providerHeaders, ...(options.headers ?? {}) };
 }
 
 function buildBody(options: JudgeClientOptions, system: string, user: string): Record<string, unknown> {
@@ -114,6 +120,52 @@ export function createJudgeClient(options: JudgeClientOptions): JudgeClient {
 
 export interface ResolvedJudgeConfig extends JudgeClientOptions {}
 
+/** Parse FINAGENT_JUDGE_HEADERS (JSON object of string→string); invalid input is ignored. */
+function parseJudgeHeaders(raw: string | undefined): Record<string, string> | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as unknown;
+    if (!parsed || typeof parsed !== 'object' || Array.isArray(parsed)) return undefined;
+    const entries = Object.entries(parsed).filter((entry): entry is [string, string] => typeof entry[1] === 'string');
+    return entries.length > 0 ? Object.fromEntries(entries) : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+export interface JudgeConfigResolution {
+  /** True when any judge setting is present (flags or env) — i.e. a judge is expected. */
+  requested: boolean;
+  config?: ResolvedJudgeConfig;
+  /** Required settings still missing, named for the user (never their values). */
+  missing: string[];
+}
+
+/**
+ * Like {@link resolveJudgeConfig}, but distinguishes "no judge requested" from
+ * "judge requested but misconfigured". The live preflight (issue #113) needs
+ * the latter to be an explicit failure rather than a silent deterministic-only
+ * downgrade.
+ */
+export function resolveJudgeConfigStatus(
+  env: NodeJS.ProcessEnv,
+  explicit?: { provider?: string; model?: string; apiKey?: string; baseUrl?: string },
+): JudgeConfigResolution {
+  const provider = (explicit?.provider ?? env.FINAGENT_JUDGE_PROVIDER ?? '').trim();
+  const model = (explicit?.model ?? env.FINAGENT_JUDGE_MODEL ?? '').trim();
+  const apiKey = explicit?.apiKey ?? env.FINAGENT_JUDGE_API_KEY ?? '';
+  const requested = provider.length > 0 || model.length > 0 || apiKey.length > 0;
+  if (!requested) return { requested: false, missing: [] };
+
+  const missing: string[] = [];
+  if (provider.length === 0) missing.push('provider (--judge-provider / FINAGENT_JUDGE_PROVIDER)');
+  if (model.length === 0) missing.push('model (--judge-model / FINAGENT_JUDGE_MODEL)');
+  if (apiKey.length === 0) missing.push('API key (--judge-api-key / FINAGENT_JUDGE_API_KEY)');
+  if (missing.length > 0) return { requested: true, missing };
+
+  return { requested: true, config: resolveJudgeConfig(env, explicit), missing: [] };
+}
+
 /**
  * Resolve judge credentials from env with FINAGENT_JUDGE_* taking precedence,
  * then provider-specific fallbacks. Never reads secrets from files — the
@@ -121,12 +173,14 @@ export interface ResolvedJudgeConfig extends JudgeClientOptions {}
  */
 export function resolveJudgeConfig(
   env: NodeJS.ProcessEnv,
-  explicit?: { provider?: string; model?: string; apiKey?: string; baseUrl?: string },
+  explicit?: { provider?: string; model?: string; apiKey?: string; baseUrl?: string; headers?: Record<string, string> },
 ): ResolvedJudgeConfig | undefined {
   const provider = (explicit?.provider ?? env.FINAGENT_JUDGE_PROVIDER ?? '').toLowerCase();
   const model = explicit?.model ?? env.FINAGENT_JUDGE_MODEL;
   const apiKey = explicit?.apiKey ?? env.FINAGENT_JUDGE_API_KEY;
   if (!provider || !model || !apiKey) return undefined;
+  const headers = explicit?.headers ?? parseJudgeHeaders(env.FINAGENT_JUDGE_HEADERS);
+  const extra = headers ? { headers } : {};
 
   if (provider.startsWith('anthropic')) {
     return {
@@ -134,6 +188,7 @@ export function resolveJudgeConfig(
       model,
       apiKey,
       baseUrl: explicit?.baseUrl ?? env.FINAGENT_JUDGE_BASE_URL ?? env.ANTHROPIC_BASE_URL,
+      ...extra,
     };
   }
   return {
@@ -141,5 +196,6 @@ export function resolveJudgeConfig(
     model,
     apiKey,
     baseUrl: explicit?.baseUrl ?? env.FINAGENT_JUDGE_BASE_URL ?? env.OPENAI_BASE_URL,
+    ...extra,
   };
 }
