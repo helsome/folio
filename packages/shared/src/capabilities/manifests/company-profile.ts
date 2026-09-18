@@ -4,7 +4,7 @@ import type { FinanceCapability } from '@finagent/core';
 import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
-import { defaultCapabilityFetchers } from '../fetchers.ts';
+import { defaultCapabilityFetchers, resolveCapabilityFetch } from '../fetchers.ts';
 
 export function createCompanyProfileCapability(
   fetchers: CapabilityFetchers = defaultCapabilityFetchers
@@ -23,11 +23,19 @@ export function createCompanyProfileCapability(
     }),
     async execute(input, ctx) {
       const symbol = normalizeSymbol(input.symbol);
-      const info = await fetchers.getStaticInfo(symbol);
+      const resolved = await resolveCapabilityFetch(
+        fetchers,
+        'company.profile',
+        { symbol },
+        () => fetchers.getStaticInfo(symbol),
+        ctx?.now ?? Date.now,
+        undefined,
+        ctx?.signal
+      );
       return {
-        data: info,
-        provenance: { provider: 'longbridge', fetchedAt: (ctx?.now ?? Date.now)(), stale: false },
-        summary: formatStaticInfo(info),
+        data: resolved.data,
+        provenance: resolved.provenance,
+        summary: formatStaticInfo(resolved.data),
       };
     },
   });

@@ -1,6 +1,8 @@
 import type {
   AccountAssets,
+  CalendarEventsQueryOptions,
   CalcIndex,
+  CashFlowQueryOptions,
   CalendarEvent,
   CapitalFlow,
   CashFlowRecord,
@@ -12,6 +14,7 @@ import type {
   InstitutionRating,
   IntradayData,
   Kline,
+  KlineQueryOptions,
   MarketStatus,
   MarketTemperature,
   NewsItem,
@@ -41,10 +44,8 @@ import {
   getQuote,
   getStaticInfo,
   getTrades,
-  type GetCalendarEventsOptions,
-  type GetCashFlowOptions,
-  type GetKlineOptions,
 } from '@finagent/longbridge-tools';
+import type { CapabilityProvenance, ProviderResult } from '@finagent/core';
 
 /**
  * Provider fetchers consumed by the capability manifests. Production uses the
@@ -54,7 +55,7 @@ import {
  */
 export interface CapabilityFetchers {
   getQuote: (symbol: string) => Promise<Quote>;
-  getKline: (options: GetKlineOptions) => Promise<Kline[]>;
+  getKline: (options: KlineQueryOptions) => Promise<Kline[]>;
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
   getMarketStatus: () => Promise<MarketStatus[]>;
   getStaticInfo: (symbol: string) => Promise<StaticInfo>;
@@ -73,10 +74,54 @@ export interface CapabilityFetchers {
   getInstitutionRating: (symbol: string) => Promise<InstitutionRating>;
   getDividends: (symbol: string) => Promise<DividendRecord[]>;
   getEpsForecasts: (symbol: string) => Promise<EpsForecast[]>;
-  getCalendarEvents: (options: GetCalendarEventsOptions) => Promise<CalendarEvent[]>;
+  getCalendarEvents: (options: CalendarEventsQueryOptions) => Promise<CalendarEvent[]>;
   getAccountPositions: () => Promise<Holding[]>;
   getAssets: (currency?: string) => Promise<AccountAssets[]>;
-  getCashFlow: (options?: GetCashFlowOptions) => Promise<CashFlowRecord[]>;
+  getCashFlow: (options?: CashFlowQueryOptions) => Promise<CashFlowRecord[]>;
+  /** Optional structured gateway entry point used to preserve provenance. */
+  execute?: <T>(capabilityId: string, input: unknown, signal?: AbortSignal) => Promise<ProviderResult<T>>;
+}
+
+export interface ResolvedCapabilityFetch<T> {
+  data: T;
+  provenance: CapabilityProvenance;
+}
+
+/** Resolve through the provider gateway when configured, preserving its provenance. */
+export async function resolveCapabilityFetch<T>(
+  fetchers: CapabilityFetchers,
+  capabilityId: string,
+  input: unknown,
+  fallback: () => Promise<T>,
+  now: () => number,
+  marketTime?: number,
+  signal?: AbortSignal
+): Promise<ResolvedCapabilityFetch<T>> {
+  if (fetchers.execute) {
+    const result = await fetchers.execute<T>(capabilityId, input, signal);
+    if (!result.ok) {
+      const error = Object.assign(new Error(result.error.message), {
+        code: result.error.code,
+        retryable: result.error.retryable,
+      });
+      throw error;
+    }
+    return {
+      data: result.data,
+      provenance: {
+        provider: result.provenance.providerId,
+        providerId: result.provenance.providerId,
+        fetchedAt: result.provenance.fetchedAt,
+        marketTime: result.provenance.marketTime ?? marketTime,
+        delayed: result.provenance.delayed,
+        stale: result.provenance.stale,
+      },
+    };
+  }
+  return {
+    data: await fallback(),
+    provenance: { provider: 'longbridge', fetchedAt: now(), marketTime, stale: false },
+  };
 }
 
 export const defaultCapabilityFetchers: CapabilityFetchers = {

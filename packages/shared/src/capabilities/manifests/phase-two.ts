@@ -1,20 +1,23 @@
 import { Type } from '@sinclair/typebox';
-import type { AccountAssets, CashFlowRecord, FinanceCapability, Holding } from '@finagent/core';
 import type {
+  AccountAssets,
   CalendarEvent,
   CapitalFlow,
+  CashFlowRecord,
   Depth,
   DividendRecord,
   EpsForecast,
+  FinanceCapability,
   FinancialReport,
+  Holding,
   InstitutionRating,
   MarketTemperature,
   TradeTick,
-} from '@finagent/longbridge-tools';
+} from '@finagent/core';
 import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
-import { defaultCapabilityFetchers } from '../fetchers.ts';
+import { defaultCapabilityFetchers, resolveCapabilityFetch } from '../fetchers.ts';
 
 // ── market.depth ────────────────────────────────────────────────────────────
 
@@ -181,14 +184,19 @@ export function createCompanyFinancialsCapability(
     }),
     async execute(input, ctx) {
       const symbol = normalizeSymbol(input.symbol);
-      const report = await fetchers.getFinancialReport(
-        symbol,
-        input.kind ?? 'ALL',
-        input.report
+      const resolved = await resolveCapabilityFetch(
+        fetchers,
+        'company.financials',
+        { symbol, kind: input.kind ?? 'ALL', report: input.report },
+        () => fetchers.getFinancialReport(symbol, input.kind ?? 'ALL', input.report),
+        ctx?.now ?? Date.now,
+        undefined,
+        ctx?.signal
       );
+      const report = resolved.data;
       return {
         data: report,
-        provenance: { provider: 'longbridge', fetchedAt: (ctx?.now ?? Date.now)(), stale: false },
+        provenance: resolved.provenance,
         summary: `Financial statements for ${symbol}: ${formatStatementNames(report.statements)}.`,
       };
     },

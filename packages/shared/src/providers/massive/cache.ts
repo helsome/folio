@@ -1,9 +1,9 @@
 /**
  * Tiny in-memory TTL cache for provider responses.
  *
- * Massive (Polygon.io) free tier is limited to 5 API calls/minute, so parsed
- * responses are cached to keep the router smoke test and repeated UI renders
- * under the cap. Entries are keyed by the caller (capability + input); this
+ * Massive (Polygon.io) rate limits depend on the API plan, so parsed responses
+ * are cached to keep router smoke tests and repeated UI renders within normal
+ * request budgets. Entries are keyed by the caller (capability + input); this
  * class only owns expiry and bounded eviction.
  */
 
