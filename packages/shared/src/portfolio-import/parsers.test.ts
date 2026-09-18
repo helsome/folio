@@ -96,6 +96,30 @@ describe('splitCsvLine', () => {
 })
 
 describe('parseCsv', () => {
+  it('keeps thousands separators inside tab-delimited numeric cells', () => {
+    const [row] = parseCsv('Symbol\tQuantity\tCost\tCurrency\nAAPL.US\t1,000\t1,234.50\tUSD')
+    expect(row).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 1234.5, currency: 'USD', confidence: 1, issues: [] })
+  })
+
+  it('uses the header delimiter even when data contains commas and quoted newlines', () => {
+    const [row] = parseCsv('Symbol\tName\tQuantity\tCost\nAAPL.US\t"Apple,\nInc."\t100\t180.5')
+    expect(row).toMatchObject({ name: 'Apple,\nInc.', quantity: 100, costPrice: 180.5, issues: [] })
+    const [plain] = parseCsv('Symbol\tName\tQuantity\tCost\nAAPL.US\tApple, Inc.\t100\t180.5')
+    expect(plain).toMatchObject({ name: 'Apple, Inc.', quantity: 100, costPrice: 180.5, issues: [] })
+  })
+
+  it('does not split embedded tabs in comma-delimited fields', () => {
+    const [row] = parseCsv('Symbol,Name,Quantity,Cost\nAAPL.US,Apple\tInc.,100,180.5')
+    expect(row).toMatchObject({ name: 'Apple\tInc.', quantity: 100, costPrice: 180.5, issues: [] })
+  })
+
+  it('supports headerless TSV and explicit TSV header mappings', () => {
+    const [row] = parseCsv('AAPL.US\tApple, Inc.\t1,000\t180.5')
+    expect(row).toMatchObject({ name: 'Apple, Inc.', quantity: 1000, costPrice: 180.5, issues: [] })
+    const [mapped] = parseCsv('Ticker\tUnits\tAvg Cost\nAAPL.US\t1,000\t180.5', { symbol: 'Ticker', quantity: 'Units', cost: 'Avg Cost' })
+    expect(mapped).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, issues: [] })
+  })
+
   it('detects English headers and maps columns', () => {
     const rows = parseCsv('Symbol,Name,Quantity,Cost\nAAPL.US,Apple,100,180.5\n0700.HK,Tencent,500,320')
     expect(rows).toHaveLength(2)

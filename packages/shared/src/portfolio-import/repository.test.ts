@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ManualPortfolio } from '@finagent/core'
 import { JsonFileStore } from '../storage/json-file-store.ts'
-import { createDraft } from './draft.ts'
-import { parsePaste } from './parsers.ts'
+import { createDraft, draftToPortfolioInput } from './draft.ts'
+import { parseCsv, parsePaste } from './parsers.ts'
 import { ManualPortfolioRepository } from './repository.ts'
 
 function tempStore(): JsonFileStore {
@@ -21,6 +21,14 @@ const INPUT = {
 }
 
 describe('ManualPortfolioRepository', () => {
+  it('persists TSV quantities and costs without splitting thousands separators', async () => {
+    const store = tempStore()
+    const draft = createDraft('csv', parseCsv('Symbol\tQuantity\tCost\tCurrency\nAAPL.US\t1,000\t1,234.50\tUSD'))
+    const created = await new ManualPortfolioRepository(store).create(draftToPortfolioInput(draft, 'TSV'))
+    const reloaded = await new ManualPortfolioRepository(store).get(created.id)
+    expect(reloaded?.holdings).toEqual([{ symbol: 'AAPL.US', name: '', quantity: 1000, costPrice: 1234.5, currency: 'USD' }])
+  })
+
   it('lists nothing before the first create', async () => {
     const repository = new ManualPortfolioRepository(tempStore())
     expect(await repository.list()).toEqual([])
