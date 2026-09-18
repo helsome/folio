@@ -249,58 +249,47 @@ describe('ExperimentService.runExperiment', () => {
     expect(kernel.deletedSessions).toBe(1);
   });
 
-  it('computes summary aggregates and records failure modes, excluding infra failures from quality', async () => {
-    const dataset = makeDataset([
-      makeCase('case-pass', { expected: { mustHaveEvidence: true } }),
-      makeCase('case-fail'),
-      makeCase('case-timeout'),
-    ]);
+  it('counts a timeout after execution starts as a negative quality result', async () => {
+    const dataset = makeDataset([makeCase('case-pass'), makeCase('case-timeout')]);
     const kernel = new FakeKernel();
     scriptSuccess(kernel, 'case-pass');
-    kernel.script('case-fail', { status: 'failed', error: { code: 'RUNTIME_CRASH', message: 'runtime exited' } });
     kernel.script('case-timeout', {
       status: 'failed',
-      error: { code: 'PI_REQUEST_TIMEOUT', message: 'Pi request timed out after 120000ms.' },
+      error: {
+        code: 'PI_REQUEST_TIMEOUT',
+        message: 'Pi request timed out after 120000ms.',
+      },
     });
     const service = createService(kernel);
 
     const experiment = await service.runExperiment({ dataset, config: makeConfig() });
 
-    // Two runs never completed: their 0-scores must not dilute the quality
-    // aggregate, and the experiment is not valid for gating (issue #113).
+    // The agent started and then exhausted its wall-clock budget: a real
+    // negative quality result, not infrastructure (#113 review).
     expect(experiment.summary).toMatchObject({
-      totalRuns: 3,
-      completedRuns: 1,
-      passRate: 1,
-      validity: 'inconclusive',
-      execution: { requested: 3, started: 3, evaluated: 1, infraFailed: 2, skipped: 0 },
+      validity: 'valid',
+      passRate: 0.5,
+      execution: {
+        requested: 2,
+        started: 2,
+        evaluated: 2,
+        infraFailed: 0,
+        skipped: 0,
+      },
     });
-    const aggregate = experiment.summary!.metricAggregates.find((entry) => entry.metric === 'task_completion');
-    expect(aggregate?.score).toBe(1);
-    expect(aggregate?.sampleCount).toBe(1);
-    expect(experiment.summary!.validityReasons).toEqual(
-      expect.arrayContaining(['RUNTIME_CRASH', 'PI_REQUEST_TIMEOUT'])
-    );
 
     const results = await store.listResults(experiment.id);
-    const byCase = Object.fromEntries(results.map((result) => [result.caseId, result]));
+    const timeout = results.find((result) => result.caseId === 'case-timeout');
 
-    expect(byCase['case-fail'].verdict).toBe('fail');
-    expect(byCase['case-fail'].failureModes).toContain('runtime_error');
-    expect(byCase['case-timeout'].verdict).toBe('fail');
-    expect(byCase['case-timeout'].failureModes).toContain('timeout');
-    // Non-completed runs are not evaluated: no phantom rule-metric passes.
-    expect(byCase['case-fail'].scores).toEqual([]);
-    expect(byCase['case-timeout'].scores).toEqual([]);
+    expect(timeout?.verdict).toBe('fail');
+    expect(timeout?.failureModes).toContain('timeout');
 
-    const runs = await store.listRuns(experiment.id);
-    expect(runs.find((run) => run.caseId === 'case-timeout')?.status).toBe('timeout');
-    const failureModes = experiment.summary!.failureModes.map((entry) => entry.mode);
-    expect(failureModes).toContain('timeout');
-    expect(failureModes).toContain('runtime_error');
+    // No deterministic/judge evaluators run for a non-completed run: no
+    // phantom rule-metric passes on an unfinished agent trajectory.
+    expect(timeout?.scores).toEqual([]);
   });
 
-  it('marks the experiment invalid when no run can start (issue #113)', async () => {
+  it('excludes a configuration failure that prevents the agent from starting', async () => {
     const dataset = makeDataset([makeCase('n1'), makeCase('n2')]);
     const kernel = new FakeKernel();
     kernel.startRunError = { code: 'PI_RUNTIME_NOT_FOUND', message: 'Pi runtime is not available.' };
@@ -322,21 +311,48 @@ describe('ExperimentService.runExperiment', () => {
     expect(kernel.startedRuns).toBe(0);
   });
 
-  it('keeps completed negative runs valid and aggregates only measured runs on partial infra failure', async () => {
-    const dataset = makeDataset([makeCase('ok'), makeCase('bad'), makeCase('infra')]);
+  it('treats a started generic runtime error as a quality failure, not infra', async () => {
+    // `PI_RUNTIME_ERROR` is too broad to exclude from quality once the run
+    // started: only `not-started` or an explicit process failure is infra
+    // (#113 review).
+    const dataset = makeDataset([makeCase('ok'), makeCase('runtime')]);
     const kernel = new FakeKernel();
     scriptSuccess(kernel, 'ok');
-    kernel.script('bad', { status: 'completed', answer: '' });
-    kernel.script('infra', { status: 'failed', error: { code: 'PI_RUNTIME_ERROR', message: 'no key' } });
+    kernel.script('runtime', { status: 'failed', error: { code: 'PI_RUNTIME_ERROR', message: 'runtime rejected the prompt' } });
+    const service = createService(kernel);
+
+    const experiment = await service.runExperiment({ dataset, config: makeConfig() });
+
+    expect(experiment.summary?.validity).toBe('valid');
+    expect(experiment.summary?.validityReasons).toEqual([]);
+    expect(experiment.summary?.execution).toMatchObject({ evaluated: 2, infraFailed: 0 });
+    expect(experiment.summary?.passRate).toBe(0.5);
+    const aggregate = experiment.summary?.metricAggregates.find((entry) => entry.metric === 'task_completion');
+    expect(aggregate?.score).toBe(1);
+    expect(aggregate?.sampleCount).toBe(1);
+
+    const results = await store.listResults(experiment.id);
+    const failed = results.find((result) => result.caseId === 'runtime');
+    expect(failed?.verdict).toBe('fail');
+    expect(failed?.failureModes).toContain('runtime_error');
+    expect(failed?.scores).toEqual([]);
+  });
+
+  it('is inconclusive when an explicit runtime process failure interrupts the suite', async () => {
+    const dataset = makeDataset([makeCase('ok'), makeCase('exited')]);
+    const kernel = new FakeKernel();
+    scriptSuccess(kernel, 'ok');
+    kernel.script('exited', { status: 'failed', error: { code: 'PI_RUNTIME_EXITED', message: 'Pi exited with code 1.' } });
     const service = createService(kernel);
 
     const experiment = await service.runExperiment({ dataset, config: makeConfig() });
 
     expect(experiment.summary?.validity).toBe('inconclusive');
-    expect(experiment.summary?.validityReasons).toContain('PI_RUNTIME_ERROR');
+    expect(experiment.summary?.validityReasons).toContain('PI_RUNTIME_EXITED');
+    expect(experiment.summary?.execution.infraFailed).toBe(1);
     const aggregate = experiment.summary?.metricAggregates.find((entry) => entry.metric === 'task_completion');
-    expect(aggregate?.score).toBe(0.5);
-    expect(aggregate?.sampleCount).toBe(2);
+    expect(aggregate?.score).toBe(1);
+    expect(aggregate?.sampleCount).toBe(1);
   });
 
   it('does not call the judge for non-completed runs', async () => {

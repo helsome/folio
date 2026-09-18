@@ -325,10 +325,22 @@ describe('summarizeExperiment', () => {
 
   it('is invalid with no headline score when every run failed at infrastructure level', () => {
     // Regression for the nightly incident (issue #113): 0 measured cases must
-    // never read as a comparable composite score or a valid benchmark.
+    // never read as a comparable composite score or a valid benchmark. A
+    // generic `PI_RUNTIME_ERROR` that never started is still infrastructure —
+    // it must not masquerade as an agent-quality result.
     const runs = [
-      makeRun({ id: 'run-1', status: 'failed', error: { code: 'PI_RUNTIME_ERROR', message: 'no key' } }),
-      makeRun({ id: 'run-2', status: 'failed', error: { code: 'PI_HEALTH_TIMEOUT', message: 'timeout' } }),
+      makeRun({
+        id: 'run-1',
+        status: 'failed',
+        execution: 'not-started',
+        error: { code: 'PI_RUNTIME_ERROR', message: 'no key' },
+      }),
+      makeRun({
+        id: 'run-2',
+        status: 'failed',
+        execution: 'not-started',
+        error: { code: 'PI_HEALTH_TIMEOUT', message: 'timeout' },
+      }),
     ];
     const results = [
       makeResult([makeScore('task_completion', 0)], {
@@ -350,7 +362,7 @@ describe('summarizeExperiment', () => {
     expect(summary.passRate).toBeNull();
     expect(summary.execution).toEqual({
       requested: 0,
-      started: 2,
+      started: 0,
       evaluated: 0,
       infraFailed: 2,
       skipped: 0,
@@ -368,20 +380,86 @@ describe('summarizeExperiment', () => {
     ];
     const results = [
       makeResult([makeScore('task_completion', 1)], { id: 'result-1', runId: 'run-1', verdict: 'pass' }),
-      makeResult([makeScore('task_completion', 0)], { id: 'result-2', runId: 'run-2', verdict: 'fail' }),
-      makeResult([makeScore('task_completion', 0)], { id: 'result-3', runId: 'run-3', verdict: 'fail' }),
+      makeResult([], { id: 'result-2', runId: 'run-2', verdict: 'fail' }),
+      makeResult([], { id: 'result-3', runId: 'run-3', verdict: 'fail' }),
     ];
     const summary = summarizeExperiment(runs, results, cases);
     expect(summary.validity).toBe('inconclusive');
-    expect(summary.passRate).toBe(1); // 1 pass out of 1 valid, applicable run
-    expect(summary.compositeScore).toBe(1); // failed runs contribute no scores
-    expect(summary.execution.infraFailed).toBe(2);
-    expect(summary.execution.evaluated).toBe(1);
+    // run-2 is explicit infra (process exited); run-3 started and failed with
+    // the catch-all runtime error, so it stays a quality failure.
+    expect(summary.passRate).toBe(0.5); // 1 pass out of 2 quality, applicable runs
+    expect(summary.compositeScore).toBe(1); // quality failures contribute no scores
+    expect(summary.execution.infraFailed).toBe(1);
+    expect(summary.execution.evaluated).toBe(2);
+    expect(summary.validityReasons).toContain('PI_RUNTIME_EXITED');
+    expect(summary.validityReasons).not.toContain('PI_RUNTIME_ERROR');
     expect(summary.metricAggregates).toContainEqual({
       metric: 'task_completion',
       score: 1,
       sampleCount: 1,
     });
+  });
+
+  it('counts a run that started and then timed out as a negative quality result', () => {
+    // The wall-clock budget is a task-level outcome: the agent had its chance
+    // and failed to deliver. Only "never started" or an explicit runtime
+    // process failure is infrastructure (#113 review).
+    const runs = [
+      makeRun({ id: 'run-1' }),
+      makeRun({
+        id: 'run-2',
+        status: 'timeout',
+        failureModes: ['timeout'],
+        error: { code: 'PI_REQUEST_TIMEOUT', message: 'Pi request timed out after 120000ms.' },
+      }),
+    ];
+    const results = [
+      makeResult([makeScore('task_completion', 1)], { id: 'result-1', runId: 'run-1', verdict: 'pass' }),
+      makeResult([], {
+        id: 'result-2',
+        runId: 'run-2',
+        verdict: 'fail',
+        failureModes: ['timeout'],
+      }),
+    ];
+    const summary = summarizeExperiment(runs, results, [makeCase('case-1'), makeCase('case-2')]);
+    expect(summary.validity).toBe('valid');
+    expect(summary.passRate).toBe(0.5);
+    expect(summary.execution).toEqual({
+      requested: 2,
+      started: 2,
+      evaluated: 2,
+      infraFailed: 0,
+      skipped: 0,
+    });
+    expect(summary.validityReasons).toEqual([]);
+  });
+
+  it('counts a started tool-loop / budget failure as a negative quality result', () => {
+    const runs = [
+      makeRun({
+        id: 'run-1',
+        status: 'failed',
+        failureModes: ['tool_loop'],
+        error: { code: 'LOOP_DETECTED', message: 'Run stopped: loop_detected.' },
+      }),
+      makeRun({
+        id: 'run-2',
+        status: 'failed',
+        failureModes: ['tool_loop'],
+        error: { code: 'BUDGET_EXHAUSTED', message: 'Run stopped: budget_exhausted.' },
+      }),
+    ];
+    const results = [
+      makeResult([], { id: 'result-1', runId: 'run-1', verdict: 'fail', failureModes: ['tool_loop'] }),
+      makeResult([], { id: 'result-2', runId: 'run-2', verdict: 'fail', failureModes: ['tool_loop'] }),
+    ];
+    const summary = summarizeExperiment(runs, results, [makeCase('case-1'), makeCase('case-2')]);
+    expect(summary.validity).toBe('valid');
+    expect(summary.passRate).toBe(0);
+    expect(summary.execution.infraFailed).toBe(0);
+    expect(summary.execution.evaluated).toBe(2);
+    expect(summary.failureModes).toContainEqual({ mode: 'tool_loop', count: 2, sampleCount: 2 });
   });
 
   it('keeps a completed negative case valid and failed', () => {

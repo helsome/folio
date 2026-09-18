@@ -44,6 +44,8 @@ import {
   ExperimentService,
   type GateEvaluation,
 } from '../../packages/shared/src/evaluation/experiment-service.ts';
+import { isInfrastructureRun, isQualityRun } from '../../packages/shared/src/evaluation/aggregate.ts';
+import { normalizeModelSelection } from '../../packages/shared/src/evaluation/model-selection.ts';
 import { EVALUATION_METRICS } from '../../packages/core/src/index.ts';
 import type {
   EvaluationBaseline,
@@ -630,9 +632,12 @@ function printSummary(
   const summary = experiment.summary;
   if (!summary) return;
   const runById = new Map(runs.map((run) => [run.id, run]));
-  const validResults = results.filter((result) => runById.get(result.runId)?.status === 'completed');
-  const passed = validResults.filter((result) => result.verdict === 'pass').length;
-  const applicable = validResults.filter((result) => result.verdict !== 'not-applicable').length;
+  const qualityResults = results.filter((result) => {
+    const run = runById.get(result.runId);
+    return run !== undefined && isQualityRun(run);
+  });
+  const passed = qualityResults.filter((result) => result.verdict === 'pass').length;
+  const applicable = qualityResults.filter((result) => result.verdict !== 'not-applicable').length;
   const counts = summary.execution;
   console.log('');
   console.log(`--- Summary (${experiment.id}) ---`);
@@ -666,9 +671,7 @@ function printSummary(
       console.log(`  ${mode.mode.padEnd(24)} ${String(mode.count).padStart(4)}  (of ${mode.sampleCount} runs)`);
     }
   }
-  const infraRuns = runs.filter(
-    (run) => run.execution === 'not-started' || run.status === 'failed' || run.status === 'timeout'
-  );
+  const infraRuns = runs.filter((run) => isInfrastructureRun(run));
   if (infraRuns.length > 0) {
     const byCode = new Map<string, number>();
     for (const run of infraRuns) {
@@ -833,23 +836,20 @@ async function main(): Promise<number> {
 
     const correlation = new TraceCorrelationService({ backend, store });
     const service = new ExperimentService({ store, kernel, backend, correlation });
+    // The split happens once, here, via the helper shared with #116: only the
+    // first `/` segment is the provider (`openrouter/anthropic/x` keeps
+    // `anthropic/x` as the model id).
+    const selection = normalizeModelSelection(options.model, options.provider);
     const config: ExperimentConfig = {
       mode: options.mode,
-      model: options.model,
-      provider: options.provider,
+      model: selection.model,
+      provider: selection.provider,
       strategyId: options.strategy,
       judgeModel: options.judgeModel ?? judgeConfig?.model,
       judgeProvider: options.judgeProvider ?? judgeConfig?.provider,
       maxCases: options.maxCases,
       timeoutMs: options.timeoutMs,
     };
-    // A `--model provider/model` shorthand implies the provider, and the
-    // runtime control surface takes the bare model id (setModel(provider, id)).
-    if (config.model && config.model.includes('/')) {
-      const [modelProvider, ...rest] = config.model.split('/');
-      if (!config.provider) config.provider = modelProvider;
-      if (rest.length > 0) config.model = rest.join('/');
-    }
 
     // Live preflight (issue #113): nothing runs until the runtime, model,
     // credentials, data source, and requested judge are proven ready. A

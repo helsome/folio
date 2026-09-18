@@ -434,10 +434,12 @@ export class ExperimentService {
 
       // ── Evaluation (spec §27-38): deterministic first, judges when a client
       // is configured. Only completed runs are measurable: a failed/timeout
-      // run never did the agent work, so rule metrics would emit phantom
-      // passes (e.g. "no tool calls made" = 1.0) and judge calls would waste
-      // credits on an empty answer (issue #113). Such runs stay in the record
-      // as infrastructure failures, excluded from quality aggregates.
+      // run never produced a finished agent trajectory, so rule metrics would
+      // emit phantom passes (e.g. "no tool calls made" = 1.0) and judge calls
+      // would waste credits on an empty answer (issue #113). Such runs still
+      // carry a verdict (`fail`) and stay in the quality aggregates as real
+      // negative results when they started; only not-started config failures
+      // and explicit runtime/process failures are infrastructure.
       let scores: EvaluationScore[] = [];
       if (evalRun.status === 'completed') {
         const registry = new EvaluatorRegistry();

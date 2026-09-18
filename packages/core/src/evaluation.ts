@@ -553,15 +553,16 @@ export interface ExperimentSummary {
   failureModes: FailureModeCount[];
   /** Cases requested (selected for the experiment). */
   totalRuns: number;
-  /** Cases that completed a valid agent run (evaluated). */
+  /** Cases that produced an interpretable agent-quality outcome (evaluated). */
   completedRuns: number;
   /**
    * Execution validity, separate from quality: `invalid` means no case
    * produced a valid run (missing runtime/credentials/data source), so no
    * quality claim can be made; `inconclusive` means some cases were
    * invalidated by infrastructure; `valid` means every requested case ran and
-   * was measured. Negative case outcomes stay `valid` — they are quality
-   * failures, not execution failures.
+   * produced a quality outcome (completed, or started then failed the task).
+   * Negative case outcomes stay `valid` — they are quality failures, not
+   * execution failures.
    */
   validity: ExperimentValidity;
   /** Requested/started/evaluated/infra-failed/skipped run counts. */
@@ -577,9 +578,17 @@ export interface ExperimentExecutionCounts {
   requested: number;
   /** Cases whose agent run was accepted and began executing. */
   started: number;
-  /** Cases with a completed run that was evaluated (quality measured). */
+  /**
+   * Cases that produced an interpretable quality result: completed runs and
+   * runs that started and then failed the task (timeout, tool loop, budget
+   * exhaustion). Infrastructure failures and skipped runs are excluded.
+   */
   evaluated: number;
-  /** Cases invalidated by infrastructure (never started, failed, or timed out). */
+  /**
+   * Cases invalidated by infrastructure: the run never started (spawn/config/
+   * credential rejection) or failed for an explicit runtime/process reason.
+   * A started task failure is a quality result, not an infrastructure failure.
+   */
   infraFailed: number;
   /** Cases never run: cancelled mid-flight or skipped after an abort. */
   skipped: number;
