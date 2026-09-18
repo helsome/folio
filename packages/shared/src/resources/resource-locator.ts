@@ -1,4 +1,5 @@
 import { dirname, join, resolve } from 'node:path';
+import { homedir } from 'node:os';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -51,6 +52,11 @@ export function getRuntimeRoot(): string {
 /** Directory containing the vendored skills (SKILL.md packages). */
 export function getSkillsDir(): string {
   return join(getRuntimeRoot(), 'skills');
+}
+
+/** User-installed skills live outside the read-only packaged resources tree. */
+export function getUserSkillsDir(): string {
+  return join(homedir(), '.finagent', 'skills');
 }
 
 /**

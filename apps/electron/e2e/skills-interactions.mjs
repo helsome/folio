@@ -11,7 +11,7 @@
 // client; the real main-process handler cannot be forced to fail here.
 
 import { execSync, spawn } from 'node:child_process';
-import { seedLocale } from './seed-locale.mjs';
+import { seedLocale, seedOnboardingCompleted } from './seed-locale.mjs';
 import { existsSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -99,6 +99,7 @@ async function main() {
   execSync(`rm -rf "${userDataDir}"`);
   execSync(`mkdir -p "${userDataDir}"`);
   seedLocale(userDataDir, 'en-US');
+  seedOnboardingCompleted(userDataDir);
   const electronProcess = spawn(
     electronBinary,
     [electronMain, `--remote-debugging-port=${CDP_PORT}`, '--no-sandbox'],
@@ -134,6 +135,7 @@ async function main() {
       await page.getByRole('button', { name: 'Skills', exact: true }).click();
       // Search box renders immediately (part of the loading surface).
       await page.locator('[data-testid="skills-search"]').waitFor({ timeout: 15_000 });
+      await page.locator('[data-testid="skills-install-local"]').waitFor({ timeout: 15_000 });
       // The list appears once skills load.
       await page.locator('[data-testid="skill-list"]').waitFor({ timeout: 15_000 });
       await row.waitFor({ timeout: 15_000 });
@@ -181,6 +183,8 @@ async function main() {
     try {
       await row.click();
       await drawer.waitFor({ timeout: 15_000 });
+      const drawerText = (await drawer.textContent()) ?? '';
+      if (!drawerText.includes('Bundled')) throw new Error('bundled source label missing');
       pass('S4: detail drawer opens on row click');
     } catch (error) {
       fail('S4: detail drawer opens on row click', error);

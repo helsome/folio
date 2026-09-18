@@ -99,6 +99,7 @@ export interface SkillListItem {
   version?: string;
   /** Parsed from SKILL.md frontmatter; absent until the main process maps it. */
   author?: string;
+  source: 'bundled' | 'user';
 }
 
 export interface SkillResourceItem {
@@ -106,6 +107,13 @@ export interface SkillResourceItem {
   path: string;
   kind: 'skill' | 'reference' | 'script' | 'asset' | 'other';
   size?: number;
+}
+
+export interface LocalSkillInstallResult {
+  canceled: boolean;
+  skillId?: string;
+  name?: string;
+  source?: 'user';
 }
 
 /** Renderer-facing evaluation DTOs (spec §62-69). Never carries secrets. */
@@ -288,6 +296,8 @@ export interface FinagentClient {
     listResources: (skillId: string) => Promise<ApiResult<SkillResourceItem[]>>;
     readResource: (skillId: string, relativePath: string) => Promise<ApiResult<string>>;
     readiness: () => Promise<ApiResult<SkillReadiness[]>>;
+    installLocal: () => Promise<ApiResult<LocalSkillInstallResult>>;
+    remove: (skillId: string) => Promise<ApiResult<void>>;
   };
   diagnostics?: {
     collect: () => Promise<ApiResult<DiagnosticsBundle>>;
@@ -402,6 +412,8 @@ export const fallbackClient: FinagentClient = {
     listResources: missingClient('skills.listResources'),
     readResource: missingClient('skills.readResource'),
     readiness: missingClient('skills.readiness'),
+    installLocal: missingClient('skills.installLocal'),
+    remove: missingClient('skills.remove'),
   },
   connections: {
     list: missingClient('connections.list'),
