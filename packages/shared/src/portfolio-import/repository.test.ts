@@ -21,6 +21,14 @@ const INPUT = {
 }
 
 describe('ManualPortfolioRepository', () => {
+  it('persists TSV quantities and costs without splitting thousands separators', async () => {
+    const store = tempStore()
+    const draft = createDraft('csv', parseCsv('Symbol\tQuantity\tCost\tCurrency\nAAPL.US\t1,000\t1,234.50\tUSD'))
+    const created = await new ManualPortfolioRepository(store).create(draftToPortfolioInput(draft, 'TSV'))
+    const reloaded = await new ManualPortfolioRepository(store).get(created.id)
+    expect(reloaded?.holdings).toEqual([{ symbol: 'AAPL.US', name: '', quantity: 1000, costPrice: 1234.5, currency: 'USD' }])
+  })
+
   it('keeps invalid numeric cells absent through draft review and persistence', async () => {
     const store = tempStore()
     const draft = createDraft('csv', parseCsv('Symbol,Quantity,Cost\nAAPL.US,100,$\nMSFT.US,",",180.5'))
