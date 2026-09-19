@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ManualPortfolio } from '@finagent/core'
 import { JsonFileStore } from '../storage/json-file-store.ts'
-import { createDraft, draftToPortfolioInput, validateDraft } from './draft.ts'
+import { createDraft, draftHasRecognizableSymbols, draftToPortfolioInput, validateDraft } from './draft.ts'
 import { parseCsv, parsePaste } from './parsers.ts'
 import { ManualPortfolioRepository } from './repository.ts'
 
@@ -125,6 +125,26 @@ describe('ManualPortfolioRepository', () => {
 })
 
 describe('confirm persists only after confirm (spec §93)', () => {
+  it('preserves empty paste columns through review and persisted holdings', async () => {
+    const store = tempStore()
+    const repository = new ManualPortfolioRepository(store)
+    const draft = createDraft('paste', parsePaste('AAPL.US,100,\nMSFT.US,,180.5,USD'))
+    expect(draft.warnings).toContain('2 rows need review')
+    expect(await repository.list()).toEqual([])
+    const created = await repository.create(draftToPortfolioInput(draft, 'Partial holdings'))
+    const reloaded = await new ManualPortfolioRepository(store).get(created.id)
+    expect(reloaded?.holdings).toEqual([
+      { symbol: 'AAPL.US', name: '', quantity: 100 },
+      { symbol: 'MSFT.US', name: '', costPrice: 180.5, currency: 'USD' },
+    ])
+  })
+
+  it('keeps a missing leading symbol blocked at draft confirmation', () => {
+    const draft = createDraft('paste', parsePaste(',100,180.5,USD'))
+    expect(draftHasRecognizableSymbols(draft)).toBe(false)
+    expect(draft.warnings).toContain('1 row with no recognizable symbol')
+  })
+
   it('draft creation has zero side effects on disk', async () => {
     const store = tempStore()
     const repository = new ManualPortfolioRepository(store)

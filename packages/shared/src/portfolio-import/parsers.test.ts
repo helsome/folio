@@ -214,6 +214,59 @@ describe('confidence tiers (spec §48)', () => {
 })
 
 describe('parsePaste (spec §46)', () => {
+  it('keeps quantity in place when the trailing cost column is empty', () => {
+    const [row] = parsePaste('AAPL.US,100,')
+    expect(row.quantity).toBe(100)
+    expect(row.costPrice).toBeUndefined()
+    expect(row.issues).toEqual(['Cost price missing'])
+    expect(row.confidence).toBe(0.6)
+  })
+
+  it('keeps cost and currency in place when quantity is empty', () => {
+    const [row] = parsePaste('AAPL.US, ,180.5,USD')
+    expect(row.quantity).toBeUndefined()
+    expect(row.costPrice).toBe(180.5)
+    expect(row.currency).toBe('USD')
+    expect(row.issues).toEqual(['Quantity missing'])
+    expect(row.confidence).toBe(0.6)
+  })
+
+  it('keeps currency in place when cost is empty', () => {
+    const [row] = parsePaste('AAPL.US,100, ,USD')
+    expect(row.quantity).toBe(100)
+    expect(row.costPrice).toBeUndefined()
+    expect(row.currency).toBe('USD')
+    expect(row.issues).toEqual(['Cost price missing'])
+  })
+
+  it('does not turn an empty symbol into a quantity ticker', () => {
+    const [row] = parsePaste(',100,180.5,USD')
+    expect(row.symbol).toBe('')
+    expect(row.quantity).toBe(100)
+    expect(row.costPrice).toBe(180.5)
+    expect(row.currency).toBe('USD')
+    expect(row.issues).toEqual(['Missing symbol'])
+  })
+
+  it('keeps both numeric fields missing when both columns are empty', () => {
+    const [row] = parsePaste('AAPL.US, , ,USD')
+    expect(row.quantity).toBeUndefined()
+    expect(row.costPrice).toBeUndefined()
+    expect(row.currency).toBe('USD')
+    expect(row.issues).toEqual(['Quantity missing', 'Cost price missing'])
+  })
+
+  it('preserves the existing two-column symbol-cost shorthand', () => {
+    const [row] = parsePaste('AAPL.US,180.5')
+    expect(row.quantity).toBeUndefined()
+    expect(row.costPrice).toBe(180.5)
+    expect(row.issues).toEqual(['Quantity missing'])
+    const [empty] = parsePaste('AAPL.US, ')
+    expect(empty.quantity).toBeUndefined()
+    expect(empty.costPrice).toBeUndefined()
+    expect(empty.issues).toEqual(['Quantity missing', 'Cost price missing'])
+  })
+
   it('flags formatting-only numeric cells in both paste formats', () => {
     for (const input of ['AAPL.US $ $', 'AAPL.US, $, $']) {
       const [row] = parsePaste(input)
