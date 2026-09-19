@@ -314,9 +314,11 @@ export function flagDuplicates(rows: PortfolioImportRow[]): PortfolioImportRow[]
  */
 export function parseCsv(text: string, headerMapping?: CsvHeaderMapping): PortfolioImportRow[] {
   const rawRows = splitCsvRows(text)
-  if (rawRows.length === 0) return []
-  const columns = resolveCsvColumns(rawRows[0], headerMapping)
-  const start = columns.isHeader ? 1 : 0
+  // Empty records must not hide the header or become positional column hints.
+  const firstRow = rawRows.findIndex((row) => splitCsvLine(row).some((cell) => cell.trim() !== ''))
+  if (firstRow < 0) return []
+  const columns = resolveCsvColumns(rawRows[firstRow], headerMapping)
+  const start = firstRow + (columns.isHeader ? 1 : 0)
 
   const rows: PortfolioImportRow[] = []
   for (let i = start; i < rawRows.length; i++) {
