@@ -173,6 +173,8 @@ longbridge auth login
 
 前置条件：[Bun](https://bun.sh)、用于实时数据的 [Longbridge CLI](https://open.longbridge.com/longbridge/longbridge-terminal/install)，以及用于 Pi 运行时的 LLM 提供商。
 
+> **Windows**：建议在普通（非管理员）开发终端下先开启「开发人员模式」（设置 → 系统 → 开发者选项）。否则本项目使用 Bun 安装 workspace/symlink 依赖时可能出现 `node_modules` 空目录、缺少 `.bin`、`tsc not found` 等问题；具有相应符号链接权限或以提升权限运行的进程不受此限制。
+
 ```bash
 # 克隆并安装
 git clone https://github.com/helsome/folio.git

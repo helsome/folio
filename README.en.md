@@ -173,6 +173,8 @@ longbridge auth login
 
 Prerequisites: [Bun](https://bun.sh), the [Longbridge CLI](https://open.longbridge.com/longbridge/longbridge-terminal/install) for live data, and an LLM provider for the Pi runtime.
 
+> **Windows**: When developing from a standard (non-administrator) terminal, enable Developer Mode first (Settings → System → For developers). Otherwise, installing this project's workspace/symlink dependencies with Bun may leave empty directories under `node_modules`, omit `.bin`, or fail with `tsc not found`. Processes with the required symlink privilege or elevated permissions are not affected.
+
 ```bash
 # Clone and install
 git clone https://github.com/helsome/folio.git
