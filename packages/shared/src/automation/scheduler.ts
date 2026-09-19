@@ -19,8 +19,6 @@ import type { AutomationRule, AutomationType } from '@finagent/core'
  * Everything here is pure and deterministic: `now` is injected epoch-ms.
  */
 
-const DAY_MS = 86_400_000
-
 /** Default daily-brief cadence: weekdays only (0=Sun … 6=Sat). */
 export const WEEKDAYS = [1, 2, 3, 4, 5] as const
 
@@ -90,9 +88,14 @@ export function occurrenceOn(rule: AutomationRule, day: number): number | null {
  */
 export function nextRunAt(rule: AutomationRule, now: number = Date.now()): number | null {
   if (!isScheduledType(rule.type)) return null
+  // Calendar days can be 23 or 25 hours at DST transitions. Scan at local
+  // noon so a fixed-duration step cannot skip or repeat a calendar date.
+  const day = new Date(now)
+  day.setHours(12, 0, 0, 0)
   for (let i = 0; i < SCAN_DAYS; i += 1) {
-    const candidate = occurrenceOn(rule, now + i * DAY_MS)
+    const candidate = occurrenceOn(rule, day.getTime())
     if (candidate !== null && candidate >= now) return candidate
+    day.setDate(day.getDate() + 1)
   }
   return null
 }

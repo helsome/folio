@@ -28,6 +28,7 @@ import { LocalEvaluationBackend, resolveBackend } from '../../packages/shared/sr
 import { resolveLangfuseBackend } from '../../packages/shared/src/evaluation/langfuse/resolve.ts';
 import { TraceCorrelationService } from '../../packages/shared/src/evaluation/correlation.ts';
 import { createJudgeClient, resolveJudgeConfig } from '../../packages/shared/src/evaluation/judge-client.ts';
+import { normalizeModelSelection } from '../../packages/shared/src/evaluation/model-selection.ts';
 import { embeddedDatasets } from '../../packages/shared/src/evaluation/datasets/index.ts';
 import { validateGoldCaseDataset } from '../../packages/core/src/evaluation.ts';
 import {
@@ -53,6 +54,7 @@ interface CliOptions {
   mode: 'fixture' | 'live';
   model?: string;
   provider?: string;
+  thinking?: string;
   strategy?: string;
   judgeProvider?: string;
   judgeModel?: string;
@@ -74,8 +76,10 @@ const USAGE = `Usage:
 Flags:
   --dataset <id>          Embedded dataset id (default: folio-agent-v1)
   --mode fixture|live     Runtime mode (default: fixture)
-  --model <id>            Agent model under test (e.g. anthropic/claude-sonnet-4-5)
+  --model <id>            Agent model under test (e.g. anthropic/claude-sonnet-4-5;
+                          a provider prefix is split off and applied via setModel)
   --provider <id>         Agent provider override
+  --thinking <level>      Thinking level to apply to the runtime (live mode)
   --strategy <id>         Strategy/skill id to load into the runtime
   --judge-provider <id>   Judge provider (anthropic | openai-compatible)
   --judge-model <id>      Judge model (separate from the agent under test)
@@ -150,6 +154,14 @@ function parseFlags(argv: string[]): CliOptions {
         const next = value(name, index);
         if (next !== undefined) {
           options.provider = next;
+          index += 1;
+        }
+        break;
+      }
+      case '--thinking': {
+        const next = value(name, index);
+        if (next !== undefined) {
+          options.thinking = next;
           index += 1;
         }
         break;
@@ -614,6 +626,37 @@ function printSummary(experiment: EvaluationExperiment, runs: EvaluationRun[], r
   }
 }
 
+/**
+ * Requested vs effective config transparency (#114): print the runtime
+ * readback per run. Runs without an effectiveConfig are historical-unknown —
+ * labeled as such, never backfilled with the requested values.
+ */
+function printConfigSummary(config: ExperimentConfig, runs: EvaluationRun[]): void {
+  console.log('');
+  console.log('--- Config (requested vs effective) ---');
+  console.log(
+    `requested: model=${config.model ?? '—'} provider=${config.provider ?? '—'} thinking=${config.thinkingLevel ?? '—'} strategy=${config.strategyId ?? '—'}`
+  );
+  for (const run of runs) {
+    const effective = run.effectiveConfig;
+    if (!effective) {
+      console.log(`  ${run.id}: effective=unknown (no runtime readback recorded)`);
+      continue;
+    }
+    const applied = [
+      effective.model ? `${effective.provider ?? '?'}/${effective.model}` : undefined,
+      effective.thinkingLevel ? `thinking=${effective.thinkingLevel}` : undefined,
+    ]
+      .filter(Boolean)
+      .join(', ');
+    const unapplied = (effective.unapplied ?? [])
+      .map((item) => `${item.key} not applied (${item.reason})`)
+      .join('; ');
+    const suffix = run.error ? ` · run error=${run.error.code}` : '';
+    console.log(`  ${run.id}: effective=${applied || '—'}${unapplied ? ` · ${unapplied}` : ''}${suffix}`);
+  }
+}
+
 function printGate(
   experiment: EvaluationExperiment,
   regressions: Array<{ metric: string; baseline: number | null; current: number | null; delta: number | null; maxDelta: number; critical: boolean; passed: boolean }>,
@@ -750,20 +793,23 @@ async function main(): Promise<number> {
 
     const correlation = new TraceCorrelationService({ backend, store });
     const service = new ExperimentService({ store, kernel, backend, correlation });
+    // `--model provider/model-id` is a CLI shorthand: split it into the two
+    // dimensions the runtime control surface takes (setModel(provider, id))
+    // BEFORE anything touches ExperimentConfig — the prefixed id must never
+    // reach the runtime or the run metadata (#114; the same normalization
+    // #122 needs, kept in one place).
+    const selection = normalizeModelSelection(options.model, options.provider);
     const config: ExperimentConfig = {
       mode: options.mode,
-      model: options.model,
-      provider: options.provider,
+      model: selection.model,
+      provider: selection.provider,
+      thinkingLevel: options.thinking,
       strategyId: options.strategy,
       judgeModel: options.judgeModel ?? judgeConfig?.model,
       judgeProvider: options.judgeProvider ?? judgeConfig?.provider,
       maxCases: options.maxCases,
       timeoutMs: options.timeoutMs,
     };
-    // A `--model provider/model` shorthand implies the provider.
-    if (config.model && !config.provider && config.model.includes('/')) {
-      config.provider = config.model.split('/')[0];
-    }
 
     const storeBaseline = options.baseline
       ? (await store.listBaselines()).find((entry) => entry.id === options.baseline) ??
@@ -796,6 +842,7 @@ async function main(): Promise<number> {
     const results = await store.listResults(experiment.id);
     printCaseTable(runs, results);
     printSummary(experiment, runs, results);
+    printConfigSummary(config, runs);
 
     // Baseline handling: gate against an existing baseline (store, then the
     // committed scripts/eval/ci-baselines/<id>.json), optionally store one.

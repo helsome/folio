@@ -1,5 +1,8 @@
 import type { Holding, Kline, PortfolioAccount, PortfolioSnapshot, Quote } from '@finagent/core';
 import type { MarketDataFetchers } from './market-data-service.ts';
+import type { CapabilityFetchResult } from '../capabilities/fetchers.ts';
+
+type QuoteResultFetcher = (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<Quote>>;
 
 /**
  * Built-in sample data for the offline demo path (#31 E2E, README offline
@@ -54,6 +57,20 @@ function demoQuoteFor(symbol: string): Quote {
     low: round2(Math.min(lastPrice, dayOpen) * 0.996),
     open: dayOpen,
     prevClose,
+  };
+}
+
+function demoQuoteResult(symbol: string): CapabilityFetchResult<Quote> {
+  const data = demoQuoteFor(symbol);
+  return {
+    data,
+    provenance: {
+      providerId: 'demo',
+      providerName: 'Built-in demo data',
+      fetchedAt: Date.now(),
+      marketTime: data.timestamp * 1000,
+      stale: false,
+    },
   };
 }
 
@@ -122,7 +139,10 @@ function demoPortfolioSnapshot(): PortfolioSnapshot {
  * demo dataset answers instead. Only the surfaces typed blocks demo are
  * wrapped; everything else keeps failing honestly.
  */
-export function withDemoDataFallback<F extends Partial<MarketDataFetchers>>(fetchers: F): F {
+export function withDemoDataFallback<F extends Partial<MarketDataFetchers> & { getQuoteResult?: QuoteResultFetcher }>(
+  fetchers: F
+): F {
+  const quoteResult = fetchers.getQuoteResult;
   return {
     ...fetchers,
     getQuote: async (symbol) => {
@@ -136,6 +156,17 @@ export function withDemoDataFallback<F extends Partial<MarketDataFetchers>>(fetc
       }
       return demoQuoteFor(symbol);
     },
+    ...(quoteResult
+      ? {
+        getQuoteResult: async (symbol: string, signal?: AbortSignal) => {
+          try {
+            return await quoteResult(symbol, signal);
+          } catch {
+            return demoQuoteResult(symbol);
+          }
+        },
+      }
+      : {}),
     getKline: async (options) => {
       const real = fetchers.getKline;
       if (real) {

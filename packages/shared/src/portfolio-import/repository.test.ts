@@ -4,8 +4,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import type { ManualPortfolio } from '@finagent/core'
 import { JsonFileStore } from '../storage/json-file-store.ts'
-import { createDraft, draftHasRecognizableSymbols, draftToPortfolioInput } from './draft.ts'
-import { parsePaste } from './parsers.ts'
+import { createDraft, draftHasRecognizableSymbols, draftToPortfolioInput, validateDraft } from './draft.ts'
+import { parseCsv, parsePaste } from './parsers.ts'
 import { ManualPortfolioRepository } from './repository.ts'
 
 function tempStore(): JsonFileStore {
@@ -21,6 +21,24 @@ const INPUT = {
 }
 
 describe('ManualPortfolioRepository', () => {
+  it('keeps invalid numeric cells absent through draft review and persistence', async () => {
+    const store = tempStore()
+    const draft = createDraft('csv', parseCsv('Symbol,Quantity,Cost\nAAPL.US,100,$\nMSFT.US,",",180.5'))
+    expect(draft.warnings).toContain('2 rows need review')
+    expect(validateDraft(draft)).toEqual([
+      'AAPL.US: Invalid cost price "$"',
+      'MSFT.US: Invalid quantity ","',
+    ])
+
+    const repository = new ManualPortfolioRepository(store)
+    const created = await repository.create(draftToPortfolioInput(draft, 'Review import'))
+    const reloaded = await new ManualPortfolioRepository(store).get(created.id)
+    expect(reloaded?.holdings).toEqual([
+      { symbol: 'AAPL.US', name: '', quantity: 100 },
+      { symbol: 'MSFT.US', name: '', costPrice: 180.5 },
+    ])
+  })
+
   it('lists nothing before the first create', async () => {
     const repository = new ManualPortfolioRepository(tempStore())
     expect(await repository.list()).toEqual([])

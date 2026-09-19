@@ -444,6 +444,32 @@ export interface EvaluationScore {
 
 export type EvaluationRunStatus = 'completed' | 'failed' | 'cancelled' | 'timeout' | 'skipped';
 
+/**
+ * A requested experiment-config dimension that has NO runtime control surface
+ * and was therefore NOT applied (#114). Recorded explicitly — never silently
+ * dropped, and never presented as if it were in effect.
+ */
+export interface UnappliedConfigItem {
+  key: 'model' | 'provider' | 'thinkingLevel' | 'strategyId';
+  reason: string;
+}
+
+/**
+ * Runtime configuration confirmed by READBACK after application (#114).
+ * Only values observed from the runtime's own state land here; a requested
+ * value without readback proof never masquerades as effective. Runs recorded
+ * before #114 simply omit this field (historical unknown — never backfilled).
+ */
+export interface EffectiveRuntimeConfig {
+  model?: string;
+  provider?: string;
+  thinkingLevel?: string;
+  /** Requested dimensions that could not be applied, with the reason why. */
+  unapplied?: UnappliedConfigItem[];
+  /** Epoch ms of the runtime readback that confirmed these values. */
+  confirmedAt: number;
+}
+
 export interface EvaluationRun {
   id: string;
   experimentId: string;
@@ -459,6 +485,11 @@ export interface EvaluationRun {
   failureModes: EvaluationFailureMode[];
   traceRef?: TraceReference;
   error?: ApiError;
+  /**
+   * Runtime config actually in effect for this run, confirmed by readback
+   * (#114). `undefined` on historical records = unknown, not "default".
+   */
+  effectiveConfig?: EffectiveRuntimeConfig;
 }
 
 /** Backend the trace lives in; `none` when observability is off (spec §89). */

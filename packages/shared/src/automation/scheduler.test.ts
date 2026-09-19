@@ -1,4 +1,5 @@
 import { describe, expect, it } from 'bun:test'
+import { spawnSync } from 'node:child_process'
 import type { AutomationRule } from '@finagent/core'
 import {
   DEFAULT_BRIEF_HOUR,
@@ -48,6 +49,34 @@ describe('scheduler scheduleFor', () => {
 })
 
 describe('scheduler nextRunAt', () => {
+  // A child process keeps TZ changes isolated from other suites and the host.
+  for (const scenario of [
+    { name: 'New York spring-forward Sunday', zone: 'America/New_York', now: '2026-03-07T23:30:00', expected: '2026-03-08T09:00:00', overrides: { type: 'weekly-thesis-review' } },
+    { name: 'Berlin spring-forward Sunday', zone: 'Europe/Berlin', now: '2026-03-28T23:30:00', expected: '2026-03-29T09:00:00', overrides: { type: 'weekly-thesis-review' } },
+    { name: 'next Saturday across New York fall-back', zone: 'America/New_York', now: '2026-10-31T00:30:00', expected: '2026-11-07T00:00:00', overrides: { days: [6], hour: 0 } },
+    { name: 'Shanghai without DST', zone: 'Asia/Shanghai', now: '2026-03-07T23:30:00', expected: '2026-03-08T09:00:00', overrides: { type: 'weekly-thesis-review' } },
+  ]) {
+    it(`scans local calendar days for ${scenario.name}`, () => {
+      const script = `
+        import { nextRunAt } from ${JSON.stringify(new URL('./scheduler.ts', import.meta.url).href)};
+        const rule = ${JSON.stringify({ id: 'dst', type: 'watchlist-daily-review', enabled: true, notify: 'material-only', createdAt: 0, ...scenario.overrides })};
+        console.log(JSON.stringify({
+          actual: nextRunAt(rule, new Date(${JSON.stringify(scenario.now)}).getTime()),
+          expected: new Date(${JSON.stringify(scenario.expected)}).getTime(),
+        }));
+      `
+      const result = spawnSync(process.execPath, ['-e', script], {
+        env: { ...process.env, TZ: scenario.zone },
+        encoding: 'utf8',
+        timeout: 10_000,
+      })
+      expect(result.error).toBeUndefined()
+      expect(result.status).toBe(0)
+      const { actual, expected } = JSON.parse(result.stdout)
+      expect(actual).toBe(expected)
+    })
+  }
+
   it('returns today after-market-close when still ahead of the schedule', () => {
     const now = local('2026-08-10', 10, 0) // Monday 10:00
     expect(nextRunAt(rule({}), now)).toBe(local('2026-08-10', 16, 30))
