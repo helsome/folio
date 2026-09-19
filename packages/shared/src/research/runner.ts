@@ -9,6 +9,7 @@ import {
   type ResearchSection,
   type ResearchSynthesis,
   type ResearchSynthesizer,
+  type ResearchDocumentResult,
   type StrategyId,
 } from '@finagent/core';
 import { i18nCurrentLocale } from '@finagent/i18n';
@@ -332,6 +333,19 @@ function assembleReport(args: {
         summary: outcome.result?.summary,
         ...(instrumentId ? { instrumentId } : {}),
       });
+      if (outcome.record.capabilityId === 'research.documents') {
+        const data = outcome.result?.data as ResearchDocumentResult | undefined;
+        for (const document of data?.documents ?? []) {
+          evidence.push({
+            capabilityId: outcome.record.capabilityId, runId: outcome.record.id,
+            // Discovery metadata is not proof of the synthesis's financial claims.
+            claim: document.title, fetchedAt: document.provenance.fetchedAt,
+            documentId: document.documentId, instrumentId: document.instrumentId,
+            sourceType: document.sourceType, canonicalUrl: document.canonicalUrl,
+            documentEvidence: document.evidence,
+          });
+        }
+      }
     }
     return { ...section, evidence };
   });
