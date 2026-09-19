@@ -37,7 +37,11 @@ export {
 export { computeSkillReadiness } from './readiness.ts';
 export { createCapabilityTools, type CapabilityTool } from './pi-tools.ts';
 export { createCapabilityError, validateInput, normalizeSymbol } from './validate.ts';
-export { defaultCapabilityFetchers, type CapabilityFetchers } from './fetchers.ts';
+export {
+  defaultCapabilityFetchers,
+  type CapabilityFetchers,
+  type CapabilityFetchResult,
+} from './fetchers.ts';
 export { createPhaseOneCapabilities, phaseOneCapabilities } from './manifests/index.ts';
 
 /** All twenty capabilities built from the default (real) Longbridge fetchers. */

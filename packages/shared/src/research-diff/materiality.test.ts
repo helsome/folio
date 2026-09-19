@@ -32,6 +32,12 @@ describe('isMaterial', () => {
     expect(isMaterial(change({ before: '100', after: '110' }))).toBe(true)
   })
 
+  it('does not turn missing price values into material drops to zero', () => {
+    expect(isMaterial(change({ before: 100, after: undefined }))).toBe(false)
+    expect(isMaterial(change({ before: 100, after: '' }))).toBe(false)
+    expect(isMaterial(change({ before: 100, after: '  ' }))).toBe(false)
+  })
+
   it('marks verdict flips (positive ↔ negative) as material', () => {
     expect(
       isMaterial(
@@ -153,6 +159,12 @@ describe('isMaterial', () => {
         })
       )
     ).toBe(true)
+  })
+
+  it('does not turn missing confidence values into material drops to zero', () => {
+    expect(isMaterial(change({ label: 'Confidence', before: 0.7, after: undefined }))).toBe(false)
+    expect(isMaterial(change({ label: 'Confidence', before: 0.7, after: '' }))).toBe(false)
+    expect(isMaterial(change({ label: 'Confidence', before: 0.7, after: '  ' }))).toBe(false)
   })
 
   it('marks new risks and new earnings sections as material', () => {

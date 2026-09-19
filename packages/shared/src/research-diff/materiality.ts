@@ -71,6 +71,8 @@ export function isMaterial(change: ResearchChange): boolean {
 }
 
 function asFiniteNumber(value: string | number | undefined): number | null {
-  const parsed = typeof value === 'number' ? value : Number(value?.trim() ?? '')
+  if (typeof value !== 'number' && typeof value !== 'string') return null
+  if (typeof value === 'string' && value.trim() === '') return null
+  const parsed = typeof value === 'number' ? value : Number(value.trim())
   return Number.isFinite(parsed) ? parsed : null
 }

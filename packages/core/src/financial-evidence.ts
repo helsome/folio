@@ -54,6 +54,8 @@ export interface FinancialEvidenceEnvelope {
   retrievedAt: number;
   asOf?: number;
   stale: boolean;
+  /** True when the provider reported a delayed value rather than live data. */
+  delayed?: boolean;
   cacheHit: boolean;
   fallback?: { from: string; to: string; reason?: string };
   reconciliation?: { providers: string[]; method: string };

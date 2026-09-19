@@ -1,3 +1,4 @@
+import { join } from 'node:path';
 import type { AgentRuntime, ApiResult, ToolDefinition } from '@finagent/core';
 import type { SkillHub } from '@finagent/skill-hub';
 import { JsonFileStore } from '../storage/json-file-store.ts';
@@ -84,6 +85,8 @@ export class AgentKernel {
       budgets: options.budgets,
       searchTools: options.searchTools,
       runaway: options.runaway,
+      // issue #75：与 kernel 存储同目录落盘流事件日志，支持跨重启 replay。
+      streamLogDir: join(options.storageDir, 'stream-events'),
     });
   }
 

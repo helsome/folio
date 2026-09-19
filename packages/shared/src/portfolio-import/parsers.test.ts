@@ -49,6 +49,18 @@ describe('checkSymbol', () => {
 })
 
 describe('toFiniteNumber', () => {
+  it('rejects cells containing only formatting characters', () => {
+    for (const value of ['$', ',', ',,,', '$ ,', '\u00a0$\u00a0,\u00a0']) {
+      expect(toFiniteNumber(value)).toBeUndefined()
+    }
+  })
+
+  it('preserves explicit zero values', () => {
+    for (const value of [0, '0', '0.00', '$0.00', ' 0,000.00 ']) {
+      expect(toFiniteNumber(value)).toBe(0)
+    }
+  })
+
   it('coerces string numbers', () => {
     expect(toFiniteNumber('100')).toBe(100)
     expect(toFiniteNumber('180.50')).toBe(180.5)
@@ -118,6 +130,20 @@ describe('parseCsv', () => {
     expect(row).toMatchObject({ name: 'Apple, Inc.', quantity: 1000, costPrice: 180.5, issues: [] })
     const [mapped] = parseCsv('Ticker\tUnits\tAvg Cost\nAAPL.US\t1,000\t180.5', { symbol: 'Ticker', quantity: 'Units', cost: 'Avg Cost' })
     expect(mapped).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, issues: [] })
+  })
+
+  it('flags formatting-only quantities and costs without inventing zeros', () => {
+    const rows = parseCsv('Symbol,Quantity,Cost\nAAPL.US,100,$\nMSFT.US,",",180.5\n0700.HK,500,320')
+    expect(rows).toHaveLength(3)
+    expect(rows[0].quantity).toBe(100)
+    expect(rows[0].costPrice).toBeUndefined()
+    expect(rows[0].confidence).toBe(0.6)
+    expect(rows[0].issues).toEqual(['Invalid cost price "$"'])
+    expect(rows[1].quantity).toBeUndefined()
+    expect(rows[1].costPrice).toBe(180.5)
+    expect(rows[1].confidence).toBe(0.6)
+    expect(rows[1].issues).toEqual(['Invalid quantity ","'])
+    expect(rows[2]).toMatchObject({ quantity: 500, costPrice: 320, confidence: 1, issues: [] })
   })
 
   it('detects English headers and maps columns', () => {
@@ -212,6 +238,16 @@ describe('confidence tiers (spec §48)', () => {
 })
 
 describe('parsePaste (spec §46)', () => {
+  it('flags formatting-only numeric cells in both paste formats', () => {
+    for (const input of ['AAPL.US $ $', 'AAPL.US, $, $']) {
+      const [row] = parsePaste(input)
+      expect(row.quantity).toBeUndefined()
+      expect(row.costPrice).toBeUndefined()
+      expect(row.confidence).toBe(0.6)
+      expect(row.issues).toEqual(['Invalid quantity "$"', 'Invalid cost price "$"'])
+    }
+  })
+
   it('parses SYMBOL QTY COST', () => {
     const rows = parsePaste('AAPL.US 100 180.5')
     expect(rows).toHaveLength(1)
