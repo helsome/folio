@@ -100,4 +100,16 @@ describe('AutomationRunRepository', () => {
     expect((await repo.listByRule('r2')).map((r) => r.id)).toEqual(['run-2'])
     expect(await repo.listByRule('r3')).toEqual([])
   })
+
+  it('claims scheduled occurrences across repository instances', async () => {
+    const repo = new AutomationRunRepository(store)
+    expect(await repo.claimScheduledOccurrence('r1', 'Mon Jan 01 2024')).toBe(true)
+    await repo.record(run('run-1', 'r1', 1_704_067_200_000))
+    expect(await repo.claimScheduledOccurrence('r1', 'Mon Jan 01 2024')).toBe(false)
+
+    const fresh = new AutomationRunRepository(new JsonFileStore(dir))
+    expect(await fresh.claimScheduledOccurrence('r1', 'Mon Jan 01 2024')).toBe(false)
+    expect(await fresh.claimScheduledOccurrence('r1', 'Tue Jan 02 2024')).toBe(true)
+    expect(await fresh.claimScheduledOccurrence('r2', 'Mon Jan 01 2024')).toBe(true)
+  })
 })
