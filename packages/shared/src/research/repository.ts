@@ -1,5 +1,6 @@
 import type { ResearchReport, ResearchRunSummary, ResearchStance } from '@finagent/core';
 import type { JsonFileStore } from '../storage/json-file-store.ts';
+import { createCodeError } from '../agent/errors.ts';
 import { mkdir, open, readFile, readdir, rename, unlink } from 'node:fs/promises';
 import { dirname } from 'node:path';
 import { randomUUID } from 'node:crypto';
@@ -16,7 +17,15 @@ import { decodeCheckpoint, encodeCheckpoint, type ResearchCheckpoint } from './c
  */
 const INDEX_FILE = 'research/index.json';
 const RUNS_FILE = 'research/runs.json';
-const reportFile = (id: string) => `research/reports/${id}.json`;
+
+// Report IDs are opaque names, not relative paths. Keep the file-name
+// contract aligned with the generated research/run IDs at this boundary.
+const reportFile = (id: unknown): string => {
+  if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+    throw createCodeError('INVALID_ARGUMENT', 'Invalid research report id.');
+  }
+  return `research/reports/${id}.json`;
+};
 
 export interface ReportSummary {
   id: string;
