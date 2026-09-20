@@ -349,12 +349,12 @@ export function parsePasteLine(line: string): PortfolioImportRow {
   const parts = trimmed.includes(',')
     ? trimmed
         .split(',')
-        .map((part) => part.trim())
-        .filter((part) => part !== '')
+        // Empty cells still occupy a column; dropping them shifts holdings data.
+        .map((part) => part.trim() || undefined)
     : trimmed.split(/\s+/)
 
   const fields: ParsedFields = { symbol: '', name: undefined, quantity: undefined, cost: undefined, currency: undefined, account: undefined }
-  if (parts.length >= 1) fields.symbol = parts[0]
+  if (parts.length >= 1) fields.symbol = parts[0] ?? ''
   if (parts.length >= 3) {
     fields.quantity = parts[1]
     fields.cost = parts[2]
