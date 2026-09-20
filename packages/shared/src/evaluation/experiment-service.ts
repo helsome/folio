@@ -531,7 +531,7 @@ export class ExperimentService {
       };
       await this.traceRun(failedRun, session.id, caseItem.locale);
       await this.kernel.deleteSession(session.id).catch(() => undefined);
-      return { run: failedRun, aborted: false };
+      return { run: failedRun, aborted: false, runtimeUnusable: false };
     }
 
     const collected: AgentEvent[] = [];
