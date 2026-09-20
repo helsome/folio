@@ -105,9 +105,46 @@ describe('splitCsvLine', () => {
     expect(splitCsvLine('"A, Inc.",AAPL.US')).toEqual(['A, Inc.', 'AAPL.US'])
     expect(splitCsvLine('"said ""hi""",x')).toEqual(['said "hi"', 'x'])
   })
+
+  it('uses one explicit delimiter and preserves the other inside cells', () => {
+    expect(splitCsvLine('AAPL.US\t1,000\t180.5', '\t')).toEqual(['AAPL.US', '1,000', '180.5'])
+    expect(splitCsvLine('AAPL.US,"Apple\tInc.",100,180.5', ',')).toEqual([
+      'AAPL.US',
+      'Apple\tInc.',
+      '100',
+      '180.5',
+    ])
+  })
 })
 
 describe('parseCsv', () => {
+  it('uses the file delimiter so TSV thousands separators do not shift columns', () => {
+    const rows = parseCsv('Symbol\tQuantity\tCost\nAAPL.US\t1,000\t180.5')
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, confidence: 1, issues: [] })
+  })
+
+  it('preserves unquoted commas in TSV company names', () => {
+    const rows = parseCsv('AAPL.US\tApple, Inc.\t100\t180.5')
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', name: 'Apple, Inc.', quantity: 100, costPrice: 180.5 })
+  })
+
+  it('detects the first separator outside quotes and honors explicit TSV header mappings', () => {
+    const rows = parseCsv(
+      '"Ticker, Symbol"\tUnits\tAvg Cost\nAAPL.US\t1,000\t180.5',
+      { symbol: 'Ticker, Symbol', quantity: 'Units', cost: 'Avg Cost' }
+    )
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5 })
+  })
+
+  it('keeps quoted tabs and multiline fields intact in CSV and TSV files', () => {
+    const csvRows = parseCsv('Symbol,Name,Quantity,Cost\nAAPL.US,"Apple\tInc.",100,180.5')
+    expect(csvRows[0]).toMatchObject({ name: 'Apple\tInc.', quantity: 100, costPrice: 180.5 })
+
+    const tsvRows = parseCsv('Symbol\tName\tQuantity\tCost\nAAPL.US\t"Apple\nInc."\t1,000\t180.5')
+    expect(tsvRows[0]).toMatchObject({ name: 'Apple\nInc.', quantity: 1000, costPrice: 180.5 })
+  })
+
   it('flags formatting-only quantities and costs without inventing zeros', () => {
     const rows = parseCsv('Symbol,Quantity,Cost\nAAPL.US,100,$\nMSFT.US,",",180.5\n0700.HK,500,320')
     expect(rows).toHaveLength(3)

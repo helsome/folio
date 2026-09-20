@@ -109,6 +109,27 @@ export function toFiniteNumber(value: unknown): number | undefined {
 
 // ── CSV ────────────────────────────────────────────────────────────────────
 
+export type CsvDelimiter = ',' | '\t'
+
+/** Detect the file delimiter from its first logical row, ignoring quoted cells. */
+function detectCsvDelimiter(firstRow: string): CsvDelimiter {
+  let inQuotes = false
+  for (let i = 0; i < firstRow.length; i++) {
+    const ch = firstRow[i]
+    if (ch === '"') {
+      if (inQuotes && firstRow[i + 1] === '"') {
+        i++
+      } else {
+        inQuotes = !inQuotes
+      }
+    } else if (!inQuotes && (ch === ',' || ch === '\t')) {
+      return ch
+    }
+  }
+  // Keep the historical comma behavior for a one-column/empty first row.
+  return ','
+}
+
 /** Split CSV text into logical rows, honoring quoted fields spanning lines. */
 export function splitCsvRows(text: string): string[] {
   const normalized = text.replace(/\r\n/g, '\n').replace(/\r/g, '\n')
@@ -130,8 +151,11 @@ export function splitCsvRows(text: string): string[] {
   return rows
 }
 
-/** Split one CSV row into cells (comma or tab separated, quote-aware). */
-export function splitCsvLine(line: string): string[] {
+/** Split one CSV/TSV row using one delimiter, honoring quoted fields. */
+export function splitCsvLine(
+  line: string,
+  delimiter: CsvDelimiter = detectCsvDelimiter(line)
+): string[] {
   const cells: string[] = []
   let current = ''
   let inQuotes = false
@@ -150,7 +174,7 @@ export function splitCsvLine(line: string): string[] {
       }
     } else if (ch === '"') {
       inQuotes = true
-    } else if (ch === ',' || ch === '\t') {
+    } else if (ch === delimiter) {
       cells.push(current)
       current = ''
     } else {
@@ -180,9 +204,10 @@ export interface CsvColumnMap {
  */
 export function resolveCsvColumns(
   firstRow: string,
-  headerMapping?: CsvHeaderMapping
+  headerMapping?: CsvHeaderMapping,
+  delimiter: CsvDelimiter = detectCsvDelimiter(firstRow)
 ): CsvColumnMap {
-  const cells = splitCsvLine(firstRow).map(normalizeHeaderCell)
+  const cells = splitCsvLine(firstRow, delimiter).map(normalizeHeaderCell)
   const byIndex = new Map<number, HeaderField>()
   const fields = Object.keys(HEADER_ALIASES) as HeaderField[]
 
@@ -315,12 +340,13 @@ export function flagDuplicates(rows: PortfolioImportRow[]): PortfolioImportRow[]
 export function parseCsv(text: string, headerMapping?: CsvHeaderMapping): PortfolioImportRow[] {
   const rawRows = splitCsvRows(text)
   if (rawRows.length === 0) return []
-  const columns = resolveCsvColumns(rawRows[0], headerMapping)
+  const delimiter = detectCsvDelimiter(rawRows[0])
+  const columns = resolveCsvColumns(rawRows[0], headerMapping, delimiter)
   const start = columns.isHeader ? 1 : 0
 
   const rows: PortfolioImportRow[] = []
   for (let i = start; i < rawRows.length; i++) {
-    const cells = splitCsvLine(rawRows[i])
+    const cells = splitCsvLine(rawRows[i], delimiter)
     if (cells.every((cell) => cell.trim() === '')) continue
     rows.push(buildRow(fieldsFromCells(cells, columns.byIndex)))
   }

@@ -125,6 +125,19 @@ describe('ManualPortfolioRepository', () => {
 })
 
 describe('confirm persists only after confirm (spec §93)', () => {
+  it('keeps TSV thousands and comma-containing names intact after save and reload', async () => {
+    const store = tempStore()
+    const repository = new ManualPortfolioRepository(store)
+    const draft = createDraft('csv', parseCsv('Symbol\tName\tQuantity\tCost\nAAPL.US\tApple, Inc.\t1,000\t180.5'))
+    expect(draft.warnings).toEqual([])
+
+    const created = await repository.create(draftToPortfolioInput(draft, 'TSV import'))
+    const reloaded = await new ManualPortfolioRepository(store).get(created.id)
+    expect(reloaded?.holdings).toEqual([
+      { symbol: 'AAPL.US', name: 'Apple, Inc.', quantity: 1000, costPrice: 180.5 },
+    ])
+  })
+
   it('draft creation has zero side effects on disk', async () => {
     const store = tempStore()
     const repository = new ManualPortfolioRepository(store)
