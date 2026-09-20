@@ -376,6 +376,22 @@ describe('ProviderRouter.coverage + capabilityMapping', () => {
   });
 });
 
+/**
+ * JsonFileStore whose reads yield before completing, widening the
+ * read-modify-write window so that a lost-update regression interleaves
+ * deterministically under Promise.all (issue #145).
+ */
+class SlowReadJsonFileStore extends JsonFileStore {
+  constructor(dir: string, private readonly delayMs: number) {
+    super(dir);
+  }
+
+  override async read<T>(file: string, fallback: T): Promise<T> {
+    await new Promise((resolve) => setTimeout(resolve, this.delayMs));
+    return super.read<T>(file, fallback);
+  }
+}
+
 describe('ConnectionStore', () => {
   let dir = '';
   let store: JsonFileStore;
@@ -497,6 +513,59 @@ describe('ConnectionStore', () => {
     expect((await connections.getConfig('massive'))?.endpoint).toBe(
       'https://api.example.com/v1?symbol=AAPL'
     );
+  });
+
+  it('serializes concurrent setConfig so no provider config is silently dropped (issue #145)', async () => {
+    const connections = new ConnectionStore(new SlowReadJsonFileStore(dir, 20));
+    await Promise.all([
+      connections.setConfig('massive', {
+        enabled: true,
+        endpoint: 'https://a.example',
+        region: 'US',
+      }),
+      connections.setConfig('longbridge', {
+        enabled: false,
+        endpoint: 'https://b.example',
+        region: 'HK',
+      }),
+    ]);
+    const file = await store.read<{
+      connections: unknown[];
+      configs?: Record<string, Record<string, unknown>>;
+    }>('connections.json', { connections: [] });
+    expect(Object.keys(file.configs ?? {}).sort()).toEqual(['longbridge', 'massive']);
+    expect(file.configs?.massive).toMatchObject({ enabled: true, region: 'US' });
+    expect(file.configs?.longbridge).toMatchObject({ enabled: false, region: 'HK' });
+  });
+
+  it('serializes concurrent update and setConfig so both land (issue #145)', async () => {
+    const connections = new ConnectionStore(new SlowReadJsonFileStore(dir, 20));
+    await Promise.all([
+      connections.setConfig('massive', { enabled: true }),
+      connections.update({ providerId: 'massive', status: 'connected', lastCheck: 1 }),
+    ]);
+    const file = await store.read<{
+      connections: { providerId: string }[];
+      configs?: Record<string, Record<string, unknown>>;
+    }>('connections.json', { connections: [] });
+    expect(file.connections).toHaveLength(1);
+    expect(file.connections[0]?.providerId).toBe('massive');
+    expect(file.configs?.massive).toMatchObject({ enabled: true });
+  });
+
+  it('serializes concurrent setRouting and setConfig so both land (issue #145)', async () => {
+    const connections = new ConnectionStore(new SlowReadJsonFileStore(dir, 20));
+    await Promise.all([
+      connections.setConfig('massive', { enabled: true }),
+      connections.setRouting({ primary: 'massive', fallback: 'longbridge' }),
+    ]);
+    const file = await store.read<{
+      connections: unknown[];
+      configs?: Record<string, Record<string, unknown>>;
+      routing?: Record<string, string>;
+    }>('connections.json', { connections: [] });
+    expect(file.configs?.massive).toMatchObject({ enabled: true });
+    expect(file.routing).toMatchObject({ primary: 'massive', fallback: 'longbridge' });
   });
 });
 
