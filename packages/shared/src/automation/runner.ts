@@ -100,12 +100,24 @@ export async function runAutomation(
     const material = signalsAreMaterial(outcome.signals)
     if (material) {
       materialChanges += 1
-      analyzed += 1
-      await ctx.researchStart(symbol, rule.strategyId)
+      // A failing analysis or notification is recorded and degraded, exactly
+      // like the quote/calendar probes: it must never abort the whole rule
+      // (which would also drop the AutomationRun record) or skip the
+      // remaining symbols.
+      try {
+        await ctx.researchStart(symbol, rule.strategyId)
+        analyzed += 1
+      } catch {
+        failures.push(`${symbol}: research analysis failed`)
+      }
     }
     if (rule.notify === 'all' || material) {
-      await ctx.notify?.(notificationFor(rule, symbol, material, outcome.signals, ranAt, ctx.locale))
-      notified = true
+      try {
+        await ctx.notify?.(notificationFor(rule, symbol, material, outcome.signals, ranAt, ctx.locale))
+        notified = true
+      } catch {
+        failures.push(`${symbol}: notification failed`)
+      }
     }
   }
 

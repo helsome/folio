@@ -307,6 +307,37 @@ describe('runAutomation material filter', () => {
     await runAutomation(rule({ strategyId: 'event-driven' }), context)
     expect(researchCalls).toEqual(['AAPL.US'])
   })
+
+  it('degrades a failing research or notify callback into a recorded failure', async () => {
+    const { context, researchCalls, notifications } = makeContext({
+      quotes: {
+        'AAPL.US': quote(106, 100),
+        'MSFT.US': quote(106, 100),
+        'NVDA.US': quote(106, 100),
+      },
+    })
+    context.watchlistSymbols = async () => ['AAPL.US', 'MSFT.US', 'NVDA.US']
+    context.researchStart = async (symbol: string) => {
+      researchCalls.push(symbol)
+      if (symbol === 'AAPL.US') throw new Error('research backend offline')
+    }
+    context.notify = async (event: NotificationEvent) => {
+      notifications.push(event)
+      if (event.symbol === 'MSFT.US') throw new Error('notification bridge down')
+    }
+    const run = await runAutomation(rule({ notify: 'all' }), context)
+
+    // A failing side effect must not abort the rule or lose the run record.
+    expect(run.evaluated).toBe(3)
+    expect(run.materialChanges).toBe(3)
+    expect(run.analyzed).toBe(2)
+    expect(researchCalls).toEqual(['AAPL.US', 'MSFT.US', 'NVDA.US'])
+    expect(notifications.map((event) => event.symbol)).toEqual(['AAPL.US', 'MSFT.US', 'NVDA.US'])
+    expect(run.failures).toEqual([
+      'AAPL.US: research analysis failed',
+      'MSFT.US: notification failed',
+    ])
+  })
 })
 
 describe('runAutomation notify semantics', () => {
