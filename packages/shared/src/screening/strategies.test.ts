@@ -197,6 +197,17 @@ describe('market-movers rules', () => {
     expect(rule.compute(makeContext({ kline: bars(3), valuation: { symbol: 'AAPL.US' } }))).toBeNull()
   })
 
+  it('high-volume skips the kline ratio when the latest bar volume is unknown', () => {
+    const rule = getScreeningStrategy('high-volume')!
+    const klines = bars(30, 100, 1, 100_000)
+    // Yesterday spiked, but today's (latest bar) volume is missing/NaN —
+    // the ratio must stay unknown instead of labelling yesterday's spike as today.
+    klines[klines.length - 2] = { ...klines[klines.length - 2], volume: 400_000 }
+    klines[klines.length - 1] = { ...klines[klines.length - 1], volume: Number.NaN }
+    const result = rule.compute(makeContext({ kline: klines, valuation: { symbol: 'AAPL.US' } }))
+    expect(result).toBeNull()
+  })
+
   it('unusual-movement flags amplitude far above the 20d average', () => {
     const rule = getScreeningStrategy('unusual-movement')!
     const klines = bars(30, 100, 0, 1_000_000) // flat: amplitude ~2% per bar
