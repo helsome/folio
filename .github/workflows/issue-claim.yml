@@ -3,14 +3,18 @@ name: Issue Claim
 on:
   issue_comment:
     types: [created]
+  schedule:
+    - cron: '17 1 * * *'
+  workflow_dispatch:
 
 permissions:
   contents: read
   issues: write
+  pull-requests: read
 
 jobs:
   claim:
-    if: ${{ !github.event.issue.pull_request }}
+    if: ${{ github.event_name == 'issue_comment' && !github.event.issue.pull_request }}
     runs-on: ubuntu-latest
     steps:
       - name: Assign claimed issue
@@ -160,3 +164,157 @@ jobs:
               issue_number: issue.number,
               body: '该 Issue 已释放，可以重新认领。'
             });
+
+  stale-claims:
+    if: ${{ github.event_name == 'schedule' || github.event_name == 'workflow_dispatch' }}
+    runs-on: ubuntu-latest
+    steps:
+      - name: Remind and release stale claims
+        uses: actions/github-script@v9
+        with:
+          script: |
+            const owner = context.repo.owner;
+            const repo = context.repo.repo;
+            const now = Date.now();
+            const DAY = 24 * 60 * 60 * 1000;
+            const REMIND_AFTER = 7 * DAY;
+            const RELEASE_AFTER_REMINDER = 3 * DAY;
+
+            const claimFirstLine = firstLine => {
+              const commandClaim = /^(?:\/?claim|\/?take|\/?认领)$/i.test(firstLine);
+              const chineseClaim = /^(?:你好[，,！!。]?\s*)?(?:我想|我来|我要|我可以)?\s*(?:认领|接手)(?:\s*#?\d+)?(?:[（(].*)?[。！!]?$/i.test(firstLine)
+                || /^我来(?:也)?[。！!]?$/i.test(firstLine);
+              const englishClaim = /^(?:hi[,!]?\s*)?(?:i(?:'d| would)? like to|i want to|i can|i(?:'ll| will))\s+(?:take|work on|pick up)\s+(?:this|this one|it)(?:[.!])?$/i.test(firstLine)
+                || /^(?:please\s+)?assign\s+(?:this\s+)?(?:issue\s+)?to\s+me[.!]?$/i.test(firstLine);
+              return commandClaim || chineseClaim || englishClaim;
+            };
+            const releaseFirstLine = firstLine => /^(?:\/?release|\/?unclaim|\/?释放)$/i.test(firstLine);
+            const firstLineOf = body => String(body || '').trim().split(/\r?\n/, 1)[0].trim();
+            const reminderMarker = login => `<!-- stale-claim-reminder:${login} -->`;
+
+            const issues = await github.paginate(github.rest.issues.listForRepo, {
+              owner,
+              repo,
+              state: 'open',
+              labels: 'claimed',
+              per_page: 100
+            });
+            const openPrs = await github.paginate(github.rest.pulls.list, {
+              owner,
+              repo,
+              state: 'open',
+              per_page: 100
+            });
+
+            for (const issue of issues) {
+              if (issue.pull_request) continue;
+
+              const comments = await github.paginate(github.rest.issues.listComments, {
+                owner,
+                repo,
+                issue_number: issue.number,
+                per_page: 100
+              });
+
+              const assignees = (issue.assignees || []).map(a => a.login);
+              const staleAssignees = [];
+
+              for (const login of assignees) {
+                const userComments = comments.filter(c => c.user?.login === login);
+                const claims = userComments.filter(c => claimFirstLine(firstLineOf(c.body)));
+                if (claims.length === 0) continue;
+
+                const claim = claims.reduce((latest, c) =>
+                  new Date(c.created_at) > new Date(latest.created_at) ? c : latest
+                );
+                const claimAt = new Date(claim.created_at).getTime();
+
+                const linkedOpenPr = openPrs.some(pr => {
+                  if (pr.user?.login !== login) return false;
+                  const text = `${pr.title || ''}\n${pr.body || ''}`;
+                  return new RegExp(`(^|\\s|[([])#${issue.number}(?!\\d)`).test(text);
+                });
+                if (linkedOpenPr) continue;
+
+                const progressComments = userComments.filter(c => {
+                  const at = new Date(c.created_at).getTime();
+                  if (at <= claimAt) return false;
+                  const line = firstLineOf(c.body);
+                  if (claimFirstLine(line) || releaseFirstLine(line)) return false;
+                  return String(c.body || '').trim().length >= 10;
+                });
+
+                const lastProgressAt = progressComments.reduce(
+                  (latest, c) => Math.max(latest, new Date(c.created_at).getTime()),
+                  claimAt
+                );
+
+                if (now - lastProgressAt < REMIND_AFTER) continue;
+
+                const marker = reminderMarker(login);
+                const reminders = comments.filter(c =>
+                  c.user?.login === 'github-actions[bot]' &&
+                  String(c.body || '').includes(marker)
+                );
+                const latestReminder = reminders.length === 0
+                  ? null
+                  : reminders.reduce((latest, c) =>
+                      new Date(c.created_at) > new Date(latest.created_at) ? c : latest
+                    );
+
+                if (!latestReminder || new Date(latestReminder.created_at).getTime() < lastProgressAt) {
+                  await github.rest.issues.createComment({
+                    owner,
+                    repo,
+                    issue_number: issue.number,
+                    body: `${marker}\n@${login} 这个 Issue 已认领超过 7 天，目前没有发现关联的 open PR，也没有看到最近 7 天的进度更新。\n\n如果仍在推进，请在 **3 天内** 留一条简短进度说明（包括正在等待的前置依赖也可以）；如果已经有 PR，请贴出链接。若 3 天内没有回应，认领会自动释放，方便其他贡献者接手。`
+                  });
+                  continue;
+                }
+
+                const reminderAt = new Date(latestReminder.created_at).getTime();
+                const repliedAfterReminder = userComments.some(c =>
+                  new Date(c.created_at).getTime() > reminderAt &&
+                  !claimFirstLine(firstLineOf(c.body)) &&
+                  !releaseFirstLine(firstLineOf(c.body))
+                );
+
+                if (!repliedAfterReminder && now - reminderAt >= RELEASE_AFTER_REMINDER) {
+                  staleAssignees.push(login);
+                }
+              }
+
+              if (staleAssignees.length === 0) continue;
+
+              await github.rest.issues.removeAssignees({
+                owner,
+                repo,
+                issue_number: issue.number,
+                assignees: staleAssignees
+              });
+
+              const { data: refreshed } = await github.rest.issues.get({
+                owner,
+                repo,
+                issue_number: issue.number
+              });
+              if ((refreshed.assignees || []).length === 0) {
+                try {
+                  await github.rest.issues.removeLabel({
+                    owner,
+                    repo,
+                    issue_number: issue.number,
+                    name: 'claimed'
+                  });
+                } catch (error) {
+                  if (error.status !== 404) throw error;
+                }
+              }
+
+              await github.rest.issues.createComment({
+                owner,
+                repo,
+                issue_number: issue.number,
+                body: `${staleAssignees.map(a => `@${a}`).join(', ')} 在提醒后 3 天内没有进度回应，且仍未发现关联的 open PR；本次认领已自动释放。Issue 保持开放，可以重新认领。`
+              });
+            }
