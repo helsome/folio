@@ -256,6 +256,28 @@ describe('fundamental rules', () => {
     expect(metrics.revenueGrowth).toBe(12)
   })
 
+  it('never reads the oldest period when the newest one carries no number', () => {
+    // Longbridge-style multi-period account, newest first. The newest period
+    // ships only a yoy (value unknown to the provider), so the latest usable
+    // number is Q4 2026 = 12 — the oldest 30 must never be reported as latest.
+    const report = financialReport({})
+    report.statements.IS!.indicators[0].accounts = [
+      {
+        field: 'ROE',
+        name: 'ROE',
+        values: [
+          { fpEnd: NOW_SECONDS - 86_400, period: 'Q1 2027', year: 2027, value: Number.NaN, yoy: '20' },
+          { fpEnd: NOW_SECONDS - 90 * 86_400, period: 'Q4 2026', year: 2026, value: 12 },
+          { fpEnd: NOW_SECONDS - 180 * 86_400, period: 'Q3 2026', year: 2026, value: 30 },
+        ],
+      },
+    ]
+    const metrics = extractFinancialMetrics(makeContext({ financials: report }).data)
+    expect(metrics.roe).toBe(12)
+    // 12% is below the bar; the stale 30% must not produce a candidate.
+    expect(getScreeningStrategy('high-roe')!.compute(makeContext({ financials: report }))).toBeNull()
+  })
+
   it('high-dividend requires yield above the bar and cites payment history', () => {
     const rule = getScreeningStrategy('high-dividend')!
     const result = rule.compute(

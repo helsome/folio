@@ -184,7 +184,10 @@ function statementAccounts(report: FinancialReport | undefined, kind: 'IS' | 'BS
 function latestAccountValue(accounts: ReportAccount[], field: string): number | undefined {
   const account = accounts.find((entry) => entry.field === field)
   if (!account) return undefined
-  return account.values[0]?.value ?? account.values[account.values.length - 1]?.value
+  // Values are newest-first: the latest *reported* number is the first one with
+  // a usable value. Never fall back to the array tail — that is the oldest
+  // period and would report stale financials as the latest figures.
+  return account.values.find((entry) => entry.value !== undefined)?.value
 }
 
 function latestAccountYoy(accounts: ReportAccount[], field: string): number | undefined {
