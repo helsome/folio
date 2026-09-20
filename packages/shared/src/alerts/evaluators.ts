@@ -311,7 +311,12 @@ async function evaluatePositionWeight(
   const held =
     enriched !== undefined || (rawPositions?.some((p) => sameSymbol(p.symbol, rule.symbol)) ?? false);
   if (!held) return null;
-  const holdingValue = enriched ? (enriched.marketValueBase ?? enriched.marketValue) : undefined;
+  // Raw marketValue is denominated in the holding currency. Only compare it
+  // with totalAssets when both currencies are known to match.
+  const holdingCurrency = enriched?.currency?.trim().toUpperCase();
+  const baseCurrency = summary.baseCurrency?.trim().toUpperCase();
+  const sameCurrency = Boolean(holdingCurrency && baseCurrency && holdingCurrency === baseCurrency);
+  const holdingValue = enriched?.marketValueBase ?? (sameCurrency ? enriched?.marketValue : undefined);
   if (typeof holdingValue !== 'number') return null; // held, value unknown
 
   const weight = holdingValue / summary.totalAssets;
