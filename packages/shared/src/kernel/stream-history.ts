@@ -13,7 +13,7 @@
 import type { StreamEvent } from '@finagent/core';
 import type { StreamEventLog } from './stream-event-log.ts';
 
-/** 保留的最大 run 数（最早的新增 run 被淘汰）。 */
+/** 保留的最大 run 数（最久未活跃的 run 被淘汰）。 */
 const MAX_RUNS = 32;
 /** 单 run 内存缓冲的事件上限（截断后无法从头恢复 → 明确不可恢复）。 */
 const MAX_EVENTS_PER_RUN = 2000;
@@ -38,7 +38,7 @@ const TERMINAL_TYPES = new Set<StreamEvent['type']>(['run_completed', 'cancelled
 
 export class StreamEventHistory {
   private readonly runs = new Map<string, StreamEvent[]>();
-  /** FIFO LRU 顺序，用于淘汰最久未更新的 run。 */
+  /** LRU 顺序（队尾 = 最近活跃），用于淘汰最久未更新的 run。 */
   private readonly order: string[] = [];
   private readonly log?: StreamEventLog;
 
@@ -77,6 +77,11 @@ export class StreamEventHistory {
       const last = list[list.length - 1];
       if (event.sequence <= last.sequence) return false;
       list.push(event);
+      // 已有 run 再次成功追加 → 刷新到 LRU 队尾（issue #146）：否则淘汰
+      // 实际按首次出现顺序 FIFO，最近仍活跃的 run 会先于陈旧 run 被淘汰。
+      const orderIndex = this.order.indexOf(event.runId);
+      if (orderIndex >= 0) this.order.splice(orderIndex, 1);
+      this.order.push(event.runId);
       if (list.length > MAX_EVENTS_PER_RUN) {
         list.splice(0, list.length - MAX_EVENTS_PER_RUN);
       }
