@@ -126,6 +126,7 @@ export class RunManager {
   private readonly budgetInput: ResolveBudgetInput;
   private readonly searchToolPatterns: readonly string[];
   private readonly runawayPolicy: Partial<RunawayPolicy>;
+  private startingSessionId: string | null = null;
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly streamListeners = new Set<(sessionId: string, event: StreamEvent) => void>();
   private activeRun: ActiveRun | null = null;
@@ -175,12 +176,12 @@ export class RunManager {
 
   /** Whether a run is currently executing (Pi runtime executes one at a time). */
   isRunning(): boolean {
-    return this.activeRun !== null;
+    return this.startingSessionId !== null || this.activeRun !== null;
   }
 
   /** Whether a run is currently executing for the given session. */
   hasActiveRun(sessionId: string): boolean {
-    return this.activeRun?.sessionId === sessionId;
+    return this.startingSessionId === sessionId || this.activeRun?.sessionId === sessionId;
   }
 
   /**
@@ -203,13 +204,30 @@ export class RunManager {
     if (!text) {
       throw createCodeError('INVALID_ARGUMENT', 'Message content is required.');
     }
-    if (this.activeRun) {
+    if (this.isRunning()) {
       throw createCodeError(
         'RUN_IN_PROGRESS',
         'Another run is still in progress. Stop it before sending a new message.'
       );
     }
 
+    // Reserve the single runtime before any asynchronous lookup or persistence.
+    // A failed start must release the reservation so the caller can retry.
+    this.startingSessionId = sessionId;
+    try {
+      return await this.prepareRun(sessionId, text, workspaceContext, locale, budgetOverrides);
+    } finally {
+      this.startingSessionId = null;
+    }
+  }
+
+  private async prepareRun(
+    sessionId: string,
+    text: string,
+    workspaceContext?: WorkspaceContext,
+    locale?: SupportedLocale,
+    budgetOverrides?: RunBudgetLimits
+  ): Promise<Run> {
     const session = await this.sessions.getSession(sessionId);
     if (!session) {
       throw createCodeError('SESSION_NOT_FOUND', `Session ${sessionId} was not found.`);

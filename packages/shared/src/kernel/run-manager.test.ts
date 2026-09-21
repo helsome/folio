@@ -1,7 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
-import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, spyOn } from 'bun:test';
 import type {
   AgentEvent,
   AgentEventPayload,
@@ -153,6 +153,67 @@ function completedScript(answer: string): (input: AgentRunInput) => AsyncIterabl
 }
 
 describe('RunManager', () => {
+  for (const sameSession of [true, false]) {
+    it(`rejects concurrent starts during session lookup (${sameSession ? 'same' : 'different'} session)`, async () => {
+      const setup = Promise.withResolvers<void>();
+      const runtimeGate = Promise.withResolvers<void>();
+      const { sessions, runs, runtime } = makeKernel(completedScript('Done'), {}, runtimeGate.promise);
+      const first = await sessions.createSession('First');
+      const second = sameSession ? first : await sessions.createSession('Second');
+      const getSession = sessions.getSession.bind(sessions);
+      const lookup = spyOn(sessions, 'getSession').mockImplementation(async (id) => {
+        await setup.promise;
+        return getSession(id);
+      });
+      const pending = Promise.allSettled([
+        runs.startRun(first.id, 'first question'),
+        runs.startRun(second.id, 'second question'),
+      ]);
+      setup.resolve();
+      const results = await pending;
+      lookup.mockRestore();
+      runtimeGate.resolve();
+      // Drain even the buggy two-run baseline before asserting or removing storage.
+      await waitFor(async () => {
+        const finished = await Promise.all(results.map(async (result) =>
+          result.status === 'rejected' ||
+          (await sessions.getRun(result.value.sessionId, result.value.id))?.status === 'completed'
+        ));
+        return finished.every(Boolean) && !runs.isRunning();
+      });
+      expect(results[0].status).toBe('fulfilled');
+      expect(results[1]).toMatchObject({ status: 'rejected', reason: { code: 'RUN_IN_PROGRESS' } });
+      expect(runtime.ensureSessionCalls).toHaveLength(1);
+      expect((await sessions.listMessages(first.id)).map((message) => message.content)).toEqual(['first question', 'Done']);
+      if (!sameSession) expect(await sessions.listMessages(second.id)).toEqual([]);
+    });
+  }
+
+  it('reports a starting session as busy and releases it after a lookup failure', async () => {
+    const setup = Promise.withResolvers<void>();
+    const { sessions, runs } = makeKernel(completedScript('Recovered'));
+    const session = await sessions.createSession('A');
+    const lookup = spyOn(sessions, 'getSession').mockImplementationOnce(async () => {
+      await setup.promise;
+      throw new Error('storage unavailable');
+    });
+    const pending = runs.startRun(session.id, 'failed attempt');
+    const busy = runs.isRunning();
+    const sessionBusy = runs.hasActiveRun(session.id);
+    const otherBusy = runs.hasActiveRun('other');
+    setup.resolve();
+    await expect(pending).rejects.toThrow('storage unavailable');
+    lookup.mockRestore();
+    expect(runs.isRunning()).toBe(false);
+    expect(runs.hasActiveRun(session.id)).toBe(false);
+    await runs.startRun(session.id, 'retry');
+    await waitFor(async () => !runs.isRunning());
+    expect((await sessions.listMessages(session.id)).map((message) => message.content)).toEqual(['retry', 'Recovered']);
+    expect(busy).toBe(true);
+    expect(sessionBusy).toBe(true);
+    expect(otherBusy).toBe(false);
+  });
+
   it('runs a full loop: run_started → tools → deltas → run_completed, persisted', async () => {
     const { sessions, runs, runtime, store } = makeKernel(completedScript('Portfolio risk is moderate.'));
     const session = await sessions.createSession('Portfolio Review');
