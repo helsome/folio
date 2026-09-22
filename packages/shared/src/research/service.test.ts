@@ -37,6 +37,17 @@ function makeService(
   });
 }
 
+/**
+ * Poll until the run reaches a terminal status.
+ *
+ * The budget is wall-clock based, not iteration based: a fixed `100 × 5ms`
+ * loop only buys ~500–700ms on a loaded machine, which is shorter than the
+ * time the research pipeline itself needs once every poll round-trips through
+ * the on-disk run store. On slower machines / saturated CI runners that made
+ * otherwise healthy runs look like "did not reach a terminal status" failures.
+ */
+const TERMINAL_WAIT_MS = 5_000;
+
 async function waitForTerminal(
   service: ResearchService,
   runId: string
@@ -47,11 +58,12 @@ async function waitForTerminal(
     'failed',
     'cancelled',
   ]);
-  for (let i = 0; i < 100; i += 1) {
+  const deadline = Date.now() + TERMINAL_WAIT_MS;
+  do {
     const run = await service.getRun(runId);
     if (run && terminal.has(run.status)) return run.status;
     await new Promise((resolve) => setTimeout(resolve, 5));
-  }
+  } while (Date.now() < deadline);
   throw new Error(`run ${runId} did not reach a terminal status`);
 }
 
@@ -163,6 +175,25 @@ describe('ResearchService', () => {
     const reports = await service.listReports('NVDA.US');
     expect(reports).toHaveLength(1);
     expect(reports[0].strategyId).toBe('value');
+  });
+
+  it('keeps polling past the old fixed 500ms budget when the pipeline is slow', async () => {
+    const service = makeService(RESEARCH_CAPABILITY_PLAN.map((id) => [id, 'success' as const]));
+    const realGetRun = service.getRun.bind(service);
+    const startedAt = Date.now();
+    // Emulate a pipeline that only settles after 800ms of wall-clock — longer
+    // than the previous fixed `100 × 5ms` poll budget could ever cover. The
+    // run itself is healthy, so waiting must still resolve to `completed`.
+    service.getRun = async (runId: string) => {
+      const run = await realGetRun(runId);
+      if (run && Date.now() - startedAt < 800) {
+        return { ...run, status: 'running' as ResearchRunStatus };
+      }
+      return run;
+    };
+
+    const queued = await service.start('NVDA.US');
+    expect(await waitForTerminal(service, queued.id)).toBe('completed');
   });
 
   it('rejects an unknown strategy id', async () => {
