@@ -24,6 +24,7 @@ import {
   planForStrategy,
   type PlannedCapability,
 } from './planner.ts';
+import { snapshotCapabilityEvidence } from './source-provenance.ts';
 
 const CONCURRENCY = 4;
 const TIMEOUT_MS = 20000;
@@ -321,7 +322,7 @@ function assembleReport(args: {
   const sections: ResearchSection[] = synthesis.sections.map((section) => {
     const outcome = outcomeByCapability.get(section.key);
     const evidence: EvidenceRef[] = [];
-    if (outcome && outcome.record.status === 'success') {
+    if (outcome && outcome.record.status === 'success' && outcome.result) {
       const instrumentId =
         outcome.result?.provenance?.instrumentId ?? readInstrumentId(outcome.result?.data);
       evidence.push({
@@ -331,6 +332,11 @@ function assembleReport(args: {
         fetchedAt: outcome.record.provenance?.fetchedAt ?? generatedAt,
         summary: outcome.result?.summary,
         ...(instrumentId ? { instrumentId } : {}),
+        sourceSnapshots: snapshotCapabilityEvidence({
+          capabilityId: outcome.record.capabilityId,
+          result: outcome.result,
+          retrievedAt: outcome.record.provenance?.fetchedAt ?? generatedAt,
+        }),
       });
     }
     return { ...section, evidence };

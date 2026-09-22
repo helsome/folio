@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
-import type { ResearchRunSummary } from '@finagent/core';
+import { Type } from '@sinclair/typebox';
+import type { FinanceCapability, ResearchRunSummary } from '@finagent/core';
 import { createCapabilityRegistry } from '../capabilities/index.ts';
 import { LocalResearchSynthesizer } from './synthesizer-local.ts';
 import { ResearchRunner } from './runner.ts';
@@ -60,6 +61,13 @@ describe('ResearchRunner', () => {
       for (const ref of section.evidence) {
         expect(runIds.has(ref.runId)).toBe(true);
         expect(ref.capabilityId).toBe(section.key);
+        // Every persisted report evidence ref carries an immutable source
+        // snapshot; a later live retrieval cannot silently replace it.
+        expect(ref.sourceSnapshots).toHaveLength(1);
+        expect(ref.sourceSnapshots![0]).toMatchObject({
+          schemaVersion: 'folio-source-provenance/v1',
+          retrievedAt: 1_700_000_000_000,
+        });
       }
     }
   });
@@ -93,6 +101,41 @@ describe('ResearchRunner', () => {
 
     // Absent capabilities are never silently dropped from the report.
     expect(result.report!.capabilityRuns).toHaveLength(RESEARCH_CAPABILITY_PLAN.length);
+  });
+
+  it('persists per-article provenance from the real research.news report assembly path', async () => {
+    const news: FinanceCapability = {
+      id: 'research.news', name: 'News', description: 'Controlled news source', category: 'research',
+      riskLevel: 'read', auth: 'public', toolName: 'get_news', inputSchema: Type.Object({ symbol: Type.String() }),
+      async execute() {
+        return {
+          data: [{
+            id: 'article-1', title: 'Issuer result', summary: 'Revenue grew 10%.',
+            url: 'https://news.example.test/result?utm_source=research', timestamp: 1_700_000_000,
+            symbols: ['NVDA.US'],
+          }],
+          provenance: { provider: 'controlled-news', fetchedAt: 1_700_000_001_000, stale: false },
+          summary: 'One issuer result.',
+        };
+      },
+    };
+    const registry = createCapabilityRegistry([
+      ...RESEARCH_CAPABILITY_PLAN.filter((id) => id !== 'research.news').map((id) => fakeCap(id)),
+      news,
+    ]);
+    const runner = new ResearchRunner({
+      registry, synthesizer: new LocalResearchSynthesizer(), now: () => 1_700_000_002_000,
+    });
+
+    const result = await runner.run({ symbol: 'NVDA.US', runId: 'run-news-snapshot' });
+    const snapshot = result.report!.sections.find((section) => section.key === 'research.news')!.evidence[0].sourceSnapshots![0];
+
+    expect(snapshot).toMatchObject({
+      documentId: 'article-1', canonicalUrl: 'https://news.example.test/result',
+      excerpt: 'Issuer result\n\nRevenue grew 10%.',
+      retrievedAt: 1_700_000_001_000,
+      retrieval: { provider: 'controlled-news', method: 'capability:research.news' },
+    });
   });
 
   it('fails when no capability succeeds', async () => {
