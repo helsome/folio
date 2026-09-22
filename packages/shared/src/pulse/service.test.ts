@@ -280,6 +280,34 @@ describe('portfolioExposurePercent', () => {
     expect(portfolioExposurePercent('AAPL.US')).toBeUndefined()
     expect(portfolioExposurePercent('AAPL.US', { ...PORTFOLIO, totalAssets: undefined })).toBeUndefined()
   })
+
+  it('does not divide an unconverted marketValue by a base-currency total', () => {
+    // 780,000 HKD is NOT 780% of a 100,000 USD book — without a converted
+    // marketValueBase the exposure is simply unknown.
+    const crossCurrency: PortfolioSnapshot = {
+      baseCurrency: 'USD',
+      totalAssets: 100_000,
+      accounts: [],
+      holdings: [
+        { symbol: '0700.HK', name: 'Tencent', currency: 'HKD', marketValue: 780_000 },
+      ],
+      fetchedAt: NOW_MS,
+    }
+    expect(portfolioExposurePercent('0700.HK', crossCurrency)).toBeUndefined()
+  })
+
+  it('uses marketValue when the holding currency matches the base currency', () => {
+    const sameCurrency: PortfolioSnapshot = {
+      baseCurrency: 'HKD',
+      totalAssets: 1_000_000,
+      accounts: [],
+      holdings: [
+        { symbol: '0700.HK', name: 'Tencent', currency: 'HKD', marketValue: 780_000 },
+      ],
+      fetchedAt: NOW_MS,
+    }
+    expect(portfolioExposurePercent('0700.HK', sameCurrency)).toBe(78)
+  })
 })
 
 describe('computePersonalImpact', () => {
