@@ -287,6 +287,40 @@ describe('runAutomation material filter', () => {
     expect(researchCalls).toEqual(['AAPL.US'])
   })
 
+  it('ignores historical earnings events outside the freshness window (#168)', async () => {
+    const stale: CalendarEvent = {
+      id: 'e-old',
+      date: 1_700_000_000 - 30 * 86_400, // 30 days ago — still in the "recent 5" list
+      type: 'report',
+      symbol: 'AAPL.US',
+    }
+    const { context, researchCalls } = makeContext({
+      quotes: { 'AAPL.US': quote(100, 100) },
+      events: [stale],
+    })
+    context.watchlistSymbols = async () => ['AAPL.US']
+    const run = await runAutomation(rule({}), context)
+    expect(run.materialChanges).toBe(0)
+    expect(researchCalls).toEqual([])
+  })
+
+  it('still treats an earnings event inside the freshness window as announced', async () => {
+    const recent: CalendarEvent = {
+      id: 'e-new',
+      date: 1_700_000_000 - 86_400, // 1 day ago
+      type: 'report',
+      symbol: 'AAPL.US',
+    }
+    const { context, researchCalls } = makeContext({
+      quotes: { 'AAPL.US': quote(100, 100) },
+      events: [recent],
+    })
+    context.watchlistSymbols = async () => ['AAPL.US']
+    const run = await runAutomation(rule({}), context)
+    expect(run.materialChanges).toBe(1)
+    expect(researchCalls).toEqual(['AAPL.US'])
+  })
+
   it('skips symbols whose quote is unavailable', async () => {
     const { context, researchCalls } = makeContext({
       quotes: { 'AAPL.US': quote(106, 100) },
