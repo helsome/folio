@@ -1,5 +1,8 @@
 import { describe, expect, it } from 'bun:test';
 import { createMarketQuoteCapability } from './manifests/market-quote.ts';
+import { createMarketKlineCapability } from './manifests/market-kline.ts';
+import { createMarketIntradayCapability } from './manifests/market-intraday.ts';
+import { createResearchNewsCapability } from './manifests/research-news.ts';
 import type { CapabilityFetchers } from './fetchers.ts';
 
 const quote = {
@@ -79,5 +82,64 @@ describe('market.quote manifest', () => {
     expect(cap.auth).toBe('public');
     expect(cap.category).toBe('market');
     expect(cap.riskLevel).toBe('read');
+  });
+});
+
+// Kline / intraday / news timestamps are epoch SECONDS (each manifest's own
+// formatter does `timestamp * 1000`), but `provenance.marketTime` is epoch MS
+// everywhere else — `market.quote` writes `quote.timestamp * 1000` and the
+// longbridge adapter's `marketTimeMsFrom()` multiplies by 1000.
+const SECOND_TS = 1710000000;
+
+describe('provenance.marketTime is epoch milliseconds', () => {
+  it('market.kline converts the last bar timestamp from seconds', async () => {
+    const cap = createMarketKlineCapability(
+      fetchers({
+        getKline: async () => [
+          { symbol: 'AAPL.US', timestamp: SECOND_TS - 86400, open: 1, high: 1, low: 1, close: 1, volume: 1 },
+          { symbol: 'AAPL.US', timestamp: SECOND_TS, open: 2, high: 2, low: 2, close: 2, volume: 2 },
+        ],
+      })
+    );
+    const result = await cap.execute({ symbol: 'AAPL.US' }, { now: () => 12345 });
+    expect(result.provenance.marketTime).toBe(SECOND_TS * 1000);
+  });
+
+  it('market.intraday converts the last tick timestamp from seconds', async () => {
+    const cap = createMarketIntradayCapability(
+      fetchers({
+        getIntraday: async () => [
+          { symbol: 'AAPL.US', timestamp: SECOND_TS - 60, price: 199, volume: 10 },
+          { symbol: 'AAPL.US', timestamp: SECOND_TS, price: 200, volume: 20 },
+        ],
+      })
+    );
+    const result = await cap.execute({ symbol: 'AAPL.US' }, { now: () => 12345 });
+    expect(result.provenance.marketTime).toBe(SECOND_TS * 1000);
+  });
+
+  it('research.news converts the latest item timestamp from seconds', async () => {
+    const cap = createResearchNewsCapability(
+      fetchers({
+        getNews: async () => [
+          {
+            id: 'n-1',
+            title: 'Apple ships',
+            summary: 'A summary.',
+            url: 'https://example.com/n1',
+            timestamp: SECOND_TS,
+            symbols: ['AAPL.US'],
+          },
+        ],
+      })
+    );
+    const result = await cap.execute({ symbol: 'AAPL.US' }, { now: () => 12345 });
+    expect(result.provenance.marketTime).toBe(SECOND_TS * 1000);
+  });
+
+  it('leaves marketTime undefined when the series is empty', async () => {
+    const cap = createMarketKlineCapability(fetchers({ getKline: async () => [] }));
+    const result = await cap.execute({ symbol: 'AAPL.US' }, { now: () => 12345 });
+    expect(result.provenance.marketTime).toBeUndefined();
   });
 });

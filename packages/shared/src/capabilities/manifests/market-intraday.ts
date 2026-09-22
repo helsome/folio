@@ -24,12 +24,15 @@ export function createMarketIntradayCapability(
     async execute(input, ctx) {
       const symbol = normalizeSymbol(input.symbol);
       const data = await fetchers.getIntraday(symbol);
+      // IntradayData.timestamp is epoch SECONDS (see formatIntraday below);
+      // provenance.marketTime is epoch MS everywhere else.
+      const latest = data[data.length - 1];
       return {
         data,
         provenance: {
           provider: 'longbridge',
           fetchedAt: (ctx?.now ?? Date.now)(),
-          marketTime: data[data.length - 1]?.timestamp,
+          marketTime: latest === undefined ? undefined : latest.timestamp * 1000,
           stale: false,
         },
         summary: formatIntraday(symbol, data),

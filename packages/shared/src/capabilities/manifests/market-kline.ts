@@ -43,12 +43,16 @@ export function createMarketKlineCapability(
       const period = input.period ?? '1d';
       const limit = input.limit ?? 100;
       const klines = await fetchers.getKline({ symbol, period, limit });
+      // Kline.timestamp is epoch SECONDS (see formatKline below); every other
+      // producer writes provenance.marketTime in epoch MS (market.quote does
+      // `timestamp * 1000`, longbridge's marketTimeMsFrom() the same).
+      const latest = klines[klines.length - 1];
       return {
         data: klines,
         provenance: {
           provider: 'longbridge',
           fetchedAt: (ctx?.now ?? Date.now)(),
-          marketTime: klines[klines.length - 1]?.timestamp,
+          marketTime: latest === undefined ? undefined : latest.timestamp * 1000,
           stale: false,
         },
         summary: formatKline(symbol, period, klines),

@@ -29,12 +29,15 @@ export function createResearchNewsCapability(
       // summaries, research data bundles, Copilot tool results) sees
       // neutralized text only.
       const news = sanitizeNewsItems(await fetchers.getNews(symbol));
+      // NewsItem.timestamp is epoch SECONDS (see formatNews below);
+      // provenance.marketTime is epoch MS everywhere else.
+      const latest = news[0];
       return {
         data: news,
         provenance: {
           provider: 'longbridge',
           fetchedAt: (ctx?.now ?? Date.now)(),
-          marketTime: news[0]?.timestamp,
+          marketTime: latest === undefined ? undefined : latest.timestamp * 1000,
           stale: false,
         },
         summary: formatNews(symbol, news),
