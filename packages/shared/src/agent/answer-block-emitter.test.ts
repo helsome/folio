@@ -80,6 +80,28 @@ describe('buildQuoteAnswerBlocks', () => {
       expect([...times].sort()).toEqual(times);
     }
   });
+
+  it('renders epoch-SECOND kline timestamps as real dates, not 1970 (#167)', () => {
+    // Repo convention: Kline.timestamp is epoch seconds (longbridge normalizer).
+    // 2026-01-10T00:00:00Z → 1768003200.
+    const seconds: Kline[] = Array.from({ length: 5 }, (_, index) => ({
+      symbol: 'AAPL.US',
+      timestamp: 1_768_003_200 + index * 86_400,
+      open: 100 + index,
+      high: 101 + index,
+      low: 99 + index,
+      close: 100.5 + index,
+      volume: 1000 + index,
+    }));
+    const blocks = buildQuoteAnswerBlocks(quote, seconds, ['get_quote-1']);
+    const chart = blocks.find((block) => block.type === 'time_series_chart');
+    expect(chart?.type).toBe('time_series_chart');
+    if (chart?.type === 'time_series_chart') {
+      expect(chart.asOf).toBe('2026-01-14T00:00:00.000Z');
+      expect(chart.points[0].t).toBe('2026-01-10T00:00:00.000Z');
+      expect(chart.points[4].t).toBe('2026-01-14T00:00:00.000Z');
+    }
+  });
 });
 
 describe('buildPortfolioTableBlock', () => {
