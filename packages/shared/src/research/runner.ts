@@ -282,44 +282,46 @@ function buildDataBundle(
   const bundle: Record<string, unknown> = {};
   for (const outcome of outcomes) {
     if (outcome.record.status === 'success' && outcome.result) {
-      if (
-        outcome.record.capabilityId === 'research.news' &&
-        Array.isArray(outcome.result.data)
-      ) {
-        const sources = toRetrievalSources(
-          outcome.result.data,
-          outcome.result.provenance.provider
+      if (outcome.record.capabilityId === 'research.news') {
+        const provider = outcome.result.provenance?.provider ?? 'unknown';
+        let items = truncateData(
+          outcome.record.capabilityId,
+          outcome.result.data
         );
-        const ranking = rankRetrievalSources(sources, {
-          query,
-          now,
-          topK: 10,
-          maxPerDomain: 2,
-        });
-        // Security: preserve the untrusted-content envelope added upstream
-        // while ranking and deduplicating the news items inside it.
-        bundle[outcome.record.capabilityId] = {
-          trust: 'untrusted',
-          provider: outcome.result.provenance?.provider ?? 'unknown',
-          items: ranking.selected.map((item) => ({
+        if (Array.isArray(outcome.result.data)) {
+          const sources = toRetrievalSources(outcome.result.data, provider);
+          const ranking = rankRetrievalSources(sources, {
+            query,
+            now,
+            topK: 10,
+            maxPerDomain: 2,
+          });
+          items = ranking.selected.map((item) => ({
             ...item.source,
             canonicalUrl: item.canonicalUrl,
             sourceClass: item.sourceClass,
             clusterId: item.clusterId,
             qualityScore: item.qualityScore,
-          })),
-        };
-        bundle['research.news:ranking'] = {
-          policyVersion: ranking.policyVersion,
-          independentSourceCount: ranking.independentSourceCount,
-          clusters: ranking.clusters,
-          decisions: [...ranking.selected, ...ranking.dropped].map((item) => ({
-            sourceId: item.source.id,
-            originalRank: item.originalRank,
-            clusterId: item.clusterId,
-            selected: item.selected,
-            reason: item.decisionReason,
-          })),
+          }));
+          bundle['research.news:ranking'] = {
+            policyVersion: ranking.policyVersion,
+            independentSourceCount: ranking.independentSourceCount,
+            clusters: ranking.clusters,
+            decisions: [...ranking.selected, ...ranking.dropped].map((item) => ({
+              sourceId: item.source.id,
+              originalRank: item.originalRank,
+              clusterId: item.clusterId,
+              selected: item.selected,
+              reason: item.decisionReason,
+            })),
+          };
+        }
+        // Security: every external news payload remains explicitly untrusted,
+        // including malformed provider responses that cannot be ranked.
+        bundle[outcome.record.capabilityId] = {
+          trust: 'untrusted',
+          provider,
+          items,
         };
         continue;
       }

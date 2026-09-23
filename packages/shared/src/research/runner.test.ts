@@ -191,6 +191,33 @@ describe('ResearchRunner', () => {
     });
   });
 
+  it('keeps malformed news payloads inside the untrusted envelope', async () => {
+    const news = fakeCap('research.news');
+    news.execute = async () => ({
+      data: { message: 'provider returned an unexpected payload' },
+      provenance: { provider: 'test', fetchedAt: 1, stale: false },
+    });
+    let observed: Record<string, unknown> = {};
+    const runner = new ResearchRunner({
+      registry: createCapabilityRegistry([news]),
+      synthesizer: {
+        async synthesize(input) {
+          observed = JSON.parse(input.dataBundle) as Record<string, unknown>;
+          return new LocalResearchSynthesizer().synthesize(input);
+        },
+      },
+    });
+
+    await runner.run({ symbol: 'NVDA.US', runId: 'malformed-news' });
+
+    expect(observed['research.news']).toEqual({
+      trust: 'untrusted',
+      provider: 'test',
+      items: { message: 'provider returned an unexpected payload' },
+    });
+    expect(observed['research.news:ranking']).toBeUndefined();
+  });
+
   it('cancels mid-fetch when the signal aborts', async () => {
     const runner = makeRunner([
       ['company.profile', 'success'],
