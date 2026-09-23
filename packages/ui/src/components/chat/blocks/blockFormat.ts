@@ -24,9 +24,21 @@ export function formatBlockValue(value: number, unit: AnswerBlockUnit, currency?
   }
 }
 
-/** Signed variant for change deltas (price/percent units only). */
+/**
+ * Signed variant for change deltas (price/percent units only).
+ *
+ * `formatPercent` is the repo's *signed* percent formatter — it already prefixes
+ * a `+` for gains and `Intl` renders the `-` for losses. Formatting the
+ * magnitude through it and adding a second sign here produced `++1.5%` for a
+ * gain and `−+1.5%` for a loss in the metric grid. Render the magnitude as a
+ * ratio instead so the sign is applied exactly once.
+ */
 export function formatBlockChange(value: number, unit: AnswerBlockUnit, currency?: string): string {
-  const formatted = formatBlockValue(Math.abs(value), unit, currency);
+  const magnitude = Math.abs(value);
+  const formatted =
+    unit === 'percent'
+      ? formatPercentRatio(magnitude / 100)
+      : formatBlockValue(magnitude, unit, currency);
   return `${value > 0 ? '+' : value < 0 ? '−' : ''}${formatted}`;
 }
 
