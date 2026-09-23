@@ -52,6 +52,15 @@ describe('buildFinancialEvidence', () => {
     expect(first.lineage.at(-1)?.version).toBe('folio-normalization/v1');
   });
 
+  it('keeps 6-digit A-share symbol arguments as the instrument id', () => {
+    const records = buildFinancialEvidence({
+      sessionId: 'session-1',
+      runId: 'run-1',
+      toolCalls: [call({ args: { symbol: '600519.SH' } })],
+    });
+    expect(records[0].instrumentId).toBe('600519.SH');
+  });
+
   it('supports fundamental and historical results', () => {
     const records = buildFinancialEvidence({
       sessionId: 's',

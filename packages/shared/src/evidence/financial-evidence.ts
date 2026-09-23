@@ -175,7 +175,7 @@ function redact(value: unknown): unknown {
 function canonicalInstrument(value: unknown): string | undefined {
   if (typeof value !== 'string') return undefined;
   const normalized = value.trim().toUpperCase();
-  return /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/.test(normalized) ? normalized : undefined;
+  return /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/.test(normalized) ? normalized : undefined;
 }
 
 function inferSymbol(data: unknown): unknown {

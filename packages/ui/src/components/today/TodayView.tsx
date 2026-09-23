@@ -151,7 +151,7 @@ export const TodayView: React.FC = () => {
   const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
     if (event.key !== 'Enter') return
     const value = searchQuery.trim().toUpperCase()
-    if (/^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/.test(value)) {
+    if (/^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/.test(value)) {
       setActiveSymbol(value)
       setNavSection('watchlist')
       setSearchQuery('')

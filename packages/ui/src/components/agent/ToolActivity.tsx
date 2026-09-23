@@ -25,7 +25,7 @@ function displaySymbol(args: Record<string, unknown>): string | null {
   const symbol = args.symbol;
   if (typeof symbol !== 'string') return null;
   const normalized = symbol.trim().toUpperCase();
-  return /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/.test(normalized) ? normalized : null;
+  return /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/.test(normalized) ? normalized : null;
 }
 
 /** Compact, collapsible tool timeline for live and persisted agent runs. */

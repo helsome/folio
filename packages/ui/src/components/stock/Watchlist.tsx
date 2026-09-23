@@ -19,7 +19,7 @@ import { Button } from '../primitives/Button';
 import { DataFreshness } from '../primitives/DataFreshness';
 import { DemoBadge } from '../primitives/DemoBadge';
 
-const SYMBOL_REGEX = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
+const SYMBOL_REGEX = /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/;
 const DASH = '\u2014';
 
 const formatPrice = (value: number): string => `$${value.toFixed(2)}`;

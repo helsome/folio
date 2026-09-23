@@ -13,7 +13,7 @@ interface AlertFormProps {
   onCancel: () => void;
 }
 
-const SYMBOL_REGEX = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
+const SYMBOL_REGEX = /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/;
 
 export const AlertForm: React.FC<AlertFormProps> = ({
   symbol: initialSymbol = '',

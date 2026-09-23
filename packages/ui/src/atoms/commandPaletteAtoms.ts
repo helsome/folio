@@ -85,7 +85,7 @@ const DEFAULT_LABELS: PaletteLabels = {
 }
 
 /** Fully-qualified `CODE.MARKET` symbol (same markets as the Watchlist). */
-const SYMBOL_PATTERN = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/
+const SYMBOL_PATTERN = /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/
 
 /**
  * Normalize a fully-qualified free-text symbol (`CODE.MARKET`) to uppercase,

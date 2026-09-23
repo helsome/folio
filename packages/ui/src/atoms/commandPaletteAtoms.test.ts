@@ -18,6 +18,11 @@ describe('normalizeSymbolInput', () => {
     expect(normalizeSymbolInput('  aapl.us ')).toBe('AAPL.US')
   })
 
+  it('accepts 6-digit A-share codes', () => {
+    expect(normalizeSymbolInput('600519.sh')).toBe('600519.SH')
+    expect(normalizeSymbolInput('000001.SZ')).toBe('000001.SZ')
+  })
+
   it('rejects bare tickers (watchlist-only search)', () => {
     expect(normalizeSymbolInput('nvda')).toBeNull()
     expect(normalizeSymbolInput('aapl')).toBeNull()

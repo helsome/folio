@@ -28,7 +28,7 @@ import { ContentReveal } from '../motion/ContentReveal';
 import { useFinagentClient } from '../../client';
 
 const POLL_MS = 900;
-const SYMBOL_REGEX = /^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
+const SYMBOL_REGEX = /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/;
 
 /** localStorage key for the last strategy chosen for a symbol (V9 §20). */
 function lastStrategyKey(symbol: string): string {

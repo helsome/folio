@@ -65,7 +65,7 @@ export class ResearchService {
 
   private async startNew(symbol: string, strategyId?: StrategyId, locale?: SupportedLocale): Promise<ResearchRunSummary> {
     const key = symbol.trim().toUpperCase();
-    if (!/^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/.test(key)) {
+    if (!/^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/.test(key)) {
       throw createCodeError('RESEARCH_SYMBOL_INVALID', 'Research requires a valid market symbol.');
     }
     if (strategyId !== undefined && !isStrategyId(strategyId)) {

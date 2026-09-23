@@ -3,7 +3,7 @@
 import { z } from 'zod';
 
 // Symbol validation regex
-const SYMBOL_REGEX = /^[A-Z]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/;
+const SYMBOL_REGEX = /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/;
 
 export const symbolSchema = z.string().regex(SYMBOL_REGEX, {
   message: 'Invalid symbol format. Expected: AAPL.US, 0700.HK, 600519.SH',
