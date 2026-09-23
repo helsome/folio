@@ -80,6 +80,26 @@ function eventsCapability(events: CalendarEvent[]): FinanceCapability<{ symbol: 
   })
 }
 
+function failingEventsCapability(): FinanceCapability<{ symbol: string }, CalendarEvent[]> {
+  return defineCapability<{ symbol: string }, CalendarEvent[]>({
+    id: 'research.events',
+    name: 'Finance Calendar',
+    description: 'test calendar (failing)',
+    category: 'research',
+    riskLevel: 'read',
+    auth: 'public',
+    toolName: 'get_calendar_events',
+    inputSchema: Type.Object({
+      eventType: Type.String(),
+      symbols: Type.Optional(Type.Array(Type.String())),
+      count: Type.Optional(Type.Number()),
+    }),
+    async execute() {
+      throw new Error('calendar backend down')
+    },
+  })
+}
+
 function diff(symbol: string, material: boolean): ResearchDiff {
   return {
     id: `diff-${symbol}`,
@@ -154,6 +174,17 @@ describe('signalsAreMaterial', () => {
     expect(signalsAreMaterial({ ...base, diffMaterial: true })).toBe(true)
     expect(signalsAreMaterial({ ...base, ratingChanged: true })).toBe(true)
     expect(signalsAreMaterial({ ...base, earningsAnnounced: true })).toBe(true)
+  })
+
+  it('never crosses the price bar on a NaN move (#185)', () => {
+    expect(
+      signalsAreMaterial({
+        priceMovePct: Number.NaN,
+        diffMaterial: false,
+        ratingChanged: false,
+        earningsAnnounced: false,
+      })
+    ).toBe(false)
   })
 })
 
@@ -233,6 +264,20 @@ describe('runAutomation scope resolution', () => {
   it('does not report no material change without a valid previous close', async () => {
     const noBaseline = { ...quote(100, 100), prevClose: 0 }
     const { context } = makeContext({ quotes: { 'AAPL.US': noBaseline } })
+    context.portfolioSnapshot = async () => ({
+      symbols: ['AAPL.US'],
+      fetchedAt: 1_699_999_000_000,
+    })
+
+    const run = await runAutomation(rule({ type: 'portfolio-daily-brief' }), context)
+
+    expect(run.evaluated).toBe(1)
+    expect(run.outcome).toBe('incomplete')
+    expect(run.failures).toEqual(['AAPL.US: previous close unavailable'])
+  })
+
+  it('does not report no material change when the last price is NaN (#185)', async () => {
+    const { context } = makeContext({ quotes: { 'AAPL.US': quote(Number.NaN, 100) } })
     context.portfolioSnapshot = async () => ({
       symbols: ['AAPL.US'],
       fetchedAt: 1_699_999_000_000,
@@ -438,6 +483,42 @@ describe('runAutomation material filter', () => {
       'AAPL.US: research analysis failed',
       'MSFT.US: notification failed',
     ])
+    // Delivery failures stay recorded but no longer flip a decided outcome
+    // into incomplete (issue #185).
+    expect(run.outcome).toBe('material_update')
+  })
+
+  it('records a failing calendar probe instead of reading it as no event (#185)', async () => {
+    const { context, researchCalls } = makeContext({
+      quotes: { 'AAPL.US': quote(100, 100) },
+    })
+    context.watchlistSymbols = async () => ['AAPL.US']
+    context.registry = createCapabilityRegistry([
+      quoteCapability({ 'AAPL.US': quote(100, 100) }),
+      failingEventsCapability(),
+    ]) as unknown as CapabilityRegistry
+
+    const run = await runAutomation(rule({}), context)
+
+    expect(run.failures).toEqual(['AAPL.US: earnings calendar probe failed'])
+    expect(run.outcome).toBe('incomplete')
+    expect(researchCalls).toEqual([])
+  })
+
+  it('keeps a delivery failure from degrading a decided no-change outcome (#185)', async () => {
+    const { context, notifications } = makeContext({
+      quotes: { 'AAPL.US': quote(100, 100) },
+    })
+    context.watchlistSymbols = async () => ['AAPL.US']
+    context.notify = async (event: NotificationEvent) => {
+      notifications.push(event)
+      throw new Error('notification bridge down')
+    }
+
+    const run = await runAutomation(rule({ notify: 'all' }), context)
+
+    expect(run.failures).toEqual(['AAPL.US: notification failed'])
+    expect(run.outcome).toBe('no_material_update')
   })
 })
 
