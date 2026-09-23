@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { createPhaseTwoCapabilities, createMarketDepthCapability, createResearchEventsCapability, createPortfolioPositionsCapability } from './manifests/phase-two.ts';
+import { createPhaseTwoCapabilities, createMarketCapitalFlowCapability, createMarketDepthCapability, createResearchEventsCapability, createPortfolioPositionsCapability } from './manifests/phase-two.ts';
 import type { CapabilityFetchers } from './fetchers.ts';
 
 function fetchers(overrides: Partial<CapabilityFetchers> = {}): CapabilityFetchers {
@@ -109,6 +109,19 @@ describe('phase-2 manifest input validation', () => {
     });
     expect(result.data.symbol).toBe('NVDA.US');
     expect(result.summary).toContain('NVDA.US');
+  });
+
+  it('stamps capitalFlow provenance.marketTime in epoch MS (issue #179)', async () => {
+    const flow = createMarketCapitalFlowCapability(fetchers());
+    const result = await flow.execute({ symbol: 'NVDA.US' }, { now: () => 12345 });
+    // The parser emits CapitalFlow.timestamp in epoch SECONDS; the ms-
+    // convention provenance field must be ×1000 — magnitude pins the unit.
+    expect(result.provenance).toMatchObject({
+      provider: 'longbridge',
+      fetchedAt: 12345,
+      marketTime: 1710000000_000,
+    });
+    expect(result.provenance.marketTime! > 1e12).toBe(true);
   });
 
   it('validates research.events requires a known eventType', async () => {

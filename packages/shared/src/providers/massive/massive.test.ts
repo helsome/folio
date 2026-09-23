@@ -84,7 +84,10 @@ describe('MassiveFinancialDataProvider', () => {
     expect(result.provenance.providerName).toBe('Massive (Polygon.io)')
     expect(result.provenance.delayed).toBe(true)
     expect(result.provenance.stale).toBe(false)
-    expect(result.provenance.marketTime).toBe(1699559040)
+    // Quote.timestamp is epoch SECONDS; provenance.marketTime is epoch MS
+    // (issue #179) — the magnitude assertion pins the unit conversion.
+    expect(result.provenance.marketTime).toBe(1699559040_000)
+    expect(result.provenance.marketTime! > 1e12).toBe(true)
 
     // First attempt uses the documented apiKey query param on the canonical host.
     expect(calls[0].url).toContain('https://api.massive.com')
@@ -166,6 +169,10 @@ describe('MassiveFinancialDataProvider', () => {
     expect(result.data[1].open).toBe(74.2875)
     expect(result.data[1].close).toBe(74.3575)
     expect(result.data[1].volume).toBe(146535512)
+    // Kline timestamps are epoch SECONDS; provenance.marketTime is epoch MS
+    // (issue #179). The last (most recent) bar is the market time.
+    expect(result.provenance.marketTime).toBe(1578027600_000)
+    expect(result.provenance.marketTime! > 1e12).toBe(true)
   })
 
   it('maps ticker details to the StaticInfo subset', async () => {

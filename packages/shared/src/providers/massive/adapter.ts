@@ -226,7 +226,8 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
         const path = `/v2/snapshot/locale/us/markets/stocks/tickers/${encodeURIComponent(ticker)}`
         const payload = await getJson(path, apiKey, signal, endpoint)
         const quote = mapQuote(symbol, payload)
-        return { ok: true, data: quote, provenance: provenance(quote.timestamp) }
+        // Repo convention: Quote.timestamp is epoch SECONDS; provenance.marketTime is MS.
+        return { ok: true, data: quote, provenance: provenance(quote.timestamp * 1000) }
       }
       case 'market.kline': {
         const { count, timespan } = readKlineOptions(input)
@@ -234,7 +235,8 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
         const path = `/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/1/${timespan}/${from}/${to}`
         const payload = await getJson(buildAggsUrl(path, count), apiKey, signal, endpoint)
         const klines = mapKlines(symbol, payload)
-        const marketTime = klines.length > 0 ? klines[klines.length - 1].timestamp : undefined
+        // Kline timestamps are epoch SECONDS; provenance.marketTime is MS (issue #179).
+        const marketTime = klines.length > 0 ? klines[klines.length - 1].timestamp * 1000 : undefined
         return { ok: true, data: klines, provenance: provenance(marketTime) }
       }
       case 'company.profile': {
