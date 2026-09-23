@@ -4,7 +4,9 @@ import {
   parseCapitalFlowResponse,
   parseDepthResponse,
   parseInstitutionRatingResponse,
+  parseKlineResponse,
   parseMarketTemperatureResponse,
+  parseNewsResponse,
   parseQuoteResponse,
 } from './parser.ts';
 
@@ -69,6 +71,39 @@ describe('parseQuoteResponse empty-value markers', () => {
     expect(parsed.prevClose).toBe(280.14);
     expect(parsed.timestamp).toBe(Math.floor(Date.parse('2026-05-05 12:36:35') / 1000));
   });
+
+  it('treats a whitespace-only optional field as missing, not as 0 (issue #184)', () => {
+    const parsed = parseQuoteResponse(quote({ high: '   ', low: '\t', volume: '  ' }));
+    expect(parsed.high).toBe(195.5);
+    expect(parsed.low).toBe(195.5);
+    expect(parsed.volume).toBe(0);
+  });
+
+  it('does not coerce null/boolean/array values into numbers (issue #184)', () => {
+    // Required fields fail closed instead of reporting Number(null) === 0.
+    expect(() => parseQuoteResponse(quote({ prev_close: null }))).toThrow(LongBridgeError);
+    expect(() => parseQuoteResponse(quote({ prev_close: true }))).toThrow(LongBridgeError);
+    expect(() => parseQuoteResponse(quote({ prev_close: [] }))).toThrow(LongBridgeError);
+    // Optional fields fall back instead of carrying a coerced value.
+    const parsed = parseQuoteResponse(quote({ high: true, low: [], open: null }));
+    expect(parsed.high).toBe(195.5);
+    expect(parsed.low).toBe(195.5);
+    expect(parsed.open).toBe(195.5);
+  });
+
+  it('fails a quote with no usable timestamp instead of fabricating the current time (issue #184)', () => {
+    expect(() => parseQuoteResponse(quote({ timestamp: '' }))).toThrow(LongBridgeError);
+    expect(() => parseQuoteResponse(quote({ timestamp: '   ' }))).toThrow(LongBridgeError);
+    expect(() => parseQuoteResponse(quote({ timestamp: 'not-a-date' }))).toThrow(LongBridgeError);
+  });
+
+  it('keeps the documented fallback for garbage optional values (issue #184)', () => {
+    // A non-empty non-numeric string is "no value" for optional fields — the
+    // documented tradeoff: the quote stays usable, high/low/volume fall back.
+    const parsed = parseQuoteResponse(quote({ high: 'abc', volume: 'n/a' }));
+    expect(parsed.high).toBe(195.5);
+    expect(parsed.volume).toBe(0);
+  });
 });
 
 describe('other parsers with empty-value markers', () => {
@@ -109,5 +144,17 @@ describe('other parsers with empty-value markers', () => {
     expect(temp.temperature).toBe(0);
     expect(temp.valuation).toBe(0);
     expect(temp.sentiment).toBe(0);
+  });
+
+  it('fails a kline without a timestamp instead of stamping it "now" (issue #184)', () => {
+    const payload = JSON.stringify([{ open: 1, high: 2, low: 0.5, close: 1.5, volume: 10 }]);
+    expect(() => parseKlineResponse(payload)).toThrow(LongBridgeError);
+  });
+
+  it('keeps the "now" fallback for a dateless news item instead of failing the feed (issue #184)', () => {
+    const news = parseNewsResponse(
+      JSON.stringify([{ id: 1, title: 'headline', published_at: '' }])
+    );
+    expect(news[0]?.timestamp).toBeGreaterThan(0);
   });
 });
