@@ -72,23 +72,20 @@ export function parseQuoteResponse(output: string): Quote {
 
     const lastPrice = toNumber(data.last_price ?? data.last, 'last price');
     const prevClose = toNumber(data.prev_close, 'previous close');
-    const change = data.change === undefined
-      ? lastPrice - prevClose
-      : toNumber(data.change, 'change');
-    const changeRatio = data.change_ratio === undefined
-      ? prevClose === 0 ? 0 : change / prevClose
-      : toNumber(data.change_ratio, 'change ratio');
+    const change = toOptionalNumber(data.change) ?? (lastPrice - prevClose);
+    const changeRatio =
+      toOptionalNumber(data.change_ratio) ?? (prevClose === 0 ? 0 : change / prevClose);
 
     return {
       symbol: data.symbol,
       lastPrice,
       change,
       changePercent: changeRatio * 100,
-      volume: toNumber(data.volume ?? 0, 'volume'),
+      volume: toOptionalNumber(data.volume) ?? 0,
       timestamp: toTimestamp(data.timestamp),
-      high: toNumber(data.high ?? lastPrice, 'high'),
-      low: toNumber(data.low ?? lastPrice, 'low'),
-      open: toNumber(data.open ?? lastPrice, 'open'),
+      high: toOptionalNumber(data.high) ?? lastPrice,
+      low: toOptionalNumber(data.low) ?? lastPrice,
+      open: toOptionalNumber(data.open) ?? lastPrice,
       prevClose,
     };
   } catch (e) {
@@ -285,6 +282,12 @@ function toOptionalNumber(value: unknown): number | undefined {
 }
 
 function toNumber(value: unknown, field: string): number {
+  // The CLI writes an empty string for a value it does not have (see
+  // `toOptionalNumber` below, which guards the same way). `Number('')` is 0, so
+  // without this the "no value" marker was reported as a real 0 price/volume.
+  if (typeof value === 'string' && value.trim() === '') {
+    throw new Error(`Invalid ${field}`);
+  }
   const numberValue = typeof value === 'number' ? value : Number(value);
   if (!Number.isFinite(numberValue)) {
     throw new Error(`Invalid ${field}`);
@@ -330,7 +333,7 @@ export function parseDepthResponse(output: string): Depth {
       position: toNumber(l.position, 'position'),
       price: toNumber(l.price, 'price'),
       volume: toNumber(l.volume, 'volume'),
-      orderNum: toNumber(l.order_num ?? 0, 'order_num'),
+      orderNum: toOptionalNumber(l.order_num) ?? 0,
     });
     return {
       symbol: data.symbol,
@@ -388,9 +391,9 @@ export function parseCapitalFlowResponse(output: string): CapitalFlow {
       throw new Error('Capital flow response is empty');
     }
     const side = (s?: RawCapitalFlowSide): CapitalFlowSide => ({
-      large: toNumber(s?.large ?? 0, 'large'),
-      medium: toNumber(s?.medium ?? 0, 'medium'),
-      small: toNumber(s?.small ?? 0, 'small'),
+      large: toOptionalNumber(s?.large) ?? 0,
+      medium: toOptionalNumber(s?.medium) ?? 0,
+      small: toOptionalNumber(s?.small) ?? 0,
     });
     return {
       symbol: data.symbol,
@@ -417,10 +420,10 @@ export function parseMarketTemperatureResponse(output: string): MarketTemperatur
     const field = (name: string) => items.find((i) => i.field === name)?.value ?? '';
     return {
       market: field('Market') || 'US',
-      temperature: toNumber(field('Temperature'), 'temperature'),
+      temperature: toOptionalNumber(field('Temperature')) ?? 0,
       description: field('Description'),
-      valuation: toNumber(field('Valuation'), 'valuation'),
-      sentiment: toNumber(field('Sentiment'), 'sentiment'),
+      valuation: toOptionalNumber(field('Valuation')) ?? 0,
+      sentiment: toOptionalNumber(field('Sentiment')) ?? 0,
     };
   } catch (e) {
     throw parseFailure('market-temp', output);
@@ -481,8 +484,8 @@ export function parseFinancialReportResponse(output: string, fallbackSymbol = ''
           values: (acc.values ?? []).map((v): FinancialReportValue => ({
             fpEnd: toEpochSeconds(v.fp_end) ?? 0,
             period: v.period ?? '',
-            year: toNumber(v.year ?? 0, 'year'),
-            value: toNumber(v.value ?? 0, 'value'),
+            year: toOptionalNumber(v.year) ?? 0,
+            value: toOptionalNumber(v.value) ?? 0,
             ratio: v.ratio,
             yoy: v.yoy,
           })),
@@ -541,14 +544,14 @@ export function parseInstitutionRatingResponse(output: string, symbol = ''): Ins
     const data: RawInstitutionRatingResponse = JSON.parse(output);
     const { analyst, instratings } = data;
     const dist = (d?: RawRatingDistribution): RatingDistribution => ({
-      buy: toNumber(d?.buy ?? 0, 'buy'),
-      hold: toNumber(d?.hold ?? 0, 'hold'),
-      sell: toNumber(d?.sell ?? 0, 'sell'),
+      buy: toOptionalNumber(d?.buy) ?? 0,
+      hold: toOptionalNumber(d?.hold) ?? 0,
+      sell: toOptionalNumber(d?.sell) ?? 0,
       strongBuy: toOptionalNumber(d?.strong_buy),
       noOpinion: toOptionalNumber(d?.no_opinion),
       over: toOptionalNumber(d?.over),
       under: toOptionalNumber(d?.under),
-      total: toNumber(d?.total ?? 0, 'total'),
+      total: toOptionalNumber(d?.total) ?? 0,
     });
     return {
       symbol,
