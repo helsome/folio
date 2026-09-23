@@ -97,6 +97,13 @@ describe('parseQuoteResponse empty-value markers', () => {
     expect(() => parseQuoteResponse(quote({ timestamp: 'not-a-date' }))).toThrow(LongBridgeError);
   });
 
+  it('parses epoch seconds delivered as a numeric string (issue #184)', () => {
+    // The CLI sends epoch seconds as strings (same shape `toEpochSeconds`
+    // already handles for capital-flow/trade payloads).
+    const parsed = parseQuoteResponse(quote({ timestamp: '1786492800' }));
+    expect(parsed.timestamp).toBe(1786492800);
+  });
+
   it('keeps the documented fallback for garbage optional values (issue #184)', () => {
     // A non-empty non-numeric string is "no value" for optional fields — the
     // documented tradeoff: the quote stays usable, high/low/volume fall back.

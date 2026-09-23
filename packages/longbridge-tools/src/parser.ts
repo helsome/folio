@@ -269,7 +269,7 @@ export function parseNewsResponse(output: string): NewsItem[] {
       // A news item may legitimately omit its date; falling back to "now" is
       // the documented tradeoff — better than rejecting the whole feed, and
       // never presented as market data (issue #184).
-      timestamp: toOptionalTimestamp(entry.published_at) ?? Math.floor(Date.now() / 1000),
+      timestamp: toEpochSeconds(entry.published_at) ?? Math.floor(Date.now() / 1000),
       symbols: [],
     }));
   } catch (e) {
@@ -318,25 +318,18 @@ function toNumber(value: unknown, field: string): number {
   throw new Error(`Invalid ${field}`);
 }
 
-/** Strict timestamp: epoch-seconds number or a date-parseable string. */
+/**
+ * Strict timestamp for required fields, delegating to `toEpochSeconds` so the
+ * CLI's shapes (epoch seconds as number or numeric string, `YYYY.MM.DD`, ISO
+ * dates) all parse; missing/unparseable values throw instead of being
+ * fabricated as the current time (issue #184).
+ */
 function toTimestamp(value: unknown): number {
-  const parsed = toOptionalTimestamp(value);
+  const parsed = toEpochSeconds(value);
   if (parsed === undefined) {
     throw new Error('Invalid timestamp');
   }
   return parsed;
-}
-
-function toOptionalTimestamp(value: unknown): number | undefined {
-  if (typeof value === 'number') {
-    return Number.isFinite(value) ? value : undefined;
-  }
-  if (typeof value === 'string') {
-    if (value.trim() === '') return undefined;
-    const parsed = Date.parse(value);
-    return Number.isFinite(parsed) ? Math.floor(parsed / 1000) : undefined;
-  }
-  return undefined;
 }
 
 // ── Phase-2 parsers ────────────────────────────────────────────────────────
