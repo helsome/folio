@@ -319,9 +319,13 @@ function baseCurrencyValue(holding: Holding, baseCurrency?: string): number | un
   if (converted !== undefined) return converted
   const raw = toFiniteNumber(holding.marketValue)
   if (raw === undefined) return undefined
+  // `sameCurrency` must be false when either side is unknown — an unconverted
+  // `marketValue` divided by a base-currency total is only meaningful when both
+  // currencies are known to be the same one (mirrors evaluatePositionWeight).
   const holdingCurrency = holding.currency?.trim().toUpperCase()
   const base = baseCurrency?.trim().toUpperCase()
-  if (holdingCurrency && base && holdingCurrency !== base) return undefined
+  const sameCurrency = Boolean(holdingCurrency && base && holdingCurrency === base)
+  if (!sameCurrency) return undefined
   return raw
 }
 
