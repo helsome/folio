@@ -7,7 +7,7 @@ import type { JsonFileStore } from '../storage/json-file-store.ts'
  * research-diff / outcome repository pattern:
  *
  *   automations.json     — AutomationRule[] (five fixed rules; no cron UI)
- *   automation-runs.json — { runs: AutomationRun[] } newest first
+ *   automation-runs.json — completed runs plus claimed scheduled occurrences
  *
  * The repository is deliberately thin: seeding the five default rules is the
  * kernel host's job (first run), the UI only toggles `enabled` / runs a rule,
@@ -19,6 +19,8 @@ const RUNS_FILE = 'automation-runs.json'
 
 interface RunsFile {
   runs: AutomationRun[]
+  /** Scheduled occurrences claimed before execution, grouped by rule id. */
+  scheduledOccurrences?: Record<string, string[]>
 }
 
 export class AutomationRuleRepository {
@@ -88,7 +90,26 @@ export class AutomationRunRepository {
     const file = await this.read()
     const next = [run, ...file.runs.filter((existing) => existing.id !== run.id)]
     next.sort((a, b) => b.ranAt - a.ranAt || a.id.localeCompare(b.id))
-    await this.store.write(RUNS_FILE, { runs: next })
+    await this.store.write(RUNS_FILE, { ...file, runs: next })
+  }
+
+  /**
+   * Persistently claim one scheduled occurrence. A claim is made before the
+   * rule starts, so another scheduler tick (or a restarted host) cannot run
+   * the same occurrence again.
+   */
+  async claimScheduledOccurrence(ruleId: string, occurrence: string): Promise<boolean> {
+    const file = await this.read()
+    const occurrences = file.scheduledOccurrences?.[ruleId] ?? []
+    if (occurrences.includes(occurrence)) return false
+    await this.store.write(RUNS_FILE, {
+      ...file,
+      scheduledOccurrences: {
+        ...file.scheduledOccurrences,
+        [ruleId]: [...occurrences, occurrence],
+      },
+    })
+    return true
   }
 
   async list(): Promise<AutomationRun[]> {
