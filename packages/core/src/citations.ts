@@ -44,6 +44,7 @@ export interface CitationSource {
   title?: string;
   url?: string;
   retrievedAt?: number;
+  /** Epoch milliseconds — mirrors FinancialEvidenceValue.asOf. */
   asOf?: number;
   stale?: boolean;
   status: 'success' | 'error';
