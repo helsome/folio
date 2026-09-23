@@ -77,6 +77,30 @@ describe('CapabilityExecutor.run', () => {
     expect(record.error).toContain('timed out');
   });
 
+  it('records cancelled when an uncooperative capability ignores the timeout signal', async () => {
+    const executor = new CapabilityExecutor();
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const cap = makeCap('market.slow', 'get_slow', async () => {
+      await pending;
+      return result({ completed: true });
+    });
+
+    const releaseTimer = setTimeout(release, 20);
+    try {
+      const outcome = await executor.run(cap, {}, { timeoutMs: 5 });
+
+      expect(outcome.record.status).toBe('cancelled');
+      expect(outcome.record.error).toContain('timed out');
+      expect(outcome.result).toBeUndefined();
+    } finally {
+      clearTimeout(releaseTimer);
+      release();
+    }
+  });
+
   it('records cancelled when the external signal aborts mid-run', async () => {
     const executor = new CapabilityExecutor();
     const controller = new AbortController();
@@ -92,6 +116,33 @@ describe('CapabilityExecutor.run', () => {
     const { record } = await running;
 
     expect(record.status).toBe('cancelled');
+  });
+
+  it('records cancelled when an uncooperative capability ignores the external abort signal', async () => {
+    const executor = new CapabilityExecutor();
+    const controller = new AbortController();
+    let release!: () => void;
+    const pending = new Promise<void>(resolve => {
+      release = resolve;
+    });
+    const cap = makeCap('market.slow', 'get_slow', async () => {
+      await pending;
+      return result({ completed: true });
+    });
+
+    const releaseTimer = setTimeout(release, 20);
+    const abortTimer = setTimeout(() => controller.abort(new Error('user cancelled')), 5);
+    try {
+      const outcome = await executor.run(cap, {}, { signal: controller.signal });
+
+      expect(outcome.record.status).toBe('cancelled');
+      expect(outcome.record.error).toContain('user cancelled');
+      expect(outcome.result).toBeUndefined();
+    } finally {
+      clearTimeout(releaseTimer);
+      clearTimeout(abortTimer);
+      release();
+    }
   });
 });
 

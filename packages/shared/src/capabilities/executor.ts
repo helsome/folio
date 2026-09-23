@@ -80,6 +80,7 @@ export class CapabilityExecutor {
     const ctx: CapabilityExecutionContext = { signal: controller.signal, now: this.now };
 
     let timer: ReturnType<typeof setTimeout> | undefined;
+    let onAbort: (() => void) | undefined;
     if (options.timeoutMs !== undefined && options.timeoutMs > 0) {
       timer = setTimeout(
         () => controller.abort(createAbortReason(`Capability ${cap.id} timed out after ${options.timeoutMs}ms`)),
@@ -97,7 +98,16 @@ export class CapabilityExecutor {
     }
 
     try {
-      const result = await cap.execute(input, ctx);
+      const execution = cap.execute(input, ctx);
+      const aborted = new Promise<never>((_resolve, reject) => {
+        onAbort = () => reject(controller.signal.reason ?? new Error('Capability execution aborted'));
+        if (controller.signal.aborted) {
+          onAbort();
+        } else {
+          controller.signal.addEventListener('abort', onAbort, { once: true });
+        }
+      });
+      const result = await Promise.race([execution, aborted]);
       const finishedAt = this.now();
       return {
         record: {
@@ -126,6 +136,7 @@ export class CapabilityExecutor {
       };
     } finally {
       clearTimeout(timer);
+      if (onAbort) controller.signal.removeEventListener('abort', onAbort);
       if (options.signal) options.signal.removeEventListener('abort', onExternalAbort);
     }
   }
