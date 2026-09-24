@@ -491,8 +491,11 @@ function buildPrompt(
   if (workspaceContext?.selectedPosition) {
     workspaceLines.push(`- Selected position: ${workspaceContext.selectedPosition}`);
   }
+  if (workspaceContext?.comparisonSymbols && workspaceContext.comparisonSymbols.length > 0) {
+    workspaceLines.push(`- Comparison symbols: ${workspaceContext.comparisonSymbols.join(', ')}`);
+  }
   const workspaceSection = workspaceLines.length > 0
-    ? `\nWorkspace context:\n${workspaceLines.join('\n')}\nWhen the user refers to "this", "the stock", or asks follow-up questions about a symbol without naming it, use the active symbol above.`
+    ? `\nWorkspace context:\n${workspaceLines.join('\n')}\nWhen the user refers to "this", "the stock", or asks follow-up questions about a symbol without naming it, use the active symbol above. When the user asks to compare securities, use the comparison symbols above as the explicit comparison set.`
     : '';
 
   const skillSection = buildSkillIndexSection(skillHub, readinessProvider);
