@@ -41,6 +41,42 @@ describe('claim verifier', () => {
     expect(judge.calls).toHaveLength(0);
   });
 
+  it('fails closed without calling the judge when evidence content is blank', async () => {
+    const judge = judgeReturning('{"status":"supported","reason":"invented"}');
+    const result = await createClaimVerifier(judge).verify(
+      input('Revenue increased.', [{ id: 'e-1', content: '  \n\t' }]),
+    );
+
+    expect(result.status).toBe('insufficient_evidence');
+    expect(result.reason).toBe('invalid_evidence: evidence content must not be blank (index 0)');
+    expect(judge.calls).toHaveLength(0);
+  });
+
+  it('fails closed without calling the judge when an evidence ID is blank', async () => {
+    const judge = judgeReturning('{"status":"supported","reason":"invented"}');
+    const result = await createClaimVerifier(judge).verify(
+      input('Revenue increased.', [{ id: '  ', content: 'Revenue increased.' }]),
+    );
+
+    expect(result.status).toBe('insufficient_evidence');
+    expect(result.reason).toBe('invalid_evidence: evidence id must not be blank (index 0)');
+    expect(judge.calls).toHaveLength(0);
+  });
+
+  it('fails closed without calling the judge when valid and invalid evidence are mixed', async () => {
+    const judge = judgeReturning('{"status":"supported","reason":"invented"}');
+    const result = await createClaimVerifier(judge).verify(
+      input('Revenue increased.', [
+        { id: 'e-1', content: 'Revenue increased.' },
+        { id: 'e-2', content: '' },
+      ]),
+    );
+
+    expect(result.status).toBe('insufficient_evidence');
+    expect(result.reason).toBe('invalid_evidence: evidence content must not be blank (index 1)');
+    expect(judge.calls).toHaveLength(0);
+  });
+
   it('returns supported when the supplied evidence directly supports the claim', async () => {
     const judge = judgeReturning('{"status":"supported","reason":"The filing reports the same revenue increase."}');
     const result = await createClaimVerifier(judge).verify(
