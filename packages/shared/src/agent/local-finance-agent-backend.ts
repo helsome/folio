@@ -54,6 +54,7 @@ export class LocalFinanceAgentBackend implements AgentBackend {
   }
 
   async send(request: AgentRequest): Promise<ApiResult<AgentResponse>> {
+    const signal = request.signal;
     const session = this.getSession(request.sessionId);
     const workspaceSymbol =
       typeof request.context?.activeSymbol === 'string' && request.context.activeSymbol.length > 0
@@ -79,7 +80,7 @@ export class LocalFinanceAgentBackend implements AgentBackend {
     }
 
     if (routed.intent === 'portfolio_risk') {
-      return { ok: true, data: await this.answerPortfolioRisk(session) };
+      return { ok: true, data: await this.answerPortfolioRisk(session, signal) };
     }
 
     const toolName = intentToToolName(routed.intent);
@@ -89,7 +90,7 @@ export class LocalFinanceAgentBackend implements AgentBackend {
     session.lastIntent = routed.intent;
 
     try {
-      const result = await this.registry.execute({ name: toolName, args });
+      const result = await this.registry.execute({ name: toolName, args, signal });
       toolCall.status = 'success';
       toolCall.completedAt = this.now();
       if (routed.symbol) {
@@ -103,7 +104,8 @@ export class LocalFinanceAgentBackend implements AgentBackend {
         result.details,
         toolCall,
         session,
-        routed.symbol
+        routed.symbol,
+        signal
       );
       enriched.session = session;
       return { ok: true, data: enriched };
@@ -155,7 +157,10 @@ export class LocalFinanceAgentBackend implements AgentBackend {
     return session;
   }
 
-  private async answerPortfolioRisk(session: AgentSessionSnapshot): Promise<AgentResponse> {
+  private async answerPortfolioRisk(
+    session: AgentSessionSnapshot,
+    signal?: AbortSignal
+  ): Promise<AgentResponse> {
     const toolCalls: ToolCallRecord[] = [];
     session.lastIntent = 'portfolio_risk';
 
@@ -164,12 +169,13 @@ export class LocalFinanceAgentBackend implements AgentBackend {
       toolCalls.push(toolCall);
       session.toolCalls.unshift(toolCall);
       try {
-        const result = await this.registry.execute({ name: toolName, args });
+        const result = await this.registry.execute({ name: toolName, args, signal });
         toolCall.status = 'success';
         toolCall.completedAt = this.now();
         toolCall.result = structuredResult(result.details, result.provenance, result.evidence);
         return result.details;
       } catch (error) {
+        if (signal?.aborted) throw error;
         const apiError = toApiError(error);
         toolCall.status = 'error';
         toolCall.completedAt = this.now();
@@ -245,7 +251,8 @@ export class LocalFinanceAgentBackend implements AgentBackend {
     details: unknown,
     toolCall: ToolCallRecord,
     session: AgentSessionSnapshot,
-    symbol?: string
+    symbol?: string,
+    signal?: AbortSignal
   ): Promise<AgentResponse> {
     const blocks: AnswerBlock[] = [];
 
@@ -258,11 +265,13 @@ export class LocalFinanceAgentBackend implements AgentBackend {
         const klineResult = await this.registry.execute({
           name: 'get_kline',
           args: { symbol: chartSymbol, period: '1d', limit: 30 },
+          signal,
         });
         klineCall.result = structuredResult(klineResult.details, klineResult.provenance);
         klines = isKlineList(klineResult.details) ? klineResult.details : undefined;
         blocks.push(...buildQuoteAnswerBlocks(details, klines, [toolCall.id, klineCall.id], source));
       } catch (error) {
+        if (signal?.aborted) throw error;
         klineCall.status = 'error';
         klineCall.error = toApiError(error);
         blocks.push(...buildQuoteAnswerBlocks(details, undefined, [toolCall.id], source));
