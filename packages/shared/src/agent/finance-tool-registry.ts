@@ -40,6 +40,7 @@ export interface FinanceToolResult {
 export interface ExecuteToolInput {
   name: FinanceToolName;
   args: Record<string, unknown>;
+  signal?: AbortSignal;
 }
 
 export interface FinanceToolRegistryOptions {
@@ -78,7 +79,7 @@ export class FinanceToolRegistry {
       throw createCodeError('TOOL_NOT_FOUND', `Tool is not registered: ${input.name}`);
     }
 
-    const { record, result } = await this.executor.run(cap, input.args);
+    const { record, result } = await this.executor.run(cap, input.args, { signal: input.signal });
     if (!result) {
       throw createCodeError(
         failureCode(record.status),
