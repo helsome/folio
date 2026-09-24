@@ -5,6 +5,8 @@ import { LocalResearchSynthesizer } from './synthesizer-local.ts';
 import { ResearchRunner } from './runner.ts';
 import { fakeCap } from './test-helpers.ts';
 import { RESEARCH_CAPABILITY_PLAN } from './planner.ts';
+import { CapabilityExecutor, type RunOptions, type RunOutcome } from '../capabilities/executor.ts';
+import type { FinanceCapability } from '@finagent/core';
 
 function makeRunner(capabilities: Array<[string, Parameters<typeof fakeCap>[1]?]>) {
   const registry = createCapabilityRegistry(
@@ -131,5 +133,66 @@ describe('ResearchRunner', () => {
     expect(result.summary.cancelled).toBe(true);
     expect(result.report).toBeUndefined();
     expect(statuses[statuses.length - 1]).toBe('cancelled');
+  });
+
+  it('aborts sibling capability workers after a fatal worker error', async () => {
+    let profileStarted!: () => void;
+    let quoteStarted!: () => void;
+    const profileStartedPromise = new Promise<void>((resolve) => { profileStarted = resolve; });
+    const quoteStartedPromise = new Promise<void>((resolve) => { quoteStarted = resolve; });
+    let quoteAborted = false;
+
+    class FailFastExecutor extends CapabilityExecutor {
+      override async run(
+        cap: FinanceCapability,
+        input: unknown,
+        options: RunOptions = {}
+      ): Promise<RunOutcome> {
+        if (cap.id === 'company.profile') {
+          profileStarted();
+          await Promise.all([profileStartedPromise, quoteStartedPromise]);
+          throw new Error('fatal worker failure');
+        }
+        if (cap.id === 'market.quote') {
+          quoteStarted();
+          return new Promise<RunOutcome>((resolve) => {
+            const onAbort = () => {
+              quoteAborted = true;
+              options.signal?.removeEventListener('abort', onAbort);
+              resolve({
+                record: {
+                  id: 'cancelled-quote',
+                  capabilityId: cap.id,
+                  startedAt: 1,
+                  finishedAt: 2,
+                  durationMs: 1,
+                  status: 'cancelled',
+                  error: 'aborted by sibling failure',
+                },
+              });
+            };
+            if (options.signal?.aborted) onAbort();
+            else options.signal?.addEventListener('abort', onAbort, { once: true });
+          });
+        }
+        return super.run(cap, input, options);
+      }
+    }
+
+    const registry = createCapabilityRegistry([
+      fakeCap('company.profile'),
+      fakeCap('market.quote'),
+    ]);
+    const runner = new ResearchRunner({
+      registry,
+      executor: new FailFastExecutor(),
+      synthesizer: new LocalResearchSynthesizer(),
+      now: () => 1_700_000_000_000,
+    });
+
+    await expect(runner.run({ symbol: 'NVDA.US', runId: 'run-fail-fast' })).rejects.toThrow(
+      'fatal worker failure'
+    );
+    expect(quoteAborted).toBe(true);
   });
 });
