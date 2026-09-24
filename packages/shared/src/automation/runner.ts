@@ -46,8 +46,12 @@ export interface MaterialSignals {
 /** True when any signal crosses the materiality bar. */
 export function signalsAreMaterial(signals: MaterialSignals): boolean {
   if (signals.diffMaterial || signals.ratingChanged || signals.earningsAnnounced) return true
+  // Number.isFinite also rejects NaN produced by dirty quotes — a NaN move
+  // must read as "no usable signal", never as a crossed bar (issue #185).
   return (
-    signals.priceMovePct !== undefined && signals.priceMovePct >= MATERIAL_PRICE_MOVE_PCT
+    signals.priceMovePct !== undefined &&
+    Number.isFinite(signals.priceMovePct) &&
+    signals.priceMovePct >= MATERIAL_PRICE_MOVE_PCT
   )
 }
 
@@ -85,9 +89,21 @@ export async function runAutomation(
   const symbols = resolvedScope.snapshot.symbols
 
   const failures: string[] = []
-  if (resolvedScope.failure !== undefined) failures.push(resolvedScope.failure)
+  // Subset of `failures` that decides completeness/outcome: problems with the
+  // scope or the materiality evaluation itself. Delivery-side problems
+  // (research/notification) are recorded in `failures` only, so one noisy OS
+  // notification failure cannot degrade a decided run into incomplete and
+  // silently drop it from the daily brief (issue #185).
+  const evaluationFailures: string[] = []
+  const fail = (message: string, decisive = true) => {
+    failures.push(message)
+    if (decisive) evaluationFailures.push(message)
+  }
+  if (resolvedScope.failure !== undefined) fail(resolvedScope.failure)
   if (symbols.length === 0) {
-    if (resolvedScope.failure === undefined) failures.push(`no symbols in scope for ${rule.type}`)
+    if (resolvedScope.failure === undefined) {
+      fail(`no symbols in scope for ${rule.type}`)
+    }
   }
 
   let evaluated = 0
@@ -97,20 +113,23 @@ export async function runAutomation(
 
   for (const raw of symbols) {
     const symbol = raw.trim().toUpperCase()
-    let evaluation: { signals: MaterialSignals; quote: Quote } | null
+    let evaluation: { signals: MaterialSignals; quote: Quote; probeFailed?: boolean } | null
     try {
       evaluation = await evaluateSymbol(symbol, ctx)
     } catch {
-      failures.push(`${symbol}: evaluation failed`)
+      fail(`${symbol}: evaluation failed`)
       continue
     }
     if (evaluation === null) {
-      failures.push(`${symbol}: quote unavailable`)
+      fail(`${symbol}: quote unavailable`)
       continue
     }
     evaluated += 1
-    if (evaluation.signals.priceMovePct === undefined) {
-      failures.push(`${symbol}: previous close unavailable`)
+    if (!Number.isFinite(evaluation.signals.priceMovePct)) {
+      fail(`${symbol}: previous close unavailable`)
+    }
+    if (evaluation.probeFailed === true) {
+      fail(`${symbol}: earnings calendar probe failed`)
     }
     const material = signalsAreMaterial(evaluation.signals)
     if (material) {
@@ -119,7 +138,7 @@ export async function runAutomation(
         await ctx.researchStart(symbol, rule.strategyId)
         analyzed += 1
       } catch {
-        failures.push(`${symbol}: research analysis failed`)
+        fail(`${symbol}: research analysis failed`, false)
       }
     }
     if (rule.notify === 'all' || material) {
@@ -127,12 +146,12 @@ export async function runAutomation(
         await ctx.notify?.(notificationFor(rule, symbol, material, evaluation.signals, ranAt, ctx.locale))
         notified = true
       } catch {
-        failures.push(`${symbol}: notification failed`)
+        fail(`${symbol}: notification failed`, false)
       }
     }
   }
 
-  const complete = symbols.length > 0 && evaluated === symbols.length && failures.length === 0
+  const complete = symbols.length > 0 && evaluated === symbols.length && evaluationFailures.length === 0
   const outcome: AutomationRun['outcome'] = complete
     ? materialChanges > 0
       ? 'material_update'
@@ -230,12 +249,15 @@ function makeScopeSnapshot(
 
 /**
  * Lightweight refresh for one symbol. Returns null (symbol skipped) only when
- * the quote itself is unavailable; optional probes degrade to no-signal.
+ * the quote itself is unavailable. The optional calendar probe degrades to
+ * no-signal when the capability is absent; a failing probe call is surfaced
+ * via `probeFailed` so the run can distinguish "no event" from "could not
+ * probe" instead of silently reading an error as no signal (issue #185).
  */
 async function evaluateSymbol(
   symbol: string,
   ctx: AutomationRunContext
-): Promise<{ signals: MaterialSignals; quote: Quote } | null> {
+): Promise<{ signals: MaterialSignals; quote: Quote; probeFailed?: boolean } | null> {
   const quote = await fetchQuote(symbol, ctx)
   if (quote === null) return null
   const diff = await ctx.diffRepo.getBySymbol(symbol)
@@ -243,10 +265,17 @@ async function evaluateSymbol(
     priceMovePct: priceMovePct(quote),
     diffMaterial: diff?.material === true,
     ratingChanged: hasMaterialRatingChange(diff),
-    earningsAnnounced:
-      hasNewEarnings(diff) || (await calendarProbe(symbol, ctx)),
+    earningsAnnounced: hasNewEarnings(diff),
   }
-  return { signals, quote }
+  let probeFailed = false
+  if (!signals.earningsAnnounced) {
+    try {
+      signals.earningsAnnounced = await calendarProbe(symbol, ctx)
+    } catch {
+      probeFailed = true
+    }
+  }
+  return { signals, quote, probeFailed }
 }
 
 async function fetchQuote(symbol: string, ctx: AutomationRunContext): Promise<Quote | null> {
@@ -265,37 +294,42 @@ async function fetchQuote(symbol: string, ctx: AutomationRunContext): Promise<Qu
  * means an earnings announcement the research diff may not cover yet. Without
  * the freshness lower bound, any historical event still sitting in the "recent
  * 5" list kept `earningsAnnounced` true forever, re-triggering research and
- * notifications every single day (#168). Degrades to no-signal when the
- * capability is absent or the call fails.
+ * notifications every single day (#168). The capability being absent degrades
+ * to no-signal; a failing call throws so the run can record a probe failure
+ * rather than silently reporting "no event" (issue #185).
  */
 const EARNINGS_PROBE_WINDOW_SECONDS = 7 * 86_400;
 
 async function calendarProbe(symbol: string, ctx: AutomationRunContext): Promise<boolean> {
   const cap = ctx.registry.get('research.events')
   if (!cap) return false
-  try {
-    const result = await cap.execute(
-      { eventType: 'report', symbols: [symbol], count: 5 },
-      { now: ctx.now }
-    )
-    const events = result.data as CalendarEvent[]
-    const nowSeconds = (ctx.now?.() ?? Date.now()) / 1000
-    return events.some(
-      (event) =>
-        (event.type === 'report' || event.type === 'financial') &&
-        event.date <= nowSeconds &&
-        event.date > nowSeconds - EARNINGS_PROBE_WINDOW_SECONDS
-    )
-  } catch {
-    return false
-  }
+  const result = await cap.execute(
+    { eventType: 'report', symbols: [symbol], count: 5 },
+    { now: ctx.now }
+  )
+  const events = result.data as CalendarEvent[]
+  const nowSeconds = (ctx.now?.() ?? Date.now()) / 1000
+  return events.some(
+    (event) =>
+      (event.type === 'report' || event.type === 'financial') &&
+      event.date <= nowSeconds &&
+      event.date > nowSeconds - EARNINGS_PROBE_WINDOW_SECONDS
+  )
 }
 
-/** Abs percent move vs previous close; undefined when prevClose is unusable. */
+/**
+ * Abs percent move vs previous close; undefined when either price is unusable.
+ * Dirty data can carry NaN — a NaN move must read as "unusable baseline"
+ * (→ recorded failure), not as a silent no-signal (issue #185).
+ */
 function priceMovePct(quote: Quote): number | undefined {
+  const lastPrice = quote.lastPrice
   const prevClose = quote.prevClose
-  if (!Number.isFinite(prevClose) || prevClose <= 0) return undefined
-  return (Math.abs(quote.lastPrice - prevClose) / prevClose) * 100
+  if (!Number.isFinite(lastPrice) || !Number.isFinite(prevClose) || prevClose <= 0) {
+    return undefined
+  }
+  const pct = (Math.abs(lastPrice - prevClose) / prevClose) * 100
+  return Number.isFinite(pct) ? pct : undefined
 }
 
 function hasMaterialRatingChange(diff: ResearchDiff | undefined): boolean {
