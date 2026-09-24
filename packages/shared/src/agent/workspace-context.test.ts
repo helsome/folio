@@ -90,7 +90,11 @@ describe('WorkspaceContext → prompt', () => {
       sessionId: 's1',
       runId: 'r1',
       content: '最近走势怎么样？',
-      workspaceContext: { activeSymbol: 'NVDA.US', activeView: 'chart' },
+      workspaceContext: {
+        activeSymbol: 'NVDA.US',
+        activeView: 'chart',
+        comparisonSymbols: ['NVDA.US', 'AMD.US'],
+      },
     })) {
       events.push(event.type);
     }
@@ -100,6 +104,8 @@ describe('WorkspaceContext → prompt', () => {
     const message = String(prompt?.message ?? '');
     expect(message).toContain('Active symbol: NVDA.US');
     expect(message).toContain('Active workspace view: chart');
+    expect(message).toContain('Comparison symbols: NVDA.US, AMD.US');
+    expect(message).toContain('use the comparison symbols above as the explicit comparison set');
     expect(message).toContain('use the active symbol above');
     expect(events).toContain('run_completed');
   });
