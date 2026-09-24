@@ -59,7 +59,7 @@ export interface TraceStep {
   label: string;
   detail?: string;
   timestamp: number;
-  status?: 'success' | 'error' | 'running';
+  status?: 'success' | 'error' | 'running' | 'cancelled';
   tool?: TraceToolExecution;
   source: TraceElementSource;
 }
