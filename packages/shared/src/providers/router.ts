@@ -405,6 +405,7 @@ export class ProviderRouter implements FinancialProviderRouter {
     }
 
     const controller = new AbortController();
+    const externalAbort = Promise.withResolvers<ProviderResult<T>>();
     let settled = false;
     let timer: ReturnType<typeof setTimeout> | undefined;
 
@@ -414,13 +415,13 @@ export class ProviderRouter implements FinancialProviderRouter {
       externalSignal?.removeEventListener('abort', onExternalAbort);
     };
     const onExternalAbort = (): void => {
+      if (settled) return;
+      settled = true;
       controller.abort();
-      if (!settled) {
-        settled = true;
-        if (timer) clearTimeout(timer);
-      }
+      if (timer) clearTimeout(timer);
+      externalAbort.resolve({ ok: false, error: ABORTED });
     };
-    externalSignal?.addEventListener('abort', onExternalAbort);
+    externalSignal?.addEventListener('abort', onExternalAbort, { once: true });
 
     const work = this.invoke<T>(provider, capabilityId, input, controller.signal).then(
       (result) => {
@@ -452,15 +453,7 @@ export class ProviderRouter implements FinancialProviderRouter {
       }, this.timeoutMs);
     });
 
-    const externalAbort = new Promise<ProviderResult<T>>((resolve) => {
-      if (!externalSignal) return;
-      externalSignal.addEventListener('abort', () => {
-        cleanup();
-        resolve({ ok: false, error: ABORTED });
-      });
-    });
-
-    return Promise.race([work, timeout, externalAbort]);
+    return Promise.race([work, timeout, externalAbort.promise]);
   }
 
   private coverageFor(provider: AnyProvider): ProviderCoverage {

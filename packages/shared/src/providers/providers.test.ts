@@ -1,6 +1,7 @@
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+import { getEventListeners } from 'node:events';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
 import type {
   AccountAssets,
@@ -301,6 +302,101 @@ describe('ProviderRouter.execute', () => {
       expect(result.error.code).toBe('ABORTED');
     }
     expect(primaryCalls).toBe(0);
+  });
+
+  it('removes external abort listeners after successful calls on a shared signal', async () => {
+    const router = new ProviderRouter({ timeoutMs: 100 });
+    router.register(
+      new FakeFinancialDataProvider('primary', 'Primary', ['market.quote'], async () =>
+        success('primary', 'Primary', { value: 'p' })
+      )
+    );
+    router.setRouting({ primary: 'primary' });
+
+    const controller = new AbortController();
+    for (let i = 0; i < 12; i += 1) {
+      const result = await router.execute('market.quote', {}, controller.signal);
+      expect(result.ok).toBe(true);
+    }
+
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+  });
+
+  it('removes external abort listeners when a provider fails', async () => {
+    const router = new ProviderRouter({ timeoutMs: 100 });
+    router.register(
+      new FakeFinancialDataProvider('primary', 'Primary', ['market.quote'], async () =>
+        failure('NETWORK_ERROR', 'provider failed')
+      )
+    );
+    router.setRouting({ primary: 'primary' });
+
+    const controller = new AbortController();
+    const result = await router.execute('market.quote', {}, controller.signal);
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('NETWORK_ERROR');
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+  });
+
+  it('removes external abort listeners when a provider times out', async () => {
+    const router = new ProviderRouter({ timeoutMs: 5 });
+    let releaseProvider!: () => void;
+    const providerPending = new Promise<void>((resolve) => {
+      releaseProvider = resolve;
+    });
+    router.register(
+      new FakeFinancialDataProvider('primary', 'Primary', ['market.quote'], async () => {
+        await providerPending;
+        return success('primary', 'Primary', { value: 'late' });
+      })
+    );
+    router.setRouting({ primary: 'primary' });
+
+    const controller = new AbortController();
+    const result = await router.execute('market.quote', {}, controller.signal);
+    releaseProvider();
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('TIMEOUT');
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
+  });
+
+  it('removes external abort listeners and skips fallback after an in-flight abort', async () => {
+    const router = new ProviderRouter({ timeoutMs: 100 });
+    const started = Promise.withResolvers<void>();
+    let fallbackCalls = 0;
+    router.register(
+      new FakeFinancialDataProvider('primary', 'Primary', ['market.quote'], async (_cap, _input, signal) => {
+        started.resolve();
+        await new Promise<void>((resolve) => {
+          if (signal?.aborted) {
+            resolve();
+            return;
+          }
+          signal?.addEventListener('abort', () => resolve(), { once: true });
+        });
+        return failure('ABORTED', 'aborted');
+      })
+    );
+    router.register(
+      new FakeFinancialDataProvider('fallback', 'Fallback', ['market.quote'], async () => {
+        fallbackCalls += 1;
+        return success('fallback', 'Fallback', { value: 'f' });
+      })
+    );
+    router.setRouting({ primary: 'primary', fallback: 'fallback' });
+
+    const controller = new AbortController();
+    const pending = router.execute('market.quote', {}, controller.signal);
+    await started.promise;
+    controller.abort();
+    const result = await pending;
+
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('ABORTED');
+    expect(fallbackCalls).toBe(0);
+    expect(getEventListeners(controller.signal, 'abort')).toHaveLength(0);
   });
 
   it('returns the last error when all candidates fail', async () => {
