@@ -41,4 +41,18 @@ describe('ErrorLog', () => {
     expect(log.size).toBe(0);
     expect(log.recent(5)).toEqual([]);
   });
+
+  it('redacts messages and stacks at collection time (issue #19)', () => {
+    const log = new ErrorLog({ now: () => 0 });
+    log.push({
+      message: 'Request failed: Authorization: Bearer abcdefghijklmnop123',
+      stack:
+        'Error: Request failed: cookie: session=deadbeef1234\n    at fetch (client.ts:1:1)',
+    });
+    const [entry] = log.recent(1);
+    expect(entry.message).not.toContain('abcdefghijklmnop123');
+    expect(entry.message).toContain('[REDACTED]');
+    expect(entry.stack).not.toContain('deadbeef1234');
+    expect(entry.stack).toContain('at fetch (client.ts:1:1)');
+  });
 });
