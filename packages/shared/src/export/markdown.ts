@@ -1,4 +1,9 @@
 import type { ResearchReport, ResearchStance, ResearchVerdict } from '@finagent/core'
+import {
+  buildClaimEvidenceIndex,
+  claimIdOf,
+  findUnbackedClaims,
+} from '../research/claim-evidence.ts'
 import { isStrategyId, RESEARCH_STRATEGIES } from '../strategies/index.ts'
 
 /**
@@ -7,7 +12,9 @@ import { isStrategyId, RESEARCH_STRATEGIES } from '../strategies/index.ts'
  * Pure function — no I/O, no `Date.now()`, no locale-dependent formatting —
  * so main-process IPC handlers and tests get byte-identical output for the
  * same report. The evidence list is the source-of-truth layer: every claim
- * stays linked to the capability run that produced it.
+ * stays linked to the capability run that produced it, and each entry carries
+ * the claim id so the exported text can be walked back to the report's
+ * claim ↔ evidence index.
  */
 
 export interface MarkdownOptions {
@@ -15,6 +22,12 @@ export interface MarkdownOptions {
   includeEvidence?: boolean
   /** Print the research strategy badge line. Default true. */
   includeStrategy?: boolean
+  /**
+   * Append the machine-readable claim ↔ evidence index (both directions) as a
+   * JSON block. Default false: the human-readable list above already carries
+   * the claim ids, this is for consumers that need the full mapping.
+   */
+  includeClaimEvidenceIndex?: boolean
 }
 
 export const STANCE_LABEL: Record<ResearchStance, string> = {
@@ -46,7 +59,11 @@ function pushList(lines: string[], points: string[]): void {
 }
 
 export function reportToMarkdown(report: ResearchReport, options: MarkdownOptions = {}): string {
-  const { includeEvidence = true, includeStrategy = true } = options
+  const {
+    includeEvidence = true,
+    includeStrategy = true,
+    includeClaimEvidenceIndex = false,
+  } = options
   const lines: string[] = []
 
   lines.push(`# ${report.symbol} — Research Report`)
@@ -85,11 +102,14 @@ export function reportToMarkdown(report: ResearchReport, options: MarkdownOption
     lines.push('')
     lines.push('## Evidence')
     const refs = report.sections.flatMap((section) =>
-      section.evidence.map((ref) => ({
+      section.evidence.map((ref, index) => ({
         sectionTitle: section.title,
         claim: ref.claim,
         capabilityId: ref.capabilityId,
         runId: ref.runId,
+        // Reports written before claim linking have no stored id; derive the
+        // same one the report's index derives for them.
+        claimId: ref.claimId ?? claimIdOf(section.key, index),
       }))
     )
     if (refs.length === 0) {
@@ -98,8 +118,29 @@ export function reportToMarkdown(report: ResearchReport, options: MarkdownOption
     } else {
       for (const ref of refs) {
         lines.push('')
-        lines.push(`- ${ref.sectionTitle}: ${ref.claim || '(claim not recorded)'} — ${ref.capabilityId} (run ${ref.runId})`)
+        lines.push(`- ${ref.sectionTitle}: ${ref.claim || '(claim not recorded)'} — ${ref.capabilityId} (run ${ref.runId}) · claim ${ref.claimId}`)
       }
+    }
+
+    // A claim nothing backs must not read as a verified conclusion, so it is
+    // named here instead of only appearing as prose in the section above.
+    const unbacked = findUnbackedClaims(report)
+    if (unbacked.length > 0) {
+      lines.push('')
+      lines.push('### Unbacked Claims')
+      for (const claim of unbacked) {
+        lines.push('')
+        lines.push(`- ${claim.id}: ${claim.text || '(claim text not recorded)'} — no evidence`)
+      }
+    }
+
+    if (includeClaimEvidenceIndex) {
+      lines.push('')
+      lines.push('### Claim-Evidence Index')
+      lines.push('')
+      lines.push('```json')
+      lines.push(JSON.stringify(buildClaimEvidenceIndex(report), null, 2))
+      lines.push('```')
     }
   }
 
