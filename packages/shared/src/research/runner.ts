@@ -141,25 +141,42 @@ export class ResearchRunner {
     const outcomes: RunOutcome[] = [...(cp?.outcomes ?? [])];
     let next = 0;
     let workerError: unknown;
-    const workers = Array.from({ length: Math.min(CONCURRENCY, specs.length) }, async () => {
-      while (next < specs.length && !signal?.aborted && !workerError) {
-        const spec = specs[next++];
-        try {
-          await charge('toolCalls', spec.cap.id);
-          const outcome = await this.executor.run(spec.cap, spec.input, { timeoutMs: TIMEOUT_MS, signal });
-          outcomes.push(outcome);
-          await checkpoint(() => {
-            if (!cp) return;
-            cp.outcomes.push(outcome);
-            cp.inFlight = cp.inFlight.filter((id) => id !== spec.cap.id);
-            cp.summary.completedCapabilities = cp.outcomes.filter((o) => o.record.status === 'success').map((o) => o.record.capabilityId);
-            cp.summary.failedCapabilities = cp.outcomes.filter((o) => o.record.status !== 'success').map((o) => o.record.capabilityId);
-            cp.events.push({ runId, parentRunId: runId, spanId: randomUUID(), type: 'step', stepId: spec.cap.id, at: this.now() });
-          });
-        } catch (error) { workerError = error; }
-      }
-    });
-    await Promise.allSettled(workers);
+    const stopController = new AbortController();
+    const stopOnExternalAbort = () => stopController.abort(signal?.reason);
+    signal?.addEventListener('abort', stopOnExternalAbort);
+    if (signal?.aborted) stopOnExternalAbort();
+
+    try {
+      const workers = Array.from({ length: Math.min(CONCURRENCY, specs.length) }, async () => {
+        while (next < specs.length && !stopController.signal.aborted && !workerError) {
+          const spec = specs[next++];
+          try {
+            await charge('toolCalls', spec.cap.id);
+            const outcome = await this.executor.run(spec.cap, spec.input, {
+              timeoutMs: TIMEOUT_MS,
+              signal: stopController.signal,
+            });
+            outcomes.splice(0, outcomes.length, ...orderOutcomes([...outcomes, outcome], plannedIds));
+            await checkpoint(() => {
+              if (!cp) return;
+              cp.outcomes = orderOutcomes([...cp.outcomes, outcome], plannedIds);
+              cp.inFlight = cp.inFlight.filter((id) => id !== spec.cap.id);
+              cp.summary.completedCapabilities = cp.outcomes.filter((o) => o.record.status === 'success').map((o) => o.record.capabilityId);
+              cp.summary.failedCapabilities = cp.outcomes.filter((o) => o.record.status !== 'success').map((o) => o.record.capabilityId);
+              cp.events.push({ runId, parentRunId: runId, spanId: randomUUID(), type: 'step', stepId: spec.cap.id, at: this.now() });
+            });
+          } catch (error) {
+            if (!workerError) {
+              workerError = error;
+              stopController.abort(error);
+            }
+          }
+        }
+      });
+      await Promise.allSettled(workers);
+    } finally {
+      signal?.removeEventListener('abort', stopOnExternalAbort);
+    }
     if (workerError) throw workerError;
 
     const successIds = outcomes
@@ -268,6 +285,15 @@ function buildRuns(plan: PlannedCapability[], outcomes: RunOutcome[]) {
       error: outcome.record.error,
     };
   });
+}
+
+function orderOutcomes(outcomes: RunOutcome[], plannedIds: string[]): RunOutcome[] {
+  const order = new Map(plannedIds.map((id, index) => [id, index]));
+  return outcomes.sort(
+    (left, right) =>
+      (order.get(left.record.capabilityId) ?? Number.MAX_SAFE_INTEGER) -
+      (order.get(right.record.capabilityId) ?? Number.MAX_SAFE_INTEGER)
+  );
 }
 
 function buildDataBundle(outcomes: RunOutcome[]): string {
