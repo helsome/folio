@@ -154,6 +154,68 @@ describe('AutomationRulesView', () => {
     container.remove()
   })
 
+  it('shows the material-update outcome for a run with material changes (#185)', async () => {
+    const materialRun: AutomationRun = {
+      ...RUN,
+      materialChanges: 2,
+      analyzed: 2,
+      notified: true,
+      outcome: 'material_update',
+    }
+    const { client } = clientWithRules({ run: materialRun })
+    const { container, root } = render(client)
+
+    await act(async () => {
+      root.render(
+        withI18n(
+          <FinagentClientProvider client={client}>
+            <AutomationRulesView />
+          </FinagentClientProvider>
+        )
+      )
+    })
+    await flushAsync()
+
+    expect(container.textContent ?? '').toContain('Material changes found')
+
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  })
+
+  it('shows the incomplete outcome when the run recorded failures (#185)', async () => {
+    const incompleteRun: AutomationRun = {
+      ...RUN,
+      evaluated: 1,
+      materialChanges: 0,
+      analyzed: 0,
+      notified: false,
+      outcome: 'incomplete',
+      failures: ['MSFT.US: quote unavailable'],
+    }
+    const { client } = clientWithRules({ run: incompleteRun })
+    const { container, root } = render(client)
+
+    await act(async () => {
+      root.render(
+        withI18n(
+          <FinagentClientProvider client={client}>
+            <AutomationRulesView />
+          </FinagentClientProvider>
+        )
+      )
+    })
+    await flushAsync()
+
+    expect(container.textContent ?? '').toContain('Run incomplete')
+
+    await act(async () => {
+      root.unmount()
+    })
+    container.remove()
+  })
+
   it('toggle calls saveRule with the flipped rule', async () => {
     const { client, saveCalls } = clientWithRules()
     const { container, root } = render(client)
