@@ -9,6 +9,8 @@ import type {
   Quote,
 } from '@finagent/core';
 import { defineCapability } from '../capabilities/define.ts';
+import type { CapabilityFetchers } from '../capabilities/fetchers.ts';
+import { createResearchEventsCapability } from '../capabilities/manifests/phase-two.ts';
 import { createCapabilityRegistry } from '../capabilities/registry.ts';
 import { CapabilityExecutor } from '../capabilities/executor.ts';
 import {
@@ -52,6 +54,19 @@ function makeCap(
       };
     },
   });
+}
+
+/**
+ * The real `research.events` capability bound to a stub finance calendar, so
+ * the tests exercise its actual input contract (required `eventType`, bare
+ * `CalendarEvent[]` payload) instead of a hand-rolled look-alike.
+ */
+function calendarCap(
+  events: Array<{ symbol: string; type: string; date: number }>
+): FinanceCapability {
+  return createResearchEventsCapability({
+    getCalendarEvents: async () => events,
+  } as unknown as CapabilityFetchers);
 }
 
 function makeService(
@@ -240,14 +255,13 @@ describe('PortfolioRiskService signals', () => {
 
   it('emits an earnings signal only when an event falls within the 7-day horizon', async () => {
     const data = portfolio([holding('AAA.US', { marketValue: 100 })]);
+    const seconds = (deltaMs: number) => (FIXED_NOW + deltaMs) / 1000;
 
     const within = makeService([
       summaryCap(data),
       positionsCap(data.holdings),
       quoteCap(),
-      makeCap('research.events', 'get_calendar_events', emptySchema, () => ({
-        events: [{ symbol: 'AAA.US', type: 'earnings', date: FIXED_NOW + 3 * DAY_MS }],
-      })),
+      calendarCap([{ symbol: 'AAA.US', type: 'financial', date: seconds(3 * DAY_MS) }]),
     ]);
     expect((await within.analyze()).signals.some((s) => s.kind === 'upcoming_earnings')).toBe(true);
 
@@ -255,11 +269,27 @@ describe('PortfolioRiskService signals', () => {
       summaryCap(data),
       positionsCap(data.holdings),
       quoteCap(),
-      makeCap('research.events', 'get_calendar_events', emptySchema, () => ({
-        events: [{ symbol: 'AAA.US', type: 'earnings', date: FIXED_NOW + 30 * DAY_MS }],
-      })),
+      calendarCap([{ symbol: 'AAA.US', type: 'financial', date: seconds(30 * DAY_MS) }]),
     ]);
     expect((await outside.analyze()).signals.some((s) => s.kind === 'upcoming_earnings')).toBe(false);
+  });
+
+  it('batches research.events by 10 held symbols and reads the bare event array', async () => {
+    const holdings = Array.from({ length: 12 }, (_, i) => holding(`AAA${i}.US`, { marketValue: 10 }));
+    const data = portfolio(holdings);
+    const service = makeService([
+      summaryCap(data),
+      positionsCap(data.holdings),
+      quoteCap(),
+      calendarCap([{ symbol: 'AAA3.US', type: 'financial', date: (FIXED_NOW + DAY_MS) / 1000 }]),
+    ]);
+
+    const report = await service.analyze();
+
+    expect(
+      report.capabilityRuns.filter((run) => run.capabilityId === 'research.events' && run.status === 'success')
+    ).toHaveLength(2);
+    expect(report.signals.some((s) => s.kind === 'upcoming_earnings')).toBe(true);
   });
 
   it('applies drawdown thresholds (high >35%, medium >20%, none otherwise)', async () => {

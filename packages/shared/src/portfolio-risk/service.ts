@@ -15,6 +15,8 @@ import type { CapabilityExecutor, RunOutcome } from '../capabilities/executor.ts
 
 const DAY_MS = 24 * 60 * 60 * 1000;
 const EARNINGS_HORIZON_MS = 7 * DAY_MS;
+/** `research.events` accepts at most 10 `--symbol` flags per run (see screening). */
+const CALENDAR_BATCH = 10;
 const NEWS_RECENT_MS = 7 * DAY_MS;
 const DRAWDOWN_WINDOW_BARS = 20;
 const KLINE_LIMIT = 30;
@@ -138,9 +140,20 @@ export class PortfolioRiskService {
     const eventsCap = this.registry.get('research.events');
     let eventsData: unknown;
     if (eventsCap && hasPositions) {
-      const eventsOutcome = await this.executor.run(eventsCap, {}, { signal });
-      runs.push(toRunEntry(eventsOutcome.record));
-      eventsData = eventsOutcome.result?.data;
+      const symbols = allocation.map((item) => item.symbol);
+      const batches: string[][] = [];
+      for (let i = 0; i < symbols.length; i += CALENDAR_BATCH) {
+        batches.push(symbols.slice(i, i + CALENDAR_BATCH));
+      }
+      const eventsOutcomes = await this.executor.runAll(
+        batches.map((batch) => ({
+          cap: eventsCap,
+          input: { eventType: 'financial', symbols: batch },
+        })),
+        { concurrency: SIDE_CONCURRENCY, signal }
+      );
+      for (const outcome of eventsOutcomes) runs.push(toRunEntry(outcome.record));
+      eventsData = collectCalendarEvents(eventsOutcomes);
     } else if (!eventsCap && hasPositions) {
       runs.push(missingRun('research.events'));
     }
@@ -314,7 +327,7 @@ function buildUpcomingEarningsSignal(
   const matched = new Set<string>();
 
   for (const event of events) {
-    if (typeof event.type !== 'string' || !/earn/i.test(event.type)) continue;
+    if (!isEarningsEvent(event)) continue;
     const at = toEpochMs(event.date);
     if (at === undefined || at < nowMs || at > horizonEnd) continue;
     if (!event.symbol) continue;
@@ -533,10 +546,31 @@ function isCalendarEvent(value: unknown): value is CalendarEvent {
   return true;
 }
 
+/**
+ * `research.events` returns a bare `CalendarEvent[]` per run (see the manifest),
+ * so the runs are flattened into one list before filtering.
+ */
+function collectCalendarEvents(outcomes: RunOutcome[]): unknown[] {
+  const events: unknown[] = [];
+  for (const outcome of outcomes) {
+    const data = outcome.result?.data;
+    if (Array.isArray(data)) events.push(...data);
+  }
+  return events;
+}
+
 function extractEvents(data: unknown): CalendarEvent[] {
-  if (typeof data !== 'object' || data === null || !('events' in data)) return [];
-  const events = data.events;
-  return Array.isArray(events) ? events.filter(isCalendarEvent) : [];
+  return Array.isArray(data) ? data.filter(isCalendarEvent) : [];
+}
+
+/**
+ * The finance calendar names an earnings announcement `financial` (`report` is
+ * the same event seen from the report/release side — see `automation/runner.ts`).
+ * The previous `/earn/i` test matched neither, so this signal could never fire.
+ */
+function isEarningsEvent(event: CalendarEvent): boolean {
+  const type = (event.type ?? '').toLowerCase();
+  return type === 'financial' || type === 'report';
 }
 
 /** Read an optional `sector` string from company.profile data, if present. */
