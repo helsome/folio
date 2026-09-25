@@ -82,7 +82,9 @@ function demoKlinesFor(symbol: string, limit?: number): Kline[] {
   const daySeconds = 86_400;
   const todayUtc = Math.floor(new Date().setUTCHours(0, 0, 0, 0) / 1000);
   for (let index = count - 1; index >= 0; index -= 1) {
-    const step = count - 1 - index;
+    // Bars are appended oldest → newest, so the exponent must equal the bar's
+    // distance from today (`index`), not the distance from the first bar.
+    const step = index;
     const drift = (seeded(symbol, index + 3) - 0.5) * 0.02;
     const close = round2(quote.lastPrice / Math.pow(1 + drift, step));
     const open = round2(close * (1 + (seeded(symbol, index + 61) - 0.5) * 0.008));
