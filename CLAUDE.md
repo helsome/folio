@@ -24,7 +24,7 @@ npx skills add longbridge/developers -g -y
 ### Critical Rules
 
 1. **LongBridge CLI is user-installed** — NEVER bundle it in the app
-2. **Symbol validation** — Validate with `/^[A-Z0-9]{1,5}\.(US|HK|SG|SH|SZ|HAS)$/` before exec
+2. **Symbol validation** — Validate with `/^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/` before exec. The body is 1–6 characters: A-share codes such as `600519.SH` are 6 digits, so a 5-character limit rejects valid listings.
 3. **Use execa array params** — Never string concatenation for commands
 4. **Session isolation** — Use `atomFamily` for per-session state
 
