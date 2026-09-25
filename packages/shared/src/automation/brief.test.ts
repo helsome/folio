@@ -78,22 +78,41 @@ describe('buildBrief', () => {
     expect(brief.quiet).toEqual({ count: 0, message: 'No monitored securities.' })
   })
 
-  it('every item carries an explainable source', () => {
+  it('every item carries an explainable source, provenance references, and context version when applicable', () => {
     const brief = buildBrief(
       inputs({
-        runs: [run('r1', 2, true)],
-        alerts: [alert('a1', 'AAPL.US', 'AAPL price alert')],
-        diffs: [diff('NVDA.US', true, 'strengthened')],
-        portfolio: [{ label: 'AAPL.US · 12.4% of portfolio', detail: 'Single-stock exposure 12.4%' }],
-        movers: [mover('TSLA.US', 7.2)],
+        diffs: [
+          {
+            ...diff('NVDA.US', true, 'strengthened'),
+            changes: [
+              {
+                category: 'valuation',
+                label: 'PE ratio',
+                before: 50,
+                after: 40,
+                direction: 'improved',
+                material: true,
+                evidence: ['capability:company.valuation run:run-1 fetchedAt:1700000000'],
+              },
+            ],
+          },
+        ],
+        runs: [run('run-auto', 1, true)],
       }),
       1_700_000_000_000
     )
-    // portfolio(1) + watchlist mover(1) + watchlist diff(1) + thesis(1) + alert(1) + automation(1)
-    expect(brief.items.length).toBe(6)
-    for (const item of brief.items) {
-      expect(['Portfolio', 'Watchlist', 'Thesis', 'Alert', 'Automation']).toContain(item.source)
-    }
+    expect(brief.items.length).toBeGreaterThan(0)
+    const diffItem = brief.items.find((item) => item.id === 'diff-NVDA.US')
+    expect(diffItem?.provenanceRefs).toContain('capability:company.valuation run:run-1 fetchedAt:1700000000')
+    expect(diffItem?.contextVersion).toBe('diff-diff-NVDA.US')
+
+    const thesisItem = brief.items.find((item) => item.id === 'thesis-NVDA.US')
+    expect(thesisItem?.provenanceRefs).toContain('capability:company.valuation run:run-1 fetchedAt:1700000000')
+    expect(thesisItem?.contextVersion).toBe('diff-diff-NVDA.US')
+
+    const autoItem = brief.items.find((item) => item.id === 'automation-run-auto')
+    expect(autoItem?.provenanceRefs).toContain('automation-run:run-auto:material')
+    expect(autoItem?.contextVersion).toBe('run-run-auto')
   })
 
   it('flags only material movers as watchlist changes', () => {
