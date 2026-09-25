@@ -36,6 +36,23 @@ function makeMessage(id: string, content: string): Message {
   return { id, role: 'user', content, timestamp: 1000 };
 }
 
+/**
+ * JsonFileStore whose reads yield before completing, widening the
+ * read-modify-write window so that a lost-update regression interleaves
+ * deterministically under `Promise.all`. `ConnectionStore` uses the same
+ * harness for the equivalent guard (issue #145).
+ */
+class SlowReadJsonFileStore extends JsonFileStore {
+  constructor(dir: string, private readonly delayMs: number) {
+    super(dir);
+  }
+
+  override async read<T>(file: string, fallback: T): Promise<T> {
+    await new Promise((resolve) => setTimeout(resolve, this.delayMs));
+    return super.read<T>(file, fallback);
+  }
+}
+
 describe('JsonFileStore', () => {
   it('writes and reads back JSON', async () => {
     await store.write('a.json', { hello: 'world' });
@@ -87,6 +104,16 @@ describe('SessionRepository', () => {
     expect(await repo.list()).toEqual([]);
     expect(await store.read('sessions/s1/messages.json', null)).toBeNull();
   });
+
+  it('serializes concurrent upserts so no session is silently dropped', async () => {
+    const repo = new SessionRepository(new SlowReadJsonFileStore(dir, 20));
+    await Promise.all([repo.upsert(makeSession('s1')), repo.upsert(makeSession('s2'))]);
+
+    const reloaded = new SessionRepository(new JsonFileStore(dir));
+    const ids = (await reloaded.list()).map((session) => session.id).sort();
+
+    expect(ids).toEqual(['s1', 's2']);
+  });
 });
 
 describe('MessageRepository', () => {
@@ -108,6 +135,19 @@ describe('MessageRepository', () => {
 
     expect((await repo.list('s1')).map((message) => message.id)).toEqual(['m1']);
     expect((await repo.list('s2')).map((message) => message.id)).toEqual(['m2']);
+  });
+
+  it('serializes concurrent appends so no message is silently dropped', async () => {
+    const repo = new MessageRepository(new SlowReadJsonFileStore(dir, 20));
+    await Promise.all([
+      repo.append('s1', makeMessage('m1', 'first')),
+      repo.append('s1', makeMessage('m2', 'second')),
+    ]);
+
+    const reloaded = new MessageRepository(new JsonFileStore(dir));
+    const ids = (await reloaded.list('s1')).map((message) => message.id).sort();
+
+    expect(ids).toEqual(['m1', 'm2']);
   });
 });
 
@@ -140,5 +180,18 @@ describe('RunRepository', () => {
 
     const runs = await repo.list('s1');
     expect(runs.map((run) => run.id)).toEqual(['r2', 'r1']);
+  });
+
+  it('serializes concurrent run writes so no run is silently dropped', async () => {
+    const repo = new RunRepository(new SlowReadJsonFileStore(dir, 20));
+    await Promise.all([
+      repo.create({ id: 'r1', sessionId: 's1', status: 'completed', input: 'a', startedAt: 1000 }),
+      repo.create({ id: 'r2', sessionId: 's1', status: 'completed', input: 'b', startedAt: 2000 }),
+    ]);
+
+    const reloaded = new RunRepository(new JsonFileStore(dir));
+    const ids = (await reloaded.list('s1')).map((run) => run.id).sort();
+
+    expect(ids).toEqual(['r1', 'r2']);
   });
 });
