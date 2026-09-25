@@ -39,6 +39,60 @@ describe('translation resources (spec §7–9, §81–82)', () => {
     expect(() => assertKeyParity()).not.toThrow();
   });
 
+  it('reports one issue per key difference, on the locale that has the gap', () => {
+    // en-US has `navigation.today`, zh-CN does not → the pair is a single
+    // difference. `i18n:check` counts `issues.length` and prints `N issue(s)`,
+    // so a mirrored report makes CI claim two problems where there is one.
+    const zhNav = resources['zh-CN'].navigation as Record<string, string>;
+    const before = zhNav['today'];
+    delete zhNav['today'];
+    try {
+      const issues = checkKeyParity();
+      const forToday = issues.filter((issue) => issue.key === 'navigation.today');
+      expect(forToday).toHaveLength(1);
+      expect(forToday[0].type).toBe('missing');
+      expect(forToday[0].locale).toBe('zh-CN');
+    } finally {
+      zhNav['today'] = before;
+    }
+    expect(checkKeyParity()).toEqual([]);
+  });
+
+  it('reports a key only zh-CN defines as an extra on zh-CN', () => {
+    const zhNav = resources['zh-CN'].navigation as Record<string, string>;
+    zhNav['__parity_probe__'] = '探针';
+    try {
+      const issues = checkKeyParity();
+      const probe = issues.filter((issue) => issue.key === 'navigation.__parity_probe__');
+      expect(probe).toHaveLength(1);
+      expect(probe[0].type).toBe('extra');
+      // The key exists here and not in en-US, so the label must name zh-CN —
+      // reporting it as an en-US extra states the opposite of the fact.
+      expect(probe[0].locale).toBe('zh-CN');
+    } finally {
+      delete zhNav['__parity_probe__'];
+    }
+    expect(checkKeyParity()).toEqual([]);
+  });
+
+  it('reports an interpolation mismatch once, not once per direction', () => {
+    const zhAutomation = resources['zh-CN'].automation as unknown as {
+      run: Record<string, string>;
+    };
+    const before = zhAutomation.run['lastRun'];
+    zhAutomation.run['lastRun'] = '无占位符';
+    try {
+      const issues = checkKeyParity();
+      const mismatches = issues.filter((issue) => issue.key === 'automation.run.lastRun');
+      expect(mismatches).toHaveLength(1);
+      expect(mismatches[0].type).toBe('interpolation-mismatch');
+      expect(mismatches[0].locale).toBe('zh-CN');
+    } finally {
+      zhAutomation.run['lastRun'] = before;
+    }
+    expect(checkKeyParity()).toEqual([]);
+  });
+
   it('detects interpolation variable mismatches across locales', () => {
     const enFlat = flattenLocale('en-US');
     const zhFlat = flattenLocale('zh-CN');
