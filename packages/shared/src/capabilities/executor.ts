@@ -10,12 +10,30 @@ import type {
  * Provider error codes that mean "can't serve right now" (missing CLI, missing
  * auth, rate limited, or the provider timed out) rather than a data/logic
  * failure. These map a run to `unavailable`.
+ *
+ * Two vocabularies reach this executor and both have to be listed:
+ *  - the vendor codes thrown by `@finagent/longbridge-tools` when a caller uses
+ *    its fetchers directly;
+ *  - the normalized `ProviderError.code` that `toProviderError` substitutes for
+ *    them (`providers/longbridge/adapter.ts`), which is what actually arrives on
+ *    the production path — the kernel builds the capability registry from
+ *    `createRouterFetchers`, and `ProviderFetchError` carries that normalized
+ *    code ("so callers can branch on the machine code without importing vendor
+ *    types"). With only the vendor codes listed, `unavailable` was unreachable
+ *    for the four cases this table exists to describe.
+ *
+ * Note: "CLI not installed" still arrives as `PROVIDER_ERROR`, which is too
+ * broad to treat as unavailable — that adapter mapping would need its own code
+ * before it can be classified here.
  */
 const UNAVAILABLE_ERROR_CODES = {
   LONGBRIDGE_NOT_INSTALLED: true,
   LONGBRIDGE_NOT_AUTHED: true,
   LONGBRIDGE_RATE_LIMITED: true,
   LONGBRIDGE_TIMEOUT: true,
+  AUTH_EXPIRED: true,
+  RATE_LIMITED: true,
+  TIMEOUT: true,
 } as const;
 
 export interface CapabilityExecutorOptions {
