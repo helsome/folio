@@ -59,6 +59,25 @@ describe('ResearchReportRepository', () => {
     expect(await second.getReport('r1')).toMatchObject({ id: 'r1', symbol: 'NVDA.US' });
   });
 
+  it('keeps source provenance snapshots intact after restart', async () => {
+    const original = report('r1', 'NVDA.US');
+    original.sections = [{
+      key: 'research.news', title: 'News', verdict: 'neutral', summary: 'Summary',
+      evidence: [{
+        capabilityId: 'research.news', runId: 'cap-1', claim: 'Summary', fetchedAt: 1,
+        sourceSnapshots: [{
+          schemaVersion: 'folio-source-provenance/v1', sourceId: 'src_test', documentId: 'news-1',
+          retrievedAt: 1, retrieval: { provider: 'test', method: 'capability:research.news' },
+          excerpt: 'Original v1 evidence', excerptHash: 'sha256:excerpt', sourceContentHash: 'sha256:content',
+        }],
+      }],
+    }];
+    await new ResearchReportRepository(store).saveReport(original);
+
+    const reloaded = await new ResearchReportRepository(new JsonFileStore(dir)).getReport('r1');
+    expect(reloaded?.sections[0].evidence[0].sourceSnapshots).toEqual(original.sections[0].evidence[0].sourceSnapshots);
+  });
+
   it('lists reports per symbol', async () => {
     const repo = new ResearchReportRepository(store);
     await repo.saveReport(report('r1', 'NVDA.US'));
