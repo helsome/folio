@@ -115,7 +115,14 @@ export class PiRpcClient {
   private readonly onLog: (log: PiRuntimeLog) => void;
   private process: SpawnProcess | null = null;
   private stdoutBuffer = '';
+  /** Line-splitting accumulator for stderr; holds only the unterminated tail. */
   private stderrBuffer = '';
+  /**
+   * Capped byte history of stderr for Diagnostics (V8.1 §40). Kept apart from
+   * `stderrBuffer`, which is drained line by line and therefore never retains a
+   * complete line.
+   */
+  private stderrHistory = '';
   private exited = false;
   /** Last process termination (V8.1 §35, §40): exit code/signal for diagnostics. */
   private lastExitInfo: { code: number | null; signal: string | null } | null = null;
@@ -226,8 +233,7 @@ export class PiRpcClient {
 
   /** Recent stderr tail (capped) for Diagnostics — never has live prompt text. */
   getRecentStderr(maxBytes = 6000): string {
-    if (this.stderrBuffer.length <= maxBytes) return this.stderrBuffer;
-    return this.stderrBuffer.slice(this.stderrBuffer.length - maxBytes);
+    return capTail(this.stderrHistory, maxBytes);
   }
 
   /**
@@ -484,6 +490,7 @@ export class PiRpcClient {
     this.process = proc;
     this.stdoutBuffer = '';
     this.stderrBuffer = '';
+    this.stderrHistory = '';
 
     proc.stdout.on('data', (chunk) => this.consumeStdout(String(chunk)));
     proc.stderr.on('data', (chunk) => this.consumeStderr(String(chunk)));
@@ -543,6 +550,7 @@ export class PiRpcClient {
 
   private consumeStderr(chunk: string) {
     this.stderrBuffer += chunk;
+    this.stderrHistory = capTail(this.stderrHistory + chunk, STDERR_HISTORY_LIMIT);
     let newlineIndex = this.stderrBuffer.indexOf('\n');
     while (newlineIndex >= 0) {
       const line = this.stderrBuffer.slice(0, newlineIndex).trim();
@@ -745,6 +753,14 @@ export class PiRpcClient {
     }
     this.pendingControls.clear();
   }
+}
+
+/** Stderr bytes retained for Diagnostics; older output is evicted. */
+const STDERR_HISTORY_LIMIT = 16_000;
+
+/** Keep at most `maxBytes` from the end of `value`. */
+function capTail(value: string, maxBytes: number) {
+  return value.length <= maxBytes ? value : value.slice(value.length - maxBytes);
 }
 
 function parseArgs(value: string | undefined) {
