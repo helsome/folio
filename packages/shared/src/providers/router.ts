@@ -60,6 +60,13 @@ function readOptions(input: unknown): unknown {
   return input.options;
 }
 
+/** Optional reporting-currency filter carried by `portfolio.assets` inputs. */
+function readCurrency(input: unknown): string | undefined {
+  if (!isRecord(input)) return undefined;
+  const currency = input.currency;
+  return typeof currency === 'string' && currency.length > 0 ? currency : undefined;
+}
+
 /**
  * Opt-in resilience configuration (#25). Every field is optional; when the
  * whole object (or a field) is omitted, the router behaves exactly like the
@@ -502,7 +509,7 @@ export class ProviderRouter implements FinancialProviderRouter {
       case 'portfolio.positions':
         return provider.getPositions(accountId, signal);
       case 'portfolio.assets':
-        return provider.getAssets(accountId, signal);
+        return provider.getAssets(accountId, signal, readCurrency(input));
       case 'portfolio.cashFlow':
         return provider.getCashFlow(accountId, readOptions(input), signal);
       default:

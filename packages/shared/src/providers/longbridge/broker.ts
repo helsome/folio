@@ -99,8 +99,12 @@ export class LongbridgeBrokerAccountProvider implements BrokerAccountProvider {
     return runProviderCall<Holding[]>(() => getAccountPositions(), signal);
   }
 
-  getAssets(accountId?: string, signal?: AbortSignal): Promise<ProviderResult<AccountAssets[]>> {
-    return runProviderCall<AccountAssets[]>(() => getAssets(), signal);
+  getAssets(
+    accountId?: string,
+    signal?: AbortSignal,
+    currency?: string
+  ): Promise<ProviderResult<AccountAssets[]>> {
+    return runProviderCall<AccountAssets[]>(() => getAssets(currency), signal);
   }
 
   getCashFlow(
