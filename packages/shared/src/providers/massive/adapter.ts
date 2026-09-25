@@ -231,7 +231,7 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
       }
       case 'market.kline': {
         const { count, timespan } = readKlineOptions(input)
-        const { from, to } = klineRange(count)
+        const { from, to } = klineRange(count, timespan)
         const path = `/v2/aggs/ticker/${encodeURIComponent(ticker)}/range/1/${timespan}/${from}/${to}`
         const payload = await getJson(buildAggsUrl(path, count), apiKey, signal, endpoint)
         const klines = mapKlines(symbol, payload)
@@ -399,9 +399,13 @@ function readKlineOptions(input: unknown): KlineOptions {
   return { count, timespan: period === '1w' ? 'week' : 'day' }
 }
 
-function klineRange(count: number): { from: string; to: string } {
+function klineRange(count: number, timespan: 'day' | 'week'): { from: string; to: string } {
+  // Daily bars need ~2 calendar days each to absorb non-trading days; weekly bars
+  // are one per calendar week. Sizing every request by days silently truncated
+  // weekly series to roughly count * 2 / 7 bars.
+  const daysPerBar = timespan === 'week' ? 7 : 2
   const to = new Date()
-  const from = new Date(to.getTime() - count * 2 * 24 * 60 * 60 * 1000)
+  const from = new Date(to.getTime() - count * daysPerBar * 24 * 60 * 60 * 1000)
   return { from: from.toISOString().slice(0, 10), to: to.toISOString().slice(0, 10) }
 }
 

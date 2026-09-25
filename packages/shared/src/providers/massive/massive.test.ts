@@ -175,6 +175,43 @@ describe('MassiveFinancialDataProvider', () => {
     expect(result.provenance.marketTime! > 1e12).toBe(true)
   })
 
+  it('sizes the weekly window by weeks so the requested bars fit', async () => {
+    const calls = installFetch(() =>
+      jsonResponse({ status: 'OK', ticker: 'AAPL', results: [] })
+    )
+    const provider = makeProvider('key')
+    await provider.execute<Kline[]>('market.kline', {
+      symbol: 'AAPL.US',
+      period: '1w',
+      limit: 300,
+    })
+
+    // One bar per calendar week: 300 weekly bars need roughly 300 * 7 = 2100 days.
+    const range = /\/range\/1\/week\/(\d{4}-\d{2}-\d{2})\/(\d{4}-\d{2}-\d{2})/.exec(calls[0].url)
+    expect(range).not.toBeNull()
+    if (!range) return
+    const days = Math.round((Date.parse(range[2]) - Date.parse(range[1])) / 86_400_000)
+    expect(days).toBeGreaterThanOrEqual(300 * 7)
+  })
+
+  it('keeps the daily window at two days per requested bar', async () => {
+    const calls = installFetch(() =>
+      jsonResponse({ status: 'OK', ticker: 'AAPL', results: [] })
+    )
+    const provider = makeProvider('key')
+    await provider.execute<Kline[]>('market.kline', {
+      symbol: 'AAPL.US',
+      period: '1d',
+      limit: 100,
+    })
+
+    const range = /\/range\/1\/day\/(\d{4}-\d{2}-\d{2})\/(\d{4}-\d{2}-\d{2})/.exec(calls[0].url)
+    expect(range).not.toBeNull()
+    if (!range) return
+    const days = Math.round((Date.parse(range[2]) - Date.parse(range[1])) / 86_400_000)
+    expect(days).toBe(200)
+  })
+
   it('maps ticker details to the StaticInfo subset', async () => {
     installFetch(() =>
       jsonResponse({
