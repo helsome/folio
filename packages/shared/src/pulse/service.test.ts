@@ -194,12 +194,15 @@ async function makeService(
 }
 
 const PORTFOLIO: PortfolioSnapshot = {
+  // Single-currency book: an unconverted `marketValue` is only comparable with
+  // `totalAssets` when the holding currency and the base currency are known.
+  baseCurrency: 'USD',
   totalAssets: 10_000,
   accounts: [],
   holdings: [
-    { symbol: 'AAPL.US', name: 'Apple', marketValueBase: 1_500, marketValue: 1_500 },
-    { symbol: 'MSFT.US', name: 'Microsoft', marketValue: 2_500 },
-    { symbol: 'GOOGL.US', name: 'Alphabet', marketValueBase: 4_000 },
+    { symbol: 'AAPL.US', name: 'Apple', currency: 'USD', marketValueBase: 1_500, marketValue: 1_500 },
+    { symbol: 'MSFT.US', name: 'Microsoft', currency: 'USD', marketValue: 2_500 },
+    { symbol: 'GOOGL.US', name: 'Alphabet', currency: 'USD', marketValueBase: 4_000 },
   ],
   fetchedAt: NOW_MS,
 }
@@ -279,6 +282,55 @@ describe('portfolioExposurePercent', () => {
   it('returns undefined without a snapshot or when totalAssets is missing', () => {
     expect(portfolioExposurePercent('AAPL.US')).toBeUndefined()
     expect(portfolioExposurePercent('AAPL.US', { ...PORTFOLIO, totalAssets: undefined })).toBeUndefined()
+  })
+
+  it('does not divide an unconverted marketValue by a base-currency total', () => {
+    // 780,000 HKD is NOT 780% of a 100,000 USD book — without a converted
+    // marketValueBase the exposure is simply unknown.
+    const crossCurrency: PortfolioSnapshot = {
+      baseCurrency: 'USD',
+      totalAssets: 100_000,
+      accounts: [],
+      holdings: [
+        { symbol: '0700.HK', name: 'Tencent', currency: 'HKD', marketValue: 780_000 },
+      ],
+      fetchedAt: NOW_MS,
+    }
+    expect(portfolioExposurePercent('0700.HK', crossCurrency)).toBeUndefined()
+  })
+
+  it('uses marketValue when the holding currency matches the base currency', () => {
+    const sameCurrency: PortfolioSnapshot = {
+      baseCurrency: 'HKD',
+      totalAssets: 1_000_000,
+      accounts: [],
+      holdings: [
+        { symbol: '0700.HK', name: 'Tencent', currency: 'HKD', marketValue: 780_000 },
+      ],
+      fetchedAt: NOW_MS,
+    }
+    expect(portfolioExposurePercent('0700.HK', sameCurrency)).toBe(78)
+  })
+
+  it('leaves exposure undefined when either currency is unknown', () => {
+    // With the holding currency (or the base currency) missing, the unit of the
+    // denominator is unverifiable, so the raw market value cannot stand in —
+    // same rule as evaluatePositionWeight in the alerts evaluator.
+    const noHoldingCurrency: PortfolioSnapshot = {
+      baseCurrency: 'USD',
+      totalAssets: 100_000,
+      accounts: [],
+      holdings: [{ symbol: '0700.HK', name: 'Tencent', marketValue: 780_000 }],
+      fetchedAt: NOW_MS,
+    }
+    const noBaseCurrency: PortfolioSnapshot = {
+      totalAssets: 100_000,
+      accounts: [],
+      holdings: [{ symbol: '0700.HK', name: 'Tencent', currency: 'HKD', marketValue: 780_000 }],
+      fetchedAt: NOW_MS,
+    }
+    expect(portfolioExposurePercent('0700.HK', noHoldingCurrency)).toBeUndefined()
+    expect(portfolioExposurePercent('0700.HK', noBaseCurrency)).toBeUndefined()
   })
 })
 
