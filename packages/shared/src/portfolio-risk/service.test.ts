@@ -10,7 +10,9 @@ import type {
 } from '@finagent/core';
 import { defineCapability } from '../capabilities/define.ts';
 import type { CapabilityFetchers } from '../capabilities/fetchers.ts';
-import { createResearchEventsCapability } from '../capabilities/manifests/phase-two.ts';
+import { createMarketQuoteCapability } from '../capabilities/manifests/market-quote.ts';
+import { createPortfolioSummaryCapability } from '../capabilities/manifests/portfolio-summary.ts';
+import { createPortfolioPositionsCapability, createResearchEventsCapability } from '../capabilities/manifests/phase-two.ts';
 import { createCapabilityRegistry } from '../capabilities/registry.ts';
 import { CapabilityExecutor } from '../capabilities/executor.ts';
 import {
@@ -163,6 +165,34 @@ const quoteCap = (price = 10) =>
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('PortfolioRiskService allocation + concentration', () => {
+  it('preserves currency coverage through production capability manifests and executor', async () => {
+    const data = portfolio([
+      holding('AAPL.US', { marketValue: 20_000 }),
+      holding('0700.HK', { currency: 'HKD', marketValue: 780_000 }),
+    ], 100_000);
+    const requestedQuotes: string[] = [];
+    const fetchers = {
+      getPortfolio: async () => data,
+      getAccountPositions: async () => data.holdings,
+      getQuote: async (symbol: string) => {
+        requestedQuotes.push(symbol);
+        return quote(symbol, 10);
+      },
+    } as unknown as CapabilityFetchers;
+    const report = await makeService([
+      createPortfolioSummaryCapability(fetchers),
+      createPortfolioPositionsCapability(fetchers),
+      createMarketQuoteCapability(fetchers),
+    ]).analyze();
+
+    expect(requestedQuotes.sort()).toEqual(['0700.HK', 'AAPL.US']);
+    expect(report.capabilityRuns.filter((run) =>
+      ['portfolio.summary', 'portfolio.positions', 'market.quote'].includes(run.capabilityId)
+    ).every((run) => run.status === 'success')).toBe(true);
+    expect(report.allocation).toEqual([{ symbol: 'AAPL.US', marketValue: 20_000, weight: 0.2 }]);
+    expect(report.allocationCoverage).toEqual({ excludedSymbols: ['0700.HK'], basis: 'portfolio' });
+  });
+
   it('does not treat unconverted HKD as USD in portfolio weights or risk signals', async () => {
     const data = portfolio([
       holding('AAA.US', { marketValue: 20_000 }),
