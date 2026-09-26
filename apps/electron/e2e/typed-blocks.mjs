@@ -10,9 +10,10 @@
 // Hidden by default; run via `bun run test:typed-blocks` (or
 // FINAGENT_E2E_VISIBLE=1 bun run test:typed-blocks).
 import { execSync, spawn } from 'node:child_process';
-import { existsSync, mkdirSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdirSync, rmSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveElectronBinary } from './electron-harness.mjs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -35,27 +36,9 @@ const fail = (name, error) => {
   console.error(String(error?.stack ?? error).slice(0, 900));
 };
 
-function resolveElectronBinary() {
-  const candidates = [
-    process.env.ELECTRON_BINARY,
-    (() => {
-      try {
-        return require(join(appRoot, 'node_modules/electron'));
-      } catch {
-        return null;
-      }
-    })(),
-    join(repoRoot, 'node_modules/electron/dist/electron.exe'),
-    join(repoRoot, 'node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'),
-  ].filter(Boolean);
-  const binary = candidates.find((candidate) => existsSync(candidate));
-  if (!binary) throw new Error(`Electron binary not found. Checked: ${candidates.join(', ')}`);
-  return binary;
-}
-
 function launch() {
   const proc = spawn(
-    resolveElectronBinary(),
+    resolveElectronBinary(appRoot, repoRoot),
     [electronMain, `--remote-debugging-port=${CDP_PORT}`, '--no-sandbox'],
     {
       cwd: repoRoot,
