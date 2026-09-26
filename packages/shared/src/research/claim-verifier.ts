@@ -1,12 +1,15 @@
+import type { ResearchReport } from '@finagent/core';
 import type { JudgeClient } from '../evaluation/judge-client.ts';
+import { buildReportEvidenceBundle } from '../evidence/contract.ts';
+import { createCodeError } from '../agent/errors.ts';
+import { redact } from '../diagnostics/redact.ts';
 
-export const CLAIM_VERIFIER_VERSION = 'claim-verifier-v1';
+export const CLAIM_VERIFIER_VERSION = '1.0.0';
 
 export type ClaimVerificationStatus =
   | 'supported'
   | 'contradicted'
   | 'insufficient_evidence';
-
 export interface ClaimVerifierEvidence {
   id: string;
   content: string;
@@ -30,6 +33,80 @@ export interface ClaimVerificationResult {
 
 export interface ClaimVerifier {
   verify(input: ClaimVerificationInput, signal?: AbortSignal): Promise<ClaimVerificationResult>;
+}
+
+export interface ReportClaimVerificationSummary {
+  reportId: string;
+  verifiedAt: number;
+  totalClaims: number;
+  supported: number;
+  contradicted: number;
+  insufficientEvidence: number;
+  results: ClaimVerificationResult[];
+}
+
+/**
+ * Verify the claims in a ResearchReport using the canonical #104/#105 evidence
+ * bundle. Identity and claim deduplication belong to that bundle, so a result
+ * can be resolved back to the same evidence item and source.
+ */
+export async function verifyReportClaims(
+  report: ResearchReport,
+  verifier: ClaimVerifier,
+  signal?: AbortSignal
+): Promise<ReportClaimVerificationSummary> {
+  const bundle = buildReportEvidenceBundle(report);
+  const sourceIds = new Set(bundle.sources.map((source) => source.sourceId));
+  const evidenceById = new Map(bundle.evidence.map((item) => [item.evidenceId, item]));
+
+  const results: ClaimVerificationResult[] = [];
+  let supported = 0;
+  let contradicted = 0;
+  let insufficientEvidence = 0;
+
+  for (const claim of bundle.claims) {
+    const evidenceList: ClaimVerifierEvidence[] = [];
+    let resolvable = claim.evidenceIds.length > 0;
+    for (const id of claim.evidenceIds) {
+      const item = evidenceById.get(id);
+      if (!item || !sourceIds.has(item.sourceId) || item.availability !== 'available' || !item.excerpt?.text.trim()) {
+        resolvable = false;
+        break;
+      }
+      evidenceList.push({ id, content: item.excerpt.text });
+    }
+    const verified = resolvable
+      ? await verifier.verify({ claimId: claim.claimId, claimText: claim.statement, evidence: evidenceList }, signal)
+      : undefined;
+    const validResult = verified !== undefined
+      && verified.claimId === claim.claimId
+      && STATUSES.has(verified.status)
+      && Array.isArray(verified.evidenceIds)
+      && (verified.status === 'insufficient_evidence' || verified.evidenceIds.length > 0)
+      && verified.evidenceIds.every((id) => claim.evidenceIds.includes(id));
+    const res: ClaimVerificationResult = verified && validResult
+      ? verified
+      : {
+          claimId: claim.claimId,
+          status: 'insufficient_evidence',
+          evidenceIds: [],
+          reason: resolvable ? 'Verifier returned an unmapped identity.' : 'No resolvable source evidence was provided for this claim.',
+          verifierVersion: CLAIM_VERIFIER_VERSION,
+        };
+    results.push(res);
+    if (res.status === 'supported') supported += 1;
+    else if (res.status === 'contradicted') contradicted += 1;
+    else insufficientEvidence += 1;
+  }
+  return {
+    reportId: report.id,
+    verifiedAt: Date.now(),
+    totalClaims: results.length,
+    supported,
+    contradicted,
+    insufficientEvidence,
+    results,
+  };
 }
 
 interface JudgeResult {
