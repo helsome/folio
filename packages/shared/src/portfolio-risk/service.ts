@@ -30,6 +30,7 @@ type CapabilityRunEntry = PortfolioRiskReport['capabilityRuns'][number];
 /** Facts handed to the synthesizer (same shape the Lead's agent sees). */
 export interface PortfolioRiskSynthesisInput {
   allocation: AllocationItem[];
+  allocationCoverage?: PortfolioRiskReport['allocationCoverage'];
   concentration: PortfolioRiskReport['concentration'];
   signals: RiskSignal[];
   capabilityRuns: PortfolioRiskReport['capabilityRuns'];
@@ -108,8 +109,9 @@ export class PortfolioRiskService {
     if (!quoteCap && hasPositions) runs.push(missingRun('market.quote'));
     for (const outcome of quoteOutcomes) runs.push(toRunEntry(outcome.record));
 
-    const allocation = buildAllocation(rawPositions, quoteOutcomes, summaryPortfolio);
+    const { allocation, coverage: allocationCoverage } = buildAllocation(rawPositions, quoteOutcomes, summaryPortfolio);
     const concentration = computeConcentration(allocation);
+    const hasWholePortfolioWeights = allocationCoverage.basis === 'portfolio';
 
     // ── 3. Market + research + company fetches (evidence + signals) ───────
     const klineCap = this.registry.get('market.kline');
@@ -172,9 +174,11 @@ export class PortfolioRiskService {
 
     // ── 4. Signals (spec order) ───────────────────────────────────────────
     const signals: RiskSignal[] = [];
-    const concentrationSignal = buildConcentrationSignal(concentration.top1Weight);
+    const concentrationSignal = hasWholePortfolioWeights
+      ? buildConcentrationSignal(concentration.top1Weight)
+      : null;
     if (concentrationSignal) signals.push(concentrationSignal);
-    signals.push(...buildLargePositionSignals(allocation));
+    if (hasWholePortfolioWeights) signals.push(...buildLargePositionSignals(allocation));
 
     const earningsSignal = buildUpcomingEarningsSignal(allocation, eventsData, nowMs);
     if (earningsSignal) signals.push(earningsSignal);
@@ -184,12 +188,14 @@ export class PortfolioRiskService {
 
     signals.push(...buildDrawdownSignals(allocation, klineOutcomes));
 
-    const sectorSignal = buildSectorExposureSignal(allocation, profileOutcomes);
+    const sectorSignal = hasWholePortfolioWeights
+      ? buildSectorExposureSignal(allocation, profileOutcomes)
+      : null;
     if (sectorSignal) signals.push(sectorSignal);
 
     // ── 5. Summary + report ───────────────────────────────────────────────
     const summary = await this.synthesizer(
-      { allocation, concentration, signals, capabilityRuns: runs },
+      { allocation, allocationCoverage, concentration, signals, capabilityRuns: runs },
       signal
     );
 
@@ -198,6 +204,7 @@ export class PortfolioRiskService {
       generatedAt: nowMs,
       summary,
       allocation,
+      allocationCoverage,
       concentration,
       signals,
       capabilityRuns: runs,
@@ -222,42 +229,63 @@ function buildAllocation(
   rawPositions: Holding[],
   quoteOutcomes: RunOutcome[],
   summary: PortfolioSnapshot | undefined
-): AllocationItem[] {
+): { allocation: AllocationItem[]; coverage: NonNullable<PortfolioRiskReport['allocationCoverage']> } {
   const resolved: Array<{ symbol: string; marketValue: number }> = [];
+  const excludedSymbols: string[] = [];
+  // Without a summary, same-currency positions can still be compared to one
+  // another. Never infer a base currency from a snapshot with an unknown base.
+  const currencies = new Set(rawPositions.map((position) => normalizeCurrency(position.currency)));
+  const inferredCurrency = !summary && currencies.size === 1 ? [...currencies][0] : undefined;
+  const baseCurrency = normalizeCurrency(summary?.baseCurrency) ?? inferredCurrency;
   rawPositions.forEach((position, index) => {
-    const marketValue = resolveMarketValue(position, quoteOutcomes[index]);
-    if (marketValue > 0) resolved.push({ symbol: position.symbol, marketValue });
+    const marketValue = resolveMarketValue(position, quoteOutcomes[index], baseCurrency);
+    if (marketValue === undefined) excludedSymbols.push(position.symbol);
+    else if (marketValue > 0) resolved.push({ symbol: position.symbol, marketValue });
   });
 
-  const total =
-    summary && typeof summary.marketValue === 'number' && summary.marketValue > 0
-      ? summary.marketValue
-      : resolved.reduce((sum, item) => sum + item.marketValue, 0);
+  const reportedTotal = summary?.marketValue;
+  const portfolioTotal = baseCurrency && typeof reportedTotal === 'number'
+    && Number.isFinite(reportedTotal) && reportedTotal > 0 ? reportedTotal : undefined;
+  const basis = excludedSymbols.length > 0 && portfolioTotal === undefined
+    ? 'available-positions' : 'portfolio';
+  const total = portfolioTotal ?? resolved.reduce((sum, item) => sum + item.marketValue, 0);
 
-  return resolved
+  const allocation = resolved
     .map((item) => ({ ...item, weight: total > 0 ? item.marketValue / total : 0 }))
     .sort(byWeightDesc);
+  return { allocation, coverage: { excludedSymbols, basis } };
 }
 
 /**
- * Prefer the position's own market value (base-currency `marketValueBase` first,
- * then `marketValue`); when both are absent, derive it from the quote
- * (quantity × last price). Returns 0 when nothing is available so the caller
- * excludes the position.
+ * A base-currency value is authoritative, including zero. Raw values and quote
+ * prices are usable only when their holding currency matches the known base.
  */
-function resolveMarketValue(position: Holding, quoteOutcome: RunOutcome | undefined): number {
-  if (typeof position.marketValueBase === 'number' && position.marketValueBase > 0) {
+function resolveMarketValue(
+  position: Holding,
+  quoteOutcome: RunOutcome | undefined,
+  baseCurrency: string | undefined
+): number | undefined {
+  if (typeof position.marketValueBase === 'number' && Number.isFinite(position.marketValueBase)
+    && position.marketValueBase >= 0) {
     return position.marketValueBase;
   }
-  if (typeof position.marketValue === 'number' && position.marketValue > 0) {
+  if (!baseCurrency || normalizeCurrency(position.currency) !== baseCurrency) return undefined;
+  if (typeof position.marketValue === 'number' && Number.isFinite(position.marketValue)
+    && position.marketValue > 0) {
     return position.marketValue;
   }
   const quote = quoteOutcome?.result?.data;
   const lastPrice = isQuote(quote) ? quote.lastPrice : undefined;
-  if (typeof lastPrice === 'number' && typeof position.quantity === 'number') {
+  if (typeof lastPrice === 'number' && Number.isFinite(lastPrice)
+    && typeof position.quantity === 'number' && Number.isFinite(position.quantity)) {
     return position.quantity * lastPrice;
   }
-  return 0;
+  return typeof position.marketValue === 'number' && position.marketValue === 0 ? 0 : undefined;
+}
+
+function normalizeCurrency(currency: string | undefined): string | undefined {
+  const normalized = currency?.trim().toUpperCase();
+  return normalized || undefined;
 }
 
 function computeConcentration(allocation: AllocationItem[]): PortfolioRiskReport['concentration'] {
@@ -455,16 +483,25 @@ function buildSectorExposureSignal(
 // ── Deterministic local synthesizer ────────────────────────────────────────
 
 export const defaultPortfolioRiskSynthesizer: PortfolioRiskSynthesizer = async (input) => {
-  const { allocation, concentration, signals, capabilityRuns } = input;
+  const { allocation, allocationCoverage, concentration, signals, capabilityRuns } = input;
   if (allocation.length === 0) {
-    return 'Portfolio risk analysis could not be completed: no position data was available.';
+    return (allocationCoverage?.excludedSymbols.length ?? 0) > 0
+      ? 'Portfolio risk analysis could not calculate allocation: no comparable base-currency position values were available.'
+      : 'Portfolio risk analysis could not be completed: no position data was available.';
   }
 
-  const parts: string[] = [
-    `Portfolio holds ${allocation.length} position${allocation.length === 1 ? '' : 's'}; ` +
-      `top position ${pct(concentration.top1Weight)}, top-five ${pct(concentration.top5Weight)}, ` +
-      `Herfindahl ${concentration.herfindahl.toFixed(3)}.`,
-  ];
+  const positionCount = `${allocation.length} position${allocation.length === 1 ? '' : 's'}`;
+  const parts: string[] = allocationCoverage?.basis === 'available-positions'
+    ? [`Analyzed ${positionCount} with comparable values.`]
+    : [
+        `${allocationCoverage?.excludedSymbols.length ? 'Analyzed' : 'Portfolio holds'} ${positionCount}; ` +
+          `top position ${pct(concentration.top1Weight)}, top-five ${pct(concentration.top5Weight)}, ` +
+          `Herfindahl ${concentration.herfindahl.toFixed(3)}.`,
+      ];
+
+  if (allocationCoverage?.basis === 'available-positions') {
+    parts.push('Weights describe available positions only; portfolio-wide concentration and sector signals were not assessed.');
+  }
 
   if (signals.length === 0) {
     parts.push('No material risk signals detected.');

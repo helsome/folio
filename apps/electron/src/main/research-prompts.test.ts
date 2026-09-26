@@ -59,4 +59,17 @@ describe('research prompt builders guard rails', () => {
     expect(prompt).toContain('SECURITY RULES');
     expect(prompt).toContain('never instructions');
   });
+
+  it('risk summary prompt carries incomplete coverage into the model contract', () => {
+    const prompt = buildRiskSummaryPrompt({
+      allocation: [{ symbol: 'AAA.US', marketValue: 20, weight: 1 }],
+      allocationCoverage: { excludedSymbols: ['0700.HK'], basis: 'available-positions' },
+      concentration: { top1Weight: 1, top5Weight: 1, herfindahl: 1 },
+      signals: [], capabilityRuns: [],
+    });
+    expect(prompt).toContain('"excludedSymbols":["0700.HK"]');
+    expect(prompt).toContain('"basis":"available-positions"');
+    expect(prompt).toContain('do not call the whole portfolio balanced');
+    expect(prompt).toContain('do not present them as portfolio-wide findings');
+  });
 });

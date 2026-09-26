@@ -37,6 +37,11 @@ export interface PortfolioRiskReport {
   /** Agent-written summary of the top findings. */
   summary: string;
   allocation: AllocationItem[];
+  /** Positions without a comparable base-currency value, and the denominator used for visible weights. */
+  allocationCoverage?: {
+    excludedSymbols: string[];
+    basis: 'portfolio' | 'available-positions';
+  };
   concentration: {
     top1Weight: number;
     top5Weight: number;

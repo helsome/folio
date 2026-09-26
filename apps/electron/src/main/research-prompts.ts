@@ -80,10 +80,14 @@ export function buildRiskSummaryPrompt(input: PortfolioRiskSynthesisInput): stri
     INJECTION_DEFENSE_RULES,
     '',
     'Allocation: ' + JSON.stringify(input.allocation),
+    'Allocation coverage: ' + JSON.stringify(input.allocationCoverage ?? { excludedSymbols: [], basis: 'portfolio' }),
     'Concentration: ' + JSON.stringify(input.concentration),
     'Signals: ' + JSON.stringify(input.signals),
     '',
-    'Mention only what the data supports; if there are no signals, say the portfolio looks',
-    'balanced and note any missing data explicitly.',
+    'Mention only what the data supports. If allocation coverage excludes positions,',
+    'name the incomplete coverage and do not call the whole portfolio balanced.',
+    'When coverage basis is available-positions, percentages and concentration',
+    'apply only to that subset; do not present them as portfolio-wide findings.',
+    'If there are no signals and coverage is complete, say no material signals were detected.',
   ].join('\n');
 }
