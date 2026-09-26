@@ -378,7 +378,9 @@ function buildDrawdownSignals(
     const klines = outcome.result.data;
     if (!isKlineArray(klines) || klines.length === 0) return;
 
-    const window = klines.slice(-DRAWDOWN_WINDOW_BARS);
+    const window = [...klines]
+      .sort((a, b) => a.timestamp - b.timestamp)
+      .slice(-DRAWDOWN_WINDOW_BARS);
     let peakHigh = 0;
     for (const bar of window) if (bar.high > peakHigh) peakHigh = bar.high;
     const lastClose = window[window.length - 1]?.close;
