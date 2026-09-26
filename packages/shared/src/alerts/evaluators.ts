@@ -28,6 +28,7 @@ import type { AlertRuleSnapshot } from './rules-repository.ts';
 
 const SECOND_MS = 1000;
 const DAY_MS = 86_400_000;
+const MAX_SEEN_NEWS_IDS = 1000;
 
 /** State access a rule's evaluation may need (time + cross-tick memory). */
 export interface AlertEvaluatorContext {
@@ -199,10 +200,25 @@ async function evaluateNews(
 ): Promise<AlertTriggerEvent | null> {
   const items = await run<NewsItem[]>(registry, 'research.news', { symbol: rule.symbol }, ctx.now);
   if (!items || items.length === 0) return null;
-  const cursorMs = rule.lastCheckedAt ?? rule.lastTriggeredAt ?? 0;
+  const snapshot = await ctx.getRuleSnapshot(rule.id);
+  const seenIds = new Set(snapshot.seenNewsIds ?? []);
+  // Existing rules have only a wall-clock cursor. Use it once on upgrade to
+  // avoid replaying their old headlines, then track stable article IDs.
+  const legacyCursorMs = snapshot.seenNewsIds === undefined
+    ? rule.lastCheckedAt ?? rule.lastTriggeredAt ?? 0
+    : undefined;
+  const currentIds = new Set<string>();
   const fresh = items
-    .filter((item) => secondsToMs(item.timestamp) > cursorMs)
+    .filter((item) => {
+      if (currentIds.has(item.id)) return false;
+      currentIds.add(item.id);
+      return !seenIds.has(item.id)
+        && (legacyCursorMs === undefined || secondsToMs(item.timestamp) > legacyCursorMs);
+    })
     .sort((a, b) => b.timestamp - a.timestamp);
+  await ctx.patchRuleSnapshot(rule.id, {
+    seenNewsIds: [...currentIds, ...seenIds].slice(0, MAX_SEEN_NEWS_IDS),
+  });
   if (fresh.length === 0) return null;
   const newest = fresh.slice(0, 3).map((item) => ({ id: item.id, title: item.title }));
   return makeEvent(rule, ctx.now(), {
