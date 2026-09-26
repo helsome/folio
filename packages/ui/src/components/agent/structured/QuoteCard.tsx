@@ -14,8 +14,10 @@ const fmtCompact = (n: number | null | undefined): string => {
   return String(n);
 };
 
+// `Quote.timestamp` is epoch SECONDS (core index.ts, quoteAtoms); `Date` wants
+// milliseconds, so scale it — same as SecurityHeader / ResearchMarketWorkspace.
 const fmtTime = (ts: number | null | undefined): string =>
-  ts == null || Number.isNaN(ts) ? '—' : new Date(ts).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+  ts == null || Number.isNaN(ts) ? '—' : new Date(ts * 1000).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
 
 const signed = (n: number): string => `${n >= 0 ? '+' : ''}${n.toFixed(2)}`;
 
