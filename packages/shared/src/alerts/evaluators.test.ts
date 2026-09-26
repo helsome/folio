@@ -74,6 +74,18 @@ describe('price_below', () => {
 });
 
 describe('new_news', () => {
+  it('bounds the persisted article identity set', async () => {
+    const items = Array.from({ length: 1001 }, (_, index) => ({
+      id: `article-${index}`, title: `Headline ${index}`, summary: '', url: '',
+      timestamp: NOW_S + index, symbols: [],
+    }));
+    const registry = makeRegistry({ 'research.news': items });
+    const r = rule({}, { symbol: 'NVDA.US', type: 'new_news' });
+    const snapshots = makeSnapshotContext();
+    await evaluateRule(r, registry, { now, ...snapshots });
+    expect((await snapshots.getRuleSnapshot(r.id)).seenNewsIds).toHaveLength(1000);
+  });
+
   it('triggers for items newer than the cursor (max 3)', async () => {
     const registry = makeRegistry({
       'research.news': [

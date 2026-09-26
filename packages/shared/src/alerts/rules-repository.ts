@@ -27,6 +27,8 @@ export interface AlertRuleSnapshot {
   ratingSummary?: string;
   /** Highest portfolio value seen by a `portfolio_drawdown` rule. */
   peakValue?: number;
+  /** Recently observed provider news IDs for `new_news` deduplication. */
+  seenNewsIds?: string[];
 }
 
 export interface AlertRulePatch {
