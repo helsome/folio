@@ -163,6 +163,62 @@ const quoteCap = (price = 10) =>
 // ── Tests ──────────────────────────────────────────────────────────────────
 
 describe('PortfolioRiskService allocation + concentration', () => {
+  it('does not treat unconverted HKD as USD in portfolio weights or risk signals', async () => {
+    const data = portfolio([
+      holding('AAA.US', { marketValue: 20_000 }),
+      holding('0700.HK', { currency: 'HKD', marketValue: 780_000 }),
+    ], 100_000);
+    const report = await makeService([summaryCap(data), positionsCap(data.holdings), quoteCap()]).analyze();
+
+    expect(report.allocation).toEqual([{ symbol: 'AAA.US', marketValue: 20_000, weight: 0.2 }]);
+    expect(report.concentration.top1Weight).toBeCloseTo(0.2);
+    expect(report.signals.some((signal) => signal.kind === 'concentration')).toBe(false);
+    expect(report.allocationCoverage?.excludedSymbols).toEqual(['0700.HK']);
+    expect(report.allocationCoverage?.basis).toBe('portfolio');
+  });
+
+  it('keeps converted values and same-currency raw values, including a true zero', async () => {
+    const data = portfolio([
+      holding('0700.HK', { currency: 'HKD', marketValue: 780_000, marketValueBase: 10_000 }),
+      holding('AAA.US', { marketValue: 20_000 }),
+      holding('ZERO.HK', { currency: 'HKD', marketValue: 500_000, marketValueBase: 0 }),
+    ], 100_000);
+    const report = await makeService([summaryCap(data), positionsCap(data.holdings)]).analyze();
+
+    expect(report.allocation.map((item) => [item.symbol, item.weight])).toEqual([
+      ['AAA.US', 0.2], ['0700.HK', 0.1],
+    ]);
+    expect(report.allocationCoverage?.excludedSymbols).toEqual([]);
+  });
+
+  it('does not use a foreign-currency quote as a base-currency fallback', async () => {
+    const data = portfolio([
+      holding('0700.HK', { currency: 'HKD', marketValue: 0, quantity: 100 }),
+      holding('AAA.US', { marketValue: 0, quantity: 10 }),
+    ], 1_000);
+    const quotes = makeCap('market.quote', 'get_quote', symbolSchema, (input) =>
+      quote(readSymbol(input), 10)
+    );
+    const report = await makeService([summaryCap(data), positionsCap(data.holdings), quotes]).analyze();
+
+    expect(report.allocation).toEqual([{ symbol: 'AAA.US', marketValue: 100, weight: 0.1 }]);
+    expect(report.allocationCoverage?.excludedSymbols).toEqual(['0700.HK']);
+  });
+
+  it('marks subset weights as partial when the portfolio total is unavailable', async () => {
+    const data = portfolio([
+      holding('AAA.US', { marketValue: 20 }),
+      holding('0700.HK', { currency: 'HKD', marketValue: 780 }),
+    ]);
+    data.marketValue = undefined;
+    const report = await makeService([summaryCap(data), positionsCap(data.holdings)]).analyze();
+
+    expect(report.allocation).toEqual([{ symbol: 'AAA.US', marketValue: 20, weight: 1 }]);
+    expect(report.allocationCoverage).toEqual({ excludedSymbols: ['0700.HK'], basis: 'available-positions' });
+    expect(report.signals.some((signal) => ['concentration', 'large_position', 'sector_exposure'].includes(signal.kind))).toBe(false);
+    expect(report.summary).toContain('available positions only');
+  });
+
   it('computes allocation weights and concentration from a portfolio', async () => {
     const data = portfolio([
       holding('AAA.US', { marketValue: 400 }),
