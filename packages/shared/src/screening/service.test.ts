@@ -3,7 +3,7 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
 import { Type } from '@sinclair/typebox'
-import type { FinanceCapability } from '@finagent/core'
+import type { FinanceCapability, Kline } from '@finagent/core'
 import { defineCapability } from '../capabilities/define.ts'
 import { createCapabilityRegistry } from '../capabilities/registry.ts'
 import { JsonFileStore } from '../storage/json-file-store.ts'
@@ -22,6 +22,7 @@ interface FixtureRegistry {
 interface FixtureOptions {
   symbols?: string[]
   klineLimit?: number
+  klineMutator?: (bars: Kline[]) => Kline[]
   brokenQuote?: (symbol: string) => boolean
 }
 
@@ -31,6 +32,15 @@ function makeFixture(options: FixtureOptions = {}): FixtureRegistry {
 
   const dataFor = (symbol: string): Record<string, unknown> => {
     const idx = symbols.indexOf(symbol)
+    const klines: Kline[] = Array.from({ length: options.klineLimit ?? 90 }, (_, i) => ({
+      symbol,
+      timestamp: NOW_SECONDS - (90 - i) * 86_400,
+      open: 100 + i,
+      high: 101 + i,
+      low: 99 + i,
+      close: 100 + i,
+      volume: 1_000_000,
+    }))
     return {
       'market.quote': {
         symbol,
@@ -44,15 +54,7 @@ function makeFixture(options: FixtureOptions = {}): FixtureRegistry {
         open: 0,
         prevClose: 0,
       },
-      'market.kline': Array.from({ length: options.klineLimit ?? 90 }, (_, i) => ({
-        symbol,
-        timestamp: NOW_SECONDS - (90 - i) * 86_400,
-        open: 100 + i,
-        high: 101 + i,
-        low: 99 + i,
-        close: 100 + i,
-        volume: 1_000_000,
-      })),
+      'market.kline': options.klineMutator?.(klines) ?? klines,
       'company.valuation': { symbol, pe: 12, pb: 1.1, dpsRate: 3.5, volumeRatio: 2.0 },
       'company.financials': {
         revenueGrowth: 25,
@@ -180,6 +182,18 @@ describe('ScreeningService.runScreening', () => {
     const persisted = await service.getRun(run.id)
     expect(persisted?.id).toBe(run.id)
     expect(persisted?.query.limit).toBe(2)
+  })
+
+  it('does not persist a momentum candidate from an incomplete provider kline window', async () => {
+    const fixture = makeFixture({
+      symbols: ['AAPL.US'],
+      klineMutator: (bars) => bars.map((bar, index) => index === 40 ? { ...bar, close: 0 } : bar),
+    })
+    const service = makeService(fixture, dir)
+    const run = await service.runScreening({ strategy: 'strong-momentum', universe: ['AAPL.US'], limit: 8 })
+    expect(run.candidates).toEqual([])
+    expect((await service.getRun(run.id))?.candidates).toEqual([])
+    expect(run.failures).toEqual({})
   })
 
   it('isolates per-capability failures: broken quote skips the symbol, no throw', async () => {
