@@ -326,6 +326,28 @@ describe('PortfolioRiskService signals', () => {
     expect((await healthy.analyze()).signals.some((s) => s.kind === 'drawdown')).toBe(false);
   });
 
+  it('uses the chronologically latest bar when kline results are unordered', async () => {
+    const data = portfolio([holding('AAA.US', { marketValue: 100 })]);
+    const bars = Array.from({ length: 21 }, (_, index) => ({
+      symbol: 'AAA.US',
+      timestamp: FIXED_NOW + index,
+      open: 95,
+      high: 100,
+      low: 55,
+      close: index === 20 ? 95 : 60,
+      volume: 1,
+    }));
+    const unordered = [bars[20], ...bars.slice(0, 20)];
+    const service = makeService([
+      summaryCap(data),
+      positionsCap(data.holdings),
+      quoteCap(),
+      makeCap('market.kline', 'get_kline', klineSchema, () => unordered),
+    ]);
+
+    expect((await service.analyze()).signals.some((s) => s.kind === 'drawdown')).toBe(false);
+  });
+
   it('emits sector exposure only when profile data includes a sector', async () => {
     const data = portfolio([
       holding('AAA.US', { marketValue: 60 }),
