@@ -414,6 +414,21 @@ describe('events rules', () => {
     expect(rule.compute(makeContext({ news: items.slice(0, 2) }))).toBeNull()
   })
 
+  it('uses the newest headline timestamp even when provider results are unordered', () => {
+    const rule = getScreeningStrategy('news-surge')!
+    const items = Array.from({ length: 3 }, (_, i) => ({
+      id: `n${i}`,
+      title: `headline ${i}`,
+      summary: '',
+      url: '',
+      timestamp: NOW_SECONDS - i * 86_400,
+      symbols: ['AAPL.US'],
+    }))
+    const result = rule.compute(makeContext({ news: [items[2], items[0], items[1]] }))
+
+    expect(result?.metrics.newestTimestamp).toBe(NOW_SECONDS)
+  })
+
   it('dividend-events surfaces ex-dates inside the window', () => {
     const rule = getScreeningStrategy('dividend-events')!
     const result = rule.compute(

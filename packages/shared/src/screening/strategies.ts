@@ -662,7 +662,9 @@ const newsSurge: ScreeningStrategyDef = {
     const fresh = items.filter((item) => item.timestamp >= cutoff)
     if (fresh.length < NEWS_SURGE_MIN) return null
     const score = clamp01(fresh.length / 10)
-    const newest = fresh[0]
+    const newest = fresh.reduce((latest, item) =>
+      item.timestamp > latest.timestamp ? item : latest
+    )
     return candidate(ctx, {
       score,
       reasons: [`${fresh.length} headlines in ${NEWS_SURGE_WINDOW_DAYS}d`],
