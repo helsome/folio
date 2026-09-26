@@ -1,5 +1,12 @@
 import { atom } from 'jotai';
-import type { AgentEvent, ApiError, Message, ToolCall, WorkspaceContext } from '@finagent/core';
+import type {
+  AgentEvent,
+  ApiError,
+  Message,
+  StopReason,
+  ToolCall,
+  WorkspaceContext,
+} from '@finagent/core';
 import { isRuntimeInfraCode } from '@finagent/core';
 import type { FinagentClient } from '../client';
 import { activeSessionIdAtom, messagesAtomFamily, sessionsAtom } from './sessionAtoms';
@@ -31,6 +38,9 @@ export interface LastRunSummary {
   completedAt?: number;
   toolCount: number;
   workspaceContext?: WorkspaceContext;
+  /** Structured guard information retained for the run footer. */
+  stopReason?: GuardStopReason;
+  stopDetail?: GuardStopDetail;
 }
 
 export const lastRunSummaryAtom = atom<LastRunSummary | null>(null);
@@ -40,42 +50,75 @@ export const runViewAtom = atom<RunView | null>(null);
 /** Codes the run-budget guard sets on `run_failed` (#17): a guard stop is not an error. */
 const GUARD_STOP_CODES = new Set(['BUDGET_EXHAUSTED', 'LOOP_DETECTED', 'RETRY_STORM']);
 
+export type GuardStopReason = Extract<StopReason, 'budget_exhausted' | 'loop_detected' | 'retry_storm'>;
+
+export interface GuardStopDetail {
+  key?: string;
+  limit?: number;
+  used?: number;
+  signal?: string;
+  tool?: string;
+  count?: number;
+}
+
 /**
  * One line explaining a guard stop, plus the numbers the runtime attached to it.
  * Returns undefined for ordinary failures, which keep the raw error message.
  */
 export function describeGuardStop(error: ApiError): string | undefined {
-  if (!GUARD_STOP_CODES.has(error.code)) return undefined;
+  const guardStop = getGuardStopInfo(error);
+  if (guardStop === undefined) return undefined;
   const reason =
     error.code === 'BUDGET_EXHAUSTED'
       ? 'the run budget was used up'
       : error.code === 'LOOP_DETECTED'
         ? 'a repeating loop was detected'
         : 'the run retried too often in a row';
-  return `Stopped early: ${reason}${describeGuardDetail(parseGuardDetail(error.message))}. The messages above are what it completed.`;
+  return `Stopped early: ${reason}${describeGuardDetail(guardStop.detail)}. The messages above are what it completed.`;
+}
+
+/** Extract the stable stop reason and the small allowlist of details the UI may display. */
+export function getGuardStopInfo(error: ApiError):
+  | { reason: GuardStopReason; detail?: GuardStopDetail }
+  | undefined {
+  if (!GUARD_STOP_CODES.has(error.code)) return undefined;
+  const reason: GuardStopReason =
+    error.code === 'BUDGET_EXHAUSTED'
+      ? 'budget_exhausted'
+      : error.code === 'LOOP_DETECTED'
+        ? 'loop_detected'
+        : 'retry_storm';
+  return { reason, detail: parseGuardDetail(error.message) };
 }
 
 /** The detail JSON the kernel appends to a guard stop message, when it parses. */
-function parseGuardDetail(message: string): Record<string, unknown> | undefined {
+function parseGuardDetail(message: string): GuardStopDetail | undefined {
   const start = message.indexOf('{');
   if (start < 0) return undefined;
   try {
     const parsed = JSON.parse(message.slice(start)) as unknown;
-    return typeof parsed === 'object' && parsed !== null
-      ? (parsed as Record<string, unknown>)
-      : undefined;
+    if (typeof parsed !== 'object' || parsed === null) return undefined;
+    const record = parsed as Record<string, unknown>;
+    const detail: GuardStopDetail = {};
+    if (typeof record.key === 'string') detail.key = record.key;
+    if (typeof record.limit === 'number' && Number.isFinite(record.limit)) detail.limit = record.limit;
+    if (typeof record.used === 'number' && Number.isFinite(record.used)) detail.used = record.used;
+    if (typeof record.signal === 'string') detail.signal = record.signal;
+    if (typeof record.tool === 'string') detail.tool = record.tool;
+    if (typeof record.count === 'number' && Number.isFinite(record.count)) detail.count = record.count;
+    return Object.keys(detail).length > 0 ? detail : undefined;
   } catch {
     return undefined;
   }
 }
 
 /** Render the two shapes a guard detail takes: a budget key, or a repeated signal. */
-function describeGuardDetail(detail: Record<string, unknown> | undefined): string {
+function describeGuardDetail(detail: GuardStopDetail | undefined): string {
   if (detail === undefined) return '';
-  if (typeof detail.key === 'string') {
-    return ` (${detail.key} ${String(detail.used)}/${String(detail.limit)})`;
+  if (typeof detail.key === 'string' && detail.used !== undefined && detail.limit !== undefined) {
+    return ` (${detail.key} ${detail.used}/${detail.limit})`;
   }
-  if (typeof detail.tool === 'string' && typeof detail.count === 'number') {
+  if (typeof detail.tool === 'string' && detail.count !== undefined) {
     return ` (${detail.tool} repeated ${detail.count}×)`;
   }
   return '';
@@ -213,12 +256,15 @@ export const applyAgentEventAtom = atom(
           completedAt: event.timestamp,
           toolCount: run.toolCalls.length,
           workspaceContext: previous?.workspaceContext,
+          stopReason: undefined,
+          stopDetail: undefined,
         }));
         set(runViewAtom, { ...run, infraError: error });
         return;
       }
 
       const guardStop = describeGuardStop(error);
+      const guardStopInfo = getGuardStopInfo(error);
       const assistantMessage: Message = {
         id: `assistant-${event.runId}`,
         role: 'assistant',
@@ -253,6 +299,8 @@ export const applyAgentEventAtom = atom(
         completedAt: event.timestamp,
         toolCount: run.toolCalls.length,
         workspaceContext: previous?.workspaceContext,
+        stopReason: guardStopInfo?.reason,
+        stopDetail: guardStopInfo?.detail,
       }));
       set(runViewAtom, null);
       return;

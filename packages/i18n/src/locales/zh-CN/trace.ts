@@ -86,6 +86,12 @@ export const trace = {
   footer: {
     completed: '已完成 · {{seconds}} 秒 · {{steps}} 个步骤',
     failed: '失败 · {{tools}} 个工具',
+    stopped: '已提前停止 · {{reason}} · {{tools}} 个工具{{detail}}',
+    stopReasons: {
+      budget_exhausted: '运行预算耗尽',
+      loop_detected: '检测到循环',
+      retry_storm: '重试次数过多',
+    },
     trace: '追踪',
   },
 } satisfies SameKeysAs<typeof enTrace>;
