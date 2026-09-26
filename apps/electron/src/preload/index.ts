@@ -102,6 +102,8 @@ export interface ElectronAPI {
     listResources: (skillId: string) => Promise<unknown>;
     readResource: (skillId: string, relativePath: string) => Promise<unknown>;
     readiness: () => Promise<unknown>;
+    installLocal: () => Promise<unknown>;
+    remove: (input: { skillId: string }) => Promise<unknown>;
   };
   about: {
     get: () => Promise<unknown>;
@@ -312,6 +314,8 @@ const electronAPI: ElectronAPI = {
     readResource: (skillId: string, relativePath: string) =>
       ipcRenderer.invoke('skills:readResource', skillId, relativePath),
     readiness: () => ipcRenderer.invoke('skills:readiness'),
+    installLocal: () => ipcRenderer.invoke('skills:installLocal'),
+    remove: (input: { skillId: string }) => ipcRenderer.invoke('skills:remove', input),
   },
   about: {
     get: () => ipcRenderer.invoke('app:about'),
