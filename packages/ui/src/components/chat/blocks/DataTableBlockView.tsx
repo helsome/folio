@@ -103,15 +103,26 @@ function sortRows(
   sort: SortState
 ): DataTableBlock['rows'] {
   if (!sort) return rows;
-  const sorted = [...rows].sort((a, b) => {
+  const direction = sort.dir === 'desc' ? -1 : 1;
+  return [...rows].sort((a, b) => {
     const left = a[sort.key];
     const right = b[sort.key];
-    if (left === null || left === undefined) return 1;
-    if (right === null || right === undefined) return -1;
-    if (typeof left === 'number' && typeof right === 'number') return left - right;
-    return String(left).localeCompare(String(right));
+    const leftMissing = left === null || left === undefined;
+    const rightMissing = right === null || right === undefined;
+    // A missing cell carries no sortable value: keep those rows at the bottom
+    // in both directions. Reversing the whole array (the previous approach)
+    // also reversed the missing-value placement, floating blanks to the top of
+    // a descending sort.
+    if (leftMissing || rightMissing) {
+      if (leftMissing && rightMissing) return 0;
+      return leftMissing ? 1 : -1;
+    }
+    const order =
+      typeof left === 'number' && typeof right === 'number'
+        ? left - right
+        : String(left).localeCompare(String(right));
+    return order * direction;
   });
-  return sort.dir === 'desc' ? sorted.reverse() : sorted;
 }
 
 function formatCell(
