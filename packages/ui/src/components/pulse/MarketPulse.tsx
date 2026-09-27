@@ -130,11 +130,11 @@ const ImpactRow: React.FC<{ item: PulsePersonalImpactItem }> = ({ item }) => {
   <li className="flex items-center justify-between gap-2 border-t border-border py-1.5 text-[13px] first:border-t-0" data-testid="pulse-impact-row">
     <span className="truncate font-medium text-foreground/80">{item.symbol}</span>
     <span className="flex items-center gap-3 tabular-nums">
-      <span className="font-mono text-foreground/64" title="{t('today.watchlistWeightShare')}">
+      <span className="font-mono text-foreground/64" title={t('today.watchlistWeightShare')}>
         {formatExposure(item.watchlistExposurePercent)}
       </span>
       {item.portfolioExposurePercent !== undefined && (
-        <span className="font-mono text-foreground/64" title="{t('today.portfolioExposure')}">
+        <span className="font-mono text-foreground/64" title={t('today.portfolioExposure')}>
           {formatExposure(item.portfolioExposurePercent)}
         </span>
       )}
