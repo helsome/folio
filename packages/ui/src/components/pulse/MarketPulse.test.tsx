@@ -177,4 +177,19 @@ describe('MarketPulse', () => {
     expect(text).toContain('S&P 500')
     expect(container.querySelectorAll('[data-testid="pulse-mover-row"]').length).toBeGreaterThan(0)
   })
+
+  it('gives the exposure cells translated tooltips instead of raw i18n template text', async () => {
+    await renderPulse(clientWithPulse(SNAPSHOT))
+    const titles = Array.from(
+      container.querySelectorAll<HTMLElement>('[data-testid="pulse-impact-row"] span[title]')
+    ).map((el) => el.getAttribute('title') ?? '')
+
+    expect(titles.length).toBeGreaterThan(0)
+    // Every exposure tooltip resolves through i18n to real copy...
+    expect(
+      titles.every((tip) => tip === 'Watchlist weight share' || tip === 'Portfolio exposure')
+    ).toBe(true)
+    // ...and the raw template literal never reaches the DOM.
+    expect(titles.join(' ')).not.toContain('{t(')
+  })
 })
