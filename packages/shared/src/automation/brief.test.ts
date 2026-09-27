@@ -241,4 +241,30 @@ describe('buildBrief', () => {
 
     expect(brief.quiet).toEqual({ count: 0, message: 'No monitored securities.' })
   })
+
+  it('does not surface automation runs from previous days as today\'s attention items', () => {
+    const now = 1_700_000_000_000
+    const dayMs = 24 * 60 * 60 * 1000
+    // A material run from a week ago must not be reported as something that
+    // needs attention today; the brief is day-scoped (see `latestRunsForCurrentDay`).
+    const staleRun: AutomationRun = {
+      ...run('stale-run', 3, true, 5),
+      ruleId: 'rule-stale',
+      ranAt: now - 7 * dayMs,
+    }
+    const todayRun: AutomationRun = {
+      ...run('today-run', 3, true, 5),
+      ruleId: 'rule-today',
+      ranAt: now,
+    }
+
+    const brief = buildBrief(inputs({ runs: [staleRun, todayRun] }), now)
+
+    const automationItemIds = brief.items
+      .filter((item) => item.source === 'Automation')
+      .map((item) => item.id)
+    expect(automationItemIds).toEqual(['automation-today-run'])
+    // The stale run must not inflate the "N things need your attention" summary.
+    expect(brief.summary).toBe('1 thing needs your attention.')
+  })
 })
