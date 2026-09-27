@@ -431,6 +431,12 @@ export const DEFAULT_CACHE_TTL_MS: Record<CacheDataClass, number> = {
  */
 const KEY_FIELDS = [
   'symbol',
+  // Calendar queries use a symbol list and explicit event/date filters.
+  'symbols',
+  'eventType',
+  'start',
+  'end',
+  'count',
   'instrument',
   'instrumentId',
   'ticker',

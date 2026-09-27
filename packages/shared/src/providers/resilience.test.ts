@@ -27,6 +27,7 @@ import {
   TypedProviderCache,
 } from './resilience.ts';
 import { ProviderRouter } from './router.ts';
+import { createRouterFetchers } from './router-fetchers.ts';
 
 function success<T>(providerId: string, data: T, fetchedAt = 1000): ProviderResult<T> {
   return {
@@ -298,6 +299,58 @@ describe('TypedProviderCache', () => {
 });
 
 // ── Router integration: retry / timeout / breaker / failover / cache ──────
+
+describe('calendar query cache isolation', () => {
+  const query = {
+    eventType: 'financial' as const,
+    symbols: ['AAPL.US'],
+    start: '2026-09-01',
+    end: '2026-09-30',
+    count: 10,
+  };
+
+  for (const [field, value] of [
+    ['eventType', 'dividend'],
+    ['symbols', ['MSFT.US']],
+    ['start', '2026-09-10'],
+    ['end', '2026-10-31'],
+    ['count', 20],
+  ] as const) {
+    it(`does not reuse fresh or stale calendar results when ${field} changes`, () => {
+      const clock = fakeClock();
+      const cache = new TypedProviderCache({ now: clock.now, ttls: { fundamental: 1000 } });
+      const events = [{ id: 'apple-earnings' }];
+      cache.set('research.events', 'primary', query, events, {
+        providerId: 'primary', providerName: 'Primary', fetchedAt: clock.now(), stale: false,
+      });
+
+      expect(cache.get('research.events', 'primary', { ...query, [field]: value }).kind).toBe('miss');
+      clock.advance(1001);
+      expect(cache.get('research.events', 'primary', query).kind).toBe('stale');
+      expect(cache.get('research.events', 'primary', { ...query, [field]: value }).kind).toBe('miss');
+    });
+  }
+
+  it('returns each requested calendar through router fetchers and reuses equivalent queries', async () => {
+    const clock = fakeClock();
+    const router = new ProviderRouter({ now: clock.now, cache: {} });
+    const apple = [{ id: 'apple-earnings', type: 'financial', symbol: 'AAPL.US', date: 1790294400 }];
+    const microsoft = [{ id: 'microsoft-earnings', type: 'financial', symbol: 'MSFT.US', date: 1790380800 }];
+    const primary = new ScriptedProvider('primary', 'Primary', ['research.events'], (n) =>
+      success('primary', n === 1 ? apple : microsoft)
+    );
+    router.register(primary);
+    router.setRouting({ primary: 'primary' });
+    const fetchers = createRouterFetchers(router);
+
+    expect(await fetchers.getCalendarEvents(query)).toEqual(apple);
+    expect(await fetchers.getCalendarEvents({ ...query, symbols: ['MSFT.US'] })).toEqual(microsoft);
+    expect(await fetchers.getCalendarEvents({
+      count: 10, end: '2026-09-30', start: '2026-09-01', symbols: ['AAPL.US'], eventType: 'financial',
+    })).toEqual(apple);
+    expect(primary.calls).toBe(2);
+  });
+});
 
 describe('ProviderRouter resilience integration (#25)', () => {
   it('retries a 429 on the primary and never touches the fallback', async () => {
