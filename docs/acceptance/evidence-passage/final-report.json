@@ -1,0 +1,857 @@
+{
+  "id": "report-research-064770ff-2e25-42dd-bc18-e93d72d4ff3e",
+  "symbol": "NVDA.US",
+  "generatedAt": 1790605911421,
+  "locale": "en-US",
+  "summary": "Only research. news data is available for NVDA. US. The available news includes a positive announcement of a $150B buyback increase, but most other articles are general market/AI/tariff news not directly specific to NVDA. All other planned data sections are unavailable, preventing a full assessment.",
+  "stance": "neutral",
+  "confidence": 0.2,
+  "sections": [
+    {
+      "key": "company.profile",
+      "title": "Company Profile",
+      "verdict": "unavailable",
+      "summary": "No data available.",
+      "evidence": []
+    },
+    {
+      "key": "market.quote",
+      "title": "Market Quote",
+      "verdict": "unavailable",
+      "summary": "No data available.",
+      "evidence": []
+    },
+    {
+      "key": "market.kline",
+      "title": "Market Kline",
+      "verdict": "unavailable",
+      "summary": "No data available.",
+      "evidence": []
+    },
+    {
+      "key": "company.valuation",
+      "title": "Company Valuation",
+      "verdict": "unavailable",
+      "summary": "No data available.",
+      "evidence": []
+    },
+    {
+      "key": "company.financials",
+      "title": "Company Financials",
+      "verdict": "unavailable",
+      "summary": "No data available.",
+      "evidence": []
+    },
+    {
+      "key": "company.earnings",
+      "title": "Company Earnings",
+      "verdict": "unavailable",
+      "summary": "No data available.",
+      "evidence": []
+    },
+    {
+      "key": "company.ratings",
+      "title": "Company Ratings",
+      "verdict": "unavailable",
+      "summary": "No data available.",
+      "evidence": []
+    },
+    {
+      "key": "research.news",
+      "title": "Research News",
+      "verdict": "positive",
+      "summary": "Nvidia announced a $150 billion increase to its stock buyback program, bringing total remaining authorized amount to $235 billion (largest ever). Other news articles cover AI safety risks, US-China tariffs, oil prices, and unrelated topics, but are not directly NVDA-specific. The buyback news is clearly positive for shareholders.",
+      "evidence": [
+        {
+          "capabilityId": "research.news",
+          "runId": "run-research.news-1790605880681-1",
+          "claim": "Nvidia announced a $150 billion increase to its stock buyback program, bringing total remaining authorized amount to $235 billion (largest ever). Other news articles cover AI safety risks, US-China tariffs, oil prices, and unrelated topics, but are not directly NVDA-specific. The buyback news is clearly positive for shareholders.",
+          "fetchedAt": 1790605881605,
+          "summary": "NVDA.US News\n-----------------\n- Nvidia Adds $150 Billion to Massive Stock Buyback, the Largest Ever (2026/9/28 22:28:37)\n- Could A.I. Safety Risks Derail the Sector’s I.P.O. Prospects? (2026/9/28 19:38:12)\n- China and the U.S. Pledge to Cut Tariffs on $60 Billion in Goods (2026/9/28 19:28:27)\n- Oil Prices Climb on Continued Impasse in U.S.-Iran Talks (2026/9/28 21:49:28)\n- How Scientists Can Shape Public Opinion Over A.I. Risks (2026/9/28 17:05:13)\n- Juniper Lattes? Pine Sodas? Food Is Taking Us Back to the Forest. (2026/9/28 22:03:49)\n- Trump’s Tariffs Push Canadian Companies to Look Past American Links (2026/9/28 20:03:35)\n- Under Trump, Commodity Futures Trading Commission Scales Back Enforcement, Worrying Farmers (2026/9/28 17:02:22)\n- Here’s What Fans Paid for Harry Styles Tickets at M.S.G. (2026/9/28 19:21:05)\n- Smart Headlights Finally Trickle Down to Cars in the U.S. (2026/9/28 17:00:41)"
+        }
+      ]
+    },
+    {
+      "key": "market.capitalFlow",
+      "title": "Market Capital Flow",
+      "verdict": "unavailable",
+      "summary": "No data available.",
+      "evidence": []
+    },
+    {
+      "key": "portfolio.positions",
+      "title": "Portfolio Positions",
+      "verdict": "unavailable",
+      "summary": "No data available.",
+      "evidence": []
+    }
+  ],
+  "bullCase": [
+    "Massive $150B increase to stock buyback, bringing total authorized to $235B, signals strong cash generation and shareholder returns."
+  ],
+  "bearCase": [
+    "AI safety risks could derail sector IPO prospects and potentially affect sentiment for AI-related stocks like NVDA."
+  ],
+  "catalysts": [
+    "Execution of the expanded buyback program",
+    "Potential easing of US-China tariff tensions",
+    "Further developments in AI sector and related regulation"
+  ],
+  "risks": [
+    "AI safety regulatory concerns",
+    "Trade tensions and tariffs between US and China",
+    "Unrelated macroeconomic factors (oil prices, CFTC enforcement) may increase market volatility"
+  ],
+  "capabilityRuns": [
+    {
+      "runId": "missing:company.profile",
+      "capabilityId": "company.profile",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:market.quote",
+      "capabilityId": "market.quote",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:market.kline",
+      "capabilityId": "market.kline",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:company.valuation",
+      "capabilityId": "company.valuation",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:company.financials",
+      "capabilityId": "company.financials",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:company.earnings",
+      "capabilityId": "company.earnings",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:company.ratings",
+      "capabilityId": "company.ratings",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "status": "success",
+      "fetchedAt": 1790605881605,
+      "marketTime": 1790605717000
+    },
+    {
+      "runId": "missing:market.capitalFlow",
+      "capabilityId": "market.capitalFlow",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    },
+    {
+      "runId": "missing:portfolio.positions",
+      "capabilityId": "portfolio.positions",
+      "status": "unavailable",
+      "error": "Capability not registered"
+    }
+  ],
+  "runStatus": "partial",
+  "evidencePassages": [
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-0-https://www.nytimes.com/2026/09/28/business/nvidia-stock-buyback.html:69-226",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-0-https://www.nytimes.com/2026/09/28/business/nvidia-stock-buyback.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/28/business/nvidia-stock-buyback.html",
+      "excerpt": "The increase comes four months after the chip giant added $80 billion to its buyback program, bringing the total remaining authorized amount to $235 billion.",
+      "location": {
+        "start": 69,
+        "end": 226,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-1-https://www.nytimes.com/2026/09/28/business/dealbook/ai-safety-risks-ipo.html:63-198",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-1-https://www.nytimes.com/2026/09/28/business/dealbook/ai-safety-risks-ipo.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/28/business/dealbook/ai-safety-risks-ipo.html",
+      "excerpt": "Big liability questions lie ahead for the artificial intelligence labs Anthropic and OpenAI as they push ahead with plans to go public.",
+      "location": {
+        "start": 63,
+        "end": 198,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-2-https://www.nytimes.com/2026/09/28/business/china-us-summit-tariffs.html:66-229",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-2-https://www.nytimes.com/2026/09/28/business/china-us-summit-tariffs.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/28/business/china-us-summit-tariffs.html",
+      "excerpt": "The two countries unveiled separate lists covering thousands of products as they seek to ease trade tensions and stabilize relations ahead of further negotiations.",
+      "location": {
+        "start": 66,
+        "end": 229,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-3-https://www.nytimes.com/2026/09/28/business/oil-stocks-gas-prices.html:58-217",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-3-https://www.nytimes.com/2026/09/28/business/oil-stocks-gas-prices.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/28/business/oil-stocks-gas-prices.html",
+      "excerpt": "President Trump rejected Iran’s proposal over the weekend, calling it “unacceptable,” but Iran said it was still waiting for “definitive news” from Washington.",
+      "location": {
+        "start": 58,
+        "end": 217,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-4-https://www.nytimes.com/2026/09/28/business/ai-scientists-protests.html:57-131",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-4-https://www.nytimes.com/2026/09/28/business/ai-scientists-protests.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/28/business/ai-scientists-protests.html",
+      "excerpt": "Artificial intelligence workers may have leverage to make the world safer.",
+      "location": {
+        "start": 57,
+        "end": 131,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-5-https://www.nytimes.com/2026/09/28/dining/forest-flavors-alpine-foraging.html:67-199",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-5-https://www.nytimes.com/2026/09/28/dining/forest-flavors-alpine-foraging.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/28/dining/forest-flavors-alpine-foraging.html",
+      "excerpt": "Drinks and snacks are being tweaked to evoke woods and meadows, on the theory that frazzled consumers want to reconnect with nature.",
+      "location": {
+        "start": 67,
+        "end": 199,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-6-https://www.nytimes.com/2026/09/28/business/trump-tariffs-canada-diversify.html:69-209",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-6-https://www.nytimes.com/2026/09/28/business/trump-tariffs-canada-diversify.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/28/business/trump-tariffs-canada-diversify.html",
+      "excerpt": "Shaken by tariffs and threats from the Trump administration, Canadian businesses are seeking markets and suppliers beyond the United States.",
+      "location": {
+        "start": 69,
+        "end": 209,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-7-https://www.nytimes.com/2026/09/28/us/politics/cotton-trump-commodity-markets-cftc.html:93-297",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-7-https://www.nytimes.com/2026/09/28/us/politics/cotton-trump-commodity-markets-cftc.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/28/us/politics/cotton-trump-commodity-markets-cftc.html",
+      "excerpt": "The fate of two cotton brokers highlights how the Commodity Futures Trading Commission has scaled back its regulatory actions not just for crypto cases but also for the kinds of cases it has long policed.",
+      "location": {
+        "start": 93,
+        "end": 297,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-8-https://www.nytimes.com/2026/09/28/arts/music/harry-styles-msg-ticket-prices-affordability.html:58-206",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-8-https://www.nytimes.com/2026/09/28/arts/music/harry-styles-msg-ticket-prices-affordability.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/28/arts/music/harry-styles-msg-ticket-prices-affordability.html",
+      "excerpt": "What is a concert really worth? We asked 34 fans about the time, money and effort they spent getting tickets for the star’s New York City residency.",
+      "location": {
+        "start": 58,
+        "end": 206,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-9-https://www.nytimes.com/2026/09/28/business/smart-headlights-adaptive.html:59-206",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-9-https://www.nytimes.com/2026/09/28/business/smart-headlights-adaptive.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/28/business/smart-headlights-adaptive.html",
+      "excerpt": "Federal data shows that half of all traffic fatalities happen after dark, but only one-quarter of driving happens at night. So any help is welcome.",
+      "location": {
+        "start": 59,
+        "end": 206,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-10-https://www.nytimes.com/2026/09/27/us/dee-brock-dead.html:68-179",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-10-https://www.nytimes.com/2026/09/27/us/dee-brock-dead.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/27/us/dee-brock-dead.html",
+      "excerpt": "As the first director of the troupe, she helped transform it from a high school squad into a global phenomenon.",
+      "location": {
+        "start": 68,
+        "end": 179,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-11-https://www.nytimes.com/2026/09/27/obituaries/morris-ballen-dead.html:67-208",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-11-https://www.nytimes.com/2026/09/27/obituaries/morris-ballen-dead.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/27/obituaries/morris-ballen-dead.html",
+      "excerpt": "Countless independent acts in every genre — punk, hip-hop, church choir — relied on him to create small runs of high-quality records and CDs.",
+      "location": {
+        "start": 67,
+        "end": 208,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-12-https://www.nytimes.com/2026/09/27/business/workplace-.html:50-107",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-12-https://www.nytimes.com/2026/09/27/business/workplace-.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/27/business/workplace-.html",
+      "excerpt": "Plus: What to do when your boss is nit-picking your work.",
+      "location": {
+        "start": 50,
+        "end": 107,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-13-https://www.nytimes.com/2026/09/27/technology/ai-government-regulation.html:69-232",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-13-https://www.nytimes.com/2026/09/27/technology/ai-government-regulation.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/27/technology/ai-government-regulation.html",
+      "excerpt": "The gap between technology and policymaking has gotten wider than ever with artificial intelligence, leaving a global policy vacuum as A.I. models rapidly advance.",
+      "location": {
+        "start": 69,
+        "end": 232,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-14-https://www.nytimes.com/2026/09/27/business/members-of-technical-staff-artificial-intelligence.html:69-216",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-14-https://www.nytimes.com/2026/09/27/business/members-of-technical-staff-artificial-intelligence.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/27/business/members-of-technical-staff-artificial-intelligence.html",
+      "excerpt": "Use of the generic title has risen by 50 percent in the last year among employees at Anthropic, OpenAI and other A.I. companies, an analysis found.",
+      "location": {
+        "start": 69,
+        "end": 216,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-15-https://www.nytimes.com/2026/09/27/business/heres-your-new-house-it-comes-with-friends.html:47-233",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-15-https://www.nytimes.com/2026/09/27/business/heres-your-new-house-it-comes-with-friends.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/27/business/heres-your-new-house-it-comes-with-friends.html",
+      "excerpt": "Fresh pies. Book groups. Puzzle challenges. Developers of master-planned communities see fear of social isolation and desire for friends as a business opportunity. Welcome to Amity Lane.",
+      "location": {
+        "start": 47,
+        "end": 233,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-16-https://www.nytimes.com/2026/09/27/business/women-baseball-league.html:55-215",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-16-https://www.nytimes.com/2026/09/27/business/women-baseball-league.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/27/business/women-baseball-league.html",
+      "excerpt": "As a group of players from an all-women’s baseball league in the 1940s and ’50s gathered at a recent reunion, the future of women’s baseball looks bright again.",
+      "location": {
+        "start": 55,
+        "end": 215,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-17-https://www.nytimes.com/2026/09/26/business/media/trump-white-house-tv-pool-cnn.html:72-244",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-17-https://www.nytimes.com/2026/09/26/business/media/trump-white-house-tv-pool-cnn.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/26/business/media/trump-white-house-tv-pool-cnn.html",
+      "excerpt": "The White House TV pool went dark this past week amid a standoff between CNN and the president. Network leaders, however, believe an indefinite suspension may be untenable.",
+      "location": {
+        "start": 72,
+        "end": 244,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-18-https://www.nytimes.com/2026/09/26/business/dealbook/ai-law-discount-billable-hour.html:77-203",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-18-https://www.nytimes.com/2026/09/26/business/dealbook/ai-law-discount-billable-hour.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/26/business/dealbook/ai-law-discount-billable-hour.html",
+      "excerpt": "There’s growing pressure to move beyond the billable hour. But big firms aren’t ready to blow up their trusted business model.",
+      "location": {
+        "start": 77,
+        "end": 203,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-19-https://www.nytimes.com/2026/09/26/business/media/trump-white-house-press-ban.html:62-210",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-19-https://www.nytimes.com/2026/09/26/business/media/trump-white-house-press-ban.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/26/business/media/trump-white-house-press-ban.html",
+      "excerpt": "An abrupt decree, a network boycott, a legal intervention and an uneasy détente: This was no typical battle between a president and his press corps.",
+      "location": {
+        "start": 62,
+        "end": 210,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-20-https://www.nytimes.com/2026/09/26/business/trump-economy-midterm-elections.html:67-227",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-20-https://www.nytimes.com/2026/09/26/business/trump-economy-midterm-elections.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/26/business/trump-economy-midterm-elections.html",
+      "excerpt": "As the president extolled the strength of the economy on the global stage, Americans continued to feel the sting of rising prices stemming from the war in Iran.",
+      "location": {
+        "start": 67,
+        "end": 227,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-21-https://www.nytimes.com/2026/09/26/business/ball-screws-military-production.html:74-207",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-21-https://www.nytimes.com/2026/09/26/business/ball-screws-military-production.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/26/business/ball-screws-military-production.html",
+      "excerpt": "As the Trump administration scrambles to increase the production of munitions, these special screws are expensive and hard to source.",
+      "location": {
+        "start": 74,
+        "end": 207,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-22-https://www.nytimes.com/2026/09/25/business/media/white-house-cnn-air-force-one-ban.html:64-258",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-22-https://www.nytimes.com/2026/09/25/business/media/white-house-cnn-air-force-one-ban.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/media/white-house-cnn-air-force-one-ban.html",
+      "excerpt": "CNN won’t be able to join President Trump on a Saturday trip to Tennessee. He had banned CNN and two other news outlets from the White House, but a court order on Thursday restored their access.",
+      "location": {
+        "start": 64,
+        "end": 258,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-23-https://www.nytimes.com/2026/09/25/us/politics/ice-raids-kansas-texas-oklahoma-beef-prices.html:56-225",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-23-https://www.nytimes.com/2026/09/25/us/politics/ice-raids-kansas-texas-oklahoma-beef-prices.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/us/politics/ice-raids-kansas-texas-oklahoma-beef-prices.html",
+      "excerpt": "Cattle industry groups in Texas, Oklahoma and Kansas and two Republican senators said the Trump administration’s immigration enforcement actions were hurting operations.",
+      "location": {
+        "start": 56,
+        "end": 225,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-24-https://www.nytimes.com/2026/09/25/world/middleeast/un-companies-westbank-settlements.html:82-216",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-24-https://www.nytimes.com/2026/09/25/world/middleeast/un-companies-westbank-settlements.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/world/middleeast/un-companies-westbank-settlements.html",
+      "excerpt": "Israel condemned the database of firms tied to activity in the occupied West Bank as a “political tool” to advance “a smear campaign.”",
+      "location": {
+        "start": 82,
+        "end": 216,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-25-https://www.nytimes.com/2026/09/25/business/star-meat-delivery-recall-usda.html:70-182",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-25-https://www.nytimes.com/2026/09/25/business/star-meat-delivery-recall-usda.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/star-meat-delivery-recall-usda.html",
+      "excerpt": "Star Meat Delivery did not complete the requirements necessary to process food, the Agriculture Department said.",
+      "location": {
+        "start": 70,
+        "end": 182,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-26-https://www.nytimes.com/2026/09/25/business/sunkist-fruit-gems-candy-discontinued.html:77-179",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-26-https://www.nytimes.com/2026/09/25/business/sunkist-fruit-gems-candy-discontinued.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/sunkist-fruit-gems-candy-discontinued.html",
+      "excerpt": "The jelly candies were a staple at bar and bat mitzvahs and other Jewish celebrations for generations.",
+      "location": {
+        "start": 77,
+        "end": 179,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-27-https://www.nytimes.com/2026/09/25/business/fed-interest-rates-midterms.html:84-199",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-27-https://www.nytimes.com/2026/09/25/business/fed-interest-rates-midterms.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/fed-interest-rates-midterms.html",
+      "excerpt": "Financial markets are placing nearly 70 percent odds on the Federal Reserve raising interest rates in late October.",
+      "location": {
+        "start": 84,
+        "end": 199,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-28-https://www.nytimes.com/2026/09/25/business/media/trump-white-house-tv-pool-ban.html:56-164",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-28-https://www.nytimes.com/2026/09/25/business/media/trump-white-house-tv-pool-ban.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/media/trump-white-house-tv-pool-ban.html",
+      "excerpt": "Crews from CBS and CNN covered two events on Friday with President Trump and the Chinese leader, Xi Jinping.",
+      "location": {
+        "start": 56,
+        "end": 164,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-29-https://www.nytimes.com/2026/09/25/your-money/car-insurance-child-costs.html:77-211",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-29-https://www.nytimes.com/2026/09/25/your-money/car-insurance-child-costs.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/your-money/car-insurance-child-costs.html",
+      "excerpt": "Unlike health insurance, a parent’s auto policy has no age limit on when a child has to be removed. But it’s good to know the options.",
+      "location": {
+        "start": 77,
+        "end": 211,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-30-https://www.nytimes.com/2026/09/25/business/china-trump-xi-truce.html:48-189",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-30-https://www.nytimes.com/2026/09/25/business/china-trump-xi-truce.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/china-trump-xi-truce.html",
+      "excerpt": "Easing tensions with Washington gives Beijing room to tackle economic troubles at home while reducing its vulnerability to American pressure.",
+      "location": {
+        "start": 48,
+        "end": 189,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-31-https://www.nytimes.com/2026/09/25/business/dealbook/trump-xi-tech-ceos-state-dinner.html:31-173",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-31-https://www.nytimes.com/2026/09/25/business/dealbook/trump-xi-tech-ceos-state-dinner.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/dealbook/trump-xi-tech-ceos-state-dinner.html",
+      "excerpt": "The state visit by Xi Jinping, China’s top leader, so far has been long on pomp but short on substance on issues like artificial intelligence.",
+      "location": {
+        "start": 31,
+        "end": 173,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-32-https://www.nytimes.com/2026/09/25/business/trump-xi-jinping-chinese-executives.html:83-247",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-32-https://www.nytimes.com/2026/09/25/business/trump-xi-jinping-chinese-executives.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/trump-xi-jinping-chinese-executives.html",
+      "excerpt": "American chief executives turned out in force to see Xi Jinping, while their Chinese counterparts were absent, a sign of how drastically business ties have changed.",
+      "location": {
+        "start": 83,
+        "end": 247,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-33-https://www.nytimes.com/2026/09/25/business/energy-environment/trump-diesel-export-ban.html:51-225",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-33-https://www.nytimes.com/2026/09/25/business/energy-environment/trump-diesel-export-ban.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/energy-environment/trump-diesel-export-ban.html",
+      "excerpt": "President Trump has said he is considering restricting overseas sales of the fuel to bring down domestic prices, but experts say the policy will have many unintended effects.",
+      "location": {
+        "start": 51,
+        "end": 225,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-34-https://www.nytimes.com/2026/09/25/business/interest-rates-economy-markets-inflation-mortgages.html:63-213",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-34-https://www.nytimes.com/2026/09/25/business/interest-rates-economy-markets-inflation-mortgages.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/interest-rates-economy-markets-inflation-mortgages.html",
+      "excerpt": "History shows that the markets and the economy flourished when rates were even higher than today’s. But, our columnist notes, those times didn’t last.",
+      "location": {
+        "start": 63,
+        "end": 213,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-35-https://www.nytimes.com/2026/09/25/travel/climate-change-summer-travel-disruptions.html:48-197",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-35-https://www.nytimes.com/2026/09/25/travel/climate-change-summer-travel-disruptions.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/travel/climate-change-summer-travel-disruptions.html",
+      "excerpt": "Once dismissed as occasional inconveniences, climate-related disruptions are now an inescapable fixture of summer travel. How will travelers respond?",
+      "location": {
+        "start": 48,
+        "end": 197,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-36-https://www.nytimes.com/2026/09/25/business/power-grid-jonas-birgersson.html:64-210",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-36-https://www.nytimes.com/2026/09/25/business/power-grid-jonas-birgersson.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/power-grid-jonas-birgersson.html",
+      "excerpt": "Jonas Birgersson, a Swedish entrepreneur, wants to use decentralized networks modeled on the internet to transform how electricity is distributed.",
+      "location": {
+        "start": 64,
+        "end": 210,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-37-https://www.nytimes.com/2026/09/25/business/media/nyc-tiktok-instagram-shows.html:77-158",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-37-https://www.nytimes.com/2026/09/25/business/media/nyc-tiktok-instagram-shows.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/business/media/nyc-tiktok-instagram-shows.html",
+      "excerpt": "The streets of New York are a backdrop for countless TikTok and Instagram videos.",
+      "location": {
+        "start": 77,
+        "end": 158,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-38-https://www.nytimes.com/2026/09/25/style/mark-zuckerberg-fashion-glasses.html:40-105",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-38-https://www.nytimes.com/2026/09/25/style/mark-zuckerberg-fashion-glasses.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/25/style/mark-zuckerberg-fashion-glasses.html",
+      "excerpt": "Meta’s C.E.O. talks for the first time about his style evolution.",
+      "location": {
+        "start": 40,
+        "end": 105,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-39-https://www.nytimes.com/2026/09/24/business/economy/tech-executives-state-dinner-xi-trump.html:54-204",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-39-https://www.nytimes.com/2026/09/24/business/economy/tech-executives-state-dinner-xi-trump.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/24/business/economy/tech-executives-state-dinner-xi-trump.html",
+      "excerpt": "Prominent executives attended a dinner at the White House Thursday night, as the countries wrangled over tariffs, trade and potential A.I. regulation.",
+      "location": {
+        "start": 54,
+        "end": 204,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-40-https://www.nytimes.com/2026/09/24/business/massachusetts-draftkings-ai-gambling.html:64-212",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-40-https://www.nytimes.com/2026/09/24/business/massachusetts-draftkings-ai-gambling.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/24/business/massachusetts-draftkings-ai-gambling.html",
+      "excerpt": "In response to a New York Times report on DraftKings, the state’s gaming commission said it would evaluate how each company deployed the technology.",
+      "location": {
+        "start": 64,
+        "end": 212,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-41-https://www.nytimes.com/2026/09/24/business/media/trump-white-house-press-ban-tv-pool-conservative-news.html:78-175",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-41-https://www.nytimes.com/2026/09/24/business/media/trump-white-house-press-ban-tv-pool-conservative-news.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/24/business/media/trump-white-house-press-ban-tv-pool-conservative-news.html",
+      "excerpt": "Real America’s Voice and LindellTV have teamed up to provide a feed of daily presidential events.",
+      "location": {
+        "start": 78,
+        "end": 175,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-42-https://www.nytimes.com/2026/09/24/business/trump-xi-china-exports.html:63-174",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-42-https://www.nytimes.com/2026/09/24/business/trump-xi-china-exports.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/24/business/trump-xi-china-exports.html",
+      "excerpt": "The Trump administration, like its predecessors, has struggled to deal with China’s excess industrial capacity.",
+      "location": {
+        "start": 63,
+        "end": 174,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-43-https://www.nytimes.com/2026/09/24/business/media/letterboxd-sale-sony-a24-nyt.html:76-185",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-43-https://www.nytimes.com/2026/09/24/business/media/letterboxd-sale-sony-a24-nyt.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/24/business/media/letterboxd-sale-sony-a24-nyt.html",
+      "excerpt": "A24, Sony and The New York Times Company all registered their interest in acquiring the cinephile’s paradise.",
+      "location": {
+        "start": 76,
+        "end": 185,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-44-https://www.nytimes.com/2026/09/24/business/starbucks-store-closures.html:41-133",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-44-https://www.nytimes.com/2026/09/24/business/starbucks-store-closures.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/24/business/starbucks-store-closures.html",
+      "excerpt": "The company said the affected cafes did not meet financial or customer service expectations.",
+      "location": {
+        "start": 41,
+        "end": 133,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-45-https://www.nytimes.com/2026/09/24/business/meat-recall-usda-star-ad-foods.html:74-200",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-45-https://www.nytimes.com/2026/09/24/business/meat-recall-usda-star-ad-foods.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/24/business/meat-recall-usda-star-ad-foods.html",
+      "excerpt": "The raw pork, beef and goat products from Star Meat Delivery Inc. of North Carolina were distributed across the United States.",
+      "location": {
+        "start": 74,
+        "end": 200,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-46-https://www.nytimes.com/2026/09/24/business/mortgage-rates-7-percent.html:73-199",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-46-https://www.nytimes.com/2026/09/24/business/mortgage-rates-7-percent.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/24/business/mortgage-rates-7-percent.html",
+      "excerpt": "The average rate on a 30-year mortgage in the United States jumped to 7.03 percent, putting pressure on housing affordability.",
+      "location": {
+        "start": 73,
+        "end": 199,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-47-https://www.nytimes.com/live/2026/09/24/business/trump-cnn-politico-msnow-white-house/the-court-ordered-trump-to-restore-access-for-cnn-ms-now-and-politico-last-night:84-109",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-47-https://www.nytimes.com/live/2026/09/24/business/trump-cnn-politico-msnow-white-house/the-court-ordered-trump-to-restore-access-for-cnn-ms-now-and-politico-last-night",
+      "canonicalUrl": "https://www.nytimes.com/live/2026/09/24/business/trump-cnn-politico-msnow-white-house/the-court-ordered-trump-to-restore-access-for-cnn-ms-now-and-politico-last-night",
+      "excerpt": "Around 1:15 a.m. Eastern,",
+      "location": {
+        "start": 84,
+        "end": 109,
+        "line": 3,
+        "column": 1
+      }
+    },
+    {
+      "id": "passage:run-research.news-1790605880681-1:research.news:feed-48-https://www.nytimes.com/2026/09/24/movies/film-tax-credit-congress-bill.html:62-223",
+      "runId": "run-research.news-1790605880681-1",
+      "capabilityId": "research.news",
+      "documentId": "feed-48-https://www.nytimes.com/2026/09/24/movies/film-tax-credit-congress-bill.html",
+      "canonicalUrl": "https://www.nytimes.com/2026/09/24/movies/film-tax-credit-congress-bill.html",
+      "excerpt": "In response to an exodus of movie and TV production, a bill is being introduced in Congress that would use tax credits to subsidize filming in the United States.",
+      "location": {
+        "start": 62,
+        "end": 223,
+        "line": 3,
+        "column": 1
+      }
+    }
+  ]
+}
