@@ -150,4 +150,30 @@ describe('ImportDraftReview', () => {
     expect(confirmButton).not.toBeUndefined();
     expect((confirmButton as HTMLButtonElement).disabled).toBe(true);
   });
+
+  it('disables confirm when every row still has an issue', async () => {
+    const { container } = await render(
+      draft([
+        row({ symbol: 'AAPL.US', confidence: 0.4, issues: ['Quantity is not a number'] }),
+        row({ symbol: 'TSLA.US', confidence: 0.3, issues: ['Cost price missing'] }),
+      ])
+    );
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const confirmButton = buttons.find((button) => button.textContent === 'Confirm Import');
+    expect(confirmButton).not.toBeUndefined();
+    expect((confirmButton as HTMLButtonElement).disabled).toBe(true);
+  });
+
+  it('keeps confirm enabled while at least one row is importable', async () => {
+    const { container } = await render(
+      draft([
+        row({ symbol: 'AAPL.US' }),
+        row({ symbol: 'TSLA.US', confidence: 0.3, issues: ['Cost price missing'] }),
+      ])
+    );
+    const buttons = Array.from(container.querySelectorAll('button'));
+    const confirmButton = buttons.find((button) => button.textContent === 'Confirm Import');
+    expect(confirmButton).not.toBeUndefined();
+    expect((confirmButton as HTMLButtonElement).disabled).toBe(false);
+  });
 });
