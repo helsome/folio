@@ -1,4 +1,5 @@
 import type { CapabilityProvenance, CapabilityRunStatus } from './capability.ts';
+import type { SourcePassage } from './evidence-passage.ts';
 import type { SupportedLocale } from './locale.ts';
 import type { StrategyId } from './strategy.ts';
 
@@ -88,6 +89,18 @@ export interface ResearchReport {
    * failed or were unavailable — the report still stands, gaps are explicit.
    */
   runStatus: ResearchRunStatus;
+  /**
+   * Locatable source passages behind this report's evidence (issue #13): the
+   * verbatim excerpt each text-bearing source contributed, plus the position it
+   * occupies in that source, so a claim → source jump can land on the passage
+   * instead of the source's front page.
+   *
+   * Optional, and deliberately additive to `sections[].evidence` rather than a
+   * replacement: reports persisted before passage location existed omit it, and
+   * a source that carries no retrievable text simply contributes nothing. An
+   * absent entry means "no passage recorded", never "no evidence".
+   */
+  evidencePassages?: SourcePassage[];
 }
 
 /** Lightweight progress record for the Research UI. */
