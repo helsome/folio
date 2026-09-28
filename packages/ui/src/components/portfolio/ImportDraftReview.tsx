@@ -87,6 +87,9 @@ export const ImportDraftReview: React.FC<ImportDraftReviewProps> = ({
   const { t } = useTranslation();
   const nameRef = useRef<HTMLInputElement>(null);
   const needsReview = draft.rows.some((row) => row.confidence < 1);
+  // Only issue-free rows are persisted, so confirm must stay disabled while
+  // every row still has an issue — otherwise Confirm creates an empty portfolio.
+  const importableCount = draft.rows.filter((row) => row.symbol && row.issues.length === 0).length;
   const sourceKey =
     draft.source === 'paste' ? 'portfolio.import.sourcePasted' : 'portfolio.import.sourceCsv';
 
@@ -170,7 +173,7 @@ export const ImportDraftReview: React.FC<ImportDraftReviewProps> = ({
         <Button
           size="sm"
           onClick={() => onConfirm(nameRef.current?.value ?? t('portfolio.import.portfolioNameDefault'))}
-          disabled={confirming || draft.rows.length === 0}
+          disabled={confirming || importableCount === 0}
         >
           {confirming ? t('portfolio.import.importing') : t('portfolio.import.confirmImport')}
         </Button>

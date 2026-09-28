@@ -436,6 +436,27 @@ describe('AgentKernelHost', () => {
     host.dispose();
   });
 
+  it('rejects a confirm whose drafted rows all still carry issues', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(
+      host.importConfirm({
+        name: 'My Book',
+        draft: {
+          id: 'draft_test',
+          source: 'csv',
+          importedAt: 1,
+          warnings: [],
+          rows: [
+            { symbol: 'AAPL.US', name: 'Apple', currency: 'USD', confidence: 0.4, issues: ['Quantity is not a number'] },
+            { symbol: 'TSLA.US', name: 'Tesla', currency: 'USD', confidence: 0.3, issues: ['Cost price missing'] },
+          ],
+        },
+      })
+    ).rejects.toMatchObject({ code: 'IMPORT_EMPTY' });
+    host.dispose();
+  });
+
   it('forwards kernel agent events to the attached window', async () => {
     let subscriber: ((event: AgentEvent) => void) | null = null;
     fakeRuns.subscribe = (listener) => {

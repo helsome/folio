@@ -2097,18 +2097,23 @@ export class AgentKernelHost {
     const draft = requireObject(request.draft) as unknown as PortfolioImportDraft;
     const name = requireString(request.name, 'name');
     const rows = Array.isArray(draft.rows) ? draft.rows : [];
-    if (rows.length === 0) {
-      throw createCodeError('IMPORT_EMPTY', 'Nothing to import — the draft has no rows.');
+    // The guard must run on what actually gets persisted: a draft whose rows all
+    // still carry issues filters down to zero holdings, and creating the
+    // portfolio anyway would persist an empty one and report success.
+    const importable = rows.filter((row) => row.symbol && row.issues.length === 0);
+    if (importable.length === 0) {
+      throw createCodeError(
+        'IMPORT_EMPTY',
+        'Nothing to import — no draft row is free of issues.'
+      );
     }
-    const holdings: Holding[] = rows
-      .filter((row) => row.symbol && row.issues.length === 0)
-      .map((row) => ({
-        symbol: row.symbol.toUpperCase(),
-        name: row.name ?? '',
-        currency: row.currency,
-        quantity: row.quantity,
-        costPrice: row.costPrice,
-      }));
+    const holdings: Holding[] = importable.map((row) => ({
+      symbol: row.symbol.toUpperCase(),
+      name: row.name ?? '',
+      currency: row.currency,
+      quantity: row.quantity,
+      costPrice: row.costPrice,
+    }));
     return this.importRepository.create({ name, holdings });
   }
 
