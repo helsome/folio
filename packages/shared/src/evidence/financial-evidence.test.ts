@@ -16,7 +16,13 @@ function call(overrides: Partial<ToolCall> = {}): ToolCall {
     completedAt: 120,
     status: 'success',
     result: {
-      data: { symbol: 'AAPL.US', lastPrice: 210.5, currency: 'USD', timestamp: 110 },
+      data: {
+        symbol: 'AAPL.US',
+        instrumentId: 'XNAS:AAPL',
+        lastPrice: 210.5,
+        currency: 'USD',
+        timestamp: 110,
+      },
       provenance: { providerId: 'longbridge', fetchedAt: 120, marketTime: 110, stale: false },
       evidence: {
         rawValues: { lastPrice: '210.50' },
@@ -38,7 +44,7 @@ describe('buildFinancialEvidence', () => {
       schemaVersion: 'financial-evidence/v1',
       normalizationVersion: 'folio-normalization/v1',
       provider: 'longbridge',
-      instrumentId: 'AAPL.US',
+      instrumentId: 'XNAS:AAPL',
       capabilityId: 'market.quote',
       asOf: 110,
       stale: false,
@@ -52,13 +58,34 @@ describe('buildFinancialEvidence', () => {
     expect(first.lineage.at(-1)?.version).toBe('folio-normalization/v1');
   });
 
-  it('keeps 6-digit A-share symbol arguments as the instrument id', () => {
+  it('does not promote provider symbols to canonical instrument ids', () => {
     const records = buildFinancialEvidence({
       sessionId: 'session-1',
       runId: 'run-1',
-      toolCalls: [call({ args: { symbol: '600519.SH' } })],
+      toolCalls: [call({
+        args: { symbol: '600519.SH' },
+        result: {
+          data: { symbol: '600519.SH', lastPrice: 1200 },
+          provenance: { providerId: 'longbridge' },
+        },
+      })],
     });
-    expect(records[0].instrumentId).toBe('600519.SH');
+    expect(records[0].instrumentId).toBeUndefined();
+  });
+
+  it('uses a canonical id stamped on result data when provenance omits it', () => {
+    const records = buildFinancialEvidence({
+      sessionId: 'session-1',
+      runId: 'run-1',
+      toolCalls: [call({
+        args: { symbol: 'AAPL.US' },
+        result: {
+          data: { symbol: 'AAPL.US', instrumentId: 'XNAS:AAPL', lastPrice: 210.5 },
+          provenance: { providerId: 'longbridge' },
+        },
+      })],
+    });
+    expect(records[0].instrumentId).toBe('XNAS:AAPL');
   });
 
   it('supports fundamental and historical results', () => {
