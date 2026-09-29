@@ -1,6 +1,7 @@
 import type { CapabilityProvenance, CapabilityRunStatus } from './capability.ts';
 import type { SupportedLocale } from './locale.ts';
 import type { StrategyId } from './strategy.ts';
+import type { RunManifest } from './run-manifest.ts';
 
 /**
  * Research domain — Deep Research runs, evidence-backed reports, and the
@@ -107,6 +108,12 @@ export interface ResearchRunSummary {
   recoveryCount?: number;
   recoverable?: boolean;
   error?: string;
+  /**
+   * Immutable snapshot of the run's configuration, captured at creation (#21).
+   * Absent on records written before the manifest feature landed. Never
+   * overwritten by later global settings.
+   */
+  manifest?: RunManifest;
 }
 
 /** Non-secret identity pinned at the start of a research workflow. */
