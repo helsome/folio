@@ -37,6 +37,12 @@ function createElectronClient(): FinagentClient {
         ipcResult(window.electronAPI.kernel.cancelRun({ sessionId, runId })),
       streamReplay: (input: { runId: string; lastSequence: number }) =>
         ipcResult(window.electronAPI.kernel.streamReplay(input)),
+      getManifest: (input: { sessionId: string; runId: string }) =>
+        ipcResult(window.electronAPI.kernel.getManifest(input)),
+      exportManifest: (input: { sessionId: string; runId: string }) =>
+        ipcResult(window.electronAPI.kernel.exportManifest(input)),
+      compareManifests: (input: { sessionId: string; runIdA: string; runIdB: string }) =>
+        ipcResult(window.electronAPI.kernel.compareManifests(input)),
       onAgentEvent: (callback: (event: AgentEvent) => void) =>
         window.electronAPI.kernel.onAgentEvent((event) => callback(event as AgentEvent)),
       onStreamEvent: (callback: (payload: { sessionId: string; event: StreamEvent }) => void) =>
@@ -80,6 +86,8 @@ function createElectronClient(): FinagentClient {
       listReports: (input) => ipcResult(window.electronAPI.research.listReports(input)),
       getReport: (input) => ipcResult(window.electronAPI.research.getReport(input)),
       getDiff: (input) => ipcResult(window.electronAPI.research.getDiff(input)),
+      getManifest: (input) => ipcResult(window.electronAPI.research.getManifest(input)),
+      compareManifests: (input) => ipcResult(window.electronAPI.research.compareManifests(input)),
     },
     thesis: {
       list: (symbol?) => ipcResult(window.electronAPI.thesis.list(symbol)),

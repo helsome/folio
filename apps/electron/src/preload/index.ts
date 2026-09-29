@@ -28,6 +28,9 @@ export interface ElectronAPI {
     }) => Promise<unknown>;
     cancelRun: (input: { sessionId: string; runId: string }) => Promise<unknown>;
     streamReplay: (input: { runId: string; lastSequence: number }) => Promise<unknown>;
+    getManifest: (input: { sessionId: string; runId: string }) => Promise<unknown>;
+    exportManifest: (input: { sessionId: string; runId: string }) => Promise<unknown>;
+    compareManifests: (input: { sessionId: string; runIdA: string; runIdB: string }) => Promise<unknown>;
     onAgentEvent: (callback: (event: unknown) => void) => () => void;
     onStreamEvent: (callback: (payload: { sessionId: string; event: unknown }) => void) => () => void;
   };
@@ -63,6 +66,8 @@ export interface ElectronAPI {
     cancel: (input: { runId: string }) => Promise<unknown>;
     listRuns: () => Promise<unknown>;
     getRun: (input: { runId: string }) => Promise<unknown>;
+    getManifest: (input: { runId: string }) => Promise<unknown>;
+    compareManifests: (input: { runIdA: string; runIdB: string }) => Promise<unknown>;
     listReports: (input: { symbol?: string }) => Promise<unknown>;
     getReport: (input: { reportId: string }) => Promise<unknown>;
     getDiff: (input: { symbol: string }) => Promise<unknown>;
@@ -211,6 +216,11 @@ const electronAPI: ElectronAPI = {
     cancelRun: (input: { sessionId: string; runId: string }) => ipcRenderer.invoke('runs:cancel', input),
     streamReplay: (input: { runId: string; lastSequence: number }) =>
       ipcRenderer.invoke('runs:stream-replay', input),
+    getManifest: (input: { sessionId: string; runId: string }) => ipcRenderer.invoke('runs:getManifest', input),
+    exportManifest: (input: { sessionId: string; runId: string }) =>
+      ipcRenderer.invoke('runs:exportManifest', input),
+    compareManifests: (input: { sessionId: string; runIdA: string; runIdB: string }) =>
+      ipcRenderer.invoke('runs:compareManifests', input),
     onAgentEvent: (callback: (event: unknown) => void) => {
       const listener = (_event: Electron.IpcRendererEvent, agentEvent: unknown) => callback(agentEvent);
       ipcRenderer.on('agent:event', listener);
@@ -266,6 +276,9 @@ const electronAPI: ElectronAPI = {
     cancel: (input: { runId: string }) => ipcRenderer.invoke('research:cancel', input),
     listRuns: () => ipcRenderer.invoke('research:listRuns'),
     getRun: (input: { runId: string }) => ipcRenderer.invoke('research:getRun', input),
+    getManifest: (input: { runId: string }) => ipcRenderer.invoke('research:getManifest', input),
+    compareManifests: (input: { runIdA: string; runIdB: string }) =>
+      ipcRenderer.invoke('research:compareManifests', input),
     listReports: (input: { symbol?: string }) => ipcRenderer.invoke('research:listReports', input),
     getReport: (input: { reportId: string }) => ipcRenderer.invoke('research:getReport', input),
     getDiff: (input: { symbol: string }) => ipcRenderer.invoke('research:getDiff', input),
