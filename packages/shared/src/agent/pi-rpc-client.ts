@@ -485,10 +485,22 @@ export class PiRpcClient {
     this.stdoutBuffer = '';
     this.stderrBuffer = '';
 
-    proc.stdout.on('data', (chunk) => this.consumeStdout(String(chunk)));
-    proc.stderr.on('data', (chunk) => this.consumeStderr(String(chunk)));
-    proc.on('error', (error) => this.handleExit(normalizeSpawnError(error, this.command)));
+    // kill() does not wait for exit or buffered output. A retired process must
+    // not settle requests or modify diagnostics belonging to its replacement.
+    proc.stdout.on('data', (chunk) => {
+      if (this.process !== proc) return;
+      this.consumeStdout(String(chunk));
+    });
+    proc.stderr.on('data', (chunk) => {
+      if (this.process !== proc) return;
+      this.consumeStderr(String(chunk));
+    });
+    proc.on('error', (error) => {
+      if (this.process !== proc) return;
+      this.handleExit(normalizeSpawnError(error, this.command));
+    });
     proc.on('exit', (code, signal) => {
+      if (this.process !== proc) return;
       this.lastExitInfo = { code, signal };
       this.handleExit(createCodeError(
         'PI_RUNTIME_EXITED',
