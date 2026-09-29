@@ -111,15 +111,45 @@ describe('ResearchService', () => {
     const manifest = (await service.getRun(queued.id))?.manifest;
 
     expect(manifest?.model).toBe('gpt-4o');
-    // The research strategy id wins over the host's default agent workflow id,
-    // while the version the workflow shipped with is preserved.
-    expect(manifest?.strategy).toEqual({ id: 'value', version: '0.5.0' });
+    // The research strategy wins over the host's default agent workflow: the id
+    // is the research strategy that ran, and the version is a content hash of
+    // its resolved capability plan — not the host's app version, which is
+    // already recorded separately as `appVersion`/`buildVersion`.
+    expect(manifest?.strategy?.id).toBe('value');
+    expect(manifest?.strategy?.version).toMatch(/^[0-9a-f]{64}$/);
+    expect(manifest?.strategy?.version).not.toBe('0.5.0');
     expect(manifest?.budget).toEqual({
       defaults: { modelCalls: 8 },
       ceiling: { modelCalls: 4 },
       effective: { modelCalls: 4 },
       clamped: ['modelCalls'],
     });
+  });
+
+  it('content-addresses the strategy version so it tracks the resolved plan (#21)', async () => {
+    const registry = createCapabilityRegistry(
+      RESEARCH_CAPABILITY_PLAN.map((id) => fakeCap(id, 'success'))
+    );
+    const service = new ResearchService({
+      registry,
+      synthesizer: new LocalResearchSynthesizer(),
+      repository: new ResearchReportRepository(new JsonFileStore(dir)),
+      now: () => 1_700_000_000_000,
+      getRunManifestContext: () => ({ runtimeMode: 'pi', model: 'gpt-4o' }),
+    });
+
+    const value = await service.start('NVDA.US', 'value');
+    await waitForTerminal(service, value.id);
+    const growth = await service.start('MSFT.US', 'growth');
+    await waitForTerminal(service, growth.id);
+
+    const valueManifest = (await service.getRun(value.id))?.manifest;
+    const growthManifest = (await service.getRun(growth.id))?.manifest;
+
+    expect(valueManifest?.strategy?.version).toMatch(/^[0-9a-f]{64}$/);
+    // Different plans must never share a version, or a manifest diff would
+    // silently treat two behaviourally different strategies as identical.
+    expect(valueManifest?.strategy?.version).not.toBe(growthManifest?.strategy?.version);
   });
 
   it('does not expose a terminal status until the report is persisted', async () => {
