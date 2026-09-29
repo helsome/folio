@@ -87,6 +87,8 @@ export class AgentKernel {
       runaway: options.runaway,
       // issue #75：与 kernel 存储同目录落盘流事件日志，支持跨重启 replay。
       streamLogDir: join(options.storageDir, 'stream-events'),
+      // #21: fallback runtime mode for manifests when the host passes no context.
+      runtimeMode: options.provider === 'local' ? 'local' : 'pi',
     });
   }
 
