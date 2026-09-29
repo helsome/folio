@@ -59,6 +59,13 @@ export interface RunManifestStrategy {
   version?: string;
 }
 
+/**
+ * Workflow id for the interactive Copilot agent path. Deep Research runs use
+ * the research strategy id (`StrategyId`) instead; both land in
+ * `RunManifestStrategy.id` so the manifest always names the workflow that ran.
+ */
+export const AGENT_WORKFLOW_ID = 'copilot-agent';
+
 /** One enabled tool captured in the manifest. */
 export interface RunManifestTool {
   name: string;
@@ -82,11 +89,20 @@ export interface RunManifestSearch {
 /** Active feature flags / runtime mode toggles. */
 export type RunManifestFeatureFlags = Record<string, boolean | string>;
 
-/** Budget that governed the run (#17). */
+/**
+ * Budget that governed the run (#17). Records both what was *requested*
+ * (defaults / per-run overrides / system ceiling) and what the run *actually
+ * obeyed* (`effective`, after clamping) so a historical run can be explained
+ * without re-deriving the resolution rules of the day.
+ */
 export interface RunManifestBudget {
   defaults?: Record<string, number>;
   ceiling?: Record<string, number>;
   overrides?: Record<string, number>;
+  /** Effective limits the run obeyed: defaults/overrides clamped by the ceiling. */
+  effective?: Record<string, number>;
+  /** Budget keys whose requested value was cut down by the system ceiling. */
+  clamped?: string[];
 }
 
 /** Evaluation context, when the run was part of an evaluation experiment (#15). */
@@ -149,6 +165,15 @@ export interface RunManifestContext {
   locale?: string;
   evaluation?: RunManifestEvaluation;
 }
+
+/**
+ * Per-run override of the base manifest context (#21). Same shape as
+ * `RunManifestContext` but every field is optional: the base context supplied
+ * by the host fills in the runtime mode and the live settings, while a caller
+ * (e.g. the evaluation runner) only adds the fields it owns — such as the gold
+ * case / dataset identity.
+ */
+export type RunManifestContextPatch = Partial<RunManifestContext>;
 
 /** A single resolved difference between two manifests. */
 export interface RunManifestFieldDiff {
