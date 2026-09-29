@@ -16,6 +16,23 @@ import {
 
 const SUPPORTED_CURRENCIES: Record<string, true> = { USD: true, HKD: true, CNY: true, SGD: true }
 
+/**
+ * Best-effort ISO currency for a routed symbol suffix (`0700.HK` → `HKD`).
+ *
+ * Renderer-local mirror of `currencyForSymbol` in `@finagent/shared`: the UI
+ * bundle must not import that package (it drags node/executor code into the
+ * renderer), so the routing table is duplicated on purpose. Prefer a currency
+ * reported by the data provider (e.g. `StaticInfo.currency`) when one is
+ * available; this is the fallback for call sites that only hold a symbol.
+ */
+export function currencyForSymbol(symbol: string | null | undefined): string {
+  const value = (symbol ?? '').trim()
+  if (/\.HK$/i.test(value)) return 'HKD'
+  if (/\.SH$|\.SZ$/i.test(value)) return 'CNY'
+  if (/\.SG$/i.test(value)) return 'SGD'
+  return 'USD'
+}
+
 /** Format a money value with its ISO currency; unknown code → plain number + code. */
 export function formatMoney(value: number | undefined, currency?: string): string {
   if (value === undefined || !Number.isFinite(value)) return '—'
