@@ -1,0 +1,27 @@
+{
+  "changed": true,
+  "fields": [
+    {
+      "path": "budget.defaults.modelCalls",
+      "before": 3,
+      "after": 6
+    },
+    {
+      "path": "budget.effective.modelCalls",
+      "before": 3,
+      "after": 6
+    },
+    {
+      "path": "model",
+      "before": "deepseek-flash",
+      "after": "deepseek-v4-pro"
+    }
+  ],
+  "groups": {
+    "model": true,
+    "prompt": false,
+    "tools": false,
+    "config": true,
+    "versions": false
+  }
+}

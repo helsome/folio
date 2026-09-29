@@ -1,0 +1,180 @@
+<!doctype html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<title>Run Info — 重启后</title>
+<!-- Tailwind is loaded from the CDN purely so the shipped components' utility
+     classes resolve when this artifact is opened outside the app. The color
+     values below are the repository's own design tokens. -->
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+tailwind.config = { theme: { extend: { colors: {
+  accent: '#0284c7',
+  foreground: '#0f172a',
+  border: '#e2e8f0',
+  'text-muted': '#45464d',
+} } } };
+</script>
+<style>
+  body { background:#f8fafc; color:#0f172a;
+         font-family:"Inter","PingFang SC","Microsoft YaHei",system-ui,sans-serif; }
+  .wb-card { background:#ffffff; border:1px solid #e2e8f0;
+             border-radius:6px; padding:16px; margin-bottom:16px; }
+  .wb-head { font-size:13px; font-weight:600; margin-bottom:10px; }
+  .wb-sub { font-size:11px; color:#45464d; margin-bottom:12px; }
+</style>
+</head>
+<body style="padding:24px;max-width:960px;margin:0 auto">
+<div><h1 style="font-size:18px;font-weight:600;margin-bottom:6px">Run Info — 应用重启后读取历史 run（#21）</h1><p style="font-size:12px;margin-bottom:16px;color:#45464d">读取进程的「当前全局设置」model = deepseek-v4-pro；历史 run 的 manifest model = deepseek-flash（仍为诞生时的配置）。</p><div class="wb-card"><div class="wb-head">Run A · research-e95ce1be-6eb9-479c-96dd-668d359c631e</div><div class="wb-sub">Run Info 视图（ManifestView）— 重启后读到的仍是该 run 自己的 manifest</div><div><div class="mb-3 flex items-center gap-2"><span class="rounded-[6px] bg-accent/14 px-2 py-0.5 text-[11px] font-medium text-accent">Pi 运行时</span><span class="text-[12px] text-text-muted">deepseek · deepseek-flash</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">模型</span><span class="min-w-0 break-words text-foreground">deepseek-flash</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">Provider</span><span class="min-w-0 break-words text-foreground">deepseek</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">模型参数</span><span class="min-w-0 break-words text-foreground">api=openai-completions · baseUrl=https://api.deepseek.com · max=8000 · reasoning=false</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">策略</span><span class="min-w-0 break-words text-foreground">comprehensive · 3637a33db7d9979cf55ad2331734b197b0db5ce665f65e2dcc2f57675b3fd076</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">提示词版本</span><span class="min-w-0 break-words text-foreground">deep-research-synthesis@1</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">提示词哈希</span><span class="min-w-0 break-words text-foreground">8105327bd4c6513d43687b00fe5d3e0cb9a62fd0131bf5ec103f2e423bd9656f</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">提示词来源</span><span class="min-w-0 break-words text-foreground">e2e-acceptance</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">工具</span><span class="min-w-0 break-words text-foreground">get_quote, get_kline, get_intraday, get_market_status, get_company_profile, get_valuation, get_news, get_portfolio, get_market_depth, get_trades, get_capital_flow, get_market_sentiment, get_financials, get_ratings, get_dividends, get_earnings, get_calendar_events, get_positions, get_assets, get_cash_flow</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">检索</span><span class="min-w-0 break-words text-foreground">public-http（已配置）</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">检索路由</span><span class="min-w-0 break-words text-foreground">public-http → —</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">App 版本</span><span class="min-w-0 break-words text-foreground">0.5.0-acceptance</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">构建版本</span><span class="min-w-0 break-words text-foreground">0.5.0-acceptance</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">Git 修订</span><span class="min-w-0 break-words text-foreground">402bd92f2c0b32dfed4b28b1038b67c2c0adf582</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">语言</span><span class="min-w-0 break-words text-foreground">en-US</span></div><div class="grid grid-cols-[88px_1fr] gap-2 py-[3px] text-[12px]"><span class="shrink-0 text-text-muted">功能开关</span><span class="min-w-0 break-words text-foreground">runtimeProvider=pi · demoData=false · langfuseTracing=false</span></div><div class="mt-3"><div class="mb-1.5 flex items-center justify-between"><span class="text-[11px] font-medium text-text-muted">JSON 导出（已脱敏）</span><button type="button" class="rounded-[6px] bg-foreground/8 px-2 py-0.5 text-[11px] text-foreground transition-colors hover:bg-foreground/14">复制</button></div><pre class="max-h-56 overflow-auto rounded-[6px] bg-foreground/6 p-2.5 text-[10.5px] leading-relaxed text-foreground/90">{
+  &quot;schemaVersion&quot;: 1,
+  &quot;runId&quot;: &quot;research-e95ce1be-6eb9-479c-96dd-668d359c631e&quot;,
+  &quot;createdAt&quot;: 1790674646605,
+  &quot;runtimeMode&quot;: &quot;pi&quot;,
+  &quot;appVersion&quot;: &quot;0.5.0-acceptance&quot;,
+  &quot;buildVersion&quot;: &quot;0.5.0-acceptance&quot;,
+  &quot;gitRevision&quot;: &quot;402bd92f2c0b32dfed4b28b1038b67c2c0adf582&quot;,
+  &quot;provider&quot;: &quot;deepseek&quot;,
+  &quot;model&quot;: &quot;deepseek-flash&quot;,
+  &quot;modelParams&quot;: {
+    &quot;api&quot;: &quot;openai-completions&quot;,
+    &quot;baseUrl&quot;: &quot;https://api.deepseek.com&quot;,
+    &quot;maxTokens&quot;: 8000,
+    &quot;reasoning&quot;: false
+  },
+  &quot;prompt&quot;: {
+    &quot;hash&quot;: &quot;8105327bd4c6513d43687b00fe5d3e0cb9a62fd0131bf5ec103f2e423bd9656f&quot;,
+    &quot;version&quot;: &quot;deep-research-synthesis@1&quot;,
+    &quot;source&quot;: &quot;e2e-acceptance&quot;
+  },
+  &quot;strategy&quot;: {
+    &quot;id&quot;: &quot;comprehensive&quot;,
+    &quot;version&quot;: &quot;3637a33db7d9979cf55ad2331734b197b0db5ce665f65e2dcc2f57675b3fd076&quot;
+  },
+  &quot;tools&quot;: [
+    {
+      &quot;name&quot;: &quot;get_quote&quot;,
+      &quot;capability&quot;: &quot;market.quote&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_kline&quot;,
+      &quot;capability&quot;: &quot;market.kline&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_intraday&quot;,
+      &quot;capability&quot;: &quot;market.intraday&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_market_status&quot;,
+      &quot;capability&quot;: &quot;market.status&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_company_profile&quot;,
+      &quot;capability&quot;: &quot;company.profile&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_valuation&quot;,
+      &quot;capability&quot;: &quot;company.valuation&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_news&quot;,
+      &quot;capability&quot;: &quot;research.news&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_portfolio&quot;,
+      &quot;capability&quot;: &quot;portfolio.summary&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_market_depth&quot;,
+      &quot;capability&quot;: &quot;market.depth&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_trades&quot;,
+      &quot;capability&quot;: &quot;market.trades&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_capital_flow&quot;,
+      &quot;capability&quot;: &quot;market.capitalFlow&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_market_sentiment&quot;,
+      &quot;capability&quot;: &quot;market.sentiment&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_financials&quot;,
+      &quot;capability&quot;: &quot;company.financials&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_ratings&quot;,
+      &quot;capability&quot;: &quot;company.ratings&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_dividends&quot;,
+      &quot;capability&quot;: &quot;company.dividends&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_earnings&quot;,
+      &quot;capability&quot;: &quot;company.earnings&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_calendar_events&quot;,
+      &quot;capability&quot;: &quot;research.events&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_positions&quot;,
+      &quot;capability&quot;: &quot;portfolio.positions&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_assets&quot;,
+      &quot;capability&quot;: &quot;portfolio.assets&quot;,
+      &quot;enabled&quot;: true
+    },
+    {
+      &quot;name&quot;: &quot;get_cash_flow&quot;,
+      &quot;capability&quot;: &quot;portfolio.cashFlow&quot;,
+      &quot;enabled&quot;: true
+    }
+  ],
+  &quot;search&quot;: {
+    &quot;providerId&quot;: &quot;public-http&quot;,
+    &quot;routing&quot;: {
+      &quot;primary&quot;: &quot;public-http&quot;
+    },
+    &quot;configured&quot;: true,
+    &quot;endpoint&quot;: &quot;https://query1.finance.yahoo.com&quot;
+  },
+  &quot;featureFlags&quot;: {
+    &quot;runtimeProvider&quot;: &quot;pi&quot;,
+    &quot;demoData&quot;: false,
+    &quot;langfuseTracing&quot;: false
+  },
+  &quot;budget&quot;: {
+    &quot;defaults&quot;: {
+      &quot;modelCalls&quot;: 3
+    },
+    &quot;effective&quot;: {
+      &quot;modelCalls&quot;: 3
+    },
+    &quot;clamped&quot;: []
+  },
+  &quot;locale&quot;: &quot;en-US&quot;
+}</pre></div></div></div></div>
+</body>
+</html>
