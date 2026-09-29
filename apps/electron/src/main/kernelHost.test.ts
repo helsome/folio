@@ -325,6 +325,13 @@ mock.module('@finagent/shared', () => ({
     redactToolCall = (toolCall: unknown) => toolCall;
   },
   PiRuntimeAdapter: class {},
+  // #21 run-manifest helpers used by kernelHost's manifest IPC.
+  diffRunManifests: () => ({
+    changed: false,
+    fields: [],
+    groups: { model: false, prompt: false, tools: false, config: false, versions: false },
+  }),
+  exportRunManifest: (manifest: unknown) => JSON.stringify(manifest, null, 2),
   sanitizeSettings: (input: unknown) => input,
   embeddedDatasets: [],
 }));
