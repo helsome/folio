@@ -826,6 +826,83 @@ describe('RunManager run manifest (#21)', () => {
     expect(persisted?.manifest?.tools).toEqual([]);
     expect(persisted?.manifest?.runId).toBe(run.id);
   });
+
+  it('records the resolved budget, including the ceiling clamp, in the manifest (#17)', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'), {
+      budgets: { defaults: { modelCalls: 10 }, ceiling: { modelCalls: 5, toolCalls: 4 } },
+    });
+    const session = await sessions.createSession('Manifest budget');
+    const run = await runs.startRun(session.id, 'hello', undefined, undefined, { modelCalls: 3 });
+    await waitFor(async () => !runs.isRunning());
+    const manifest = (await sessions.getRun(session.id, run.id))?.manifest;
+    expect(manifest?.budget).toEqual({
+      defaults: { modelCalls: 10 },
+      ceiling: { modelCalls: 5, toolCalls: 4 },
+      overrides: { modelCalls: 3 },
+      effective: { modelCalls: 3, toolCalls: 4 },
+      clamped: [],
+    });
+  });
+
+  it('flags a limit the system ceiling cut down as clamped', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'), {
+      budgets: { defaults: { modelCalls: 10 }, ceiling: { modelCalls: 5 } },
+    });
+    const session = await sessions.createSession('Manifest clamp');
+    const run = await runs.startRun(session.id, 'hello');
+    await waitFor(async () => !runs.isRunning());
+    const manifest = (await sessions.getRun(session.id, run.id))?.manifest;
+    expect(manifest?.budget?.effective).toEqual({ modelCalls: 5 });
+    expect(manifest?.budget?.clamped).toEqual(['modelCalls']);
+  });
+
+  it('omits the budget when no budget is configured', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'));
+    const session = await sessions.createSession('Manifest no budget');
+    const run = await runs.startRun(session.id, 'hello');
+    await waitFor(async () => !runs.isRunning());
+    const manifest = (await sessions.getRun(session.id, run.id))?.manifest;
+    expect(manifest?.budget).toBeUndefined();
+  });
+
+  it('merges the base context from the host with a per-call override', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'), {
+      getRunManifestContext: () => ({
+        runtimeMode: 'pi',
+        model: 'gpt-4o',
+        strategy: { id: 'copilot-agent', version: '0.5.0' },
+        tools: [{ name: 'get_quote', capability: 'market.quote', enabled: true }],
+      }),
+    });
+    const session = await sessions.createSession('Manifest merge');
+    const run = await runs.startRun(session.id, 'hello', undefined, undefined, undefined, {
+      evaluation: { datasetId: 'd1', caseId: 'c1', datasetVersion: '1.0.0' },
+    });
+    await waitFor(async () => !runs.isRunning());
+    const manifest = (await sessions.getRun(session.id, run.id))?.manifest;
+    expect(manifest).toMatchObject({
+      runtimeMode: 'pi',
+      model: 'gpt-4o',
+      strategy: { id: 'copilot-agent', version: '0.5.0' },
+      tools: [{ name: 'get_quote', capability: 'market.quote', enabled: true }],
+      evaluation: { datasetId: 'd1', caseId: 'c1', datasetVersion: '1.0.0' },
+    });
+  });
+
+  it('degrades to the fallback context when the base source throws', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'), {
+      runtimeMode: 'demo',
+      getRunManifestContext: () => {
+        throw new Error('settings unavailable');
+      },
+    });
+    const session = await sessions.createSession('Manifest fallback');
+    const run = await runs.startRun(session.id, 'hello');
+    await waitFor(async () => !runs.isRunning());
+    const manifest = (await sessions.getRun(session.id, run.id))?.manifest;
+    expect(manifest?.runtimeMode).toBe('demo');
+    expect(manifest?.tools).toEqual([]);
+  });
 });
 
 async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 2000) {
