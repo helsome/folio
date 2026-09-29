@@ -3,6 +3,7 @@
 import type { SupportedLocale } from './locale.ts';
 import type { FinancialEvidenceEnvelope } from './financial-evidence.ts';
 import type { MarketSource } from './market-data.ts';
+import type { RunManifest } from './run-manifest.ts';
 
 export type { SupportedLocale, LocalePreference } from './locale.ts';
 
@@ -185,6 +186,13 @@ export interface Run {
   stopReason?: StopReason;
   /** The numbers behind a non-success stop (which budget ran out, which loop fired). */
   stopDetail?: Record<string, unknown>;
+  /**
+   * Immutable snapshot of the run's configuration, captured at creation (#21).
+   * Absent on records written before the manifest feature landed. Never
+   * overwritten by later global settings — re-opening a historical run shows
+   * the manifest it was born with.
+   */
+  manifest?: RunManifest;
 }
 
 /** Live tool call state, streamed through agent events. */
@@ -608,3 +616,4 @@ export * from './financial-evidence.ts';
 export * from './reconciliation.ts';
 export * from './reconciliation-provider.ts';
 export * from './evidence-contract.ts';
+export * from './run-manifest.ts';
