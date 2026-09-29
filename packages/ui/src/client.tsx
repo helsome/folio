@@ -43,6 +43,8 @@ import type {
   ResearchOpinion,
   ResearchOutcome,
   Run,
+  RunManifest,
+  RunManifestDiff,
   SessionMeta,
   Skill,
   SkillReadiness,
@@ -189,6 +191,16 @@ export interface FinagentClient {
     ) => Promise<ApiResult<Run>>;
     cancelRun: (sessionId: string, runId: string) => Promise<ApiResult<void>>;
     streamReplay: (input: { runId: string; lastSequence: number }) => Promise<ApiResult<unknown>>;
+    /** #21: immutable run-config manifest for a copilot run. */
+    getManifest: (input: { sessionId: string; runId: string }) => Promise<ApiResult<RunManifest | undefined>>;
+    /** #21: pretty-printed, secret-redacted JSON export of a copilot run manifest. */
+    exportManifest: (input: { sessionId: string; runId: string }) => Promise<ApiResult<string | undefined>>;
+    /** #21: structured diff between two copilot run manifests. */
+    compareManifests: (input: {
+      sessionId: string;
+      runIdA: string;
+      runIdB: string;
+    }) => Promise<ApiResult<RunManifestDiff>>;
     onAgentEvent: (callback: (event: AgentEvent) => void) => () => void;
     onStreamEvent: (callback: (payload: { sessionId: string; event: StreamEvent }) => void) => () => void;
   };
@@ -239,6 +251,10 @@ export interface FinagentClient {
     listReports: (input: { symbol?: string }) => Promise<ApiResult<ResearchReport[]>>;
     getReport: (input: { reportId: string }) => Promise<ApiResult<ResearchReport | undefined>>;
     getDiff: (input: { symbol: string }) => Promise<ApiResult<ResearchDiff | undefined>>;
+    /** #21: immutable run-config manifest for a Deep Research run. */
+    getManifest: (input: { runId: string }) => Promise<ApiResult<RunManifest | undefined>>;
+    /** #21: structured diff between two Deep Research run manifests. */
+    compareManifests: (input: { runIdA: string; runIdB: string }) => Promise<ApiResult<RunManifestDiff>>;
   };
   screening?: ScreeningChannel;
   outcome?: {
@@ -320,6 +336,9 @@ export const fallbackClient: FinagentClient = {
     startRun: missingClient('kernel.startRun'),
     cancelRun: missingClient('kernel.cancelRun'),
     streamReplay: missingClient('kernel.streamReplay'),
+    getManifest: missingClient('kernel.getManifest'),
+    exportManifest: missingClient('kernel.exportManifest'),
+    compareManifests: missingClient('kernel.compareManifests'),
     onAgentEvent: () => () => undefined,
     onStreamEvent: () => () => undefined,
   },
@@ -361,6 +380,8 @@ export const fallbackClient: FinagentClient = {
     listReports: missingClient('research.listReports'),
     getReport: missingClient('research.getReport'),
     getDiff: missingClient('research.getDiff'),
+    getManifest: missingClient('research.getManifest'),
+    compareManifests: missingClient('research.compareManifests'),
   },
   screening: {
     run: missingClient('screening.run'),
