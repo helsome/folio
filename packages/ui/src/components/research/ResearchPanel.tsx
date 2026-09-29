@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
-import { Check, Search } from 'lucide-react';
+import { Check, Search, Info } from 'lucide-react';
 import type { ResearchRunSummary, ResearchReport, StrategyId } from '@finagent/core';
 import { activeSymbolAtom, navSectionAtom } from '../../atoms';
 import { pendingResearchStrategyAtom, researchOriginAtom } from '../../atoms/discoverAtoms';
@@ -18,6 +18,7 @@ import {
   TERMINAL_RUN_STATUSES,
 } from '../../atoms/researchAtoms';
 import { saveThesisFromReport } from '../../client/thesis';
+import { RunInfoDialog, RunInfoCompareDialog } from '../kernel/RunInfoPanel';
 import { ResearchReportView } from './ResearchReportView';
 import { ResearchMarketWorkspace } from './ResearchMarketWorkspace';
 import { DEFAULT_STRATEGY_ID, StrategyPicker } from './StrategyPicker';
@@ -535,24 +536,74 @@ const RunHistory: React.FC<{
   onSelect: (reportId: string) => void;
 }> = ({ runs, onSelect }) => {
   const { t } = useTranslation();
+  const [selected, setSelected] = useState<string[]>([]);
+  const [infoRunId, setInfoRunId] = useState<string | undefined>();
+  const [comparePair, setComparePair] = useState<[string, string] | undefined>();
+
+  const toggle = (runId: string) =>
+    setSelected((prev) => (prev.includes(runId) ? prev.filter((id) => id !== runId) : [...prev, runId]));
+
   if (runs.length === 0) return <EmptyState />;
   return (
     <div className="flex flex-col gap-1.5">
-      {runs.map((run) => (
+      {selected.length >= 2 && (
         <button
-          key={run.id}
-          onClick={() => {
-            if (run.reportId) onSelect(run.reportId);
-          }}
-          className="mac-list-row flex w-full items-center justify-between rounded-[8px] px-3 py-2 text-left"
+          type="button"
+          onClick={() => setComparePair([selected[0], selected[1]])}
+          className="mb-1 self-start rounded-[6px] bg-accent/14 px-2 py-1 text-[11px] font-medium text-accent transition-colors hover:bg-accent/20"
         >
-          <span className="text-[12.5px] font-semibold text-foreground">{run.symbol}</span>
-          <span className="tnum text-[11px] text-text-muted">
-            {t(`research.runStatus.${run.status}`)}
-            {run.finishedAt ? ` · ${new Date(run.finishedAt).toLocaleTimeString()}` : ''}
-          </span>
+          {`对比所选 ${selected.length} 次运行配置`}
         </button>
+      )}
+      {runs.map((run) => (
+        <div
+          key={run.id}
+          className="mac-list-row flex w-full items-center gap-2 rounded-[8px] px-3 py-2"
+        >
+          <input
+            type="checkbox"
+            checked={selected.includes(run.id)}
+            onChange={() => toggle(run.id)}
+            aria-label="选择用于对比"
+            className="h-3.5 w-3.5 shrink-0"
+          />
+          <button
+            type="button"
+            onClick={() => {
+              if (run.reportId) onSelect(run.reportId);
+            }}
+            className="flex min-w-0 flex-1 items-center justify-between text-left"
+          >
+            <span className="text-[12.5px] font-semibold text-foreground">{run.symbol}</span>
+            <span className="tnum text-[11px] text-text-muted">
+              {t(`research.runStatus.${run.status}`)}
+              {run.finishedAt ? ` · ${new Date(run.finishedAt).toLocaleTimeString()}` : ''}
+            </span>
+          </button>
+          <button
+            type="button"
+            onClick={() => setInfoRunId(run.id)}
+            title="运行信息"
+            aria-label="运行信息"
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-[6px] text-foreground/48 transition-colors hover:bg-surface-hover hover:text-foreground"
+          >
+            <Info className="h-3.5 w-3.5" />
+          </button>
+        </div>
       ))}
+      <RunInfoDialog
+        open={infoRunId !== undefined}
+        onClose={() => setInfoRunId(undefined)}
+        kind="research"
+        runId={infoRunId ?? ''}
+      />
+      <RunInfoCompareDialog
+        open={comparePair !== undefined}
+        onClose={() => setComparePair(undefined)}
+        kind="research"
+        runIdA={comparePair?.[0] ?? ''}
+        runIdB={comparePair?.[1] ?? ''}
+      />
     </div>
   );
 };
