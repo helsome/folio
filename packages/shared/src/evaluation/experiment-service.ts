@@ -33,6 +33,7 @@ import type {
   ExperimentMetadata,
   RegressionResult,
   Run,
+  RunManifestContextPatch,
   SupportedLocale,
   ToolCall,
   ToolCallRecord,
@@ -84,7 +85,13 @@ export interface ExperimentKernel {
       sessionId: string,
       content: string,
       workspaceContext?: WorkspaceContext,
-      locale?: SupportedLocale
+      locale?: SupportedLocale,
+      /**
+       * Extra manifest context for this run (#21). Merged over the kernel's base
+       * context so an evaluation run records its gold case / dataset version in
+       * the same immutable manifest as the model/prompt/tool config.
+       */
+      manifestContext?: RunManifestContextPatch
     ): Promise<Run>;
     /** True while a run's terminal persistence is still landing (AgentKernel). */
     isRunning?(): boolean;
@@ -562,7 +569,16 @@ export class ExperimentService {
           session.id,
           caseItem.input.prompt,
           caseItem.input.workspaceContext,
-          caseItem.locale
+          caseItem.locale,
+          // #21 / #15: the manifest records which gold case + dataset version
+          // this evaluation run belongs to, under the run's own identity.
+          {
+            evaluation: {
+              datasetId: dataset.id,
+              caseId: caseItem.id,
+              datasetVersion: dataset.version,
+            },
+          }
         );
       } catch (error) {
         // Infra-level failure (e.g. runtime spawn failed): record a failed run

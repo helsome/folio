@@ -5,6 +5,8 @@
 // gold cases, and production Copilot runs can be sliced without parsing
 // free-text names.
 
+import type { RunManifest } from '@finagent/core';
+
 export type LangfuseRunKind = 'normal' | 'evaluation';
 
 export const LANGFUSE_DEFAULT_HOST = 'https://cloud.langfuse.com';
@@ -98,4 +100,66 @@ export function normalizeLangfuseHost(host: string | undefined): string {
   const trimmed = host?.trim();
   if (!trimmed) return LANGFUSE_DEFAULT_HOST;
   return trimmed.replace(/\/+$/, '');
+}
+
+/** Call-site context that is not part of the run manifest itself. */
+export interface ManifestLangfuseExtras {
+  /** Folio session id (the trace's `sessionId`). */
+  sessionId?: string;
+  /** Runtime/Pi session id (the trace's `threadId`). */
+  threadId?: string;
+  /** Overrides the kind derived from the manifest's evaluation context. */
+  runKind?: LangfuseRunKind;
+  /** Instrument symbol, when the run targeted one. */
+  symbol?: string;
+  /**
+   * Runtime config confirmed by READBACK (#114). When supplied it wins over the
+   * manifest value, so a caller with fresher evidence is never overridden.
+   */
+  model?: string;
+  provider?: string;
+  /** Requested (not confirmed) values, recorded under their own names. */
+  requestedModel?: string;
+  requestedProvider?: string;
+}
+
+/**
+ * Derive the Langfuse trace metadata from a run's immutable manifest (#21 ↔ #14).
+ *
+ * This is the single place the two identities are joined: the manifest's
+ * `runId` becomes `folioRunId`, which the exporter also uses as the Langfuse
+ * trace id, so a trace and its local manifest can always be matched. The
+ * manifest's captured config (model, provider, strategy, prompt version, gold
+ * case / dataset) fills the metadata fields the old hand-rolled call sites
+ * omitted.
+ *
+ * Only readback-confirmed values become `model`/`provider`; a manifest records
+ * the model that actually ran, so it is safe to promote.
+ */
+export function manifestToLangfuseMetadata(
+  manifest: RunManifest,
+  extras: ManifestLangfuseExtras = {}
+): FolioLangfuseMetadata {
+  const evaluation = manifest.evaluation;
+  const runKind: LangfuseRunKind =
+    extras.runKind ?? (evaluation ? 'evaluation' : 'normal');
+  return {
+    folioRunId: manifest.runId,
+    folioSessionId: extras.sessionId,
+    threadId: extras.threadId,
+    runKind,
+    goldCaseId: evaluation?.caseId,
+    datasetId: evaluation?.datasetId,
+    datasetVersion: evaluation?.datasetVersion,
+    model: extras.model ?? manifest.model,
+    provider: extras.provider ?? manifest.provider,
+    requestedModel: extras.requestedModel,
+    requestedProvider: extras.requestedProvider,
+    agentVersion: manifest.strategy?.version,
+    folioVersion: manifest.appVersion,
+    promptVersion: manifest.prompt?.version,
+    strategyId: manifest.strategy?.id,
+    symbol: extras.symbol,
+    locale: manifest.locale,
+  };
 }
