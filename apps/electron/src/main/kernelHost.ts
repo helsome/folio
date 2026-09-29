@@ -237,6 +237,15 @@ interface StartRunRequest {
 /** Experiment id for runs observed outside explicit evaluation experiments. */
 const OBSERVABILITY_EXPERIMENT_ID = '__observability__';
 
+/**
+ * `RunManager` reports a user cancel as `run_failed` carrying this code and
+ * normalizes it to `cancelled` on the stream channel. The observability store
+ * has to read the same code, otherwise a deliberate cancel is recorded as a
+ * task failure and lands in the evaluated-quality bucket instead of `skipped`
+ * (`isSkippedRun` keys off `status === 'cancelled'`).
+ */
+const RUN_CANCELLED_CODE = 'RUN_CANCELLED';
+
 interface PendingEvalRun {
   sessionId: string;
   startedAt: number;
@@ -1326,21 +1335,25 @@ export class AgentKernelHost {
       pending.answer = event.payload.answer;
     } else if (event.type === 'run_completed' || event.type === 'run_failed') {
       if (event.type === 'run_failed') pending.error = event.payload.error;
-      const completed = event.type === 'run_completed';
-      void this.settleEvaluationRun(event.runId, event.sessionId, completed, event.timestamp);
+      const status: EvaluationRunStatus =
+        event.type === 'run_completed'
+          ? 'completed'
+          : event.payload.error?.code === RUN_CANCELLED_CODE
+            ? 'cancelled'
+            : 'failed';
+      void this.settleEvaluationRun(event.runId, event.sessionId, status, event.timestamp);
     }
   }
 
   private async settleEvaluationRun(
     runId: string,
     sessionId: string,
-    completed: boolean,
+    status: EvaluationRunStatus,
     endedAt: number
   ): Promise<void> {
     const pending = this.evalRuns.get(runId);
     this.evalRuns.delete(runId);
     if (!pending) return;
-    const status: EvaluationRunStatus = completed ? 'completed' : 'failed';
     const toolCalls: ToolCallRecord[] = pending.toolCalls.map((toolCall) => ({
       id: toolCall.id,
       toolName: toolCall.toolName,
@@ -1387,7 +1400,7 @@ export class AgentKernelHost {
       answer: run.answer,
       toolCalls: run.toolCalls,
       error: pending.error,
-      completed,
+      completed: status === 'completed',
     });
     if (ref) {
       await this.persistTraceLink(runId, ref);
