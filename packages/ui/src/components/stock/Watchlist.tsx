@@ -18,11 +18,11 @@ import { Input } from '../primitives/Input';
 import { Button } from '../primitives/Button';
 import { DataFreshness } from '../primitives/DataFreshness';
 import { DemoBadge } from '../primitives/DemoBadge';
+import { currencyForSymbol, formatMoney } from '../../lib/money';
 
 const SYMBOL_REGEX = /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/;
 const DASH = '\u2014';
 
-const formatPrice = (value: number): string => `$${value.toFixed(2)}`;
 const formatPercent = (value: number): string =>
   `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 
@@ -226,7 +226,7 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({
         ) : quote ? (
           <>
             <div className="text-[12px] font-semibold text-foreground">
-              {formatPrice(quote.lastPrice)}
+              {formatMoney(quote.lastPrice, currencyForSymbol(symbol))}
             </div>
             <div className="text-[11px]" style={{ color: changeColor }}>
               {formatPercent(quote.changePercent)}
