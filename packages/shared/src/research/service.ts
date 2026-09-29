@@ -6,7 +6,7 @@ import type {
 import { i18nCurrentLocale } from '@finagent/i18n';
 import { redact } from '../diagnostics/redact.ts';
 import { createCodeError } from '../agent/errors.ts';
-import { captureRunManifest } from '../kernel/run-manifest.ts';
+import { captureRunManifest, hashManifestInput } from '../kernel/run-manifest.ts';
 import { createUsage, resolveBudget, type ResolveBudgetInput } from '../kernel/run-budget.ts';
 import { isStrategyId } from '../strategies/presets.ts';
 import { buildCapabilityInput, planForStrategy } from './planner.ts';
@@ -96,10 +96,15 @@ export class ResearchService {
       // The service knows the run's strategy; fold it into the assembled context
       // so the persisted manifest records which workflow drove the research. The
       // research strategy id always wins so the manifest names the workflow that
-      // actually ran, not the host's default agent strategy.
+      // actually ran, not the host's default agent strategy. `version` is a
+      // content hash of the strategy's resolved capability plan: it is stable for
+      // a given strategy and changes the moment the plan (its capability set or
+      // order) changes, so two manifests whose strategy behaviour differs never
+      // share a version.
+      const strategyVersion = hashManifestInput(plan.map((p) => p.capabilityId).join('\n'));
       const merged: RunManifestContext = {
         ...manifestContext,
-        strategy: { ...manifestContext.strategy, id: strategyId },
+        strategy: { ...manifestContext.strategy, id: strategyId, version: strategyVersion },
         budget: {
           defaults: this.options.budgets?.defaults,
           ceiling: this.options.budgets?.ceiling,
