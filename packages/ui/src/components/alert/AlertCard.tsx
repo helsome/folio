@@ -1,7 +1,7 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { AlertRule, AlertRuleType } from '@finagent/core';
-import { formatCurrency } from '@finagent/i18n';
+import { currencyForSymbol, formatMoney } from '../../lib/money';
 import {
   ArrowDownRight,
   ArrowUpRight,
@@ -45,13 +45,22 @@ export const ALERT_TYPE_KEYS: Record<AlertRuleType, string> = {
 
 type TFunc = (key: string, opts?: Record<string, unknown>) => string;
 
+/**
+ * A price alert's threshold in the instrument's own currency. `AlertRule`
+ * carries no currency field, so the symbol's routed market decides it —
+ * rendering a bare number (or a hardcoded `$`) tells the user nothing.
+ */
+function alertPrice(rule: Extract<AlertRule, { type: 'price_above' | 'price_below' }>): string {
+  return formatMoney(rule.targetPrice, currencyForSymbol(rule.symbol));
+}
+
 /** Localized one-line rule summary (mirrors the atoms ruleSummary logic). */
 function summary(rule: AlertRule, t: TFunc): string {
   switch (rule.type) {
     case 'price_above':
-      return t('alerts.summary.above', { price: formatCurrency(rule.targetPrice) });
+      return t('alerts.summary.above', { price: alertPrice(rule) });
     case 'price_below':
-      return t('alerts.summary.below', { price: formatCurrency(rule.targetPrice) });
+      return t('alerts.summary.below', { price: alertPrice(rule) });
     case 'new_news':
       return t('alerts.summary.newHeadlines');
     case 'earnings':
