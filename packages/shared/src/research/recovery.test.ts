@@ -24,12 +24,25 @@ function service(overrides: Partial<ResearchServiceOptions> = {}) {
     synthesizer: local, repository: repository(), ...overrides,
   });
 }
+/**
+ * Poll until the run reaches a terminal status.
+ *
+ * Wall-clock budget, not iteration count — same reasoning as
+ * `service.test.ts`'s `waitForTerminal`. A fixed `400 × 5ms` loop buys ~2s
+ * only when every poll is fast; once the poll round-trips through the on-disk
+ * run store on a saturated CI runner, the loop can exhaust its iterations
+ * before an otherwise healthy run settles, surfacing as a bogus
+ * "Run did not settle".
+ */
+const TERMINAL_WAIT_MS = 5_000;
+
 async function settled(svc: ResearchService, id: string) {
-  for (let i = 0; i < 400; i++) {
+  const deadline = Date.now() + TERMINAL_WAIT_MS;
+  do {
     const run = await svc.getRun(id);
     if (run && ['interrupted', 'completed', 'partial', 'failed', 'cancelled'].includes(run.status)) return run;
     await Bun.sleep(5);
-  }
+  } while (Date.now() < deadline);
   throw new Error('Run did not settle');
 }
 async function interrupted() {
