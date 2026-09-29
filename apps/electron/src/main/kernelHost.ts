@@ -26,6 +26,15 @@ import type {
   ResearchSynthesis,
   ResearchSynthesisInput,
   Run,
+  RunManifest,
+  RunManifestContext,
+  RunManifestDiff,
+  RunManifestFeatureFlags,
+  RunManifestModelParams,
+  RunManifestPrompt,
+  RunManifestRuntimeMode,
+  RunManifestSearch,
+  RunManifestTool,
   ScreeningRun,
   ScreeningQuery,
   ScreeningStrategy,
@@ -143,6 +152,8 @@ import {
   scoresFromResearchReport,
   currentFolioVersion,
   EvaluationRedactor,
+  diffRunManifests,
+  exportRunManifest,
   PiRuntimeAdapter,
   sanitizeSettings,
   embeddedDatasets,
@@ -282,6 +293,7 @@ export class AgentKernelHost {
   private readonly portfolioRisk: PortfolioRiskService;
   private readonly connectionStore: ConnectionStore;
   private readonly providerRouter: ProviderRouter;
+  private readonly demoData: boolean;
   private instrumentResolver: InstrumentResolver;
   private activeLogin: { cancel: () => void } | null = null;
   private unsubscribe: (() => void) | null = null;
@@ -354,6 +366,7 @@ export class AgentKernelHost {
     // unavailable, built-in sample data answers instead; every surface built
     // on it labels its content with source 'demo' (DemoBadge).
     const demoData = process.env.FINAGENT_DEMO_DATA === '1';
+    this.demoData = demoData;
     const capabilityFetchers = demoData ? withDemoDataFallback(routerFetchers) : routerFetchers;
     this.marketData = new MarketDataService({ fetchers: capabilityFetchers });
     this.registry = createFullRegistry(capabilityFetchers);
@@ -382,6 +395,8 @@ export class AgentKernelHost {
         await this.saveDiffForReport(report);
       },
       onRunComplete: (result) => this.exportResearchTrace(result),
+      // #21: snapshot the research run config into an immutable manifest.
+      getRunManifestContext: () => this.buildRunManifestContext(),
     });
 
     // V5 outcome evaluation: opinions snapshotted from reports, outcomes
@@ -550,11 +565,17 @@ export class AgentKernelHost {
     // user explicitly requests another language in the prompt (spec §41–42).
     // Resolved after validation and with a safe fallback so a prefs failure
     // can never block an agent run (failure-isolation, spec §87).
+    // #21: assemble an immutable run-config snapshot and stamp it onto the run
+    // at creation. Manifest capture is best-effort — a failure here must never
+    // block an agent run (failure-isolation, spec §87).
+    const manifestContext = await this.buildRunManifestContext().catch(() => undefined);
     return this.kernel.runs.startRun(
       requireString(request.sessionId, 'sessionId'),
       requireString(request.content, 'content'),
       workspaceContext,
-      await this.effectiveRunLocale()
+      await this.effectiveRunLocale(),
+      undefined,
+      manifestContext
     );
   }
 
@@ -566,12 +587,175 @@ export class AgentKernelHost {
     }
   }
 
+  /**
+   * Assemble the immutable run-config snapshot for #21. Best-effort: any single
+   * source that is unavailable (e.g. no Pi process, no skills) simply leaves its
+   * field undefined rather than failing the run. The manifest captures model +
+   * provider identity, effective model params, the prompt composition hash,
+   * enabled tools, the search/retrieval routing, active feature flags and the
+   * app/build identity — but never credentials (defence-in-depth redaction also
+   * runs in `@finagent/shared`).
+   */
+  private async buildRunManifestContext(): Promise<RunManifestContext> {
+    const runtimeMode: RunManifestRuntimeMode = this.demoData
+      ? 'demo'
+      : readAgentProvider() === 'local'
+        ? 'local'
+        : 'pi';
+
+    const identity: {
+      provider?: string;
+      model?: string;
+      modelParams?: RunManifestModelParams;
+    } = {};
+    const api = this.kernel.getLlmApi();
+    if (api) {
+      try {
+        const state = await api.getState();
+        const model = state.model;
+        identity.provider =
+          model?.provider ?? (readAgentProvider() === 'local' ? 'local' : undefined);
+        identity.model = model?.id;
+        identity.modelParams = {
+          api: model?.api,
+          baseUrl: model?.baseUrl,
+          thinkingLevel: state.thinkingLevel,
+          contextWindow: model?.contextWindow,
+          maxTokens: model?.maxTokens,
+          reasoning: model?.reasoning,
+        };
+      } catch {
+        // Local runtime / Pi not spawned yet — identity stays empty.
+      }
+    }
+
+    const prompt = this.buildPromptManifest();
+
+    let tools: RunManifestTool[] = [];
+    try {
+      const result = await this.kernel.getTools();
+      if (result.ok) {
+        const byToolName = new Map(this.registry.list().map((cap) => [cap.toolName, cap.id]));
+        tools = result.data.map((tool) => ({
+          name: tool.name,
+          capability: byToolName.get(tool.name),
+          enabled: true,
+        }));
+      }
+    } catch {
+      tools = [];
+    }
+
+    const routing = await this.connectionStore.getRouting(DEFAULT_PROVIDER_ROUTING);
+    const primaryConfig = routing.primary
+      ? await this.connectionStore.getConfig(routing.primary)
+      : undefined;
+
+    const search: RunManifestSearch = {
+      providerId: routing.primary,
+      routing: { primary: routing.primary, fallback: routing.fallback },
+      configured: routing.primary ? primaryConfig?.enabled !== false : false,
+      endpoint: primaryConfig?.endpoint ?? undefined,
+    };
+
+    const featureFlags: RunManifestFeatureFlags = {
+      demoData: this.demoData,
+      runtimeProvider: readAgentProvider(),
+      evalTracing: this.evaluationSettings.tracingEnabled,
+      langfuseTracing: this.evaluationSettings.langfuseTracingEnabled,
+      privacyLevel: this.evaluationSettings.privacyLevel,
+    };
+
+    return {
+      runtimeMode,
+      appVersion: app.getVersion(),
+      buildVersion: app.getVersion(),
+      gitRevision: process.env.FOLIO_GIT_REVISION ?? process.env.BUILD_REVISION ?? undefined,
+      ...identity,
+      prompt,
+      tools,
+      search,
+      featureFlags,
+      locale: await this.effectiveRunLocale(),
+    };
+  }
+
+  /**
+   * Hash the *composition* of the system/developer prompt: which skills are
+   * enabled and when they last changed. Toggling or updating a skill changes
+   * the hash, so two runs with different prompt compositions diff cleanly.
+   * The app version is recorded as the template `version` (the prompt template
+   * ships with Folio).
+   */
+  private buildPromptManifest(): RunManifestPrompt {
+    const enabled = this.skillHub
+      .listSkills()
+      .filter((skill) => skill.metadata.enabled)
+      .map((skill) => `${skill.id}:${skill.metadata.updatedAt ?? 0}`)
+      .sort()
+      .join('|');
+    const hash = createHash('sha256').update(`skills|${enabled}`).digest('hex');
+    return { hash, version: currentFolioVersion() ?? undefined, source: 'skill-index' };
+  }
+
   async cancelRun(input: unknown): Promise<void> {
     const request = requireObject(input);
     await this.kernel.runs.cancelRun(
       requireString(request.sessionId, 'sessionId'),
       requireString(request.runId, 'runId')
     );
+  }
+
+  // -- Run manifests (#21) ---------------------------------------------------
+
+  /** Immutable run-config snapshot for a copilot run, or undefined if absent. */
+  async getRunManifest(input: unknown): Promise<RunManifest | undefined> {
+    const request = requireObject(input);
+    const sessionId = requireString(request.sessionId, 'sessionId');
+    const runId = requireString(request.runId, 'runId');
+    const runs = await this.kernel.sessions.listRuns(sessionId);
+    return runs.find((run) => run.id === runId)?.manifest;
+  }
+
+  /** Pretty-printed, secret-redacted JSON export of a copilot run manifest. */
+  async exportRunManifest(input: unknown): Promise<string | undefined> {
+    const manifest = await this.getRunManifest(input);
+    return manifest ? exportRunManifest(manifest) : undefined;
+  }
+
+  /** Structured diff between two copilot run manifests. */
+  async compareRunManifests(input: unknown): Promise<RunManifestDiff> {
+    const request = requireObject(input);
+    const sessionId = requireString(request.sessionId, 'sessionId');
+    const aId = requireString(request.runIdA, 'runIdA');
+    const bId = requireString(request.runIdB, 'runIdB');
+    const runs = await this.kernel.sessions.listRuns(sessionId);
+    const before = runs.find((run) => run.id === aId)?.manifest;
+    const after = runs.find((run) => run.id === bId)?.manifest;
+    if (!before || !after) {
+      throw createCodeError('RUN_MANIFEST_NOT_FOUND', 'Both runs must have a manifest to compare.');
+    }
+    return diffRunManifests(before, after);
+  }
+
+  /** Immutable run-config snapshot for a Deep Research run, or undefined. */
+  async getResearchManifest(input: unknown): Promise<RunManifest | undefined> {
+    const request = requireObject(input);
+    const runId = requireString(request.runId, 'runId');
+    return (await this.researchService.getRun(runId))?.manifest;
+  }
+
+  /** Structured diff between two Deep Research run manifests. */
+  async compareResearchManifests(input: unknown): Promise<RunManifestDiff> {
+    const request = requireObject(input);
+    const aId = requireString(request.runIdA, 'runIdA');
+    const bId = requireString(request.runIdB, 'runIdB');
+    const before = (await this.researchService.getRun(aId))?.manifest;
+    const after = (await this.researchService.getRun(bId))?.manifest;
+    if (!before || !after) {
+      throw createCodeError('RUN_MANIFEST_NOT_FOUND', 'Both runs must have a manifest to compare.');
+    }
+    return diffRunManifests(before, after);
   }
 
   /** Stream Event replay（ADR 0001 §Reconnect）：按 lastSequence 补发或明确不可恢复。 */

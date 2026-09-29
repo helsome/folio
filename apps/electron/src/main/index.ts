@@ -138,6 +138,23 @@ ipcMain.handle('runs:stream-replay', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.streamReplay(input))
 );
 
+// #21: immutable run manifests for Agent / Deep Research runs.
+ipcMain.handle('runs:getManifest', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.getRunManifest(input))
+);
+ipcMain.handle('runs:exportManifest', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.exportRunManifest(input))
+);
+ipcMain.handle('runs:compareManifests', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.compareRunManifests(input))
+);
+ipcMain.handle('research:getManifest', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.getResearchManifest(input))
+);
+ipcMain.handle('research:compareManifests', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.compareResearchManifests(input))
+);
+
 ipcMain.handle('agent:getTools', async () =>
   toIpcResult(() => agentKernelHost.getTools())
 );
