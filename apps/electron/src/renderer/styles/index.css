@@ -1393,7 +1393,6 @@ button:disabled { cursor: not-allowed; }
   line-height: 1.15;
 }
 
-.folio-thesis-subtitle,
 .folio-compare-subtitle {
   margin-top: .35rem;
   max-width: 38rem;
