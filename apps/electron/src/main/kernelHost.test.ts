@@ -332,6 +332,7 @@ mock.module('@finagent/shared', () => ({
     groups: { model: false, prompt: false, tools: false, config: false, versions: false },
   }),
   exportRunManifest: (manifest: unknown) => JSON.stringify(manifest, null, 2),
+  manifestToLangfuseMetadata: (manifest: { runId: string }) => ({ folioRunId: manifest.runId }),
   sanitizeSettings: (input: unknown) => input,
   embeddedDatasets: [],
 }));

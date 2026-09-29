@@ -80,7 +80,7 @@ import type {
   ToolCallRecord,
   TraceReference,
 } from '@finagent/core';
-import { DEFAULT_INSTRUMENT_CATALOG, InstrumentResolver, STRATEGY_IDS } from '@finagent/core';
+import { AGENT_WORKFLOW_ID, DEFAULT_INSTRUMENT_CATALOG, InstrumentResolver, STRATEGY_IDS } from '@finagent/core';
 import { isLocalePreference } from '@finagent/i18n';
 import { createAppPreferencesService, type AppPreferencesService } from './app-preferences.ts';
 import { buildImpactPrompt, buildRiskSummaryPrompt, buildSynthesisPrompt } from './research-prompts.ts';
@@ -154,6 +154,7 @@ import {
   EvaluationRedactor,
   diffRunManifests,
   exportRunManifest,
+  manifestToLangfuseMetadata,
   PiRuntimeAdapter,
   sanitizeSettings,
   embeddedDatasets,
@@ -461,6 +462,9 @@ export class AgentKernelHost {
       demoData,
       registry: new FinanceToolRegistry(this.registry),
       skillHub: this.skillHub,
+      // #21: every run snapshots the live config — including evaluation runs,
+      // which are started directly on the kernel by the experiment runner.
+      getRunManifestContext: () => this.buildRunManifestContext(),
       rpc: {
         cwd: getPiCwd(),
         requiredEnvKeys: readRequiredLlmEnvKeys(),
@@ -565,17 +569,15 @@ export class AgentKernelHost {
     // user explicitly requests another language in the prompt (spec §41–42).
     // Resolved after validation and with a safe fallback so a prefs failure
     // can never block an agent run (failure-isolation, spec §87).
-    // #21: assemble an immutable run-config snapshot and stamp it onto the run
-    // at creation. Manifest capture is best-effort — a failure here must never
-    // block an agent run (failure-isolation, spec §87).
-    const manifestContext = await this.buildRunManifestContext().catch(() => undefined);
+    // #21: the run's immutable config snapshot is assembled by the kernel from
+    // `getRunManifestContext` (wired in the constructor) at creation time, so
+    // every run entry point — this one and evaluation runs — snapshots the same
+    // settings. Capture is best-effort and never blocks the run (spec §87).
     return this.kernel.runs.startRun(
       requireString(request.sessionId, 'sessionId'),
       requireString(request.content, 'content'),
       workspaceContext,
-      await this.effectiveRunLocale(),
-      undefined,
-      manifestContext
+      await this.effectiveRunLocale()
     );
   }
 
@@ -673,6 +675,11 @@ export class AgentKernelHost {
       gitRevision: process.env.FOLIO_GIT_REVISION ?? process.env.BUILD_REVISION ?? undefined,
       ...identity,
       prompt,
+      // #21: name the workflow that drove the run. The Copilot agent path is not
+      // strategy-driven (unlike Deep Research, which overrides `id` with its
+      // `StrategyId`); recording the workflow id + shipping version keeps
+      // "which agent produced this?" answerable for a historical run.
+      strategy: { id: AGENT_WORKFLOW_ID, version: currentFolioVersion() ?? undefined },
       tools,
       search,
       featureFlags,
@@ -1632,6 +1639,27 @@ export class AgentKernelHost {
   }): Promise<import('@finagent/core').TraceReference | undefined> {
     if (!this.langfuseBackend) return undefined;
     try {
+      // #21 ↔ #14: derive the trace metadata from the run's immutable manifest
+      // so the Langfuse trace and the local manifest share one identity
+      // (`folioRunId` = trace id) and one config record (model/provider/
+      // strategy/prompt version), instead of the trace carrying a bare run id.
+      const manifest = await this.getRunManifest({
+        sessionId: input.sessionId,
+        runId: input.runId,
+      }).catch(() => undefined);
+      const metadata = manifest
+        ? manifestToLangfuseMetadata(manifest, {
+            sessionId: input.sessionId,
+            threadId: input.threadId,
+            runKind: 'normal',
+          })
+        : {
+            folioRunId: input.runId,
+            folioSessionId: input.sessionId,
+            threadId: input.threadId,
+            runKind: 'normal' as const,
+            folioVersion: currentFolioVersion(),
+          };
       const ref = await this.langfuseBackend.exportAgentRun({
         folioRunId: input.runId,
         sessionId: input.sessionId,
@@ -1642,13 +1670,7 @@ export class AgentKernelHost {
         output: input.answer,
         toolCalls: input.toolCalls,
         error: input.error,
-        metadata: {
-          folioRunId: input.runId,
-          folioSessionId: input.sessionId,
-          threadId: input.threadId,
-          runKind: 'normal',
-          folioVersion: currentFolioVersion(),
-        },
+        metadata,
       });
       if (ref.traceId) {
         const scores = scoresFromAgentRun({
@@ -1703,13 +1725,19 @@ export class AgentKernelHost {
         })),
         report: result.report,
         model: this.evaluationSettings.langfuseTracingEnabled ? 'folio-synthesizer' : undefined,
-        metadata: {
-          folioRunId: result.summary.id,
-          runKind: 'normal',
-          folioVersion: currentFolioVersion(),
-          symbol: result.summary.symbol,
-          strategyId: result.report?.strategyId,
-        },
+        // #21 ↔ #14: same run identity + config record as the persisted manifest.
+        metadata: result.summary.manifest
+          ? manifestToLangfuseMetadata(result.summary.manifest, {
+              runKind: 'normal',
+              symbol: result.summary.symbol,
+            })
+          : {
+              folioRunId: result.summary.id,
+              runKind: 'normal',
+              folioVersion: currentFolioVersion(),
+              symbol: result.summary.symbol,
+              strategyId: result.report?.strategyId,
+            },
       });
       const scores = scoresFromResearchReport(result.report, undefined, Math.max(0, finishedAt - result.summary.startedAt));
       if (ref.traceId && scores.length > 0) {
