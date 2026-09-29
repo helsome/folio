@@ -1,0 +1,17 @@
+{
+  "requested": "deepseek-flash",
+  "apiModel": "deepseek-flash",
+  "usage": {
+    "prompt_tokens": 6068,
+    "completion_tokens": 5440,
+    "total_tokens": 11508,
+    "prompt_tokens_details": {
+      "cached_tokens": 128
+    },
+    "completion_tokens_details": {
+      "reasoning_tokens": 3860
+    },
+    "prompt_cache_hit_tokens": 128,
+    "prompt_cache_miss_tokens": 5940
+  }
+}
