@@ -118,6 +118,10 @@ export {
   type RunawayState,
   type RunawayStep,
   type StopReason,
+  captureRunManifest,
+  redactManifestSecrets,
+  diffRunManifests,
+  exportRunManifest,
 } from './kernel/index.ts';
 export {
   LocalFinanceAgentBackend,

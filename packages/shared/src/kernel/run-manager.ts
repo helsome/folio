@@ -6,6 +6,8 @@ import type {
   ApiError,
   Message,
   Run,
+  RunManifestContext,
+  RunManifestRuntimeMode,
   SessionMeta,
   StreamEvent,
   TokenUsage,
@@ -38,6 +40,7 @@ import {
   type RunawayState,
 } from './runaway-detector.ts';
 import { buildFinancialEvidence } from '../evidence/financial-evidence.ts';
+import { captureRunManifest } from './run-manifest.ts';
 import { toStreamEvents } from './stream-event-adapter.ts';
 import { StreamEventHistory, type StreamReplayResult } from './stream-history.ts';
 import { StreamEventLog } from './stream-event-log.ts';
@@ -76,6 +79,13 @@ export interface RunManagerOptions {
   runaway?: Partial<RunawayPolicy>;
   /** Stream event log 目录（issue #75）：持久化 replay 历史，跨重启可用；缺省为纯内存。 */
   streamLogDir?: string;
+  /**
+   * Runtime mode used as the manifest fallback when a run is started without an
+   * explicit `manifestContext` (#21). The host always passes a full context
+   * (including `demo` when offline demo mode is on), so this only applies to
+   * internal/test runs that omit it.
+   */
+  runtimeMode?: RunManifestRuntimeMode;
 }
 
 interface ActiveRun {
@@ -126,6 +136,7 @@ export class RunManager {
   private readonly budgetInput: ResolveBudgetInput;
   private readonly searchToolPatterns: readonly string[];
   private readonly runawayPolicy: Partial<RunawayPolicy>;
+  private readonly defaultRuntimeMode: RunManifestRuntimeMode;
   private startingSessionId: string | null = null;
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly streamListeners = new Set<(sessionId: string, event: StreamEvent) => void>();
@@ -142,6 +153,7 @@ export class RunManager {
     this.budgetInput = options.budgets ?? {};
     this.searchToolPatterns = options.searchTools ?? [];
     this.runawayPolicy = options.runaway ?? {};
+    this.defaultRuntimeMode = options.runtimeMode ?? 'pi';
     // issue #75：可选持久化 —— 启动时从磁盘恢复历史，使 replay 跨重启可用；
     // 无目录或磁盘故障时降级为纯内存（实时链路不受影响）。
     const streamLog = options.streamLogDir ? new StreamEventLog(options.streamLogDir) : undefined;
@@ -198,7 +210,8 @@ export class RunManager {
     content: string,
     workspaceContext?: WorkspaceContext,
     locale?: SupportedLocale,
-    budgetOverrides?: RunBudgetLimits
+    budgetOverrides?: RunBudgetLimits,
+    manifestContext?: RunManifestContext
   ): Promise<Run> {
     const text = content.trim();
     if (!text) {
@@ -215,7 +228,7 @@ export class RunManager {
     // A failed start must release the reservation so the caller can retry.
     this.startingSessionId = sessionId;
     try {
-      return await this.prepareRun(sessionId, text, workspaceContext, locale, budgetOverrides);
+      return await this.prepareRun(sessionId, text, workspaceContext, locale, budgetOverrides, manifestContext);
     } finally {
       this.startingSessionId = null;
     }
@@ -226,7 +239,8 @@ export class RunManager {
     text: string,
     workspaceContext?: WorkspaceContext,
     locale?: SupportedLocale,
-    budgetOverrides?: RunBudgetLimits
+    budgetOverrides?: RunBudgetLimits,
+    manifestContext?: RunManifestContext
   ): Promise<Run> {
     const session = await this.sessions.getSession(sessionId);
     if (!session) {
@@ -241,6 +255,10 @@ export class RunManager {
       input: text,
       startedAt: now,
     };
+    // #21: snapshot the run configuration at creation. This is the only place
+    // the manifest is written — `execute` never mutates it, so a historical run
+    // always reflects the settings it was born with, not today's globals.
+    run.manifest = captureRunManifest(run, manifestContext ?? { runtimeMode: this.defaultRuntimeMode, tools: [] });
     await this.runs.create(run);
 
     const userMessage: Message = {

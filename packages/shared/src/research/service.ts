@@ -1,11 +1,12 @@
 import { randomUUID } from 'node:crypto';
 import type {
   CapabilityRegistry, ResearchExecutionIdentity, ResearchReport, ResearchRunSummary,
-  ResearchSynthesizer, StrategyId, SupportedLocale,
+  ResearchSynthesizer, Run, RunManifestContext, StrategyId, SupportedLocale,
 } from '@finagent/core';
 import { i18nCurrentLocale } from '@finagent/i18n';
 import { redact } from '../diagnostics/redact.ts';
 import { createCodeError } from '../agent/errors.ts';
+import { captureRunManifest } from '../kernel/run-manifest.ts';
 import { createUsage, resolveBudget, type ResolveBudgetInput } from '../kernel/run-budget.ts';
 import { isStrategyId } from '../strategies/presets.ts';
 import { buildCapabilityInput, planForStrategy } from './planner.ts';
@@ -24,6 +25,12 @@ export interface ResearchServiceOptions {
   onRunComplete?: (result: ResearchRunResult) => Promise<void> | void;
   getIdentity?: () => Promise<ResearchExecutionIdentity>;
   budgets?: ResolveBudgetInput;
+  /**
+   * Assembled run-config snapshot for the immutable manifest (#21). Called once
+   * at `start`; the service stamps it onto the `ResearchRunSummary`. Absent on
+   * runs started before the manifest feature, or when the host omits it.
+   */
+  getRunManifestContext?: () => RunManifestContext | Promise<RunManifestContext>;
 }
 
 interface ActiveRun {
@@ -80,6 +87,16 @@ export class ResearchService {
       completedCapabilities: [], failedCapabilities: [],
       strategyId, locale: locale ?? i18nCurrentLocale(), recoveryCount: 0,
     };
+    const manifestContext = await this.options.getRunManifestContext?.();
+    if (manifestContext) {
+      // The service knows the run's strategy; fold it into the assembled context
+      // so the persisted manifest records which workflow drove the research.
+      const merged: RunManifestContext = {
+        ...manifestContext,
+        strategy: { id: strategyId, ...manifestContext.strategy },
+      };
+      summary.manifest = captureRunManifest({ id: summary.id, startedAt: summary.startedAt } as Run, merged);
+    }
     const cp: ResearchCheckpoint = {
       version: CHECKPOINT_VERSION, summary, plan, outcomes: [], phase: 'fetching',
       identity: await this.identity(),
