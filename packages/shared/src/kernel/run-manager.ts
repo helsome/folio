@@ -6,7 +6,9 @@ import type {
   ApiError,
   Message,
   Run,
+  RunManifestBudget,
   RunManifestContext,
+  RunManifestContextPatch,
   RunManifestRuntimeMode,
   SessionMeta,
   StreamEvent,
@@ -86,6 +88,14 @@ export interface RunManagerOptions {
    * internal/test runs that omit it.
    */
   runtimeMode?: RunManifestRuntimeMode;
+  /**
+   * Base manifest context for every run that does not pass one explicitly
+   * (#21). The host wires this to its live settings so *all* run entry points —
+   * including evaluation runs started directly on the kernel — snapshot the
+   * same model/prompt/tool/search configuration instead of the empty fallback.
+   * A per-call `manifestContext` is merged on top of this base.
+   */
+  getRunManifestContext?: () => RunManifestContext | Promise<RunManifestContext>;
 }
 
 interface ActiveRun {
@@ -137,6 +147,7 @@ export class RunManager {
   private readonly searchToolPatterns: readonly string[];
   private readonly runawayPolicy: Partial<RunawayPolicy>;
   private readonly defaultRuntimeMode: RunManifestRuntimeMode;
+  private readonly getRunManifestContext?: () => RunManifestContext | Promise<RunManifestContext>;
   private startingSessionId: string | null = null;
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly streamListeners = new Set<(sessionId: string, event: StreamEvent) => void>();
@@ -154,6 +165,7 @@ export class RunManager {
     this.searchToolPatterns = options.searchTools ?? [];
     this.runawayPolicy = options.runaway ?? {};
     this.defaultRuntimeMode = options.runtimeMode ?? 'pi';
+    this.getRunManifestContext = options.getRunManifestContext;
     // issue #75：可选持久化 —— 启动时从磁盘恢复历史，使 replay 跨重启可用；
     // 无目录或磁盘故障时降级为纯内存（实时链路不受影响）。
     const streamLog = options.streamLogDir ? new StreamEventLog(options.streamLogDir) : undefined;
@@ -211,7 +223,7 @@ export class RunManager {
     workspaceContext?: WorkspaceContext,
     locale?: SupportedLocale,
     budgetOverrides?: RunBudgetLimits,
-    manifestContext?: RunManifestContext
+    manifestContext?: RunManifestContextPatch
   ): Promise<Run> {
     const text = content.trim();
     if (!text) {
@@ -234,13 +246,54 @@ export class RunManager {
     }
   }
 
+  /**
+   * Assemble the manifest context for a run (#21): the base context from
+   * `getRunManifestContext` (the host's live settings), overlaid with any
+   * per-call override, plus the *resolved* budget (#17) so the manifest records
+   * what the run actually obeyed.
+   *
+   * A base source that throws degrades to the fallback context rather than
+   * blocking the run (failure-isolation, spec §87).
+   */
+  private async resolveManifestContext(
+    override: RunManifestContextPatch | undefined,
+    budgetOverrides: RunBudgetLimits | undefined,
+    limits: RunBudgetLimits,
+    clamped: string[]
+  ): Promise<RunManifestContext> {
+    let base: RunManifestContext | undefined;
+    if (this.getRunManifestContext) {
+      try {
+        base = await this.getRunManifestContext();
+      } catch {
+        base = undefined;
+      }
+    }
+    const fallback: RunManifestContext = { runtimeMode: this.defaultRuntimeMode, tools: [] };
+    const merged: RunManifestContext = { ...fallback, ...base, ...override };
+
+    const { defaults, ceiling } = this.budgetInput;
+    const configured = defaults !== undefined || ceiling !== undefined || budgetOverrides !== undefined;
+    if (!configured && Object.keys(limits).length === 0) return merged;
+
+    const budget: RunManifestBudget = {
+      defaults,
+      ceiling,
+      overrides: budgetOverrides,
+      effective: limits,
+      clamped,
+    };
+    // The resolved budget is authoritative and always wins over a context-supplied one.
+    return { ...merged, budget };
+  }
+
   private async prepareRun(
     sessionId: string,
     text: string,
     workspaceContext?: WorkspaceContext,
     locale?: SupportedLocale,
     budgetOverrides?: RunBudgetLimits,
-    manifestContext?: RunManifestContext
+    manifestContext?: RunManifestContextPatch
   ): Promise<Run> {
     const session = await this.sessions.getSession(sessionId);
     if (!session) {
@@ -255,10 +308,22 @@ export class RunManager {
       input: text,
       startedAt: now,
     };
+    // #17: resolve the effective budget *before* persisting the run so the
+    // manifest records exactly what the run will obey (defaults → per-run
+    // overrides → system ceiling). Resolving first also fails loud on an
+    // invalid limit before a half-created run is written.
+    const { limits, clamped } = resolveBudget({
+      defaults: this.budgetInput.defaults,
+      ceiling: this.budgetInput.ceiling,
+      overrides: budgetOverrides,
+    });
     // #21: snapshot the run configuration at creation. This is the only place
     // the manifest is written — `execute` never mutates it, so a historical run
     // always reflects the settings it was born with, not today's globals.
-    run.manifest = captureRunManifest(run, manifestContext ?? { runtimeMode: this.defaultRuntimeMode, tools: [] });
+    run.manifest = captureRunManifest(
+      run,
+      await this.resolveManifestContext(manifestContext, budgetOverrides, limits, clamped)
+    );
     await this.runs.create(run);
 
     const userMessage: Message = {
@@ -270,11 +335,6 @@ export class RunManager {
     await this.sessions.appendMessage(sessionId, userMessage);
     await this.sessions.updateSession(sessionId, { status: 'running' });
 
-    const { limits } = resolveBudget({
-      defaults: this.budgetInput.defaults,
-      ceiling: this.budgetInput.ceiling,
-      overrides: budgetOverrides,
-    });
     const active: ActiveRun = {
       sessionId,
       runId: run.id,
