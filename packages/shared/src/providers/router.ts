@@ -226,7 +226,7 @@ export class ProviderRouter implements FinancialProviderRouter {
     // 1) Fresh cache short-circuit, consulted in routing order so the primary's
     //    fresh value always wins over the fallback's.
     if (this.cache) {
-      const cached = this.readFresh<T>(candidates, capabilityId, input);
+      const cached = await this.readFresh<T>(candidates, capabilityId, input);
       if (cached) return cached;
     }
 
@@ -296,7 +296,7 @@ export class ProviderRouter implements FinancialProviderRouter {
     // 3) Every live candidate failed: serve a STALE cache entry only as an
     //    explicit downgrade, never disguised as a live value (#25 AC).
     if (this.cache) {
-      const stale = this.readStale<T>(candidates, capabilityId, input, trail);
+      const stale = await this.readStale<T>(candidates, capabilityId, input, trail);
       if (stale) return stale;
     }
 
@@ -350,31 +350,34 @@ export class ProviderRouter implements FinancialProviderRouter {
     return { ...error, failoverTrail: trail.map((step) => ({ ...step })) };
   }
 
-  private readFresh<T>(
+  private async readFresh<T>(
     candidates: string[],
     capabilityId: CapabilityId,
     input: unknown
-  ): ProviderResult<T> | undefined {
+  ): Promise<ProviderResult<T> | undefined> {
     if (!this.cache) return undefined;
     for (const id of candidates) {
       const lookup = this.cache.get<T>(capabilityId, id, input);
       if (lookup.kind === 'fresh') {
+        // Cached responses must obey the same enablement gate as live requests.
+        if (this.isEnabled && !(await this.isEnabled(id))) continue;
         return { ok: true, data: lookup.record.data, provenance: { ...lookup.record.provenance } };
       }
     }
     return undefined;
   }
 
-  private readStale<T>(
+  private async readStale<T>(
     candidates: string[],
     capabilityId: CapabilityId,
     input: unknown,
     trail: ProviderFailoverStep[]
-  ): ProviderResult<T> | undefined {
+  ): Promise<ProviderResult<T> | undefined> {
     if (!this.cache) return undefined;
     for (const id of candidates) {
       const lookup = this.cache.get<T>(capabilityId, id, input);
       if (lookup.kind === 'stale') {
+        if (this.isEnabled && !(await this.isEnabled(id))) continue;
         // Explicit downgrade: keep the ACTUAL origin provider, force stale,
         // and attach the live-failure trail. A consumer can always tell this
         // is cached history, never a fresh quote.

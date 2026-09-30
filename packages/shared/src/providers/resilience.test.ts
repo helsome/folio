@@ -491,6 +491,106 @@ describe('ProviderRouter resilience integration (#25)', () => {
     expect(primary.calls).toBe(2);
   });
 
+  for (const [cacheState, elapsedMs] of [['fresh', 500], ['stale', 2000]] as const) {
+    it(`rejects a disabled provider's ${cacheState} cache`, async () => {
+      const clock = fakeClock();
+      let enabled = true;
+      const router = new ProviderRouter({
+        now: clock.now,
+        cache: { ttls: { quote: 1000 } },
+        isEnabled: async () => enabled,
+      });
+      const primary = new ScriptedProvider('primary', 'Primary', ['market.quote'], () =>
+        success('primary', { px: 100 })
+      );
+      router.register(primary);
+      router.setRouting({ primary: 'primary' });
+      const input = { symbol: 'AAPL.US' };
+      expect((await router.execute('market.quote', input)).ok).toBe(true);
+
+      enabled = false;
+      clock.advance(elapsedMs);
+      const result = await router.execute('market.quote', input);
+
+      expect(result).toMatchObject({ ok: false, error: { code: 'UNSUPPORTED_CAPABILITY' } });
+      expect(primary.calls).toBe(1);
+    });
+
+    it(`routes to a live fallback instead of a disabled provider's ${cacheState} cache`, async () => {
+      const clock = fakeClock();
+      let primaryEnabled = true;
+      const router = new ProviderRouter({
+        now: clock.now,
+        cache: { ttls: { quote: 1000 } },
+        isEnabled: async (id) => id !== 'primary' || primaryEnabled,
+      });
+      const primary = new ScriptedProvider('primary', 'Primary', ['market.quote'], () =>
+        success('primary', { px: 100 })
+      );
+      const fallback = new ScriptedProvider('fallback', 'Fallback', ['market.quote'], () =>
+        success('fallback', { px: 200 })
+      );
+      router.register(primary);
+      router.register(fallback);
+      router.setRouting({ primary: 'primary', fallback: 'fallback' });
+      const input = { symbol: 'AAPL.US' };
+      expect((await router.execute('market.quote', input)).ok).toBe(true);
+
+      primaryEnabled = false;
+      clock.advance(elapsedMs);
+      const result = await router.execute('market.quote', input);
+
+      expect(result).toMatchObject({
+        ok: true,
+        data: { px: 200 },
+        provenance: { providerId: 'fallback', stale: false },
+      });
+      expect(primary.calls).toBe(1);
+      expect(fallback.calls).toBe(1);
+    });
+
+    it(`skips a disabled primary's ${cacheState} cache in favor of an enabled fallback's cache`, async () => {
+      const clock = fakeClock();
+      const disabled = new Set<string>();
+      let live = true;
+      const router = new ProviderRouter({
+        now: clock.now,
+        cache: { ttls: { quote: 1000 } },
+        isEnabled: async (id) => !disabled.has(id),
+      });
+      const primary = new ScriptedProvider('primary', 'Primary', ['market.quote'], () =>
+        live ? success('primary', { px: 100 }) : failure('SERVICE_UNAVAILABLE')
+      );
+      const fallback = new ScriptedProvider('fallback', 'Fallback', ['market.quote'], () =>
+        live ? success('fallback', { px: 200 }) : failure('SERVICE_UNAVAILABLE')
+      );
+      router.register(primary);
+      router.register(fallback);
+      router.setRouting({ primary: 'primary', fallback: 'fallback' });
+      const input = { symbol: 'AAPL.US' };
+      expect((await router.execute('market.quote', input)).ok).toBe(true);
+      disabled.add('primary');
+      expect((await router.execute('market.quote', input)).ok).toBe(true);
+
+      live = false;
+      clock.advance(elapsedMs);
+      const result = await router.execute('market.quote', input);
+
+      expect(result).toMatchObject({
+        ok: true,
+        data: { px: 200 },
+        provenance: { providerId: 'fallback', stale: cacheState === 'stale' },
+      });
+      expect(primary.calls).toBe(1);
+      expect(fallback.calls).toBe(cacheState === 'stale' ? 2 : 1);
+      if (result.ok && cacheState === 'stale') {
+        expect(result.provenance.failoverTrail).toEqual([
+          expect.objectContaining({ providerId: 'fallback', code: 'SERVICE_UNAVAILABLE' }),
+        ]);
+      }
+    });
+  }
+
   it('downgrades to stale ONLY after every live provider fails, flagged stale with origin kept', async () => {
     const clock = fakeClock();
     const router = new ProviderRouter({
