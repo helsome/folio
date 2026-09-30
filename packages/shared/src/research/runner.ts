@@ -188,20 +188,26 @@ export class ResearchRunner {
     let synthesis: ResearchSynthesis;
     try {
       if (cp) await checkpoint(() => { cp.phase = 'synthesizing'; });
-      if (!cp?.synthesis) await request.beforeSynthesis?.();
+      if (!cp?.synthesis && request.beforeSynthesis) {
+        await withCancellation(signal, () => request.beforeSynthesis!());
+      }
       if (!cp?.synthesis) await charge('modelCalls');
-      synthesis = cp?.synthesis ?? await this.synthesizer.synthesize(
+      synthesis = cp?.synthesis ?? await withCancellation(signal, () => this.synthesizer.synthesize(
         { symbol, plannedCapabilities: plannedIds, runs, dataBundle,
           ...(cp ? { recovery: {
             runId, attempt: cp.retry.synthesisAttempts,
-            onAgentRun: (agentRunId: string, sessionId: string) => checkpoint(() => {
-              cp.events.push({ runId, parentRunId: runId, spanId: randomUUID(), type: 'synthesis',
-                at: this.now(), agentRunId, sessionId });
-            }),
+            onAgentRun: (agentRunId: string, sessionId: string) => {
+              if (signal?.aborted) return Promise.resolve();
+              return checkpoint(() => {
+                if (signal?.aborted) throw createCodeError('RESEARCH_CANCELLED', 'Research cancelled.');
+                cp.events.push({ runId, parentRunId: runId, spanId: randomUUID(), type: 'synthesis',
+                  at: this.now(), agentRunId, sessionId });
+              });
+            },
           } } : {}),
         },
         signal
-      );
+      ));
       // A section key identifies one report dimension; never append duplicates.
       synthesis = { ...synthesis, sections: [...new Map(synthesis.sections.map((section) => [section.key, section])).values()] };
       if (signal?.aborted) throw createCodeError('RESEARCH_CANCELLED', 'Research cancelled.');
@@ -212,7 +218,8 @@ export class ResearchRunner {
         const summary = await emit('cancelled', {
           finishedAt: this.now(),
           cancelled: true,
-          failedCapabilities: plannedIds,
+          completedCapabilities: successIds,
+          failedCapabilities: failedIds,
         });
         return { summary };
       }
@@ -250,6 +257,28 @@ export class ResearchRunner {
       failedCapabilities: failedIds,
     });
     return { summary, report };
+  }
+}
+
+/** Settle the caller on cancellation even if the model/preflight ignores its signal. */
+async function withCancellation<T>(signal: AbortSignal | undefined, work: () => Promise<T>): Promise<T> {
+  if (!signal) return work();
+  const cancelled = () => createCodeError('RESEARCH_CANCELLED', 'Research cancelled.');
+  if (signal.aborted) throw cancelled();
+  let onAbort!: () => void;
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(cancelled());
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  try {
+    // Register the listener before invoking work: it can abort synchronously.
+    // Promise.race also observes any rejection from work that arrives after cancel.
+    return await Promise.race([aborted, Promise.resolve().then(() => {
+      if (signal.aborted) throw cancelled();
+      return work();
+    })]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
   }
 }
 
