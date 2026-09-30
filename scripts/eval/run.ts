@@ -126,7 +126,7 @@ TRACE_TO_LANGSMITH + LANGSMITH_PI_API_KEY (live LangSmith tracing),
 LANGFUSE_TRACING + LANGFUSE_PUBLIC_KEY + LANGFUSE_SECRET_KEY (+ optional LANGFUSE_HOST),
 ANTHROPIC_API_KEY or FINAGENT_PROVIDER_OVERRIDES (live agent), FINAGENT_PI_VERSION.`;
 
-function parseFlags(argv: string[]): CliOptions {
+export function parseFlags(argv: string[]): CliOptions {
   const options: CliOptions = {
     smoke: false,
     dataset: 'folio-agent-v1',
@@ -1080,5 +1080,9 @@ async function loadCommittedBaseline(id: string): Promise<EvaluationBaseline | u
   }
 }
 
-const exitCode = await main();
-process.exit(exitCode);
+// Testable as a module (#114 chain test imports parseFlags without running
+// the CLI); executes only when invoked directly.
+if (import.meta.main) {
+  const exitCode = await main();
+  process.exit(exitCode);
+}
