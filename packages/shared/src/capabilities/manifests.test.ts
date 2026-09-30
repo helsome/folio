@@ -3,6 +3,7 @@ import { createMarketQuoteCapability } from './manifests/market-quote.ts';
 import { createMarketKlineCapability } from './manifests/market-kline.ts';
 import { createMarketIntradayCapability } from './manifests/market-intraday.ts';
 import { createResearchNewsCapability } from './manifests/research-news.ts';
+import { createMarketTradesCapability } from './manifests/phase-two.ts';
 import type { CapabilityFetchers } from './fetchers.ts';
 
 const quote = {
@@ -130,6 +131,18 @@ describe('provenance.marketTime is epoch milliseconds', () => {
             timestamp: SECOND_TS,
             symbols: ['AAPL.US'],
           },
+        ],
+      })
+    );
+    const result = await cap.execute({ symbol: 'AAPL.US' }, { now: () => 12345 });
+    expect(result.provenance.marketTime).toBe(SECOND_TS * 1000);
+  });
+
+  it('market.trades converts the latest tick timestamp from seconds', async () => {
+    const cap = createMarketTradesCapability(
+      fetchers({
+        getTrades: async () => [
+          { symbol: 'AAPL.US', timestamp: SECOND_TS, price: 200, volume: 20, direction: 'Up', type: 'I' },
         ],
       })
     );
