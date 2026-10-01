@@ -2257,12 +2257,28 @@ export class AgentKernelHost {
       const snapshot = await this.marketData.getPortfolio();
       const holdings = snapshot.holdings ?? [];
       const total = snapshot.totalAssets;
+      const baseCurrency = snapshot.baseCurrency?.trim().toUpperCase();
       portfolio = holdings
-        .filter((holding) => typeof holding.marketValue === 'number' && typeof total === 'number')
-        .map((holding) => ({
-          label: `${holding.symbol} · ${(((holding.marketValue ?? 0) / (total ?? 1)) * 100).toFixed(1)}% of portfolio`,
-          symbol: holding.symbol,
-        }));
+        .map((holding): BriefPortfolioSummary | undefined => {
+          // `marketValue` is denominated in the holding's own currency while
+          // `totalAssets` is base currency. Only a converted `marketValueBase`
+          // (or an unconverted value whose currency is known to match the
+          // base) may be divided by the total — same fail-closed rule as
+          // evaluatePositionWeight (alerts) and pulse portfolioExposurePercent.
+          const holdingCurrency = holding.currency?.trim().toUpperCase();
+          const sameCurrency = Boolean(
+            holdingCurrency && baseCurrency && holdingCurrency === baseCurrency
+          );
+          const value = holding.marketValueBase ?? (sameCurrency ? holding.marketValue : undefined);
+          if (typeof value !== 'number' || typeof total !== 'number' || total <= 0) {
+            return undefined;
+          }
+          return {
+            label: `${holding.symbol} · ${((value / total) * 100).toFixed(1)}% of portfolio`,
+            symbol: holding.symbol,
+          };
+        })
+        .filter((item): item is BriefPortfolioSummary => item !== undefined);
     } catch {
       // No portfolio — brief renders without the portfolio section.
     }

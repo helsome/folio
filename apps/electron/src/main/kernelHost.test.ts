@@ -5,11 +5,14 @@ import type { AgentEvent, AutomationRule } from '@finagent/core';
 let lastKernelOptions: Record<string, unknown> | null = null;
 let lastMarketData: FakeMarketDataService | null = null;
 let lastAutomationContext: unknown = null;
+let lastBriefPortfolio: unknown = null;
 let forwardedEvents: unknown[] = [];
 const routerFetchers = { getQuote: async () => ({ symbol: 'AAPL.US' }) };
 
 class FakeMarketDataService {
   quoteSymbols: string[] = [];
+  /** When set, returned by getPortfolio() instead of the default snapshot. */
+  portfolioOverride: Record<string, unknown> | null = null;
   constructor(readonly options?: { fetchers?: unknown }) {}
 
   async getQuote(symbol: string) {
@@ -22,6 +25,7 @@ class FakeMarketDataService {
   }
 
   async getPortfolio() {
+    if (this.portfolioOverride) return this.portfolioOverride;
     return {
       totalAssets: 1000,
       cash: 100,
@@ -209,6 +213,7 @@ mock.module('@finagent/shared', () => ({
   SCREENING_STRATEGIES: [],
   ResearchDiffRepository: class {
     save = async () => undefined;
+    list = async () => [];
     getBySymbol = async () => undefined;
   },
   ManualPortfolioRepository: class {
@@ -243,12 +248,15 @@ mock.module('@finagent/shared', () => ({
     list = async () => [];
     record = async () => undefined;
   },
-  buildBrief: () => ({
-    generatedAt: 0,
-    items: [],
-    summary: '',
-    quiet: { count: 0, message: '' },
-  }),
+  buildBrief: (inputs: { portfolio?: unknown }) => {
+    lastBriefPortfolio = inputs.portfolio;
+    return {
+      generatedAt: 0,
+      items: [],
+      summary: '',
+      quiet: { count: 0, message: '' },
+    };
+  },
   runAutomation: async (_rule: unknown, context: unknown) => {
     lastAutomationContext = context;
     return {
@@ -351,6 +359,7 @@ beforeEach(() => {
   lastKernelOptions = null;
   lastMarketData = null;
   lastAutomationContext = null;
+  lastBriefPortfolio = null;
   forwardedEvents = [];
 });
 
@@ -519,6 +528,32 @@ describe('AgentKernelHost', () => {
       ok: false,
       error: expect.objectContaining({ code: 'INVALID_ARGUMENT' }),
     });
+    host.dispose();
+  });
+
+  it('labels brief portfolio exposure from base-currency-comparable values only', async () => {
+    const host = new AgentKernelHost();
+    // USD book of 100,000 holding Tencent in HKD: an unconverted 780,000 HKD
+    // marketValue must never be divided by the base-currency total.
+    lastMarketData!.portfolioOverride = {
+      baseCurrency: 'USD',
+      totalAssets: 100_000,
+      accounts: [],
+      fetchedAt: 1_700_000_000_000,
+      holdings: [
+        { symbol: '0700.HK', name: 'Tencent', currency: 'HKD', marketValue: 780_000 },
+        { symbol: 'AAPL.US', name: 'Apple Inc.', currency: 'USD', marketValue: 10_000 },
+        { symbol: 'NVDA.US', name: 'NVIDIA', currency: 'USD', marketValueBase: 12_400, marketValue: 12_400 },
+      ],
+    };
+
+    await host.automationBuildBrief();
+
+    const portfolio = lastBriefPortfolio as Array<{ symbol?: string; label: string }>;
+    expect(portfolio.map((item) => item.label)).toEqual([
+      'AAPL.US · 10.0% of portfolio',
+      'NVDA.US · 12.4% of portfolio',
+    ]);
     host.dispose();
   });
 });
