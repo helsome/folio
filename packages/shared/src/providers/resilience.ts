@@ -82,6 +82,11 @@ const CODE_KIND_TABLE: Record<string, FailureKind> = {
   AUTH_EXPIRED: 'auth',
   UNAUTHORIZED: 'auth',
   FORBIDDEN: 'auth',
+  // HTTP 403 codes: the same authorization class as FORBIDDEN. The Massive
+  // adapter already emits ACCESS_DENIED for "plan does not include access",
+  // so it belongs in this table rather than falling through to 'unknown'.
+  ACCESS_DENIED: 'auth',
+  PERMISSION_DENIED: 'auth',
   AUTH_CONFIG: 'auth',
   CONFIG_ERROR: 'auth',
   INVALID_CREDENTIAL: 'auth',
