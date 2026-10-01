@@ -436,6 +436,41 @@ describe('AgentKernelHost', () => {
     host.dispose();
   });
 
+  it('rejects malformed automation rules before they reach persistence', async () => {
+    const host = new AgentKernelHost();
+    const valid: AutomationRule = {
+      id: 'daily-review',
+      type: 'watchlist-daily-review',
+      enabled: true,
+      hour: 16.5,
+      days: [1, 2, 3, 4, 5],
+      symbols: ['AAPL.US'],
+      strategyId: 'comprehensive',
+      notify: 'material-only',
+      createdAt: 1_700_000_000_000,
+    };
+    const invalidRules: unknown[] = [
+      { ...valid, id: '   ' },
+      { ...valid, type: 'monthly-review' },
+      { ...valid, enabled: 'yes' },
+      { ...valid, notify: 'sometimes' },
+      { ...valid, createdAt: Number.NaN },
+      { ...valid, hour: 24 },
+      { ...valid, days: [1, 7] },
+      { ...valid, days: [1, 1] },
+      { ...valid, symbols: [''] },
+      { ...valid, strategyId: 'unknown-strategy' },
+    ];
+
+    for (const rule of invalidRules) {
+      await expect(host.automationSaveRule({ rule })).rejects.toMatchObject({
+        code: 'AUTOMATION_RULE_INVALID',
+      });
+    }
+    await expect(host.automationSaveRule({ rule: valid })).resolves.toBeUndefined();
+    host.dispose();
+  });
+
   it('forwards kernel agent events to the attached window', async () => {
     let subscriber: ((event: AgentEvent) => void) | null = null;
     fakeRuns.subscribe = (listener) => {
