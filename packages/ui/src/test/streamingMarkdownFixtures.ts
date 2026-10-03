@@ -7,7 +7,13 @@ export interface StreamingMarkdownFixture {
   name: string;
   partial: string;
   complete: string;
+  /** Text that must already be visible while the block is still streaming. */
   stableText: string;
+  /**
+   * Selector that must already match in the partial frame. Omitted for
+   * fragments that only become structural once the stream closes them.
+   */
+  partialSelector?: string;
 }
 
 export const STREAMING_MARKDOWN_FIXTURES: StreamingMarkdownFixture[] = [
@@ -16,18 +22,21 @@ export const STREAMING_MARKDOWN_FIXTURES: StreamingMarkdownFixture[] = [
     partial: '## Example\n\n```ts\nconst margin = 0.21;\n',
     complete: '## Example\n\n```ts\nconst margin = 0.21;\n```',
     stableText: 'const margin',
+    partialSelector: 'pre code',
   },
   {
     name: 'unclosed GFM table',
     partial: '| Metric | Value |\n| --- | ---: |\n| Revenue | 12,400',
     complete: '| Metric | Value |\n| --- | ---: |\n| Revenue | 12,400 |',
     stableText: '12,400',
+    partialSelector: 'table tbody tr',
   },
   {
     name: 'unclosed ordered list',
     partial: '1. Revenue growth\n2. Operating margin\n3.',
     complete: '1. Revenue growth\n2. Operating margin\n3. Free cash flow',
     stableText: 'Operating margin',
+    partialSelector: 'ol li',
   },
   {
     name: 'unclosed link',
@@ -46,6 +55,7 @@ export const STREAMING_MARKDOWN_FIXTURES: StreamingMarkdownFixture[] = [
     partial: '> Analyst note: fiscal Q4 beat estimates on\n> revenue and margin',
     complete: '> Analyst note: fiscal Q4 beat estimates on\n> revenue and margin.',
     stableText: 'Analyst note',
+    partialSelector: 'blockquote',
   },
 ];
 
@@ -53,6 +63,11 @@ export const STREAMING_MARKDOWN_FIXTURES: StreamingMarkdownFixture[] = [
  * A long agent-style answer with the mix #28 lists: headings, tables, lists,
  * blockquotes, code, links, citation-style references, and hostile HTML/URLs
  * that must never execute or become clickable.
+ *
+ * The hostile raw-HTML lines are separated from the links by blank lines: a
+ * tag like `<img>` opens a CommonMark HTML block that would otherwise swallow
+ * the following link lines as inert text, leaving the URL assertions with
+ * nothing to catch.
  */
 export const LONG_ANSWER_MARKDOWN = `# Quarterly Investment Review
 
@@ -98,9 +113,10 @@ and [source 2](https://example.com/rates) for the original analysis.
 ## Hostile Fragment
 
 <script>alert(1)</script>
+
 <img src="x" onerror="alert(1)">
-[Unsafe](javascript:alert(1))
-[Phish](//evil.example)
+
+[Safe](https://example.com/safe) [Unsafe](javascript:alert(1)) [Phish](//evil.example)
 
 ## Evidence
 
