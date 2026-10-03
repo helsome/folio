@@ -37,6 +37,7 @@ import { TraceCorrelationService } from '../../packages/shared/src/evaluation/co
 import { createJudgeClient, resolveJudgeConfigStatus } from '../../packages/shared/src/evaluation/judge-client.ts';
 import { embeddedDatasets } from '../../packages/shared/src/evaluation/datasets/index.ts';
 import { getLongBridgeStatus } from '../../packages/longbridge-tools/src/status.ts';
+import { selectCases } from './select-cases.ts';
 import { formatPreflight, runLivePreflight, type PreflightResult } from './preflight.ts';
 import { validateGoldCaseDataset } from '../../packages/core/src/evaluation.ts';
 import {
@@ -49,7 +50,6 @@ import { normalizeModelSelection } from '../../packages/shared/src/evaluation/mo
 import { EVALUATION_METRICS } from '../../packages/core/src/index.ts';
 import type {
   EvaluationBaseline,
-  EvaluationCase,
   EvaluationDataset,
   EvaluationGoldDataset,
   EvaluationExperiment,
@@ -83,6 +83,8 @@ interface CliOptions {
   judgeBaseUrl?: string;
   maxCases?: number;
   timeoutMs?: number;
+  caseIds?: string[];
+  tags?: string[];
   baseline?: string;
   saveBaseline?: string;
   out?: string;
@@ -108,6 +110,10 @@ Flags:
   --judge-api-key <key>   Judge API key (or FINAGENT_JUDGE_API_KEY)
   --judge-base-url <url>  Judge endpoint override
   --max-cases <n>         Run only the first n cases (deterministic)
+  --case <id>             Run only the named case id (repeatable; takes
+                          precedence over --smoke)
+  --tag <tag>             Run only cases carrying the tag (repeatable; a case
+                          matches any of the tags)
   --timeout-ms <n>        Per-run wall-clock budget (default 120000)
   --baseline <id>         Gate the run against a stored baseline
   --save-baseline <name>  Store the run's aggregates as a new baseline
@@ -245,6 +251,22 @@ function parseFlags(argv: string[]): CliOptions {
           if (!Number.isFinite(options.maxCases) || options.maxCases <= 0) {
             throw new Error(`Invalid --max-cases ${next}; expected a positive integer.`);
           }
+          index += 1;
+        }
+        break;
+      }
+      case '--case': {
+        const next = value(name, index);
+        if (next !== undefined) {
+          options.caseIds = [...(options.caseIds ?? []), next];
+          index += 1;
+        }
+        break;
+      }
+      case '--tag': {
+        const next = value(name, index);
+        if (next !== undefined) {
+          options.tags = [...(options.tags ?? []), next];
           index += 1;
         }
         break;
@@ -578,24 +600,6 @@ function createFixtureFetchers(now: () => number): MarketDataFetchers {
   };
 }
 
-// ── Dataset selection ──────────────────────────────────────────────────────
-
-/** Smoke subset (spec §70): all regression cases + golden cases until ~15. */
-function selectCases(dataset: EvaluationDataset, smoke: boolean, maxCases: number | undefined): EvaluationCase[] {
-  let cases = dataset.cases;
-  if (smoke) {
-    const regression = dataset.cases.filter((caseItem) => caseItem.difficulty === 'regression');
-    const golden = dataset.cases.filter((caseItem) => caseItem.difficulty === 'golden');
-    const target = 15;
-    const goldenBudget = Math.max(0, target - regression.length);
-    cases = [...regression, ...golden.slice(0, goldenBudget)].slice(0, target);
-  }
-  if (typeof maxCases === 'number' && maxCases > 0) {
-    return cases.slice(0, Math.floor(maxCases));
-  }
-  return cases;
-}
-
 // ── Reporting ──────────────────────────────────────────────────────────────
 
 function printCaseTable(
@@ -776,7 +780,10 @@ async function main(): Promise<number> {
       return 1;
     }
   }
-  const cases = selectCases(dataset, options.smoke, options.maxCases);
+  const cases = selectCases(dataset, options.smoke, options.maxCases, {
+    caseIds: options.caseIds,
+    tags: options.tags,
+  });
   if (cases.length === 0) {
     console.error('No cases selected.');
     return 1;
