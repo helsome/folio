@@ -1,8 +1,8 @@
 /** Deterministic, provider-neutral reconciliation of financial facts. */
 export type ReconciliationState = 'agreement'|'within-tolerance'|'material-conflict'|'incomparable'|'insufficient-sources';
-export interface FinancialFactCandidate { provider:string; value:number; asOf?:number; period?:string; currency?:string; unit?:string; adjustment?:string; }
+export interface FinancialFactCandidate { provider:string; instrument?:string; value:number; asOf?:number; period?:string; currency?:string; unit?:string; adjustment?:string; }
 export interface ReconciliationPolicy { version:string; absoluteTolerance?:number; relativeTolerance?:number; providerPriority?:string[]; }
-export interface ReconciliationResult { state:ReconciliationState; candidates:FinancialFactCandidate[]; selected?:FinancialFactCandidate; discrepancy?:number; reason:string; policyVersion:string; sourceCount:number; selectedReason?:string; }
+export interface ReconciliationResult { state:ReconciliationState; candidates:FinancialFactCandidate[]; selected?:FinancialFactCandidate; discrepancy?:number; reason:string; policyVersion:string; sourceCount?:number; selectedReason?:string; }
 export function reconcileFinancialFacts(candidates:FinancialFactCandidate[], policy:ReconciliationPolicy):ReconciliationResult {
  const base={candidates:[...candidates],policyVersion:policy.version};
  if(candidates.length<2)return {...base,state:'insufficient-sources',sourceCount:candidates.length,reason:'At least two provider candidates are required.'};
