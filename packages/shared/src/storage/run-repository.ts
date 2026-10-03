@@ -1,5 +1,6 @@
 import type { Run } from '@finagent/core';
 import type { JsonFileStore } from './json-file-store.ts';
+import { withWriteLock } from './write-lock.ts';
 
 interface RunsFile {
   runs: Run[];
@@ -28,19 +29,23 @@ export class RunRepository {
   }
 
   async create(run: Run): Promise<void> {
-    const file = await this.store.read<RunsFile>(this.fileFor(run.sessionId), { runs: [] });
-    file.runs.push(run);
-    await this.store.write(this.fileFor(run.sessionId), file);
+    await withWriteLock(this.store.resolve(this.fileFor(run.sessionId)), async () => {
+      const file = await this.store.read<RunsFile>(this.fileFor(run.sessionId), { runs: [] });
+      file.runs.push(run);
+      await this.store.write(this.fileFor(run.sessionId), file);
+    });
   }
 
   async update(run: Run): Promise<void> {
-    const file = await this.store.read<RunsFile>(this.fileFor(run.sessionId), { runs: [] });
-    const index = file.runs.findIndex((existing) => existing.id === run.id);
-    if (index >= 0) {
-      file.runs[index] = run;
-    } else {
-      file.runs.push(run);
-    }
-    await this.store.write(this.fileFor(run.sessionId), file);
+    await withWriteLock(this.store.resolve(this.fileFor(run.sessionId)), async () => {
+      const file = await this.store.read<RunsFile>(this.fileFor(run.sessionId), { runs: [] });
+      const index = file.runs.findIndex((existing) => existing.id === run.id);
+      if (index >= 0) {
+        file.runs[index] = run;
+      } else {
+        file.runs.push(run);
+      }
+      await this.store.write(this.fileFor(run.sessionId), file);
+    });
   }
 }

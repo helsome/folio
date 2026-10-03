@@ -1,5 +1,6 @@
 import type { Message } from '@finagent/core';
 import type { JsonFileStore } from './json-file-store.ts';
+import { withWriteLock } from './write-lock.ts';
 
 interface MessagesFile {
   messages: Message[];
@@ -23,9 +24,11 @@ export class MessageRepository {
   }
 
   async append(sessionId: string, message: Message): Promise<Message[]> {
-    const file = await this.store.read<MessagesFile>(this.fileFor(sessionId), { messages: [] });
-    file.messages.push(message);
-    await this.store.write(this.fileFor(sessionId), file);
-    return file.messages;
+    return withWriteLock(this.store.resolve(this.fileFor(sessionId)), async () => {
+      const file = await this.store.read<MessagesFile>(this.fileFor(sessionId), { messages: [] });
+      file.messages.push(message);
+      await this.store.write(this.fileFor(sessionId), file);
+      return file.messages;
+    });
   }
 }
