@@ -93,6 +93,7 @@ export const agent = {
   },
   citation: {
     open: '打开来源检查器',
+    openSource: '在检查器中打开来源 {{id}}',
     unresolved: '来源待定或不可用',
   },
   sources: {

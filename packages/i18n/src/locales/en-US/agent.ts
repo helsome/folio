@@ -93,6 +93,7 @@ export const agent = {
   },
   citation: {
     open: 'Open source inspector',
+    openSource: 'Open source {{id}} in inspector',
     unresolved: 'Source pending or unavailable',
   },
   sources: {

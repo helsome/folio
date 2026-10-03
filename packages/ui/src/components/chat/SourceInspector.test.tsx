@@ -78,6 +78,11 @@ describe('AnswerContent citations', () => {
     expect(chip).not.toBeNull();
     expect(chip?.getAttribute('data-citation-resolved')).toBe('true');
     expect(chip?.textContent).toBe('1');
+    expect(chip?.tagName).toBe('BUTTON');
+    expect(chip?.getAttribute('type')).toBe('button');
+    expect(chip?.getAttribute('aria-haspopup')).toBe('dialog');
+    expect(chip?.getAttribute('aria-label')).toContain('get_quote-1');
+    expect((chip as HTMLElement).tabIndex).toBeGreaterThanOrEqual(0);
     await act(async () => {
       chip?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
     });
@@ -139,5 +144,43 @@ describe('SourceInspector', () => {
     const container = await renderElement(<SourceInspector message={message} onClose={() => {}} />);
     expect(container.textContent).toContain('get_news-1');
     expect(container.querySelector('[data-testid="source-details"]')?.textContent).not.toContain('fe_');
+  });
+
+  it('marks the selected source row and exposes snapshot disclosure state', async () => {
+    const container = await renderElement(<SourceInspector message={MESSAGE} onClose={() => {}} />);
+    const row = container.querySelector('[data-source-id="get_quote-1"]');
+    expect(row?.getAttribute('aria-current')).toBe('true');
+
+    const snapshotToggle = container.querySelector(
+      '[data-testid="source-snapshot-toggle"]'
+    );
+    expect(snapshotToggle?.getAttribute('aria-expanded')).toBe('false');
+    await act(async () => {
+      (snapshotToggle as HTMLElement).click();
+    });
+    expect(snapshotToggle?.getAttribute('aria-expanded')).toBe('true');
+    expect(container.querySelector('#source-snapshot')).not.toBeNull();
+  });
+
+  it('moves aria-current when the user selects another source row', async () => {
+    const message: Message = {
+      ...MESSAGE,
+      toolCalls: [
+        { id: 'get_news-1', toolName: 'get_news', args: {}, startedAt: 1, status: 'success' },
+        { id: 'get_filing-1', toolName: 'get_filing_document', args: {}, startedAt: 2, status: 'success' },
+      ],
+      financialEvidence: undefined,
+    };
+    const container = await renderElement(<SourceInspector message={message} onClose={() => {}} />);
+    const first = container.querySelector('[data-source-id="get_news-1"]');
+    const second = container.querySelector('[data-source-id="get_filing-1"]');
+    expect(first?.getAttribute('aria-current')).toBe('true');
+    expect(second?.getAttribute('aria-current')).toBeNull();
+
+    await act(async () => {
+      second?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    expect(second?.getAttribute('aria-current')).toBe('true');
+    expect(first?.getAttribute('aria-current')).toBeNull();
   });
 });
