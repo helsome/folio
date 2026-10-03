@@ -273,7 +273,7 @@ export class AgentKernelHost {
   private readonly automationRules: AutomationRuleRepository;
   private readonly automationRuns: AutomationRunRepository;
   private automationTimer: ReturnType<typeof setInterval> | null = null;
-  private readonly lastAutomationRunByRule = new Map<string, string>();
+  private readonly claimedAutomationOccurrenceByRule = new Map<string, string>();
   private readonly thesisRepository: ThesisRepository;
   private readonly thesisService: ThesisService;
   private readonly alertRepository: AlertRuleRepository;
@@ -2357,13 +2357,14 @@ export class AgentKernelHost {
       const now = Date.now();
       const todayKey = new Date(now).toDateString();
       for (const rule of runDue(rules, now)) {
-        if (this.lastAutomationRunByRule.get(rule.id) === todayKey) continue;
+        if (this.claimedAutomationOccurrenceByRule.get(rule.id) === todayKey) continue;
+        this.claimedAutomationOccurrenceByRule.set(rule.id, todayKey);
         try {
+          if (!(await this.automationRuns.claimScheduledOccurrence(rule.id, todayKey))) continue;
           const run = await this.executeAutomation(rule);
           await this.automationRuns.record(run);
-          this.lastAutomationRunByRule.set(rule.id, todayKey);
         } catch {
-          // A failing rule never blocks the other rules.
+          // The occurrence remains claimed; retry on its next scheduled date.
         }
       }
     } catch {
