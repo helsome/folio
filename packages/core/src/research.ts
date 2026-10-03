@@ -27,16 +27,49 @@ export type ResearchVerdict = 'positive' | 'negative' | 'neutral' | 'unavailable
  * underlying fact. LLM prose is never the source of truth — evidence is.
  */
 export interface EvidenceRef {
+  /**
+   * Stable identity inside the report. Derived from the producing run and
+   * capability rather than from array position, so it survives report assembly,
+   * persistence, reload and export unchanged. Optional because reports written
+   * before claim linking existed omit it — readers derive the same value from
+   * `runId` + `capabilityId` for those.
+   */
+  id?: string;
   capabilityId: string;
   /** CapabilityRunRecord.id of the run this evidence comes from. */
   runId: string;
   /** The claim this evidence supports, e.g. "NVDA valuation is expensive". */
   claim: string;
+  /**
+   * Id of the `ResearchClaim` this evidence backs: the evidence → claim
+   * direction of the mapping. The reverse direction lives in
+   * `ResearchClaim.evidenceRefs`, so the relation can be walked both ways.
+   */
+  claimId?: string;
   fetchedAt: number;
   /** Short factual summary of the data point (from CapabilityResult.summary). */
   summary?: string;
   /** Canonical instrument id linking this evidence to one listing. */
   instrumentId?: string;
+}
+
+/**
+ * A verifiable statement lifted out of a report section, carrying a stable
+ * identity so its evidence links survive persistence, reload and export.
+ *
+ * One claim may need several pieces of evidence, and one piece of evidence may
+ * back several claims — deliberately many-to-many rather than a 1:1 relational
+ * schema.
+ */
+export interface ResearchClaim {
+  /** Stable inside the report; derived from the section key and position. */
+  id: string;
+  /** `ResearchSection.key` of the section this claim was lifted from. */
+  sectionKey: string;
+  /** The statement itself. */
+  text: string;
+  /** `EvidenceRef.id` values backing this claim (claim → evidence direction). */
+  evidenceRefs: string[];
 }
 
 /** Condensed outcome of one capability run, embedded in the report. */
@@ -83,6 +116,13 @@ export interface ResearchReport {
   catalysts: string[];
   risks: string[];
   capabilityRuns: CapabilityRunSummary[];
+  /**
+   * Claim-level identities for this report, including claims that ended up with
+   * no evidence at all — those are exactly the ones a reader must not mistake
+   * for verified conclusions. Optional: reports persisted before claim linking
+   * existed omit it, and readers rebuild the same ids from `sections[].evidence`.
+   */
+  claims?: ResearchClaim[];
   /**
    * `completed` when every planned capability succeeded; `partial` when some
    * failed or were unavailable — the report still stands, gaps are explicit.
