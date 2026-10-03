@@ -12,32 +12,8 @@
 //     latency) — never raw holdings/positions/cash/account ids (spec §60).
 //   - full: complete trace, still credential-redacted. Explicit opt-in only.
 import type { PrivacyLevel, ToolCallRecord } from '@finagent/core';
-import { redact as redactText } from '../diagnostics/redact.ts';
-
-const REDACTED = '[REDACTED]';
-
-/** Field names treated as credential-bearing and always redacted. */
-const SECRET_FIELD_NAMES: Record<string, true> = {
-  apikey: true,
-  api_key: true,
-  'x-api-key': true,
-  authorization: true,
-  cookie: true,
-  cookies: true,
-  secret: true,
-  password: true,
-  passphrase: true,
-  token: true,
-  access_token: true,
-  refresh_token: true,
-  id_token: true,
-  credential: true,
-  credentials: true,
-  client_secret: true,
-  privatekey: true,
-  private_key: true,
-  auth: true,
-};
+import { REDACTED, isSecretField } from '../privacy/policy.ts';
+import { redactText } from '../privacy/redact-text.ts';
 
 /**
  * Portfolio-sensitive tool names. Full payloads never leave the machine below
@@ -63,14 +39,6 @@ export interface RedactionResult<T> {
   redactedFieldPaths: string[];
   /** True when any portfolio payload was downgraded to a summary. */
   portfolioDowngraded: boolean;
-}
-
-function isSecretField(path: string): boolean {
-  const leaf = path.split('.').pop()?.toLowerCase() ?? '';
-  if (SECRET_FIELD_NAMES[leaf]) return true;
-  // Generic credential-like suffixes: apiKey, apiKeyV2, signingKey, accessToken,
-  // password (history-safe: payload fields that end in these are credential-ish).
-  return /(key|secret|token|password|passwd|bearer)$/.test(leaf) || leaf.startsWith('api_');
 }
 
 export class EvaluationRedactor {

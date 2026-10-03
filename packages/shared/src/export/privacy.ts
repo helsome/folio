@@ -1,4 +1,5 @@
 import type { ResearchReport } from '@finagent/core'
+import { ACCOUNT_LIKE_KEY, isNumeric } from '../privacy/policy.ts'
 
 /**
  * Privacy hardening for share/export (spec §55).
@@ -13,15 +14,8 @@ import type { ResearchReport } from '@finagent/core'
  * report content pass through untouched.
  */
 
-/** Key shapes that may carry account/position/portfolio data. */
-export const ACCOUNT_LIKE_KEY =
-  /(account|position|portfolio|holding|balance|equity|assets|netasset|net_asset|nav)/i
-
-const NUMERIC_STRING = /^-?\d+(\.\d+)?$/
-
-function isNumeric(value: unknown): boolean {
-  return typeof value === 'number' || (typeof value === 'string' && NUMERIC_STRING.test(value))
-}
+/** Key shapes that may carry account/position/portfolio data. (Re-exported from the shared privacy policy, issue #19.) */
+export { ACCOUNT_LIKE_KEY }
 
 function redact(value: unknown): unknown {
   if (Array.isArray(value)) return value.map(redact)

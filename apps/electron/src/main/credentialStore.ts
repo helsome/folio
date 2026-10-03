@@ -9,6 +9,7 @@ import { mkdir, readFile, rename, unlink, writeFile } from 'node:fs/promises';
 import { dirname, join } from 'node:path';
 import { safeStorage } from 'electron';
 import type { CredentialInfo, CustomProviderConfig } from '@finagent/core';
+import { redactText } from '@finagent/shared/privacy';
 
 export interface StoredCredential {
   apiKey: string;
@@ -29,15 +30,14 @@ interface StoreShape {
   customProviders: Record<string, CustomProviderRecord>;
 }
 
-const REDACTED = '[REDACTED]';
-
-/** Remove secret material from an arbitrary message string. */
+/**
+ * Remove secret material from an arbitrary message string. Delegates to the
+ * shared privacy rule source (issue #19) so credential-store errors get the
+ * same coverage as logs, diagnostics and telemetry — cookies, connection
+ * strings, URL query secrets included, not just sk-/JWT shapes.
+ */
 export function redactSecrets(message: string): string {
-  // Strip anything that looks like a key: sk-..., long bearer tokens.
-  return message
-    .replace(/\b(sk|rk|pk|ak)-[A-Za-z0-9_\-]{8,}\b/gi, REDACTED)
-    .replace(/("apiKey"\s*:\s*")[^"]{8,}(")/g, `$1${REDACTED}$2`)
-    .replace(/\beyJ[A-Za-z0-9_\-]{20,}\b/g, REDACTED);
+  return redactText(message);
 }
 
 export class CredentialStore {

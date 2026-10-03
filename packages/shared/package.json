@@ -15,7 +15,8 @@
     "./portfolio-import": "./src/portfolio-import/index.ts",
     "./diagnostics": "./src/diagnostics/index.ts",
     "./providers/longbridge": "./src/providers/longbridge/index.ts",
-    "./providers/massive": "./src/providers/massive/index.ts"
+    "./providers/massive": "./src/providers/massive/index.ts",
+    "./privacy": "./src/privacy/index.ts"
   },
   "dependencies": {
     "@finagent/core": "workspace:*",

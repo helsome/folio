@@ -1,4 +1,5 @@
 import type { ErrorLogEntry } from './types.ts';
+import { redactText } from '../privacy/redact-text.ts';
 
 export interface ErrorLogOptions {
   /** Maximum retained entries; older entries are evicted. Defaults to 50. */
@@ -13,6 +14,10 @@ export interface ErrorLogOptions {
  * `push` normalizes each entry (no `undefined` fields) and evicts the oldest
  * once capacity is exceeded. `recent(n)` returns the newest `n` entries,
  * newest first — the order the Diagnostics UI shows them in.
+ *
+ * Messages and stacks are redacted at collection time (issue #19): stack
+ * first lines echo the raw error message, which may carry Authorization
+ * headers, signed URLs or connection strings from the failing call.
  */
 export class ErrorLog {
   private readonly capacity: number;
@@ -33,8 +38,8 @@ export class ErrorLog {
     const normalized: ErrorLogEntry = {
       at: entry.at ?? this.now(),
       source: entry.source ?? null,
-      message: entry.message,
-      stack: entry.stack ?? null,
+      message: redactText(entry.message),
+      stack: entry.stack ? redactText(entry.stack) : null,
     };
     this.entries.push(normalized);
     if (this.entries.length > this.capacity) {
