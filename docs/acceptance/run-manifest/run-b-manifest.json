@@ -1,0 +1,151 @@
+{
+  "schemaVersion": 1,
+  "runId": "research-cec9f6d1-9be6-41fd-9932-4692906d36ba",
+  "createdAt": 1790674674496,
+  "runtimeMode": "pi",
+  "appVersion": "0.5.0-acceptance",
+  "buildVersion": "0.5.0-acceptance",
+  "gitRevision": "402bd92f2c0b32dfed4b28b1038b67c2c0adf582",
+  "provider": "deepseek",
+  "model": "deepseek-v4-pro",
+  "modelParams": {
+    "api": "openai-completions",
+    "baseUrl": "https://api.deepseek.com",
+    "maxTokens": 8000,
+    "reasoning": false
+  },
+  "prompt": {
+    "hash": "8105327bd4c6513d43687b00fe5d3e0cb9a62fd0131bf5ec103f2e423bd9656f",
+    "version": "deep-research-synthesis@1",
+    "source": "e2e-acceptance"
+  },
+  "strategy": {
+    "id": "comprehensive",
+    "version": "3637a33db7d9979cf55ad2331734b197b0db5ce665f65e2dcc2f57675b3fd076"
+  },
+  "tools": [
+    {
+      "name": "get_quote",
+      "capability": "market.quote",
+      "enabled": true
+    },
+    {
+      "name": "get_kline",
+      "capability": "market.kline",
+      "enabled": true
+    },
+    {
+      "name": "get_intraday",
+      "capability": "market.intraday",
+      "enabled": true
+    },
+    {
+      "name": "get_market_status",
+      "capability": "market.status",
+      "enabled": true
+    },
+    {
+      "name": "get_company_profile",
+      "capability": "company.profile",
+      "enabled": true
+    },
+    {
+      "name": "get_valuation",
+      "capability": "company.valuation",
+      "enabled": true
+    },
+    {
+      "name": "get_news",
+      "capability": "research.news",
+      "enabled": true
+    },
+    {
+      "name": "get_portfolio",
+      "capability": "portfolio.summary",
+      "enabled": true
+    },
+    {
+      "name": "get_market_depth",
+      "capability": "market.depth",
+      "enabled": true
+    },
+    {
+      "name": "get_trades",
+      "capability": "market.trades",
+      "enabled": true
+    },
+    {
+      "name": "get_capital_flow",
+      "capability": "market.capitalFlow",
+      "enabled": true
+    },
+    {
+      "name": "get_market_sentiment",
+      "capability": "market.sentiment",
+      "enabled": true
+    },
+    {
+      "name": "get_financials",
+      "capability": "company.financials",
+      "enabled": true
+    },
+    {
+      "name": "get_ratings",
+      "capability": "company.ratings",
+      "enabled": true
+    },
+    {
+      "name": "get_dividends",
+      "capability": "company.dividends",
+      "enabled": true
+    },
+    {
+      "name": "get_earnings",
+      "capability": "company.earnings",
+      "enabled": true
+    },
+    {
+      "name": "get_calendar_events",
+      "capability": "research.events",
+      "enabled": true
+    },
+    {
+      "name": "get_positions",
+      "capability": "portfolio.positions",
+      "enabled": true
+    },
+    {
+      "name": "get_assets",
+      "capability": "portfolio.assets",
+      "enabled": true
+    },
+    {
+      "name": "get_cash_flow",
+      "capability": "portfolio.cashFlow",
+      "enabled": true
+    }
+  ],
+  "search": {
+    "providerId": "public-http",
+    "routing": {
+      "primary": "public-http"
+    },
+    "configured": true,
+    "endpoint": "https://query1.finance.yahoo.com"
+  },
+  "featureFlags": {
+    "runtimeProvider": "pi",
+    "demoData": false,
+    "langfuseTracing": false
+  },
+  "budget": {
+    "defaults": {
+      "modelCalls": 6
+    },
+    "effective": {
+      "modelCalls": 6
+    },
+    "clamped": []
+  },
+  "locale": "en-US"
+}

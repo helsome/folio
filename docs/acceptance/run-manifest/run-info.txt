@@ -1,0 +1,18 @@
+Run Info — Run A (read back in a fresh process after "restart")
+  runtime mode : pi
+  provider     : deepseek
+  model        : deepseek-flash
+  strategy     : comprehensive @ 3637a33db7d9979cf55ad2331734b197b0db5ce665f65e2dcc2f57675b3fd076
+  prompt       : deep-research-synthesis@1 (8105327bd4c6513d43687b00fe5d3e0cb9a62fd0131bf5ec103f2e423bd9656f)
+  tools        : get_quote, get_kline, get_intraday, get_market_status, get_company_profile, get_valuation, get_news, get_portfolio, get_market_depth, get_trades, get_capital_flow, get_market_sentiment, get_financials, get_ratings, get_dividends, get_earnings, get_calendar_events, get_positions, get_assets, get_cash_flow
+  budget       : effective={"modelCalls":3}
+  app version  : 0.5.0-acceptance
+  git revision : 402bd92f2c0b32dfed4b28b1038b67c2c0adf582
+  current globals in the reading process: model = deepseek-v4-pro
+
+Two-run diff
+  budget.defaults.modelCalls: 3 -> 6
+  budget.effective.modelCalls: 3 -> 6
+  model: "deepseek-flash" -> "deepseek-v4-pro"
+
+changed=true groups={"model":true,"prompt":false,"tools":false,"config":true,"versions":false}

@@ -1,0 +1,107 @@
+{
+  "kind": "live",
+  "transport": "real DeepSeek HTTP streaming; real public HTTP retrieval",
+  "retrievalSources": {
+    "quote": "https://query1.finance.yahoo.com/v8/finance/chart/<ticker>",
+    "kline": "https://query1.finance.yahoo.com/v8/finance/chart/<ticker>",
+    "profile": "https://query1.finance.yahoo.com/v8/finance/chart/<ticker>",
+    "news": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml",
+    "substitutedFor": "Longbridge CLI (not installed on this machine)"
+  },
+  "symbol": "NVDA.US",
+  "strategy": "comprehensive",
+  "runs": [
+    {
+      "label": "run-a",
+      "researchRunId": "research-e95ce1be-6eb9-479c-96dd-668d359c631e",
+      "status": "partial",
+      "requestedModel": "deepseek-flash",
+      "manifestModel": "deepseek-flash",
+      "manifestRunId": "research-e95ce1be-6eb9-479c-96dd-668d359c631e",
+      "completedCapabilities": [
+        "market.quote",
+        "market.kline",
+        "company.profile",
+        "research.news"
+      ],
+      "failedCapabilities": [
+        "market.intraday",
+        "market.depth",
+        "market.trades",
+        "market.capitalFlow",
+        "market.sentiment",
+        "market.status",
+        "company.valuation",
+        "company.financials",
+        "company.dividends",
+        "company.earnings",
+        "company.ratings",
+        "research.events"
+      ]
+    },
+    {
+      "label": "run-b",
+      "researchRunId": "research-cec9f6d1-9be6-41fd-9932-4692906d36ba",
+      "status": "partial",
+      "requestedModel": "deepseek-v4-pro",
+      "manifestModel": "deepseek-v4-pro",
+      "manifestRunId": "research-cec9f6d1-9be6-41fd-9932-4692906d36ba",
+      "completedCapabilities": [
+        "market.kline",
+        "market.quote",
+        "company.profile",
+        "research.news"
+      ],
+      "failedCapabilities": [
+        "market.intraday",
+        "market.depth",
+        "market.trades",
+        "market.capitalFlow",
+        "market.sentiment",
+        "market.status",
+        "company.valuation",
+        "company.financials",
+        "company.dividends",
+        "company.earnings",
+        "company.ratings",
+        "research.events"
+      ]
+    }
+  ],
+  "deliberateChange": {
+    "model": {
+      "before": "deepseek-flash",
+      "after": "deepseek-v4-pro"
+    },
+    "budgetModelCalls": {
+      "before": 3,
+      "after": 6
+    }
+  },
+  "diff": {
+    "changed": true,
+    "groups": {
+      "model": true,
+      "prompt": false,
+      "tools": false,
+      "config": true,
+      "versions": false
+    },
+    "fieldCount": 3,
+    "paths": [
+      "budget.defaults.modelCalls",
+      "budget.effective.modelCalls",
+      "model"
+    ]
+  },
+  "restartReadback": {
+    "process": "fresh process",
+    "currentGlobalModel": "deepseek-v4-pro",
+    "historicalModel": "deepseek-flash",
+    "historicalRunId": "research-e95ce1be-6eb9-479c-96dd-668d359c631e",
+    "preserved": true
+  },
+  "secretScan": {
+    "apiKeyPresentInManifests": false
+  }
+}

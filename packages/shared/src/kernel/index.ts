@@ -37,3 +37,10 @@ export {
   type RunawayState,
   type RunawayStep,
 } from './runaway-detector.ts';
+export {
+  captureRunManifest,
+  redactManifestSecrets,
+  diffRunManifests,
+  exportRunManifest,
+  hashManifestInput,
+} from './run-manifest.ts';

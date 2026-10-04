@@ -26,6 +26,15 @@ import type {
   ResearchSynthesis,
   ResearchSynthesisInput,
   Run,
+  RunManifest,
+  RunManifestContext,
+  RunManifestDiff,
+  RunManifestFeatureFlags,
+  RunManifestModelParams,
+  RunManifestPrompt,
+  RunManifestRuntimeMode,
+  RunManifestSearch,
+  RunManifestTool,
   ScreeningRun,
   ScreeningQuery,
   ScreeningStrategy,
@@ -71,7 +80,7 @@ import type {
   ToolCallRecord,
   TraceReference,
 } from '@finagent/core';
-import { DEFAULT_INSTRUMENT_CATALOG, InstrumentResolver, STRATEGY_IDS } from '@finagent/core';
+import { AGENT_WORKFLOW_ID, DEFAULT_INSTRUMENT_CATALOG, InstrumentResolver, STRATEGY_IDS } from '@finagent/core';
 import { isLocalePreference } from '@finagent/i18n';
 import { createAppPreferencesService, type AppPreferencesService } from './app-preferences.ts';
 import { buildImpactPrompt, buildRiskSummaryPrompt, buildSynthesisPrompt } from './research-prompts.ts';
@@ -143,6 +152,9 @@ import {
   scoresFromResearchReport,
   currentFolioVersion,
   EvaluationRedactor,
+  diffRunManifests,
+  exportRunManifest,
+  manifestToLangfuseMetadata,
   PiRuntimeAdapter,
   sanitizeSettings,
   embeddedDatasets,
@@ -282,6 +294,7 @@ export class AgentKernelHost {
   private readonly portfolioRisk: PortfolioRiskService;
   private readonly connectionStore: ConnectionStore;
   private readonly providerRouter: ProviderRouter;
+  private readonly demoData: boolean;
   private instrumentResolver: InstrumentResolver;
   private activeLogin: { cancel: () => void } | null = null;
   private unsubscribe: (() => void) | null = null;
@@ -354,6 +367,7 @@ export class AgentKernelHost {
     // unavailable, built-in sample data answers instead; every surface built
     // on it labels its content with source 'demo' (DemoBadge).
     const demoData = process.env.FINAGENT_DEMO_DATA === '1';
+    this.demoData = demoData;
     const capabilityFetchers = demoData ? withDemoDataFallback(routerFetchers) : routerFetchers;
     this.marketData = new MarketDataService({ fetchers: capabilityFetchers });
     this.registry = createFullRegistry(capabilityFetchers);
@@ -382,6 +396,8 @@ export class AgentKernelHost {
         await this.saveDiffForReport(report);
       },
       onRunComplete: (result) => this.exportResearchTrace(result),
+      // #21: snapshot the research run config into an immutable manifest.
+      getRunManifestContext: () => this.buildRunManifestContext(),
     });
 
     // V5 outcome evaluation: opinions snapshotted from reports, outcomes
@@ -446,6 +462,9 @@ export class AgentKernelHost {
       demoData,
       registry: new FinanceToolRegistry(this.registry),
       skillHub: this.skillHub,
+      // #21: every run snapshots the live config — including evaluation runs,
+      // which are started directly on the kernel by the experiment runner.
+      getRunManifestContext: () => this.buildRunManifestContext(),
       rpc: {
         cwd: getPiCwd(),
         requiredEnvKeys: readRequiredLlmEnvKeys(),
@@ -550,6 +569,10 @@ export class AgentKernelHost {
     // user explicitly requests another language in the prompt (spec §41–42).
     // Resolved after validation and with a safe fallback so a prefs failure
     // can never block an agent run (failure-isolation, spec §87).
+    // #21: the run's immutable config snapshot is assembled by the kernel from
+    // `getRunManifestContext` (wired in the constructor) at creation time, so
+    // every run entry point — this one and evaluation runs — snapshots the same
+    // settings. Capture is best-effort and never blocks the run (spec §87).
     return this.kernel.runs.startRun(
       requireString(request.sessionId, 'sessionId'),
       requireString(request.content, 'content'),
@@ -566,12 +589,180 @@ export class AgentKernelHost {
     }
   }
 
+  /**
+   * Assemble the immutable run-config snapshot for #21. Best-effort: any single
+   * source that is unavailable (e.g. no Pi process, no skills) simply leaves its
+   * field undefined rather than failing the run. The manifest captures model +
+   * provider identity, effective model params, the prompt composition hash,
+   * enabled tools, the search/retrieval routing, active feature flags and the
+   * app/build identity — but never credentials (defence-in-depth redaction also
+   * runs in `@finagent/shared`).
+   */
+  private async buildRunManifestContext(): Promise<RunManifestContext> {
+    const runtimeMode: RunManifestRuntimeMode = this.demoData
+      ? 'demo'
+      : readAgentProvider() === 'local'
+        ? 'local'
+        : 'pi';
+
+    const identity: {
+      provider?: string;
+      model?: string;
+      modelParams?: RunManifestModelParams;
+    } = {};
+    const api = this.kernel.getLlmApi();
+    if (api) {
+      try {
+        const state = await api.getState();
+        const model = state.model;
+        identity.provider =
+          model?.provider ?? (readAgentProvider() === 'local' ? 'local' : undefined);
+        identity.model = model?.id;
+        identity.modelParams = {
+          api: model?.api,
+          baseUrl: model?.baseUrl,
+          thinkingLevel: state.thinkingLevel,
+          contextWindow: model?.contextWindow,
+          maxTokens: model?.maxTokens,
+          reasoning: model?.reasoning,
+        };
+      } catch {
+        // Local runtime / Pi not spawned yet — identity stays empty.
+      }
+    }
+
+    const prompt = this.buildPromptManifest();
+
+    let tools: RunManifestTool[] = [];
+    try {
+      const result = await this.kernel.getTools();
+      if (result.ok) {
+        const byToolName = new Map(this.registry.list().map((cap) => [cap.toolName, cap.id]));
+        tools = result.data.map((tool) => ({
+          name: tool.name,
+          capability: byToolName.get(tool.name),
+          enabled: true,
+        }));
+      }
+    } catch {
+      tools = [];
+    }
+
+    const routing = await this.connectionStore.getRouting(DEFAULT_PROVIDER_ROUTING);
+    const primaryConfig = routing.primary
+      ? await this.connectionStore.getConfig(routing.primary)
+      : undefined;
+
+    const search: RunManifestSearch = {
+      providerId: routing.primary,
+      routing: { primary: routing.primary, fallback: routing.fallback },
+      configured: routing.primary ? primaryConfig?.enabled !== false : false,
+      endpoint: primaryConfig?.endpoint ?? undefined,
+    };
+
+    const featureFlags: RunManifestFeatureFlags = {
+      demoData: this.demoData,
+      runtimeProvider: readAgentProvider(),
+      evalTracing: this.evaluationSettings.tracingEnabled,
+      langfuseTracing: this.evaluationSettings.langfuseTracingEnabled,
+      privacyLevel: this.evaluationSettings.privacyLevel,
+    };
+
+    return {
+      runtimeMode,
+      appVersion: app.getVersion(),
+      buildVersion: app.getVersion(),
+      gitRevision: process.env.FOLIO_GIT_REVISION ?? process.env.BUILD_REVISION ?? undefined,
+      ...identity,
+      prompt,
+      // #21: name the workflow that drove the run. The Copilot agent path is not
+      // strategy-driven (unlike Deep Research, which overrides `id` with its
+      // `StrategyId`); recording the workflow id + shipping version keeps
+      // "which agent produced this?" answerable for a historical run.
+      strategy: { id: AGENT_WORKFLOW_ID, version: currentFolioVersion() ?? undefined },
+      tools,
+      search,
+      featureFlags,
+      locale: await this.effectiveRunLocale(),
+    };
+  }
+
+  /**
+   * Hash the *composition* of the system/developer prompt: which skills are
+   * enabled and when they last changed. Toggling or updating a skill changes
+   * the hash, so two runs with different prompt compositions diff cleanly.
+   * The app version is recorded as the template `version` (the prompt template
+   * ships with Folio).
+   */
+  private buildPromptManifest(): RunManifestPrompt {
+    const enabled = this.skillHub
+      .listSkills()
+      .filter((skill) => skill.metadata.enabled)
+      .map((skill) => `${skill.id}:${skill.metadata.updatedAt ?? 0}`)
+      .sort()
+      .join('|');
+    const hash = createHash('sha256').update(`skills|${enabled}`).digest('hex');
+    return { hash, version: currentFolioVersion() ?? undefined, source: 'skill-index' };
+  }
+
   async cancelRun(input: unknown): Promise<void> {
     const request = requireObject(input);
     await this.kernel.runs.cancelRun(
       requireString(request.sessionId, 'sessionId'),
       requireString(request.runId, 'runId')
     );
+  }
+
+  // -- Run manifests (#21) ---------------------------------------------------
+
+  /** Immutable run-config snapshot for a copilot run, or undefined if absent. */
+  async getRunManifest(input: unknown): Promise<RunManifest | undefined> {
+    const request = requireObject(input);
+    const sessionId = requireString(request.sessionId, 'sessionId');
+    const runId = requireString(request.runId, 'runId');
+    const runs = await this.kernel.sessions.listRuns(sessionId);
+    return runs.find((run) => run.id === runId)?.manifest;
+  }
+
+  /** Pretty-printed, secret-redacted JSON export of a copilot run manifest. */
+  async exportRunManifest(input: unknown): Promise<string | undefined> {
+    const manifest = await this.getRunManifest(input);
+    return manifest ? exportRunManifest(manifest) : undefined;
+  }
+
+  /** Structured diff between two copilot run manifests. */
+  async compareRunManifests(input: unknown): Promise<RunManifestDiff> {
+    const request = requireObject(input);
+    const sessionId = requireString(request.sessionId, 'sessionId');
+    const aId = requireString(request.runIdA, 'runIdA');
+    const bId = requireString(request.runIdB, 'runIdB');
+    const runs = await this.kernel.sessions.listRuns(sessionId);
+    const before = runs.find((run) => run.id === aId)?.manifest;
+    const after = runs.find((run) => run.id === bId)?.manifest;
+    if (!before || !after) {
+      throw createCodeError('RUN_MANIFEST_NOT_FOUND', 'Both runs must have a manifest to compare.');
+    }
+    return diffRunManifests(before, after);
+  }
+
+  /** Immutable run-config snapshot for a Deep Research run, or undefined. */
+  async getResearchManifest(input: unknown): Promise<RunManifest | undefined> {
+    const request = requireObject(input);
+    const runId = requireString(request.runId, 'runId');
+    return (await this.researchService.getRun(runId))?.manifest;
+  }
+
+  /** Structured diff between two Deep Research run manifests. */
+  async compareResearchManifests(input: unknown): Promise<RunManifestDiff> {
+    const request = requireObject(input);
+    const aId = requireString(request.runIdA, 'runIdA');
+    const bId = requireString(request.runIdB, 'runIdB');
+    const before = (await this.researchService.getRun(aId))?.manifest;
+    const after = (await this.researchService.getRun(bId))?.manifest;
+    if (!before || !after) {
+      throw createCodeError('RUN_MANIFEST_NOT_FOUND', 'Both runs must have a manifest to compare.');
+    }
+    return diffRunManifests(before, after);
   }
 
   /** Stream Event replay（ADR 0001 §Reconnect）：按 lastSequence 补发或明确不可恢复。 */
@@ -1448,6 +1639,27 @@ export class AgentKernelHost {
   }): Promise<import('@finagent/core').TraceReference | undefined> {
     if (!this.langfuseBackend) return undefined;
     try {
+      // #21 ↔ #14: derive the trace metadata from the run's immutable manifest
+      // so the Langfuse trace and the local manifest share one identity
+      // (`folioRunId` = trace id) and one config record (model/provider/
+      // strategy/prompt version), instead of the trace carrying a bare run id.
+      const manifest = await this.getRunManifest({
+        sessionId: input.sessionId,
+        runId: input.runId,
+      }).catch(() => undefined);
+      const metadata = manifest
+        ? manifestToLangfuseMetadata(manifest, {
+            sessionId: input.sessionId,
+            threadId: input.threadId,
+            runKind: 'normal',
+          })
+        : {
+            folioRunId: input.runId,
+            folioSessionId: input.sessionId,
+            threadId: input.threadId,
+            runKind: 'normal' as const,
+            folioVersion: currentFolioVersion(),
+          };
       const ref = await this.langfuseBackend.exportAgentRun({
         folioRunId: input.runId,
         sessionId: input.sessionId,
@@ -1458,13 +1670,7 @@ export class AgentKernelHost {
         output: input.answer,
         toolCalls: input.toolCalls,
         error: input.error,
-        metadata: {
-          folioRunId: input.runId,
-          folioSessionId: input.sessionId,
-          threadId: input.threadId,
-          runKind: 'normal',
-          folioVersion: currentFolioVersion(),
-        },
+        metadata,
       });
       if (ref.traceId) {
         const scores = scoresFromAgentRun({
@@ -1519,13 +1725,19 @@ export class AgentKernelHost {
         })),
         report: result.report,
         model: this.evaluationSettings.langfuseTracingEnabled ? 'folio-synthesizer' : undefined,
-        metadata: {
-          folioRunId: result.summary.id,
-          runKind: 'normal',
-          folioVersion: currentFolioVersion(),
-          symbol: result.summary.symbol,
-          strategyId: result.report?.strategyId,
-        },
+        // #21 ↔ #14: same run identity + config record as the persisted manifest.
+        metadata: result.summary.manifest
+          ? manifestToLangfuseMetadata(result.summary.manifest, {
+              runKind: 'normal',
+              symbol: result.summary.symbol,
+            })
+          : {
+              folioRunId: result.summary.id,
+              runKind: 'normal',
+              folioVersion: currentFolioVersion(),
+              symbol: result.summary.symbol,
+              strategyId: result.report?.strategyId,
+            },
       });
       const scores = scoresFromResearchReport(result.report, undefined, Math.max(0, finishedAt - result.summary.startedAt));
       if (ref.traceId && scores.length > 0) {

@@ -771,6 +771,140 @@ describe('RunManager budgets and runaway detection (#17)', () => {
   });
 });
 
+describe('RunManager run manifest (#21)', () => {
+  it('captures and persists an immutable manifest for a run', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'));
+    const session = await sessions.createSession('Manifest');
+    const run = await runs.startRun(session.id, 'hello', undefined, undefined, undefined, {
+      runtimeMode: 'pi',
+      provider: 'openai',
+      model: 'gpt-4o',
+      prompt: { hash: 'abc123', version: 'v1', source: 'skill-index' },
+      tools: [{ name: 'get_portfolio', capability: 'portfolio.read', enabled: true }],
+    });
+    await waitFor(async () => !runs.isRunning());
+    const persisted = await sessions.getRun(session.id, run.id);
+    expect(persisted?.manifest).toMatchObject({
+      schemaVersion: 1,
+      runId: run.id,
+      runtimeMode: 'pi',
+      provider: 'openai',
+      model: 'gpt-4o',
+      prompt: { hash: 'abc123', version: 'v1', source: 'skill-index' },
+      tools: [{ name: 'get_portfolio', capability: 'portfolio.read', enabled: true }],
+    });
+  });
+
+  it('keeps each run manifest independent of later runs', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'));
+    const session = await sessions.createSession('Manifest');
+    const first = await runs.startRun(session.id, 'one', undefined, undefined, undefined, {
+      runtimeMode: 'pi',
+      model: 'gpt-4o',
+    });
+    await waitFor(async () => !runs.isRunning());
+    const second = await runs.startRun(session.id, 'two', undefined, undefined, undefined, {
+      runtimeMode: 'local',
+      model: 'llama-3',
+    });
+    await waitFor(async () => !runs.isRunning());
+    const persistedFirst = await sessions.getRun(session.id, first.id);
+    const persistedSecond = await sessions.getRun(session.id, second.id);
+    expect(persistedFirst?.manifest?.runId).toBe(first.id);
+    expect(persistedFirst?.manifest?.model).toBe('gpt-4o');
+    expect(persistedSecond?.manifest?.runId).toBe(second.id);
+    expect(persistedSecond?.manifest?.model).toBe('llama-3');
+  });
+
+  it('defaults to an empty tool list and the pi runtime when no context is given', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'));
+    const session = await sessions.createSession('Manifest');
+    const run = await runs.startRun(session.id, 'hello');
+    await waitFor(async () => !runs.isRunning());
+    const persisted = await sessions.getRun(session.id, run.id);
+    expect(persisted?.manifest?.runtimeMode).toBe('pi');
+    expect(persisted?.manifest?.tools).toEqual([]);
+    expect(persisted?.manifest?.runId).toBe(run.id);
+  });
+
+  it('records the resolved budget, including the ceiling clamp, in the manifest (#17)', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'), {
+      budgets: { defaults: { modelCalls: 10 }, ceiling: { modelCalls: 5, toolCalls: 4 } },
+    });
+    const session = await sessions.createSession('Manifest budget');
+    const run = await runs.startRun(session.id, 'hello', undefined, undefined, { modelCalls: 3 });
+    await waitFor(async () => !runs.isRunning());
+    const manifest = (await sessions.getRun(session.id, run.id))?.manifest;
+    expect(manifest?.budget).toEqual({
+      defaults: { modelCalls: 10 },
+      ceiling: { modelCalls: 5, toolCalls: 4 },
+      overrides: { modelCalls: 3 },
+      effective: { modelCalls: 3, toolCalls: 4 },
+      clamped: [],
+    });
+  });
+
+  it('flags a limit the system ceiling cut down as clamped', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'), {
+      budgets: { defaults: { modelCalls: 10 }, ceiling: { modelCalls: 5 } },
+    });
+    const session = await sessions.createSession('Manifest clamp');
+    const run = await runs.startRun(session.id, 'hello');
+    await waitFor(async () => !runs.isRunning());
+    const manifest = (await sessions.getRun(session.id, run.id))?.manifest;
+    expect(manifest?.budget?.effective).toEqual({ modelCalls: 5 });
+    expect(manifest?.budget?.clamped).toEqual(['modelCalls']);
+  });
+
+  it('omits the budget when no budget is configured', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'));
+    const session = await sessions.createSession('Manifest no budget');
+    const run = await runs.startRun(session.id, 'hello');
+    await waitFor(async () => !runs.isRunning());
+    const manifest = (await sessions.getRun(session.id, run.id))?.manifest;
+    expect(manifest?.budget).toBeUndefined();
+  });
+
+  it('merges the base context from the host with a per-call override', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'), {
+      getRunManifestContext: () => ({
+        runtimeMode: 'pi',
+        model: 'gpt-4o',
+        strategy: { id: 'copilot-agent', version: '0.5.0' },
+        tools: [{ name: 'get_quote', capability: 'market.quote', enabled: true }],
+      }),
+    });
+    const session = await sessions.createSession('Manifest merge');
+    const run = await runs.startRun(session.id, 'hello', undefined, undefined, undefined, {
+      evaluation: { datasetId: 'd1', caseId: 'c1', datasetVersion: '1.0.0' },
+    });
+    await waitFor(async () => !runs.isRunning());
+    const manifest = (await sessions.getRun(session.id, run.id))?.manifest;
+    expect(manifest).toMatchObject({
+      runtimeMode: 'pi',
+      model: 'gpt-4o',
+      strategy: { id: 'copilot-agent', version: '0.5.0' },
+      tools: [{ name: 'get_quote', capability: 'market.quote', enabled: true }],
+      evaluation: { datasetId: 'd1', caseId: 'c1', datasetVersion: '1.0.0' },
+    });
+  });
+
+  it('degrades to the fallback context when the base source throws', async () => {
+    const { sessions, runs } = makeKernel(completedScript('Done'), {
+      runtimeMode: 'demo',
+      getRunManifestContext: () => {
+        throw new Error('settings unavailable');
+      },
+    });
+    const session = await sessions.createSession('Manifest fallback');
+    const run = await runs.startRun(session.id, 'hello');
+    await waitFor(async () => !runs.isRunning());
+    const manifest = (await sessions.getRun(session.id, run.id))?.manifest;
+    expect(manifest?.runtimeMode).toBe('demo');
+    expect(manifest?.tools).toEqual([]);
+  });
+});
+
 async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 2000) {
   const started = Date.now();
   while (!(await predicate())) {
