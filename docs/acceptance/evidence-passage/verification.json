@@ -1,0 +1,19 @@
+{
+  "mode": "live AgentKernel + ResearchService production path; real model over HTTP; production research.news capability",
+  "model": "deepseek-v4-pro",
+  "symbol": "NVDA.US",
+  "retrieval": {
+    "kind": "live public RSS feed",
+    "url": "https://rss.nytimes.com/services/xml/rss/nyt/Business.xml"
+  },
+  "runId": "research-064770ff-2e25-42dd-bc18-e93d72d4ff3e",
+  "reportId": "report-research-064770ff-2e25-42dd-bc18-e93d72d4ff3e",
+  "runStatus": "partial",
+  "retrievedNewsCount": 49,
+  "evidenceRefCount": 1,
+  "passageCount": 49,
+  "allOffsetsRelocate": true,
+  "allEvidenceMappedToPassage": true,
+  "survivesReload": true,
+  "scope": "Passage-level evidence location only. Claim identity, bidirectional claim↔evidence mapping and verifier output are separate PRs and are not exercised here."
+}
