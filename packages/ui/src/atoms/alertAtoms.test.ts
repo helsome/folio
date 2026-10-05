@@ -84,6 +84,15 @@ describe('ruleSummary', () => {
       'Drawdown > 10%'
     );
   });
+
+  it('states the price threshold in the rule symbol currency, never a bare $', () => {
+    expect(
+      ruleSummary(buildAlertRule({ type: 'price_above', symbol: '0700.HK', targetPrice: 100 }, 'f', 0))
+    ).toBe('Above HK$100.00');
+    expect(
+      ruleSummary(buildAlertRule({ type: 'price_below', symbol: '600519.SH', targetPrice: 100 }, 'g', 0))
+    ).toBe('Below CN¥100.00');
+  });
 });
 
 describe('alert atoms', () => {

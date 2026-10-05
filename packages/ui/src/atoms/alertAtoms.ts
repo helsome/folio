@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 import type { AlertRule, AlertRuleType, AlertTriggerEvent } from '@finagent/core';
 import type { FinagentClient } from '../client';
 import { loadAlertEvents, loadAlertRules, saveAlertRules } from '../client/alerts';
+import { currencyForSymbol, formatMoney } from '../lib/money';
 
 /**
  * Alert view state over the v2 `AlertRule` union. Rules and recent trigger
@@ -94,9 +95,9 @@ export function buildAlertRule(
 export function ruleSummary(rule: AlertRule): string {
   switch (rule.type) {
     case 'price_above':
-      return `Above $${rule.targetPrice.toFixed(2)}`;
+      return `Above ${formatMoney(rule.targetPrice, currencyForSymbol(rule.symbol))}`;
     case 'price_below':
-      return `Below $${rule.targetPrice.toFixed(2)}`;
+      return `Below ${formatMoney(rule.targetPrice, currencyForSymbol(rule.symbol))}`;
     case 'new_news':
       return 'New headlines';
     case 'earnings':
