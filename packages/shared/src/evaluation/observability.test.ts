@@ -160,6 +160,38 @@ describe('backend failure isolation (spec §87, §89)', () => {
   });
 });
 
+describe('LangSmith trace window', () => {
+  it('enforces startedAfter/startedBefore on the run start time', async () => {
+    const bodies: Array<Record<string, unknown>> = [];
+    const run = (id: string, startMs: number) => ({
+      id,
+      start_time: new Date(startMs).toISOString(),
+      metadata: { thread_id: 't1' },
+    });
+    const backend = new LangSmithEvaluationBackend({
+      apiKey: 'lsv2_pt_x',
+      project: 'folio-agent',
+      fetchImpl: async (_url, init) => {
+        bodies.push(init?.body ? (JSON.parse(String(init.body)) as Record<string, unknown>) : {});
+        return new Response(
+          JSON.stringify({ runs: [run('too-early', 500), run('in-window', 1_500), run('too-late', 9_000)] }),
+          { status: 200, headers: { 'content-type': 'application/json' } }
+        );
+      },
+    });
+    const matches = await backend.findTraces({
+      threadId: 't1',
+      startedAfter: 1_000,
+      startedBefore: 2_000,
+    });
+    // TraceQuery bounds the run's *start* time, so out-of-window runs must not
+    // come back even when the response happens to include them.
+    expect(matches.map((match) => match.traceId)).toEqual(['in-window']);
+    // ...and the upper bound must not be delegated to a different field.
+    expect(bodies[0]?.filters).not.toHaveProperty('end_time');
+  });
+});
+
 describe('trace reference shape', () => {
   it('carries backend, ids, and optional url', () => {
     const ref: TraceReference = { backend: 'langsmith', traceId: 'abc', threadId: 'pi-1', runId: 'run-9', url: 'https://smith.langchain.com/x' };
