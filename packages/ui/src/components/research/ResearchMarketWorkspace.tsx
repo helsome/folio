@@ -15,7 +15,9 @@ import {
 } from 'lucide-react';
 import { useTranslation } from 'react-i18next';
 import type { Kline, ResearchReport, ResearchRunStatus, StaticInfo } from '@finagent/core';
+import { formatDateTime } from '@finagent/i18n';
 import { addToWatchlistAtom, quoteCacheAtomFamily, fetchQuoteAtom, removeFromWatchlistAtom, watchlistAtom } from '../../atoms';
+import { formatMoney } from '../../lib/money';
 import { useFinagentClient } from '../../client';
 import { FinancialKLineChart } from '../chart/FinancialKLineChart';
 import { normalizeKlines, type FinancialBar } from '../chart/klineAdapter';
@@ -32,11 +34,6 @@ interface ResearchMarketWorkspaceProps {
   loading: boolean;
   onStart: () => void;
 }
-
-const formatPrice = (value: number | undefined, currency = 'USD'): string => {
-  if (value === undefined || !Number.isFinite(value)) return '—';
-  return `${value.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })} ${currency}`;
-};
 
 const formatSigned = (value: number | undefined): string => {
   if (value === undefined || !Number.isFinite(value)) return '—';
@@ -168,14 +165,14 @@ export const ResearchMarketWorkspace: React.FC<ResearchMarketWorkspaceProps> = (
               <span className="folio-research-asset-company">{companyName}</span>
             </div>
             <div className="folio-research-price-line">
-              <strong className="tnum">{formatPrice(quote?.lastPrice, currency)}</strong>
+              <strong className="tnum">{formatMoney(quote?.lastPrice, currency)}</strong>
               <span className={`folio-research-price-change tnum ${quote && quote.change >= 0 ? 'text-positive' : 'text-negative'}`}>
                 {formatSigned(quote?.change)} ({formatPercent(quote?.changePercent)})
               </span>
             </div>
             <p className="folio-research-market-meta">
               {quote?.timestamp
-                ? `${t('research.workspace.lastUpdated')} ${new Date(quote.timestamp * 1000).toLocaleString()}`
+                ? `${t('research.workspace.lastUpdated')} ${formatDateTime(quote.timestamp * 1000)}`
                 : t('research.workspace.marketDataUnavailable')}
             </p>
           </div>
@@ -242,10 +239,10 @@ export const ResearchMarketWorkspace: React.FC<ResearchMarketWorkspaceProps> = (
             )}
           </div>
           <div className="folio-research-stat-strip">
-            <ResearchStat label={t('research.workspace.open')} value={formatPrice(quote?.open, currency)} />
-            <ResearchStat label={t('research.workspace.high')} value={formatPrice(quote?.high, currency)} />
-            <ResearchStat label={t('research.workspace.low')} value={formatPrice(quote?.low, currency)} />
-            <ResearchStat label={t('research.workspace.prevClose')} value={formatPrice(quote?.prevClose, currency)} />
+            <ResearchStat label={t('research.workspace.open')} value={formatMoney(quote?.open, currency)} />
+            <ResearchStat label={t('research.workspace.high')} value={formatMoney(quote?.high, currency)} />
+            <ResearchStat label={t('research.workspace.low')} value={formatMoney(quote?.low, currency)} />
+            <ResearchStat label={t('research.workspace.prevClose')} value={formatMoney(quote?.prevClose, currency)} />
             <ResearchStat label={t('research.workspace.volume')} value={formatCompact(quote?.volume)} />
             <ResearchStat label={t('research.workspace.marketStatus')} value={quote ? t('research.workspace.live') : '—'} />
           </div>
