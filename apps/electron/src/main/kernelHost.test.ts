@@ -6,7 +6,18 @@ let lastKernelOptions: Record<string, unknown> | null = null;
 let lastMarketData: FakeMarketDataService | null = null;
 let lastAutomationContext: unknown = null;
 let forwardedEvents: unknown[] = [];
+/** Evaluation runs handed to EvaluationStore.addRun (observability path). */
+const savedEvalRuns: Array<Record<string, unknown>> = [];
 const routerFetchers = { getQuote: async () => ({ symbol: 'AAPL.US' }) };
+
+/** Poll until `predicate` holds; the settle path is fire-and-forget (`void`). */
+async function waitFor(predicate: () => boolean, timeoutMs = 1000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error('waitFor timed out');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
 
 class FakeMarketDataService {
   quoteSymbols: string[] = [];
@@ -54,6 +65,7 @@ const fakeSessions = {
   deleteSession: async () => undefined,
   listMessages: async (sessionId: string) => [{ id: 'm1', role: 'user', content: sessionId, timestamp: 1 }],
   listRuns: async () => [],
+  getSession: async () => undefined,
 };
 
 const fakeRuns = {
@@ -288,7 +300,9 @@ mock.module('@finagent/shared', () => ({
     });
     saveSettings = async (settings: unknown) => settings;
     getSettings = async () => ({});
-    addRun = async () => undefined;
+    addRun = async (run: Record<string, unknown>) => {
+      savedEvalRuns.push(run);
+    };
     listExperiments = async () => [];
     getExperiment = async () => undefined;
     listRuns = async () => [];
@@ -352,6 +366,7 @@ beforeEach(() => {
   lastMarketData = null;
   lastAutomationContext = null;
   forwardedEvents = [];
+  savedEvalRuns.length = 0;
 });
 
 afterEach(() => {
@@ -519,6 +534,86 @@ describe('AgentKernelHost', () => {
       ok: false,
       error: expect.objectContaining({ code: 'INVALID_ARGUMENT' }),
     });
+    host.dispose();
+  });
+
+  it('records a user-cancelled run as cancelled, not failed', async () => {
+    const originalSubscribe = fakeRuns.subscribe;
+    let subscriber: ((event: AgentEvent) => void) | null = null;
+    fakeRuns.subscribe = (listener) => {
+      subscriber = listener;
+      return () => undefined;
+    };
+    const host = new AgentKernelHost();
+    const emit = subscriber as ((event: AgentEvent) => void) | null;
+
+    emit?.({
+      id: 'e1',
+      sessionId: 's1',
+      runId: 'r1',
+      type: 'run_started',
+      timestamp: 10,
+      sequence: 1,
+      payload: {
+        run: { id: 'r1', sessionId: 's1', status: 'running', input: 'x', startedAt: 10 },
+        userMessage: { id: 'm1', role: 'user', content: 'x', timestamp: 10 },
+      },
+    });
+    // A user cancel settles the run as run_failed/RUN_CANCELLED (RunManager
+    // normalizes it to `cancelled` on the stream channel).
+    emit?.({
+      id: 'e2',
+      sessionId: 's1',
+      runId: 'r1',
+      type: 'run_failed',
+      timestamp: 20,
+      sequence: 2,
+      payload: { error: { code: 'RUN_CANCELLED', message: 'Run cancelled by user.' } },
+    });
+
+    await waitFor(() => savedEvalRuns.length === 1);
+    expect(savedEvalRuns[0]).toMatchObject({ id: 'r1', status: 'cancelled' });
+
+    fakeRuns.subscribe = originalSubscribe;
+    host.dispose();
+  });
+
+  it('keeps a genuine runtime failure recorded as failed', async () => {
+    const originalSubscribe = fakeRuns.subscribe;
+    let subscriber: ((event: AgentEvent) => void) | null = null;
+    fakeRuns.subscribe = (listener) => {
+      subscriber = listener;
+      return () => undefined;
+    };
+    const host = new AgentKernelHost();
+    const emit = subscriber as ((event: AgentEvent) => void) | null;
+
+    emit?.({
+      id: 'e1',
+      sessionId: 's1',
+      runId: 'r2',
+      type: 'run_started',
+      timestamp: 10,
+      sequence: 1,
+      payload: {
+        run: { id: 'r2', sessionId: 's1', status: 'running', input: 'x', startedAt: 10 },
+        userMessage: { id: 'm1', role: 'user', content: 'x', timestamp: 10 },
+      },
+    });
+    emit?.({
+      id: 'e2',
+      sessionId: 's1',
+      runId: 'r2',
+      type: 'run_failed',
+      timestamp: 20,
+      sequence: 2,
+      payload: { error: { code: 'PROVIDER_ERROR', message: 'Upstream failed.' } },
+    });
+
+    await waitFor(() => savedEvalRuns.length === 1);
+    expect(savedEvalRuns[0]).toMatchObject({ id: 'r2', status: 'failed' });
+
+    fakeRuns.subscribe = originalSubscribe;
     host.dispose();
   });
 });
