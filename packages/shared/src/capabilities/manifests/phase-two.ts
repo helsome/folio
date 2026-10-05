@@ -72,7 +72,9 @@ export function createMarketTradesCapability(
         provenance: {
           provider: 'longbridge',
           fetchedAt: (ctx?.now ?? Date.now)(),
-          marketTime: latest?.timestamp,
+          // provenance.marketTime is epoch MS everywhere else; the parser
+          // emits TradeTick.timestamp in epoch seconds (issue #179).
+          marketTime: latest === undefined ? undefined : latest.timestamp * 1000,
           stale: false,
         },
         summary: `${trades.length} recent trades for ${symbol}${latest ? `, latest @ $${latest.price.toFixed(2)}` : ''}.`,
