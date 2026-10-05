@@ -4,10 +4,10 @@ import { useTranslation } from 'react-i18next';
 import type { Quote, StaticInfo, MarketStatus } from '@finagent/core';
 import { activeSymbolAtom, navSectionAtom } from '../../atoms';
 import { useFinagentClient } from '../../client';
+import { currencyForSymbol, formatMoney } from '../../lib/money';
 import { DataFreshness } from '../primitives/DataFreshness';
 const DASH = '\u2014';
 
-const formatPrice = (value: number): string => `$${value.toFixed(2)}`;
 const formatNumber = (value: number): string => value.toLocaleString();
 const formatSigned = (value: number): string =>
   `${value >= 0 ? '+' : ''}${value.toFixed(2)}`;
@@ -134,6 +134,10 @@ export const SecurityHeader: React.FC = () => {
   const isPositive = quote.change >= 0;
   const changeColor = isPositive ? 'var(--positive)' : 'var(--negative)';
   const name = info?.name ?? symbol;
+  // Quote prices are always in the instrument's own currency: prefer the
+  // provider-reported code, fall back to the symbol's routed market.
+  const currency = info?.currency ?? currencyForSymbol(symbol);
+  const formatPrice = (value: number): string => formatMoney(value, currency);
 
   const stats: StatCellProps[] = [
     { label: t('security.header.open'), value: formatPrice(quote.open) },
