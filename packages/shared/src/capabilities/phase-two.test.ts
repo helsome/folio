@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import { createPhaseTwoCapabilities, createMarketCapitalFlowCapability, createMarketDepthCapability, createResearchEventsCapability, createPortfolioPositionsCapability } from './manifests/phase-two.ts';
+import { createPhaseTwoCapabilities, createMarketCapitalFlowCapability, createMarketDepthCapability, createMarketTradesCapability, createResearchEventsCapability, createPortfolioPositionsCapability } from './manifests/phase-two.ts';
 import type { CapabilityFetchers } from './fetchers.ts';
 
 function fetchers(overrides: Partial<CapabilityFetchers> = {}): CapabilityFetchers {
@@ -122,6 +122,37 @@ describe('phase-2 manifest input validation', () => {
       marketTime: 1710000000_000,
     });
     expect(result.provenance.marketTime! > 1e12).toBe(true);
+  });
+
+  it('market.trades reports the newest tick, not the oldest', async () => {
+    // The recorded CLI fixture `packages/longbridge-tools/src/testing/fixtures/trades.json`
+    // (`longbridge trades NVDA.US --count 20 --format json`) is ordered oldest → newest,
+    // and `parseTradesResponse` preserves that order, so the newest tick is the last one.
+    const trades = createMarketTradesCapability(
+      fetchers({
+        getTrades: async () => [
+          {
+            symbol: 'NVDA.US',
+            timestamp: 1710000000,
+            price: 224.12,
+            volume: 1,
+            direction: 'Up',
+            type: 'I',
+          },
+          {
+            symbol: 'NVDA.US',
+            timestamp: 1710000060,
+            price: 224.14,
+            volume: 3,
+            direction: 'Up',
+            type: 'I',
+          },
+        ],
+      })
+    );
+    const result = await trades.execute({ symbol: 'NVDA.US' }, { now: () => 12345 });
+    expect(result.summary).toContain('latest @ $224.14');
+    expect(result.summary).not.toContain('latest @ $224.12');
   });
 
   it('validates research.events requires a known eventType', async () => {

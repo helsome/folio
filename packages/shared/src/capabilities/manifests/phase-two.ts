@@ -66,7 +66,10 @@ export function createMarketTradesCapability(
     async execute(input, ctx) {
       const symbol = normalizeSymbol(input.symbol);
       const trades = await fetchers.getTrades(symbol, input.count ?? 20);
-      const latest = trades[0];
+      // The CLI returns trades oldest → newest (see the recorded fixture
+      // `packages/longbridge-tools/src/testing/fixtures/trades.json`), so the
+      // newest tick is the last one — matching `market.kline` / `market.intraday`.
+      const latest = trades[trades.length - 1];
       return {
         data: trades,
         provenance: {
