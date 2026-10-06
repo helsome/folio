@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink, Info } from 'lucide-react';
+import { formatDate } from '@finagent/i18n';
 import type { EvaluationSettings, LangSmithConnectionStatus, LangfuseConnectionStatus, PrivacyLevel } from '@finagent/core';
 import { useFinagentClient } from '../../client';
 import { Button } from '../primitives/Button';
@@ -36,11 +37,7 @@ const fieldClass =
   'mac-input h-8 w-full rounded-[10px] px-3 text-[12px] text-foreground placeholder:text-foreground/38 focus:outline-none focus:ring-2 focus:ring-accent/28';
 
 function formatUpdated(updatedAt: number): string {
-  return new Date(updatedAt).toLocaleDateString(undefined, {
-    year: 'numeric',
-    month: 'short',
-    day: 'numeric',
-  });
+  return formatDate(updatedAt);
 }
 
 export const EvaluationSettingsTab: React.FC = () => {

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatDate } from '@finagent/i18n';
 import type {
   DiffCategory,
   DiffDirection,
@@ -50,7 +51,7 @@ export const WhatChangedSection: React.FC<WhatChangedSectionProps> = ({ diff, pr
         {previousReport && (
           <span className="text-[11px] text-text-muted">
             {t('research.since', {
-              date: new Date(previousReport.generatedAt).toLocaleDateString(),
+              date: formatDate(previousReport.generatedAt),
             })}
           </span>
         )}
