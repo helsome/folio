@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'bun:test';
-import type { PortfolioSnapshot } from '@finagent/core';
-import { portfolioFailureFromError, portfolioFailureFromSnapshot } from './portfolioFailure';
+import type { PortfolioFailure, PortfolioFailureKind, PortfolioSnapshot } from '@finagent/core';
+import { createSyncI18n } from '@finagent/i18n';
+import {
+  portfolioFailureDetail,
+  portfolioFailureDiagnostic,
+  portfolioFailureFromError,
+  portfolioFailureFromSnapshot,
+} from './portfolioFailure';
 import { formatMoney, formatPercent, formatSignedMoney } from './money';
 
 function snapshot(overrides: Partial<PortfolioSnapshot> = {}): PortfolioSnapshot {
@@ -26,6 +32,89 @@ describe('portfolioFailureFromError', () => {
   it('never echoes raw vendor output in the message', () => {
     const failure = portfolioFailureFromError({ code: 'LONGBRIDGE_PARSE_FAILURE', message: 'raw {{{}' });
     expect(failure.message).not.toContain('{{{');
+  });
+});
+
+describe('portfolioFailureDiagnostic', () => {
+  it('hides the fixed per-kind sentence so the UI renders localized copy instead', () => {
+    // Every known code resolves to a hardcoded English KIND_MESSAGES sentence;
+    // showing it verbatim is the bug this predicate exists to prevent.
+    expect(
+      portfolioFailureDiagnostic(portfolioFailureFromError({ code: 'LONGBRIDGE_TIMEOUT' }))
+    ).toBeUndefined();
+    expect(
+      portfolioFailureDiagnostic(
+        portfolioFailureFromSnapshot(snapshot({ totalAssets: 100, holdings: [] })) as PortfolioFailure
+      )
+    ).toBeUndefined();
+  });
+
+  it('surfaces a real envelope message for provider-error', () => {
+    const failure = portfolioFailureFromError({
+      code: 'SOMETHING_ELSE',
+      message: 'connection is locked',
+    });
+    expect(portfolioFailureDiagnostic(failure)).toBe('connection is locked');
+  });
+
+  it('returns undefined when provider-error has no usable message', () => {
+    expect(portfolioFailureDiagnostic(portfolioFailureFromError(undefined))).toBeUndefined();
+    expect(
+      portfolioFailureDiagnostic(
+        portfolioFailureFromError({ code: 'SOMETHING_ELSE', message: '   ' })
+      )
+    ).toBeUndefined();
+  });
+});
+
+describe('portfolioFailureDetail', () => {
+  const ALL_KINDS: Record<PortfolioFailureKind, true> = {
+    'not-connected': true,
+    'no-account-permission': true,
+    empty: true,
+    partial: true,
+    'provider-error': true,
+    'parse-error': true,
+    timeout: true,
+  };
+
+  const translate = (locale: 'en-US' | 'zh-CN') => {
+    const i18n = createSyncI18n({ locale });
+    return (key: string, options?: Record<string, unknown>): string => i18n.t(key, options);
+  };
+
+  it('renders copy for every kind and resolves it per locale', () => {
+    const zh = translate('zh-CN');
+    const en = translate('en-US');
+    for (const kind of Object.keys(ALL_KINDS) as PortfolioFailureKind[]) {
+      // Empty message => every kind falls back to its locale copy (see the next
+      // case for the provider-error diagnostic pass-through).
+      const failure: PortfolioFailure = { kind, message: '' };
+      const zhText = portfolioFailureDetail(zh, failure);
+      const enText = portfolioFailureDetail(en, failure);
+      expect(zhText).not.toContain('portfolio.failureDetail');
+      expect(enText).not.toContain('portfolio.failureDetail');
+      expect(zhText).not.toBe(enText);
+    }
+  });
+
+  it('never surfaces the English table sentence', () => {
+    const zh = translate('zh-CN');
+    for (const kind of Object.keys(ALL_KINDS) as PortfolioFailureKind[]) {
+      if (kind === 'provider-error') continue;
+      expect(
+        portfolioFailureDetail(zh, { kind, message: 'expected English table sentence' })
+      ).not.toContain('expected English table sentence');
+    }
+  });
+
+  it('still surfaces a provider-error diagnostic verbatim', () => {
+    expect(
+      portfolioFailureDetail(translate('zh-CN'), {
+        kind: 'provider-error',
+        message: 'connection is locked',
+      })
+    ).toBe('connection is locked');
   });
 });
 
