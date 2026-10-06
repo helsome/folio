@@ -5,6 +5,7 @@ import { execSync, spawn } from 'node:child_process';
 import { existsSync, mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveElectronBinary } from './electron-harness.mjs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -14,7 +15,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, '..');
 const repoRoot = join(here, '../../..');
 const electronMain = join(appRoot, 'src/main/index.ts');
-const electronBinary = join(repoRoot, 'node_modules/.bun/electron@39.8.9/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron');
+const electronBinary = resolveElectronBinary(appRoot, repoRoot);
 const cdpPort = 9367;
 const cdpUrl = `http://127.0.0.1:${cdpPort}`;
 const userDataDir = join(appRoot, 'e2e/.user-data-v9verify');
