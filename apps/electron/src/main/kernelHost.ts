@@ -1579,6 +1579,12 @@ export class AgentKernelHost {
     } catch {
       // Provider wiring lands with the connector slice; empty until then.
     }
+    // `providerSummaries` lists every REGISTERED provider, and the broker is
+    // registered unconditionally in the constructor — so "is the broker in the
+    // list" is a constant, not a connection state. Ask the broker itself, the
+    // way `entryFor` does for the Connections surface.
+    const { connected: brokerConnected, accountCount: brokerAccountCount } =
+      await this.brokerAccountFacts();
     return collectDiagnostics({
       version: app.getVersion(),
       os: process.platform,
@@ -1589,8 +1595,8 @@ export class AgentKernelHost {
       llmProviderId: llmState?.model?.provider ?? null,
       llmModel: llmState?.model?.id ?? null,
       financialProviders: providerSummaries,
-      brokerConnected: providerSummaries.some((p) => p.id === 'longbridge-broker'),
-      brokerAccountCount: providerSummaries.some((p) => p.id === 'longbridge-broker') ? 1 : 0,
+      brokerConnected,
+      brokerAccountCount,
       skillsLoadedCount: this.skillHub.listSkills().length,
       capabilities: this.registry,
       resources: { dev: !app.isPackaged, root: getRuntimeRoot() },
@@ -2458,6 +2464,28 @@ export class AgentKernelHost {
       }
     } catch {
       // Push is best-effort; the UI can re-list on demand.
+    }
+  }
+
+  /**
+   * Broker facts for the diagnostics bundle. Registration is not connection:
+   * the broker provider is registered unconditionally at construction, so its
+   * presence in the provider list says nothing about whether an account is
+   * actually signed in. Ask the broker for its accounts — the same call
+   * `entryFor` makes for the Connections surface.
+   */
+  private async brokerAccountFacts(): Promise<{ connected: boolean; accountCount: number }> {
+    const broker = this.providerRouter.list().find((provider) => provider.kind === 'broker-account');
+    if (!broker || broker.kind !== 'broker-account') {
+      return { connected: false, accountCount: 0 };
+    }
+    try {
+      const accounts = await broker.accounts();
+      if (!accounts.ok) return { connected: false, accountCount: 0 };
+      return { connected: accounts.data.length > 0, accountCount: accounts.data.length };
+    } catch {
+      // A broker that cannot answer is reported as not connected.
+      return { connected: false, accountCount: 0 };
     }
   }
 
