@@ -89,16 +89,20 @@ const SEVERITY_RANK: Record<BriefSeverity, number> = {
 
 /** Build a deterministic DailyBrief from app-domain inputs. */
 export function buildBrief(inputs: BriefInputs, now: number = Date.now()): DailyBrief {
+  // `inputs.runs` is the full run history, but the brief is day-scoped: both the
+  // attention items and the quiet scope must collapse to today's latest run per
+  // rule, otherwise stale runs keep resurfacing as "things need your attention".
+  const todaysRuns = latestRunsForCurrentDay(inputs.runs, now)
   const items = [
     ...portfolioItems(inputs),
     ...watchlistItems(inputs),
     ...thesisItems(inputs),
     ...alertItems(inputs),
-    ...automationItems(inputs),
+    ...automationItems(todaysRuns),
   ]
   items.sort(compareItems)
 
-  const noMaterialRunSymbols = latestRunsForCurrentDay(inputs.runs, now)
+  const noMaterialRunSymbols = todaysRuns
     .filter((run) => run.outcome === 'no_material_update')
     .flatMap((run) => run.scopeSnapshot?.symbols ?? [])
   const monitored = union([
@@ -197,8 +201,8 @@ function alertItems(inputs: BriefInputs): BriefItem[] {
   }))
 }
 
-function automationItems(inputs: BriefInputs): BriefItem[] {
-  return inputs.runs
+function automationItems(runs: AutomationRun[]): BriefItem[] {
+  return runs
     .filter((run) => run.materialChanges > 0 || run.notified)
     .map((run) => ({
       id: `automation-${run.id}`,
