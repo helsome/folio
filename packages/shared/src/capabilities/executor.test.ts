@@ -62,6 +62,29 @@ describe('CapabilityExecutor.run', () => {
     expect(record.status).toBe('unavailable');
   });
 
+  // Production runs capabilities through the router-backed fetchers
+  // (`kernelHost` builds the registry with `createRouterFetchers`), so the
+  // failure that reaches the executor carries the normalized provider code
+  // emitted by `toProviderError` — never the vendor `LONGBRIDGE_*` code used
+  // above. These are the same "can't serve right now" cases the table
+  // documents (missing auth / rate limited / timed out).
+  for (const [code, message] of [
+    ['AUTH_EXPIRED', 'Longbridge session expired. Reconnect from the Connections page.'],
+    ['RATE_LIMITED', 'Longbridge rate limit reached. Wait a moment and retry.'],
+    ['TIMEOUT', 'Longbridge request timed out.'],
+  ] as const) {
+    it(`maps the router-backed provider code ${code} to unavailable`, async () => {
+      const executor = new CapabilityExecutor();
+      const cap = makeCap('market.quote', 'get_quote', async () => {
+        throw Object.assign(new Error(message), { code });
+      });
+
+      const { record } = await executor.run(cap, {});
+
+      expect(record.status).toBe('unavailable');
+    });
+  }
+
   it('records cancelled when a capability exceeds its timeout', async () => {
     const executor = new CapabilityExecutor();
     const cap = makeCap('market.quote', 'get_quote', async (_input, ctx) => {
