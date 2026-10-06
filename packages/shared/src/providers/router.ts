@@ -400,6 +400,15 @@ export class ProviderRouter implements FinancialProviderRouter {
     input: unknown,
     externalSignal?: AbortSignal
   ): Promise<ProviderResult<T>> {
+    // A signal that is already aborted never fires the listener registered
+    // below, so the cancellation would be silently dropped. This is reachable
+    // even though `execute` checks `signal.aborted` up front: the caller can
+    // cancel while async routing resolution or the enablement gate is pending.
+    // The external-abort contract of this method must hold either way.
+    if (externalSignal?.aborted) {
+      return { ok: false, error: ABORTED };
+    }
+
     if (!this.timeoutMs) {
       return this.invoke<T>(provider, capabilityId, input, externalSignal);
     }

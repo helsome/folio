@@ -304,6 +304,86 @@ describe('ProviderRouter.execute', () => {
     expect(primaryCalls).toBe(0);
   });
 
+  it('surfaces ABORTED when the signal is aborted while the enablement gate is pending', async () => {
+    const controller = new AbortController();
+    let providerCalls = 0;
+    const router = new ProviderRouter({
+      timeoutMs: 1000,
+      // Cancellation lands after `execute`'s entry check but before the provider
+      // is invoked: the gate itself is still in flight.
+      isEnabled: async () => {
+        controller.abort();
+        return true;
+      },
+    });
+    router.register(
+      new FakeFinancialDataProvider('primary', 'Primary', ['market.quote'], async () => {
+        providerCalls += 1;
+        return success('primary', 'Primary', { value: 'p' });
+      })
+    );
+    router.setRouting({ primary: 'primary' });
+
+    const result = await router.execute('market.quote', {}, controller.signal);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('ABORTED');
+    }
+    expect(providerCalls).toBe(0);
+  });
+
+  it('surfaces ABORTED when the signal is aborted while async routing resolution is pending', async () => {
+    const controller = new AbortController();
+    let providerCalls = 0;
+    const router = new ProviderRouter({
+      timeoutMs: 1000,
+      resolveRouting: async () => {
+        controller.abort();
+        return { primary: 'primary' };
+      },
+    });
+    router.register(
+      new FakeFinancialDataProvider('primary', 'Primary', ['market.quote'], async () => {
+        providerCalls += 1;
+        return success('primary', 'Primary', { value: 'p' });
+      })
+    );
+
+    const result = await router.execute('market.quote', {}, controller.signal);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('ABORTED');
+    }
+    expect(providerCalls).toBe(0);
+  });
+
+  it('surfaces ABORTED mid-gate even when no timeout is configured', async () => {
+    const controller = new AbortController();
+    let providerCalls = 0;
+    const router = new ProviderRouter({
+      // No `timeoutMs`: the external-abort contract must not depend on the
+      // timeout path being enabled.
+      isEnabled: async () => {
+        controller.abort();
+        return true;
+      },
+    });
+    router.register(
+      new FakeFinancialDataProvider('primary', 'Primary', ['market.quote'], async () => {
+        providerCalls += 1;
+        return success('primary', 'Primary', { value: 'p' });
+      })
+    );
+    router.setRouting({ primary: 'primary' });
+
+    const result = await router.execute('market.quote', {}, controller.signal);
+    expect(result.ok).toBe(false);
+    if (!result.ok) {
+      expect(result.error.code).toBe('ABORTED');
+    }
+    expect(providerCalls).toBe(0);
+  });
+
   it('removes external abort listeners after successful calls on a shared signal', async () => {
     const router = new ProviderRouter({ timeoutMs: 100 });
     router.register(
