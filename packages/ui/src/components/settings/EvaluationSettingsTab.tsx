@@ -1,7 +1,9 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { ExternalLink, Info } from 'lucide-react';
-import type { EvaluationSettings, LangSmithConnectionStatus, LangfuseConnectionStatus, PrivacyLevel } from '@finagent/core';
+import type { ApiError, EvaluationSettings, LangSmithConnectionStatus, LangfuseConnectionStatus, PrivacyLevel } from '@finagent/core';
+import { translateErrorCode } from '@finagent/i18n';
 import { useFinagentClient } from '../../client';
 import { Button } from '../primitives/Button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '../ui/select';
@@ -18,6 +20,22 @@ const DEFAULT_LANGSMITH_UI = 'https://smith.langchain.com';
 const DEFAULT_LANGFUSE_UI = 'https://cloud.langfuse.com';
 const ENDPOINT_PLACEHOLDER = 'https://api.smith.langchain.com';
 const LANGFUSE_HOST_PLACEHOLDER = 'https://cloud.langfuse.com';
+
+/**
+ * User-facing copy for a failed `ApiResult`.
+ *
+ * `@finagent/i18n` registers localised copy per *stable* `ApiError.code`
+ * (`ERROR_CODE_TO_KEY` → the `errors.*` namespace) and documents that resolver
+ * as the user-facing path, with the sanitized technical message reserved for
+ * Diagnostics. This page rendered `error.message` straight from the IPC
+ * envelope instead, so every failure surfaced as English even under zh-CN.
+ *
+ * Registered code → localised copy; unregistered code → keep the sanitized
+ * message rather than losing it; no message at all → the page's own copy.
+ */
+function errorCopy(t: TFunction, error: ApiError | undefined, fallbackKey: string): string {
+  return translateErrorCode(error?.code, t) ?? error?.message ?? t(fallbackKey);
+}
 
 const PRIVACY_LEVELS: Array<{ id: PrivacyLevel; labelKey: string; hintKey: string }> = [
   { id: 'minimal', labelKey: 'settings.evaluation.privacyMinimal', hintKey: 'settings.evaluation.privacyMinimalHint' },
@@ -87,7 +105,7 @@ export const EvaluationSettingsTab: React.FC = () => {
       if (result && result.error.code === 'CLIENT_UNAVAILABLE') {
         setUnavailable(true);
       } else {
-        setLoadError(result?.error.message ?? t('settings.evaluation.failedToLoad'));
+        setLoadError(errorCopy(t, result?.error, 'settings.evaluation.failedToLoad'));
       }
       setLoading(false);
       return;
@@ -115,7 +133,7 @@ export const EvaluationSettingsTab: React.FC = () => {
     if (result?.ok) {
       setSettings(result.data);
     } else {
-      setSaveError(result?.error.message ?? t('settings.evaluation.couldNotUpdateTracing'));
+      setSaveError(errorCopy(t, result?.error, 'settings.evaluation.couldNotUpdateTracing'));
     }
     setTracingBusy(false);
   };
@@ -134,7 +152,7 @@ export const EvaluationSettingsTab: React.FC = () => {
       setSettings(result.data);
       setSaveSuccess(t('settings.evaluation.settingsSaved'));
     } else {
-      setSaveError(result?.error.message ?? t('settings.evaluation.couldNotSaveSettings'));
+      setSaveError(errorCopy(t, result?.error, 'settings.evaluation.couldNotSaveSettings'));
     }
     setSaveBusy(false);
   };
@@ -158,7 +176,7 @@ export const EvaluationSettingsTab: React.FC = () => {
         });
       }
     } else {
-      setTestResult({ ok: false, message: result?.error.message ?? t('settings.evaluation.connectionTestFailed') });
+      setTestResult({ ok: false, message: errorCopy(t, result?.error, 'settings.evaluation.connectionTestFailed') });
     }
     setTestBusy(false);
   };
@@ -178,7 +196,7 @@ export const EvaluationSettingsTab: React.FC = () => {
       setApiKey('');
       await refresh();
     } else {
-      setKeyError(result?.error.message ?? t('settings.evaluation.couldNotSaveApiKey'));
+      setKeyError(errorCopy(t, result?.error, 'settings.evaluation.couldNotSaveApiKey'));
     }
     setKeyBusy(false);
   };
@@ -191,7 +209,7 @@ export const EvaluationSettingsTab: React.FC = () => {
       setApiKey('');
       await refresh();
     } else {
-      setKeyError(result?.error.message ?? t('settings.evaluation.couldNotRemoveApiKey'));
+      setKeyError(errorCopy(t, result?.error, 'settings.evaluation.couldNotRemoveApiKey'));
     }
     setKeyBusy(false);
   };
@@ -204,7 +222,7 @@ export const EvaluationSettingsTab: React.FC = () => {
     if (result?.ok) {
       setSettings(result.data);
     } else {
-      setSaveError(result?.error.message ?? t('settings.evaluation.couldNotUpdateTracing'));
+      setSaveError(errorCopy(t, result?.error, 'settings.evaluation.couldNotUpdateTracing'));
     }
     setLangfuseTracingBusy(false);
   };
@@ -225,7 +243,7 @@ export const EvaluationSettingsTab: React.FC = () => {
     } else {
       setLangfuseTestResult({
         ok: false,
-        message: result?.error.message ?? t('settings.evaluation.connectionTestFailed'),
+        message: errorCopy(t, result?.error, 'settings.evaluation.connectionTestFailed'),
       });
     }
     setLangfuseTestBusy(false);
@@ -248,7 +266,7 @@ export const EvaluationSettingsTab: React.FC = () => {
       setLangfuseSecretKey('');
       await refresh();
     } else {
-      setLangfuseKeyError(result?.error.message ?? t('settings.evaluation.couldNotSaveApiKey'));
+      setLangfuseKeyError(errorCopy(t, result?.error, 'settings.evaluation.couldNotSaveApiKey'));
     }
     setLangfuseKeyBusy(false);
   };
@@ -262,7 +280,7 @@ export const EvaluationSettingsTab: React.FC = () => {
       setLangfuseSecretKey('');
       await refresh();
     } else {
-      setLangfuseKeyError(result?.error.message ?? t('settings.evaluation.couldNotRemoveApiKey'));
+      setLangfuseKeyError(errorCopy(t, result?.error, 'settings.evaluation.couldNotRemoveApiKey'));
     }
     setLangfuseKeyBusy(false);
   };
