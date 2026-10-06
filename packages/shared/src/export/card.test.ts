@@ -77,6 +77,21 @@ describe('reportToShareCard', () => {
     expect(svg).toContain('…')
   })
 
+  it('wraps a whitespace-free CJK key risk into the two-line risk block', () => {
+    const cjkRisk =
+      '估值仍处高位而盈利增速与订单动能同步放缓一旦指引下修可能触发估值与业绩同步回落须警惕流动性收紧与汇率波动带来的二次冲击'
+    const { svg } = reportToShareCard(reportFixture({ risks: [cjkRisk] }))
+    const rendered = [...svg.matchAll(/<text x="32" y="(?:310|334|358)"[^>]*>([^<]*)<\/text>/g)].map(
+      (match) => match[1]
+    )
+    expect(rendered).toHaveLength(2)
+    for (const line of rendered) {
+      // 56 columns of budget → at most 28 full-width glyphs per line.
+      expect([...line].length).toBeLessThanOrEqual(28)
+    }
+    expect(svg).toContain('…')
+  })
+
   it('is deterministic — identical reports render identical bytes', () => {
     const report = reportFixture()
     const first = reportToShareCard(report)
@@ -120,5 +135,14 @@ describe('wrapText', () => {
 
   it('returns an empty array for empty input', () => {
     expect(wrapText('', 10)).toEqual([])
+  })
+
+  it('breaks CJK text between ideographs — it has no whitespace to split on', () => {
+    // Eight full-width glyphs at two columns each → three glyphs per 6-column line.
+    expect(wrapText('中文测试中文测试', 6)).toEqual(['中文测', '试中文', '测试'])
+  })
+
+  it('keeps the whitespace that separates mixed CJK and Latin atoms', () => {
+    expect(wrapText('AAPL 上涨明显', 10)).toEqual(['AAPL 上涨', '明显'])
   })
 })
