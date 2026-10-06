@@ -8,7 +8,11 @@ import { useFinagentClient } from '../../client';
 type TFunc = (key: string, vars?: Record<string, unknown>) => string;
 
 const relativeTime = (timestamp: number, t: TFunc): string => {
-  const diff = Date.now() - timestamp;
+  // `NewsItem.timestamp` is epoch SECONDS (packages/core/src/market-data.ts:10),
+  // while `Date.now()` is epoch ms — convert before subtracting, otherwise every
+  // age collapses to "N years ago". The capability layer applies the same
+  // conversion (`research-news.ts:57`).
+  const diff = Date.now() - timestamp * 1000;
   if (diff < 0) return t('security.news.justNow');
   const minutes = Math.floor(diff / 60000);
   if (minutes < 1) return t('security.news.justNow');
