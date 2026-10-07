@@ -21,9 +21,22 @@ When starting work on this project, Claude Code will automatically:
 ## Skill System
 
 Finance Agent uses a **Skill Hub** system for extensibility. Skills are loaded
-from `SKILL.md` files (`<skillsDir>/<name>/SKILL.md`) with frontmatter
-(name/keywords) and can be enabled/disabled; the choice persists to
-`skills-state.json`. Marketplace and editor features are out of scope for V1.
+from `SKILL.md` packages in two ordered roots:
+
+1. bundled skills shipped under the runtime resources `skills/` directory;
+2. user-installed skills under `~/.finagent/skills/`.
+
+Bundled skills are authoritative when ids collide. The Settings → Skills
+screen can import a local package directory and remove user-installed packages;
+bundled packages cannot be overwritten or removed. Enable/disable choices
+persist to `skills-state.json`.
+
+Local imports require a `SKILL.md` with a lowercase, hyphenated id and non-empty
+`name`/`description`. The installer rejects symbolic links, special files,
+packages over 1,000 files or 50 MB, and existing ids. It copies into a staging
+directory before an atomic rename, so failed imports do not leave partial
+packages. Removal uses the operating system Trash. A remote community catalog
+and URL installation remain future work.
 
 The current agent path runs on the persistent **Agent Kernel** in the Electron
 main process:

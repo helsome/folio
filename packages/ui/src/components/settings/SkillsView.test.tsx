@@ -47,6 +47,7 @@ const FIXTURE: SkillListItem = {
   description: 'Market data via Longbridge CLI',
   riskLevel: 'read_only',
   tier: 'read',
+  source: 'bundled',
 };
 
 function clientWith(overrides: Partial<FinagentClient['skills']>): FinagentClient {
@@ -58,6 +59,8 @@ function clientWith(overrides: Partial<FinagentClient['skills']>): FinagentClien
       listResources: async () => ({ ok: true, data: [] }),
       readResource: async () => ({ ok: true, data: '# sample' }),
       readiness: async () => ({ ok: true, data: [] }),
+      installLocal: async () => ({ ok: true, data: { canceled: true } }),
+      remove: async () => ({ ok: true, data: undefined }),
       ...overrides,
     },
   };
@@ -126,5 +129,85 @@ describe('SkillsView toggle', () => {
     expect(toggle.getAttribute('aria-checked')).toBe('false');
     expect(toggle.getAttribute('aria-busy')).toBe('false');
     expect(container.querySelector('[data-testid="skill-toggle-error-longbridge"]')).toBeNull();
+  });
+});
+
+describe('SkillsView local install', () => {
+  it('installs a selected package, reloads the list, and reports success', async () => {
+    let listCalls = 0;
+    const client = clientWith({
+      list: async () => {
+        listCalls += 1;
+        return { ok: true, data: [FIXTURE] };
+      },
+      installLocal: async () => ({
+        ok: true,
+        data: { canceled: false, skillId: 'custom-skill', name: 'Custom Skill', source: 'user' },
+      }),
+    });
+    const { container } = await renderSkillsView(client);
+    const install = container.querySelector<HTMLButtonElement>('[data-testid="skills-install-local"]');
+    expect(install).not.toBeNull();
+
+    await act(async () => {
+      install?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    expect(listCalls).toBe(2);
+    expect(container.querySelector('[data-testid="skills-install-message"]')?.textContent).toContain('Custom Skill');
+  });
+
+  it('shows installer failures without replacing the current list', async () => {
+    const client = clientWith({
+      installLocal: async () => ({
+        ok: false,
+        error: { code: 'SKILL_INSTALL_FAILED', message: 'SKILL.md is missing' },
+      }),
+    });
+    const { container } = await renderSkillsView(client);
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="skills-install-local"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+
+    const message = container.querySelector('[data-testid="skills-install-message"]');
+    expect(message?.getAttribute('role')).toBe('alert');
+    expect(message?.textContent).toContain('SKILL.md is missing');
+    expect(container.querySelector('[data-testid="skill-row-longbridge"]')).not.toBeNull();
+  });
+
+  it('removes a user skill only after confirmation and reloads the list', async () => {
+    let removeCalls = 0;
+    let listCalls = 0;
+    const userSkill: SkillListItem = { ...FIXTURE, id: 'custom-skill', name: 'Custom Skill', source: 'user' };
+    const client = clientWith({
+      list: async () => {
+        listCalls += 1;
+        return { ok: true, data: listCalls === 1 ? [userSkill] : [] };
+      },
+      remove: async () => {
+        removeCalls += 1;
+        return { ok: true, data: undefined };
+      },
+    });
+    const { container } = await renderSkillsView(client);
+
+    await act(async () => {
+      container.querySelector<HTMLElement>('[data-testid="skill-row-custom-skill"]')
+        ?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+    });
+    let confirms = 0;
+    window.confirm = () => {
+      confirms += 1;
+      return true;
+    };
+    const removeButton = document.querySelector<HTMLButtonElement>('[data-testid="skill-remove"]');
+    expect(removeButton).not.toBeNull();
+    await act(async () => removeButton?.click());
+
+    expect(confirms).toBe(1);
+    expect(removeCalls).toBe(1);
+    expect(listCalls).toBe(2);
   });
 });

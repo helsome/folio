@@ -2,6 +2,7 @@ export {
   isPackaged,
   getRuntimeRoot,
   getSkillsDir,
+  getUserSkillsDir,
   getPiExtensionEntry,
   getLangSmithExtensionEntry,
   listBundledPiExtensions,

@@ -10,6 +10,7 @@ function skill(overrides: Partial<SkillListItem> = {}): SkillListItem {
     keywords: ['quote', 'kline'],
     enabled: true,
     description: 'Market data via Longbridge CLI',
+    source: 'bundled',
     ...overrides,
   };
 }
