@@ -142,6 +142,15 @@ export interface JudgeConfigResolution {
 }
 
 /**
+ * Judge settings arrive from CLI flags, `process.env`, or a `.env` / secret
+ * file, so surrounding whitespace is a real input. Normalize once here so the
+ * preflight below and {@link resolveJudgeConfig} agree on what is configured.
+ */
+function judgeSetting(value: string | undefined): string {
+  return (value ?? '').trim();
+}
+
+/**
  * Like {@link resolveJudgeConfig}, but distinguishes "no judge requested" from
  * "judge requested but misconfigured". The live preflight (issue #113) needs
  * the latter to be an explicit failure rather than a silent deterministic-only
@@ -151,9 +160,9 @@ export function resolveJudgeConfigStatus(
   env: NodeJS.ProcessEnv,
   explicit?: { provider?: string; model?: string; apiKey?: string; baseUrl?: string },
 ): JudgeConfigResolution {
-  const provider = (explicit?.provider ?? env.FINAGENT_JUDGE_PROVIDER ?? '').trim();
-  const model = (explicit?.model ?? env.FINAGENT_JUDGE_MODEL ?? '').trim();
-  const apiKey = explicit?.apiKey ?? env.FINAGENT_JUDGE_API_KEY ?? '';
+  const provider = judgeSetting(explicit?.provider ?? env.FINAGENT_JUDGE_PROVIDER);
+  const model = judgeSetting(explicit?.model ?? env.FINAGENT_JUDGE_MODEL);
+  const apiKey = judgeSetting(explicit?.apiKey ?? env.FINAGENT_JUDGE_API_KEY);
   const requested = provider.length > 0 || model.length > 0 || apiKey.length > 0;
   if (!requested) return { requested: false, missing: [] };
 
@@ -175,9 +184,9 @@ export function resolveJudgeConfig(
   env: NodeJS.ProcessEnv,
   explicit?: { provider?: string; model?: string; apiKey?: string; baseUrl?: string; headers?: Record<string, string> },
 ): ResolvedJudgeConfig | undefined {
-  const provider = (explicit?.provider ?? env.FINAGENT_JUDGE_PROVIDER ?? '').toLowerCase();
-  const model = explicit?.model ?? env.FINAGENT_JUDGE_MODEL;
-  const apiKey = explicit?.apiKey ?? env.FINAGENT_JUDGE_API_KEY;
+  const provider = judgeSetting(explicit?.provider ?? env.FINAGENT_JUDGE_PROVIDER).toLowerCase();
+  const model = judgeSetting(explicit?.model ?? env.FINAGENT_JUDGE_MODEL);
+  const apiKey = judgeSetting(explicit?.apiKey ?? env.FINAGENT_JUDGE_API_KEY);
   if (!provider || !model || !apiKey) return undefined;
   const headers = explicit?.headers ?? parseJudgeHeaders(env.FINAGENT_JUDGE_HEADERS);
   const extra = headers ? { headers } : {};
