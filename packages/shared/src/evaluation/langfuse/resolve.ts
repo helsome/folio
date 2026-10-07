@@ -1,6 +1,6 @@
 import type { EvaluationSettings, PrivacyLevel } from '@finagent/core';
 import { NoopEvaluationBackend, type EvaluationBackend, type FetchLike } from '../backend.ts';
-import { LangfuseEvaluationBackend, langfuseCredentialsFromEnv, parseLangfuseCredential } from './backend.ts';
+import { LangfuseEvaluationBackend, isLangfuseTracingEnabled, langfuseCredentialsFromEnv, parseLangfuseCredential } from './backend.ts';
 
 export interface ResolveLangfuseInput {
   settings: Pick<EvaluationSettings, 'langfuseTracingEnabled' | 'langfuseHost' | 'privacyLevel'> & {
@@ -19,12 +19,11 @@ export interface ResolveLangfuseInput {
  */
 export function resolveLangfuseBackend(input: ResolveLangfuseInput): EvaluationBackend {
   const env = input.env ?? process.env;
-  const enabled = input.settings.langfuseTracingEnabled === true
-    || env.LANGFUSE_TRACING === 'true'
-    || env.LANGFUSE_TRACING === '1'
-    || env.LANGFUSE_TRACING === 'yes'
-    || env.LANGFUSE_TRACING === 'on';
-  if (!enabled) return new NoopEvaluationBackend();
+  // Single source of truth for the switch: `isLangfuseTracingEnabled` is the
+  // exported, tested parser. Parsing `LANGFUSE_TRACING` again here (exact-match)
+  // made the same env value mean two different things — `TRUE` / ` on ` turned
+  // tracing on for the helper and off for every real backend.
+  if (!isLangfuseTracingEnabled(input.settings, env)) return new NoopEvaluationBackend();
   const fromStore = parseLangfuseCredential(input.storedCredential);
   const fromEnv = langfuseCredentialsFromEnv(env);
   const creds = fromStore ?? (fromEnv ? { publicKey: fromEnv.publicKey, secretKey: fromEnv.secretKey } : undefined);
