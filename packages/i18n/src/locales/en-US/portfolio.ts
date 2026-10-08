@@ -80,4 +80,9 @@ export const portfolio = {
     review: 'Review',
     needsReview: 'Needs review',
   },
+  severity: {
+    high: 'High',
+    medium: 'Medium',
+    low: 'Low',
+  },
 } satisfies NamespaceResource;

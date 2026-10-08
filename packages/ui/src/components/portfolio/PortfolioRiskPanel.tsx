@@ -112,6 +112,7 @@ const AllocationBar: React.FC<{ item: AllocationItem }> = ({ item }) => (
 );
 
 const SignalCard: React.FC<{ signal: RiskSignal }> = ({ signal }) => {
+  const { t } = useTranslation();
   const visual = severityVisual(signal.severity);
   return (
     <div className="mac-stock-tile rounded-[12px] p-3">
@@ -122,7 +123,7 @@ const SignalCard: React.FC<{ signal: RiskSignal }> = ({ signal }) => {
         />
         <span className="text-[13px] font-semibold text-foreground/88">{signal.title}</span>
         <span className="ml-auto text-[11px] uppercase tracking-wide" style={{ color: visual.color }}>
-          {visual.label}
+          {t(visual.labelKey)}
         </span>
       </div>
       <div className="mt-1 text-[12px] leading-relaxed text-foreground/60">{signal.detail}</div>

@@ -6,9 +6,10 @@ import { loadPortfolioRiskReport } from '../client/portfolio-risk';
  * Portfolio risk view state.
  *
  * Analysis is computed in the main process (registry × fetchers) and exposed
- * to the UI over IPC. The channel (`window.electronAPI.portfolioRisk.analyze()`)
- * is not wired yet, so the loader degrades to `null` until the Lead adds it —
- * the panel then renders the graceful empty state.
+ * to the UI over IPC (`portfolioRisk:analyze` →
+ * `window.electronAPI.portfolioRisk.analyze()`). The loader returns `null`
+ * when the bridge is unavailable or the call fails, so the panel renders its
+ * graceful empty state.
  */
 
 export interface PortfolioRiskCache {
@@ -46,18 +47,19 @@ export const resetPortfolioRiskAtom = atom(null, (_get, set) => {
 export interface SeverityVisual {
   tone: 'high' | 'medium' | 'low';
   color: string;
-  label: string;
+  /** i18n key under `portfolio.severity.*`; the caller resolves it with `t()`. */
+  labelKey: string;
 }
 
 export function severityVisual(severity: RiskSeverity): SeverityVisual {
   switch (severity) {
     case 'high':
-      return { tone: 'high', color: 'var(--mac-red)', label: 'High' };
+      return { tone: 'high', color: 'var(--mac-red)', labelKey: 'portfolio.severity.high' };
     case 'medium':
-      return { tone: 'medium', color: 'var(--mac-yellow)', label: 'Medium' };
+      return { tone: 'medium', color: 'var(--mac-yellow)', labelKey: 'portfolio.severity.medium' };
     case 'low':
     default:
-      return { tone: 'low', color: 'var(--mac-green)', label: 'Low' };
+      return { tone: 'low', color: 'var(--mac-green)', labelKey: 'portfolio.severity.low' };
   }
 }
 
