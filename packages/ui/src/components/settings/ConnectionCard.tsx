@@ -1,5 +1,6 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatDateTime } from '@finagent/i18n';
 import type { FinancialProviderStatus } from '@finagent/core';
 import { useFinagentClient } from '../../client';
 import {
@@ -320,7 +321,7 @@ export const ConnectionCard: React.FC<{
           {quoteAccess && <span>{quoteAccess}</span>}
           {portfolioReady && <span className="text-success">{t('connections.portfolioReady')}</span>}
           {lastCheck != null && (
-            <span className="tabular-nums">{new Date(lastCheck).toLocaleString()}</span>
+            <span className="tabular-nums">{formatDateTime(lastCheck)}</span>
           )}
         </div>
       )}

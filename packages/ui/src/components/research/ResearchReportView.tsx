@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
+import { formatDateTime } from '@finagent/i18n';
 import type { ResearchReport, ResearchSection } from '@finagent/core';
 import { loadResearchDiff, researchDiffAtom } from '../../atoms/diffAtoms';
 import { loadResearchReport } from '../../atoms/researchAtoms';
@@ -83,7 +84,7 @@ export const ResearchReportView: React.FC<{
             ? t('research.partialRun')
             : t('research.allCompleted')}{' '}
           · {t('research.capabilityCalls', { count: report.capabilityRuns.length })} ·{' '}
-          {new Date(report.generatedAt).toLocaleString()}
+          {formatDateTime(report.generatedAt)}
         </div>
         {nextAction}
       </div>

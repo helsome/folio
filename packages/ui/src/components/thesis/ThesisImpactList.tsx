@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatDate } from '@finagent/i18n';
 import type { ThesisImpact, ThesisImpactKind } from '@finagent/core';
 
 const KIND_BADGE: Record<ThesisImpactKind, { color: string }> = {
@@ -37,7 +38,7 @@ export const ThesisImpactList: React.FC<{ impacts: ThesisImpact[] }> = ({ impact
                 {t(`thesis.impact.${impact.kind}`)}
               </span>
               <span className="font-mono text-[10px] tabular-nums text-[#8792a3]">
-                {new Date(impact.evaluatedAt).toLocaleDateString()}
+                {formatDate(impact.evaluatedAt)}
               </span>
             </div>
             <p className="mt-2 text-[12px] leading-5 text-foreground/70">{impact.summary}</p>

@@ -1,5 +1,6 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
+import { formatMarketTime } from '@finagent/i18n';
 import type { ResearchSection } from '@finagent/core';
 import { semanticCapabilityLabelKey } from '../../lib/agentPresentation';
 
@@ -23,7 +24,7 @@ export const EvidenceList: React.FC<{ section: ResearchSection }> = ({ section }
           >
             <span className="folio-pilot-evidence-claim">{ref.claim}</span>
             <span className="folio-pilot-evidence-meta">
-              {label} · {new Date(ref.fetchedAt).toLocaleTimeString()}
+              {label} · {formatMarketTime(ref.fetchedAt)}
               {ref.summary ? ` · ${ref.summary}` : ''}
             </span>
           </div>
