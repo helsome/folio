@@ -271,6 +271,12 @@ export async function runWithRetry<T>(
 
     const delay = backoffDelayMs(attempt, options);
     if (delay > 0) await sleep(delay);
+    // A wall-clock budget can expire while waiting; do not start another
+    // provider attempt using the pre-backoff budget decision.
+    if (options.budget?.isExhausted()) {
+      stoppedByBudget = true;
+      return { result, attempts: attempt, stoppedByBudget };
+    }
   }
 
   // Unreachable in practice (loop always returns), kept for the type checker.

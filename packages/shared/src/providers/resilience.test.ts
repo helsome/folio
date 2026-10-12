@@ -151,6 +151,53 @@ describe('backoffDelayMs', () => {
 });
 
 describe('runWithRetry', () => {
+  for (const code of ['TIMEOUT', 'RATE_LIMITED']) {
+    it(`does not retry ${code} when the budget expires during backoff`, async () => {
+      const clock = fakeClock();
+      const deadline = clock.now() + 100;
+      const lastFailure = failure(code);
+      let calls = 0;
+      const result = await runWithRetry(async () => {
+        calls += 1;
+        return calls === 1 ? lastFailure : success('p', 'unexpected retry');
+      }, {
+        maxAttempts: 3,
+        baseDelayMs: 200,
+        jitter: false,
+        sleep: async (ms) => { clock.advance(ms); },
+        budget: { isExhausted: () => clock.now() >= deadline },
+      });
+
+      expect(calls).toBe(1);
+      expect(result.attempts).toBe(1);
+      expect(result.result).toBe(lastFailure);
+      expect(result.stoppedByBudget).toBe(true);
+    });
+  }
+
+  it('retains the latest error and attempt count when a later backoff spends the budget', async () => {
+    const clock = fakeClock();
+    const deadline = clock.now() + 250;
+    const outcomes = [failure('TIMEOUT', 'first'), failure('RATE_LIMITED', 'second')];
+    let calls = 0;
+    const result = await runWithRetry(async () => {
+      calls += 1;
+      return outcomes[calls - 1] ?? success('p', 'unexpected retry');
+    }, {
+      maxAttempts: 4,
+      baseDelayMs: 100,
+      factor: 2,
+      jitter: false,
+      sleep: async (ms) => { clock.advance(ms); },
+      budget: { isExhausted: () => clock.now() >= deadline },
+    });
+
+    expect(calls).toBe(2);
+    expect(result.attempts).toBe(2);
+    expect(result.result).toBe(outcomes[1]);
+    expect(result.stoppedByBudget).toBe(true);
+  });
+
   it('retries a 429 until success and reports attempts', async () => {
     const outcomes = [failure('RATE_LIMITED'), failure('RATE_LIMITED'), success('p', 'ok')];
     const result = await runWithRetry(async () => outcomes.shift()!, {
@@ -568,6 +615,31 @@ describe('ProviderRouter resilience integration (#25)', () => {
 
     await router.execute('market.quote', {});
     expect(primary.calls).toBe(1); // budget stopped further same-provider retries
+  });
+
+  it('stops same-provider retries when the injected budget expires during backoff', async () => {
+    const clock = fakeClock();
+    const deadline = clock.now() + 100;
+    const router = new ProviderRouter({
+      retry: {
+        maxAttempts: 3,
+        baseDelayMs: 200,
+        jitter: false,
+        sleep: async (ms) => { clock.advance(ms); },
+        budget: { isExhausted: () => clock.now() >= deadline },
+      },
+    });
+    const primary = new ScriptedProvider('primary', 'Primary', ['market.quote'], () => failure('TIMEOUT'));
+    const fallback = new ScriptedProvider('fallback', 'Fallback', ['market.quote'], () => success('fallback', { v: 'f' }));
+    router.register(primary);
+    router.register(fallback);
+    router.setRouting({ primary: 'primary', fallback: 'fallback' });
+
+    const result = await router.execute('market.quote', {});
+    expect(primary.calls).toBe(1);
+    // The budget hook bounds same-provider retries, not the routing policy.
+    expect(fallback.calls).toBe(1);
+    expect(result.ok && result.provenance.providerId).toBe('fallback');
   });
 
   it('keeps original default behavior with no resilience options (single attempt)', async () => {
