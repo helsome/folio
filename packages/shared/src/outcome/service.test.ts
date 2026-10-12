@@ -57,6 +57,32 @@ describe('OutcomeService.createOpinionFromReport', () => {
 })
 
 describe('OutcomeService.evaluateDue', () => {
+  it('persists a completed report and due evaluation when they overlap', async () => {
+    class SlowReadStore extends JsonFileStore {
+      async read<T>(file: string, fallback: T): Promise<T> {
+        const snapshot = await super.read(file, fallback)
+        await new Promise((resolve) => setTimeout(resolve, 20))
+        return snapshot
+      }
+    }
+    const concurrentRepository = new OutcomeRepository(new SlowReadStore(dir))
+    const concurrentService = new OutcomeService({ repository: concurrentRepository, now: () => NOW_MS })
+    const due = dueOpinion('opinion-due', 'AAPL.US')
+    await concurrentRepository.saveOpinion(due)
+
+    const [newOpinion, outcomes] = await Promise.all([
+      concurrentService.createOpinionFromReport(makeReport()),
+      concurrentService.evaluateDue(NOW_MS, async () => barsForDue([100, 110])),
+    ])
+
+    expect(outcomes).toHaveLength(1)
+    // A fresh reader verifies both service paths reached the real JSON file.
+    expect(await repository.getOpinion(newOpinion.id)).toEqual(newOpinion)
+    expect(await repository.getOpinion(due.id)).toEqual(due)
+    expect(await repository.getOutcomeByOpinionId(due.id)).toEqual(outcomes[0])
+    expect(await repository.listDueOpinions(NOW_MS)).toEqual([])
+  })
+
   it('evaluates due opinions with the injected fetcher and stores outcomes', async () => {
     const aapl = dueOpinion('opinion-aapl', 'AAPL.US', { entryPrice: 100 })
     const msft = dueOpinion('opinion-msft', 'MSFT.US', { entryPrice: 50 })

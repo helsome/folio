@@ -169,3 +169,77 @@ describe('OutcomeRepository due opinions', () => {
     expect(await reloaded.getOutcomeByOpinionId('opinion-1')).toBeDefined()
   })
 })
+
+describe('OutcomeRepository concurrent writes', () => {
+  it('reports a failed write without blocking the next queued mutation', async () => {
+    class FailOnceStore extends JsonFileStore {
+      private failed = false
+
+      async write(file: string, data: unknown): Promise<void> {
+        if (!this.failed) {
+          this.failed = true
+          throw new Error('simulated write failure')
+        }
+        await super.write(file, data)
+      }
+    }
+    const concurrent = new OutcomeRepository(new FailOnceStore(dir))
+    const results = await Promise.allSettled([
+      concurrent.saveOpinion(makeOpinion({ id: 'opinion-failed' })),
+      concurrent.saveOutcome(outcomeFor('opinion-kept')),
+    ])
+    expect(results[0].status).toBe('rejected')
+    expect(results[1].status).toBe('fulfilled')
+    expect(await repository.listOpinions()).toEqual([])
+    expect(await repository.getOutcomeByOpinionId('opinion-kept')).toEqual(outcomeFor('opinion-kept'))
+  })
+
+  // Widen the read-modify-write window while retaining real disk reads/writes.
+  class SlowReadStore extends JsonFileStore {
+    async read<T>(file: string, fallback: T): Promise<T> {
+      const snapshot = await super.read(file, fallback)
+      await new Promise((resolve) => setTimeout(resolve, 20))
+      return snapshot
+    }
+  }
+
+  it('retains every concurrently saved opinion across repository instances', async () => {
+    const repositories = [
+      new OutcomeRepository(new SlowReadStore(dir)),
+      new OutcomeRepository(new SlowReadStore(dir)),
+    ]
+    await Promise.all([
+      repositories[0].saveOpinion(makeOpinion({ id: 'opinion-a' })),
+      repositories[1].saveOpinion(makeOpinion({ id: 'opinion-b' })),
+    ])
+    expect((await repository.listOpinions()).map((o) => o.id).sort()).toEqual([
+      'opinion-a', 'opinion-b',
+    ])
+  })
+
+  it('retains every concurrently saved outcome', async () => {
+    const concurrent = new OutcomeRepository(new SlowReadStore(dir))
+    await Promise.all([
+      concurrent.saveOutcome(outcomeFor('opinion-a')),
+      concurrent.saveOutcome(outcomeFor('opinion-b')),
+    ])
+    expect((await repository.listOutcomes()).map((o) => o.opinionId).sort()).toEqual([
+      'opinion-a', 'opinion-b',
+    ])
+  })
+
+  it('keeps both collections when a new opinion overlaps outcome evaluation', async () => {
+    const completed = makeOpinion({ id: 'opinion-completed', createdAt: NOW_MS - HORIZON_MS['1m'] - 1 })
+    await repository.saveOpinion(completed)
+    const concurrent = new OutcomeRepository(new SlowReadStore(dir))
+    await Promise.all([
+      concurrent.saveOpinion(makeOpinion({ id: 'opinion-new' })),
+      concurrent.saveOutcome(outcomeFor(completed.id)),
+    ])
+    expect((await repository.listOpinions()).map((o) => o.id).sort()).toEqual([
+      'opinion-completed', 'opinion-new',
+    ])
+    expect(await repository.getOutcomeByOpinionId(completed.id)).toEqual(outcomeFor(completed.id))
+    expect(await repository.listDueOpinions(NOW_MS)).toEqual([])
+  })
+})
