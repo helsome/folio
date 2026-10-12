@@ -355,6 +355,14 @@ function parseFrontmatter(raw: string): Record<string, unknown> {
     const rawValue = line.slice(colon + 1).trim();
     if (!key || /^[#\s-]/.test(key)) continue;
 
+    const blockScalar = /^([|>])([+-]?)$/.exec(rawValue);
+    if (blockScalar) {
+      const block = readBlockScalar(lines, index, blockScalar[1], blockScalar[2]);
+      result[key] = block.value;
+      index = block.lastIndex;
+      continue;
+    }
+
     if (rawValue.length === 0 && index + 1 < lines.length && /^\s/.test(lines[index + 1] ?? '')) {
       // Nested block: collect indented `key: value` lines until dedent.
       const nested: Record<string, unknown> = {};
@@ -371,6 +379,67 @@ function parseFrontmatter(raw: string): Record<string, unknown> {
     result[key] = parseScalar(rawValue);
   }
   return result;
+}
+
+/**
+ * Read a YAML block scalar whose `|` / `>` indicator sits on `lines[keyIndex]`.
+ *
+ * Every bundled Longbridge skill writes `description:` as a block scalar, so
+ * without this the value degrades to the literal indicator string and the
+ * block's own `Key: value` lines leak into the frontmatter as bogus keys.
+ * `chomping` is the optional `-` (strip) / `+` (keep) modifier next to the
+ * indicator; the default clips the value to a single trailing newline. Blank
+ * lines inside the block are preserved (they are insignificant when leading or
+ * trailing), and a folded (`>`) block joins its lines with single spaces.
+ */
+function readBlockScalar(
+  lines: string[],
+  keyIndex: number,
+  style: string,
+  chomping: string
+): { value: string; lastIndex: number } {
+  const blockLines: string[] = [];
+  let index = keyIndex;
+  while (index + 1 < lines.length) {
+    const next = lines[index + 1] ?? '';
+    if (next.trim().length === 0) {
+      blockLines.push('');
+      index += 1;
+      continue;
+    }
+    if (!/^\s/.test(next)) break;
+    blockLines.push(next);
+    index += 1;
+  }
+  if (chomping !== '+') {
+    while (blockLines.length > 0 && (blockLines[0] ?? '').trim().length === 0) blockLines.shift();
+    while (blockLines.length > 0 && (blockLines[blockLines.length - 1] ?? '').trim().length === 0) {
+      blockLines.pop();
+    }
+  }
+  if (blockLines.length === 0) return { value: '', lastIndex: index };
+
+  const indent = (blockLines[0] ?? '').length - (blockLines[0] ?? '').trimStart().length;
+  const dedented = blockLines.map((line) => (line.trim().length === 0 ? '' : line.slice(indent)));
+  const text = style === '|' ? dedented.join('\n') : foldBlockLines(dedented);
+  if (chomping === '-') return { value: text, lastIndex: index };
+  return { value: `${text}\n`, lastIndex: index };
+}
+
+/** Fold a `>` block: blank lines become hard breaks, other lines join with a space. */
+function foldBlockLines(lines: string[]): string {
+  let folded = '';
+  let pendingBreak = false;
+  for (const line of lines) {
+    if (line.length === 0) {
+      pendingBreak = true;
+      continue;
+    }
+    if (folded.length === 0) folded = line;
+    else folded += pendingBreak ? `\n${line}` : ` ${line}`;
+    pendingBreak = false;
+  }
+  return folded;
 }
 
 function parseScalar(rawValue: string): unknown {
