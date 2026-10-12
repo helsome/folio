@@ -162,6 +162,54 @@ describe('evidence contract projections', () => {
     expect(evidence[0]!.freshness.asOf).toBe(999);
   });
 
+  it('marks material conflicts without averaging the selected value', () => {
+    const { sources, evidence } = projectFinancialEvidence([envelope({
+      delayed: true,
+      values: [{ metric: 'lastPrice', originalValue: '210.00', normalizedValue: 210, currency: 'USD', unit: 'price' }],
+      reconciliation: {
+        providers: ['longbridge', 'massive'],
+        method: 'financial-facts.v1',
+        state: 'material-conflict',
+        selectedProvider: 'massive',
+        discrepancy: 200,
+        reason: 'Material disagreement; candidates are preserved and never averaged.',
+        candidates: [
+          { provider: 'longbridge', value: 100, currency: 'USD', unit: 'price' },
+          { provider: 'massive', value: 300, currency: 'USD', unit: 'price' },
+        ],
+      },
+    })]);
+    expect(evidence[0]!.availability).toBe('conflicted');
+    expect(evidence[0]!.financial?.value).toBe(210);
+    expect(evidence[0]!.financial?.value).not.toBe(200);
+    expect(evidence[0]!.freshness.delayed).toBe(true);
+    expect(evidence[0]!.provenance.envelopeId).toBe('fe_abc123');
+    expect(sources[0]!.providerMeta?.reconciliation).toMatchObject({
+      state: 'material-conflict',
+      candidates: [
+        { provider: 'longbridge', value: 100 },
+        { provider: 'massive', value: 300 },
+      ],
+    });
+  });
+
+  it('keeps agreement and legacy reconciliation records available', () => {
+    const agreed = projectFinancialEvidence([envelope({
+      reconciliation: {
+        providers: ['longbridge', 'massive'],
+        method: 'financial-facts.v1',
+        state: 'agreement',
+      },
+    })]);
+    expect(agreed.evidence[0]!.availability).toBe('available');
+    expect(agreed.evidence[0]!.freshness.delayed).toBeUndefined();
+
+    const legacy = projectFinancialEvidence([envelope({
+      reconciliation: { providers: ['longbridge'], method: 'priority' },
+    })]);
+    expect(legacy.evidence[0]!.availability).toBe('available');
+  });
+
   it('never fabricates canonical URLs for structured finance sources', () => {
     const { sources } = projectFinancialEvidence([envelope()]);
     expect(sources[0]!.canonicalUrl).toBeUndefined();
