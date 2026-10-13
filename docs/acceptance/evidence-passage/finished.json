@@ -1,0 +1,37 @@
+{
+  "id": "research-064770ff-2e25-42dd-bc18-e93d72d4ff3e",
+  "symbol": "NVDA.US",
+  "startedAt": 1790605880470,
+  "plannedCapabilities": [
+    "company.profile",
+    "market.quote",
+    "market.kline",
+    "company.valuation",
+    "company.financials",
+    "company.earnings",
+    "company.ratings",
+    "research.news",
+    "market.capitalFlow",
+    "portfolio.positions"
+  ],
+  "completedCapabilities": [
+    "research.news"
+  ],
+  "failedCapabilities": [
+    "company.profile",
+    "market.quote",
+    "market.kline",
+    "company.valuation",
+    "company.financials",
+    "company.earnings",
+    "company.ratings",
+    "market.capitalFlow",
+    "portfolio.positions"
+  ],
+  "status": "partial",
+  "locale": "en-US",
+  "recoveryCount": 0,
+  "reportId": "report-research-064770ff-2e25-42dd-bc18-e93d72d4ff3e",
+  "finishedAt": 1790605911615,
+  "recoverable": false
+}

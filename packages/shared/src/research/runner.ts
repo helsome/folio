@@ -24,6 +24,7 @@ import {
   planForStrategy,
   type PlannedCapability,
 } from './planner.ts';
+import { buildCapabilityPassages } from './evidence-passage.ts';
 
 const CONCURRENCY = 4;
 const TIMEOUT_MS = 20000;
@@ -365,6 +366,21 @@ function assembleReport(args: {
     .map((outcome) => outcome.result?.provenance?.instrumentId ?? readInstrumentId(outcome.result?.data))
     .find((id): id is string => typeof id === 'string' && id.length > 0);
 
+  // Passage-level provenance (issue #13): a text-bearing source records the
+  // verbatim span it contributed together with its position in that source, so
+  // the report carries enough to re-open the exact passage after a reload.
+  // Derived from the run outcomes rather than from the synthesized prose, so
+  // the location can never be invented by the model.
+  const evidencePassages = outcomes.flatMap((outcome) =>
+    outcome.record.status === 'success' && outcome.result
+      ? buildCapabilityPassages({
+        runId: outcome.record.id,
+        capabilityId: outcome.record.capabilityId,
+        result: outcome.result,
+      })
+      : []
+  );
+
   return {
     id: `report-${runId}`,
     symbol,
@@ -386,5 +402,6 @@ function assembleReport(args: {
     risks: synthesis.risks,
     capabilityRuns,
     runStatus: computeRunStatus(plan, successIds),
+    ...(evidencePassages.length > 0 ? { evidencePassages } : {}),
   };
 }

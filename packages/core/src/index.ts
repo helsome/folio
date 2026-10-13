@@ -575,6 +575,7 @@ export interface Skill {
 export * from './answer-blocks.ts';
 export * from './citations.ts';
 export * from './capability.ts';
+export * from './evidence-passage.ts';
 export * from './research.ts';
 export * from './thesis.ts';
 export * from './alert-rules.ts';
