@@ -1,8 +1,27 @@
 import { randomUUID } from 'node:crypto';
 import type { InvestmentThesis, ThesisImpact } from '@finagent/core';
 import { JsonFileStore } from '../storage/json-file-store.ts';
+import { createCodeError } from '../agent/errors.ts';
 
 const INDEX_FILE = 'index.json';
+
+// Thesis ids are opaque names, not relative paths — the same file-name contract
+// the research repositories keep at their store boundary. `JsonFileStore` only
+// `join()`s the name onto the root, so an unchecked id such as `../x` would
+// read and write outside `<storageDir>`.
+const thesisFile = (id: unknown): string => {
+  if (typeof id !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(id)) {
+    throw createCodeError('INVALID_ARGUMENT', 'Invalid thesis id.');
+  }
+  return `${id}.json`;
+};
+
+const impactFile = (thesisId: unknown): string => {
+  if (typeof thesisId !== 'string' || !/^[a-zA-Z0-9_-]+$/.test(thesisId)) {
+    throw createCodeError('INVALID_ARGUMENT', 'Invalid thesis id.');
+  }
+  return `impacts/${thesisId}.json`;
+};
 
 export interface ThesisIndexEntry {
   symbol: string;
@@ -40,7 +59,7 @@ export class ThesisRepository {
 
   /** Upsert a thesis (body + index entry). */
   async save(thesis: InvestmentThesis): Promise<InvestmentThesis> {
-    await this.store.write(`${thesis.id}.json`, thesis);
+    await this.store.write(thesisFile(thesis.id), thesis);
     const index = await this.readIndex();
     index[thesis.id] = { symbol: thesis.symbol, updatedAt: thesis.updatedAt };
     await this.writeIndex(index);
@@ -48,7 +67,7 @@ export class ThesisRepository {
   }
 
   async get(id: string): Promise<InvestmentThesis | undefined> {
-    return this.store.read<InvestmentThesis | undefined>(`${id}.json`, undefined);
+    return this.store.read<InvestmentThesis | undefined>(thesisFile(id), undefined);
   }
 
   /** Theses for a symbol, most-recently-updated first. */
@@ -70,7 +89,7 @@ export class ThesisRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await this.store.remove(`${id}.json`);
+    await this.store.remove(thesisFile(id));
     const index = await this.readIndex();
     if (id in index) {
       delete index[id];
@@ -96,6 +115,7 @@ export interface ThesisImpactRepositoryOptions {
 
 /**
  * Append-only impact history per thesis: `<storageDir>/impacts/<thesisId>.json`.
+ * Thesis ids are opaque names, not relative paths (see `impactFile`).
  */
 export class ThesisImpactRepository {
   private readonly store: JsonFileStore;
@@ -106,17 +126,14 @@ export class ThesisImpactRepository {
     this.idGen = options.idGen ?? (() => randomUUID());
   }
 
-  private path(thesisId: string): string {
-    return `impacts/${thesisId}.json`;
-  }
-
   async append(impact: ThesisImpact): Promise<void> {
-    const existing = await this.store.read<ThesisImpact[]>(this.path(impact.thesisId), []);
+    const file = impactFile(impact.thesisId);
+    const existing = await this.store.read<ThesisImpact[]>(file, []);
     existing.push(impact);
-    await this.store.write(this.path(impact.thesisId), existing);
+    await this.store.write(file, existing);
   }
 
   async list(thesisId: string): Promise<ThesisImpact[]> {
-    return this.store.read<ThesisImpact[]>(this.path(thesisId), []);
+    return this.store.read<ThesisImpact[]>(impactFile(thesisId), []);
   }
 }
