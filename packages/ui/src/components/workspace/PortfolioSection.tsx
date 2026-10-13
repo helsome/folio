@@ -24,6 +24,7 @@ import { PortfolioRiskPanel } from '../portfolio/PortfolioRiskPanel';
 import { ImportDialog } from '../portfolio/ImportDialog';
 import { Button } from '../primitives/Button';
 import { i18nCurrentLocale } from '@finagent/i18n';
+import { portfolioFailureDetail } from '../../lib/portfolioFailure';
 
 const FAILURE_HEADINGS: Record<PortfolioFailureKind, string> = {
   'not-connected': 'portfolio.failure.notConnected',
@@ -116,7 +117,7 @@ export const PortfolioSection: React.FC = () => {
           <div className="text-[13px] font-semibold text-foreground">
             {t(FAILURE_HEADINGS[cache.failure.kind])}
           </div>
-          <div className="mt-1 text-[12px] text-foreground/54">{cache.failure.message}</div>
+          <div className="mt-1 text-[12px] text-foreground/54">{portfolioFailureDetail(t, cache.failure)}</div>
         </div>
         {riskSection}
       </div>
@@ -190,7 +191,7 @@ export const PortfolioSection: React.FC = () => {
 
       {isPartial && (
         <div className="rounded-[10px] border border-[var(--mac-yellow)]/20 bg-[var(--mac-yellow)]/12 px-3 py-2 text-[12px] text-foreground/80">
-          {cache.failure?.message}
+          {cache.failure === null ? null : portfolioFailureDetail(t, cache.failure)}
         </div>
       )}
 

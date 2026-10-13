@@ -41,6 +41,18 @@ export const portfolio = {
     parseError: "Couldn't read portfolio data",
     timeout: 'Portfolio timed out',
   },
+  /** Long-form detail under a `failure` heading: heading = label, this = sentence. */
+  failureDetail: {
+    notConnected:
+      'LongBridge is not connected. Install or configure the CLI and try again.',
+    noPermission:
+      'This LongBridge account does not grant portfolio access. Reconnect or check permissions.',
+    empty: 'No portfolio data yet.',
+    partial: 'Account totals loaded, but holdings could not be read.',
+    providerError: 'LongBridge could not return portfolio data.',
+    parseError: 'Portfolio data could not be read in the expected format.',
+    timeout: 'LongBridge took too long to respond.',
+  },
   import: {
     title: 'Import Portfolio',
     description:
