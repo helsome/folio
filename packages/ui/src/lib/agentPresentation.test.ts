@@ -60,4 +60,17 @@ describe('agentPresentation (V9.1 shared layer)', () => {
     expect(semanticCompletenessLabelKey('partial')).toBe('trace.completeness.partial');
     expect(semanticContextSourceLabelKey('evaluation-input')).toBe('trace.contextSource.evaluation-input');
   });
+
+  it('resolves the registered company-profile tool to its curated label', () => {
+    // The tool registry (`packages/shared/src/agent/finance-tool-registry.ts`)
+    // emits `get_company_profile`; the label map must key off that exact id or
+    // the curated copy never reaches the UI.
+    expect(semanticToolLabelKey('get_company_profile')).toBe('agent.tool.names.getProfile');
+    expect(hasSemanticToolLabel('get_company_profile')).toBe(true);
+  });
+
+  it('keeps no label for the unregistered `get_profile` id', () => {
+    expect(hasSemanticToolLabel('get_profile')).toBe(false);
+    expect(semanticToolLabelKey('get_profile')).toBe('agent.tool.names.other');
+  });
 });
