@@ -1,6 +1,9 @@
 import type {
   CapabilityId,
   FinancialDataProvider,
+  FinancialReport,
+  FinancialReportAccount,
+  FinancialReportValue,
   Kline,
   Market,
   ProviderError,
@@ -19,7 +22,8 @@ import { TtlCache } from './cache.ts'
  * Massive (Polygon.io) — minimal secondary market-data provider proving the V4
  * router architecture (spec §13). Market-data-only: no broker interface.
  *
- * - Coverage: `market.quote`, `market.kline`, `company.profile` for US stocks
+ * - Coverage: `market.quote`, `market.kline`, `company.profile`, and
+ *   `company.financials` for US stocks
  *   only (`markets(): [US]`), so the router never routes HK/CN/SG symbols here.
  * - Auth: BYOK API key resolved via a caller-provided config getter (the
  *   OS credential store holds the key; the main process wires it). Current Massive docs use
@@ -41,6 +45,7 @@ const CAPABILITIES: readonly CapabilityId[] = [
   'market.quote',
   'market.kline',
   'company.profile',
+  'company.financials',
 ]
 
 const US_MARKET: Market = { id: 'US', name: 'United States' }
@@ -245,6 +250,29 @@ export class MassiveFinancialDataProvider implements FinancialDataProvider {
         const profile = mapProfile(symbol, payload)
         return { ok: true, data: profile, provenance: provenance() }
       }
+      case 'company.financials': {
+        const options = readFinancialOptions(input)
+        if (!options) return { ok: false, error: UNSUPPORTED }
+        const statements: FinancialReport['statements'] = {}
+        let latestPeriodEnd = 0
+        for (const kind of options.kinds) {
+          const path = buildFinancialUrl(kind, ticker, options.timeframe)
+          const payload = await getJson(path, apiKey, signal, endpoint)
+          const mapped = mapFinancialStatement(payload, kind, options.timeframe, ticker)
+          if (mapped.accounts.length > 0) {
+            statements[kind] = { indicators: [{ title: kind, accounts: mapped.accounts }] }
+            latestPeriodEnd = Math.max(latestPeriodEnd, mapped.latestPeriodEnd)
+          }
+        }
+        if (Object.keys(statements).length === 0) {
+          return { ok: false, error: { code: 'NOT_FOUND', message: 'No financial statements found for this symbol and period.' } }
+        }
+        return {
+          ok: true,
+          data: { symbol, report: options.report, statements } satisfies FinancialReport,
+          provenance: provenance(latestPeriodEnd * 1000),
+        }
+      }
       default:
         return { ok: false, error: UNSUPPORTED }
     }
@@ -341,6 +369,112 @@ function buildAggsUrl(path: string, count: number): string {
   url.searchParams.set('sort', 'desc')
   url.searchParams.set('limit', String(count))
   return url.pathname + url.search
+}
+
+type StatementKind = 'IS' | 'BS' | 'CF'
+type FinancialTimeframe = 'quarterly' | 'annual'
+
+const FINANCIAL_PATHS: Record<StatementKind, string> = {
+  IS: 'income-statements',
+  BS: 'balance-sheets',
+  CF: 'cash-flow-statements',
+}
+
+/** Only equivalent, directly reported line items are mapped to Longbridge codes. */
+const FINANCIAL_FIELDS: Record<StatementKind, Record<string, string>> = {
+  IS: {
+    revenue: 'OperatingRevenue',
+    operating_income: 'OperatingIncome',
+  },
+  BS: {
+    total_assets: 'TotalAssets',
+    total_liabilities: 'TotalLiability',
+    inventories: 'Inventory',
+    receivables: 'TotalReceiv',
+    property_plant_equipment_net: 'NPPE',
+  },
+  CF: {
+    net_cash_from_operating_activities: 'NetOperateCashFlow',
+    net_cash_from_investing_activities: 'NetInvestCashFlow',
+    net_cash_from_financing_activities: 'NetFinanceCashFlow',
+  },
+}
+
+function readFinancialOptions(input: unknown): {
+  kinds: StatementKind[];
+  timeframe: FinancialTimeframe;
+  report: 'qf' | 'af';
+} | undefined {
+  const record = isRecord(input) ? input : {}
+  const kind = record.kind ?? 'ALL'
+  const report = record.report ?? 'qf'
+  if (kind !== 'ALL' && kind !== 'IS' && kind !== 'BS' && kind !== 'CF') return undefined
+  if (report !== 'qf' && report !== 'af') return undefined
+  return {
+    kinds: kind === 'ALL' ? ['IS', 'BS', 'CF'] : [kind],
+    timeframe: report === 'af' ? 'annual' : 'quarterly',
+    report,
+  }
+}
+
+function buildFinancialUrl(kind: StatementKind, ticker: string, timeframe: FinancialTimeframe): string {
+  const url = new URL(`${MASSIVE_HOST}/stocks/financials/v1/${FINANCIAL_PATHS[kind]}`)
+  url.searchParams.set('tickers', ticker)
+  url.searchParams.set('timeframe', timeframe)
+  url.searchParams.set('sort', 'period_end.desc')
+  url.searchParams.set('limit', '8')
+  return url.pathname + url.search
+}
+
+function parsePeriodEnd(value: unknown): number | undefined {
+  if (typeof value !== 'string' || !/^\d{4}-\d{2}-\d{2}$/.test(value)) return undefined
+  const timestamp = Date.parse(`${value}T00:00:00Z`)
+  if (!Number.isFinite(timestamp) || new Date(timestamp).toISOString().slice(0, 10) !== value) return undefined
+  return timestamp / 1000
+}
+
+function mapFinancialStatement(
+  payload: unknown,
+  kind: StatementKind,
+  timeframe: FinancialTimeframe,
+  ticker: string
+): { accounts: FinancialReportAccount[]; latestPeriodEnd: number } {
+  const root = isRecord(payload) ? payload : {}
+  if (root.status === 'NOT_AUTHORIZED') {
+    throw new ProviderHttpError({ code: 'ACCESS_DENIED', message: 'Your Massive plan does not include financial statements.' })
+  }
+  if (root.status !== 'OK' || !Array.isArray(root.results)) {
+    throw new ProviderHttpError({ code: 'PARSE_FAILURE', message: 'Unexpected financial statement response from Massive.' })
+  }
+  const valuesByField = new Map<string, FinancialReportValue[]>()
+  let latestPeriodEnd = 0
+  const rows = root.results.filter(isRecord)
+    .filter((row) => Array.isArray(row.tickers) && row.tickers.includes(ticker))
+    .sort((left, right) => (parsePeriodEnd(right.period_end) ?? 0) - (parsePeriodEnd(left.period_end) ?? 0)
+      || (parsePeriodEnd(right.filing_date) ?? 0) - (parsePeriodEnd(left.filing_date) ?? 0))
+  for (const row of rows) {
+    if (row.timeframe !== timeframe) continue
+    const fpEnd = parsePeriodEnd(row.period_end)
+    const year = row.fiscal_year
+    const quarter = row.fiscal_quarter
+    if (fpEnd === undefined || typeof year !== 'number' || !Number.isInteger(year)) continue
+    if (timeframe === 'quarterly' && (typeof quarter !== 'number' || !Number.isInteger(quarter) || quarter < 1 || quarter > 4)) continue
+    const period = timeframe === 'annual' ? `FY ${year}` : `Q${quarter} ${year}`
+    const filedAt = parsePeriodEnd(row.filing_date)
+    for (const [vendorField, field] of Object.entries(FINANCIAL_FIELDS[kind])) {
+      const value = toFinite(row[vendorField])
+      if (value === undefined) continue
+      const values = valuesByField.get(field) ?? []
+      if (values.some((item) => item.fpEnd === fpEnd)) continue
+      values.push({ fpEnd, period, year, value, ...(filedAt !== undefined ? { filedAt } : {}) })
+      valuesByField.set(field, values)
+      latestPeriodEnd = Math.max(latestPeriodEnd, fpEnd)
+    }
+  }
+  return {
+    accounts: [...valuesByField].map(([field, values]) => ({ field, name: field, values })),
+    latestPeriodEnd,
+  }
 }
 
 function mapHttpStatus(status: number): ProviderError {

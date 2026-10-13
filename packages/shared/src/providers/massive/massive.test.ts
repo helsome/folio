@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'bun:test'
-import type { Kline, ProviderResult, Quote, StaticInfo } from '@finagent/core'
+import type { FinancialReport, Kline, ProviderResult, Quote, StaticInfo } from '@finagent/core'
 import { DEFAULT_INSTRUMENT_CATALOG } from '@finagent/core'
 import { MassiveFinancialDataProvider } from './adapter.ts'
 import { TtlCache } from './cache.ts'
@@ -58,7 +58,7 @@ describe('MassiveFinancialDataProvider', () => {
     expect(provider.name).toBe('Massive (Polygon.io)')
     expect(provider.kind).toBe('financial-data')
     expect(provider.markets()).toEqual([{ id: 'US', name: 'United States' }])
-    expect(provider.capabilities()).toEqual(['market.quote', 'market.kline', 'company.profile'])
+    expect(provider.capabilities()).toEqual(['market.quote', 'market.kline', 'company.profile', 'company.financials'])
   })
 
   it('maps a snapshot quote (previous close + last trade) via query-param auth', async () => {
@@ -202,6 +202,99 @@ describe('MassiveFinancialDataProvider', () => {
       exchange: 'XNAS',
       currency: 'usd',
     })
+  })
+
+  it('loads three current financial statement endpoints and preserves period and filing dates', async () => {
+    const rows: Record<string, Record<string, unknown>> = {
+      'income-statements': { revenue: 94036000000, operating_income: 28202000000 },
+      'balance-sheets': { total_assets: 331495000000, total_liabilities: 265665000000 },
+      'cash-flow-statements': { net_cash_from_operating_activities: 27867000000 },
+    }
+    const calls = installFetch((url) => {
+      const kind = Object.keys(rows).find((name) => url.includes(`/${name}?`))!
+      return jsonResponse({ status: 'OK', results: [{
+        tickers: ['AAPL'], timeframe: 'quarterly', fiscal_year: 2025,
+        fiscal_quarter: 3, period_end: '2025-06-28', filing_date: '2025-08-01',
+        ...rows[kind],
+      }] })
+    })
+    const provider = makeProvider('key')
+    const result = await provider.execute<FinancialReport>('company.financials', {
+      symbol: 'AAPL.US', kind: 'ALL', report: 'qf',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(calls).toHaveLength(3)
+    expect(calls.map((call) => new URL(call.url).pathname)).toEqual([
+      '/stocks/financials/v1/income-statements',
+      '/stocks/financials/v1/balance-sheets',
+      '/stocks/financials/v1/cash-flow-statements',
+    ])
+    for (const call of calls) {
+      const url = new URL(call.url)
+      expect(url.searchParams.get('tickers')).toBe('AAPL')
+      expect(url.searchParams.get('timeframe')).toBe('quarterly')
+      expect(url.searchParams.get('sort')).toBe('period_end.desc')
+    }
+    expect(result.data.report).toBe('qf')
+    expect(result.data.statements.IS?.indicators[0].accounts.find((item) => item.field === 'OperatingRevenue')?.values).toEqual([{
+      fpEnd: 1751068800, filedAt: 1754006400, period: 'Q3 2025', year: 2025, value: 94036000000,
+    }])
+    expect(result.data.statements.BS?.indicators[0].accounts.map((item) => item.field))
+      .toEqual(['TotalAssets', 'TotalLiability'])
+    expect(result.data.statements.CF?.indicators[0].accounts[0].field).toBe('NetOperateCashFlow')
+    // These endpoints omit reporting currency. Trading currency must not be substituted.
+    expect(result.data.statements.IS?.indicators[0].currency).toBeUndefined()
+    expect(result.provenance.marketTime).toBe(1751068800_000)
+  })
+
+  it('uses the annual filter and keeps only the requested statement', async () => {
+    const calls = installFetch(() => jsonResponse({ status: 'OK', results: [
+      { tickers: ['AAPL'], timeframe: 'annual', fiscal_year: 2024, period_end: '2024-12-31', total_assets: 100 },
+      { tickers: ['AAPL'], timeframe: 'quarterly', fiscal_year: 2025, fiscal_quarter: 1, period_end: '2025-03-31', total_assets: 200 },
+    ] }))
+    const result = await makeProvider('key').execute<FinancialReport>('company.financials', {
+      symbol: 'AAPL.US', kind: 'BS', report: 'af',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(calls).toHaveLength(1)
+    expect(new URL(calls[0].url).searchParams.get('timeframe')).toBe('annual')
+    expect(result.data.statements.BS?.indicators[0].accounts[0].values).toEqual([{
+      fpEnd: 1735603200, period: 'FY 2024', year: 2024, value: 100,
+    }])
+    expect(result.data.statements.IS).toBeUndefined()
+  })
+
+  it('ignores another ticker and picks the latest filing for the same fiscal period', async () => {
+    installFetch(() => jsonResponse({ status: 'OK', results: [
+      { tickers: ['MSFT'], timeframe: 'quarterly', fiscal_year: 2025, fiscal_quarter: 3,
+        period_end: '2025-06-28', filing_date: '2025-08-10', revenue: 900 },
+      { tickers: ['AAPL'], timeframe: 'quarterly', fiscal_year: 2025, fiscal_quarter: 3,
+        period_end: '2025-06-28', filing_date: '2025-08-01', revenue: 100 },
+      { tickers: ['AAPL'], timeframe: 'quarterly', fiscal_year: 2025, fiscal_quarter: 3,
+        period_end: '2025-06-28', filing_date: '2025-08-11', revenue: 110 },
+    ] }))
+    const result = await makeProvider('key').execute<FinancialReport>('company.financials', {
+      symbol: 'AAPL.US', kind: 'IS', report: 'qf',
+    })
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.statements.IS?.indicators[0].accounts[0].values).toEqual([{
+      fpEnd: 1751068800, filedAt: 1754870400, period: 'Q3 2025', year: 2025, value: 110,
+    }])
+  })
+
+  it('reports financial entitlement errors and unsupported period semantics', async () => {
+    const calls = installFetch(() => jsonResponse({ status: 'NOT_AUTHORIZED' }))
+    const provider = makeProvider('key')
+    const unsupported = await provider.execute('company.financials', { symbol: 'AAPL.US', report: 'cumul' })
+    expect(unsupported.ok).toBe(false)
+    if (!unsupported.ok) expect(unsupported.error.code).toBe('UNSUPPORTED_CAPABILITY')
+    expect(calls).toHaveLength(0)
+    const denied = await provider.execute('company.financials', { symbol: 'AAPL.US', report: 'qf' })
+    expect(denied.ok).toBe(false)
+    if (!denied.ok) expect(denied.error.code).toBe('ACCESS_DENIED')
   })
 
   it('returns CONFIG_MISSING when no API key is configured', async () => {

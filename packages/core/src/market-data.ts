@@ -80,6 +80,8 @@ export interface FinancialReportValue {
   period: string;
   year: number;
   value: number;
+  /** Epoch seconds of the filing carrying this value, when the provider supplies it. */
+  filedAt?: number;
   ratio?: string;
   yoy?: string;
 }
