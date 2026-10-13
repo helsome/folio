@@ -1,4 +1,5 @@
 /** Machine-readable lineage for structured financial facts used by Copilot. */
+import type { ReconciliationResult } from './reconciliation.ts';
 
 export const FINANCIAL_EVIDENCE_SCHEMA_VERSION = 'financial-evidence/v1' as const;
 export const FINANCIAL_NORMALIZATION_VERSION = 'folio-normalization/v1' as const;
@@ -58,7 +59,11 @@ export interface FinancialEvidenceEnvelope {
   delayed?: boolean;
   cacheHit: boolean;
   fallback?: { from: string; to: string; reason?: string };
-  reconciliation?: { providers: string[]; method: string };
+  reconciliation?: {
+    providers: string[];
+    method: string;
+    comparisons?: Array<{ metric: string; period: string; result: ReconciliationResult }>;
+  };
   resultSnapshot: unknown;
   resultHash: string;
   lineage: FinancialEvidenceLineageStep[];

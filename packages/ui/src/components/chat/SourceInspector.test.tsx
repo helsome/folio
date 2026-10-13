@@ -125,6 +125,75 @@ describe('AnswerContent citations', () => {
 });
 
 describe('SourceInspector', () => {
+  it('shows agreement candidates and their comparison policy', async () => {
+    const message: Message = {
+      ...MESSAGE,
+      financialEvidence: [{
+        ...MESSAGE.financialEvidence![0],
+        reconciliation: {
+          providers: ['longbridge', 'massive'],
+          method: 'folio-financial-report/v1',
+          comparisons: [{
+            metric: 'BS.TotalAssets',
+            period: '2024:FY',
+            result: {
+              state: 'agreement',
+              policyVersion: 'folio-financial-report/v1',
+              sourceCount: 2,
+              reason: 'Candidates agree exactly.',
+              candidates: [
+                { provider: 'longbridge', value: 100, currency: 'USD', unit: 'currency', adjustment: 'reported', period: 'af:2024:FY' },
+                { provider: 'massive', value: 100, currency: 'USD', unit: 'currency', adjustment: 'reported', period: 'af:2024:FY' },
+              ],
+            },
+          }],
+        },
+      }],
+    };
+    const container = await renderElement(<SourceInspector message={message} onClose={() => {}} />);
+    const comparison = container.querySelector('[data-testid="source-reconciliation"]');
+    expect(comparison?.textContent).toContain('Agreement');
+    expect(comparison?.textContent).toContain('longbridge');
+    expect(comparison?.textContent).toContain('massive');
+    expect(comparison?.textContent).toContain('reported');
+    expect(comparison?.textContent).toContain('folio-financial-report/v1');
+  });
+
+  it('shows disputed provider values and does not label them verified', async () => {
+    const message: Message = {
+      ...MESSAGE,
+      financialEvidence: [{
+        ...MESSAGE.financialEvidence![0],
+        reconciliation: {
+          providers: ['longbridge', 'massive'],
+          method: 'folio-quote/v1',
+          comparisons: [{
+            metric: 'lastPrice',
+            period: 'market.quote',
+            result: {
+              state: 'material-conflict',
+              policyVersion: 'folio-quote/v1',
+              sourceCount: 2,
+              reason: 'Material disagreement.',
+              candidates: [
+                { provider: 'longbridge', value: 100, currency: 'USD', asOf: 1_700_000_000_000 },
+                { provider: 'massive', value: 130, currency: 'USD', asOf: 1_700_000_000_000 },
+              ],
+            },
+          }],
+        },
+      }],
+    };
+    const container = await renderElement(<SourceInspector message={message} onClose={() => {}} />);
+    const comparison = container.querySelector('[data-testid="source-reconciliation"]');
+    expect(comparison?.textContent).toContain('longbridge');
+    expect(comparison?.textContent).toContain('100 USD');
+    expect(comparison?.textContent).toContain('massive');
+    expect(comparison?.textContent).toContain('130 USD');
+    expect(container.textContent).toContain('Review provider data (1)');
+    expect(container.textContent).not.toContain('Evidence verified');
+  });
+
   it('lists sources grouped by kind and expands the financial envelope', async () => {
     const container = await renderElement(<SourceInspector message={MESSAGE} onClose={() => {}} />);
     expect(container.querySelector('[data-testid="source-inspector"]')).not.toBeNull();
