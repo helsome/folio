@@ -81,4 +81,9 @@ export const portfolio = {
     review: '复核',
     needsReview: '需复核',
   },
+  severity: {
+    high: '高',
+    medium: '中',
+    low: '低',
+  },
 } satisfies SameKeysAs<typeof enPortfolio>;
