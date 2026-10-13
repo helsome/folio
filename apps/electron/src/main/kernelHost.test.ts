@@ -511,6 +511,57 @@ describe('AgentKernelHost', () => {
     host.dispose();
   });
 
+  it('leaves the LongBridge action empty while the CLI is available', async () => {
+    const host = new AgentKernelHost();
+
+    const result = await host.getLongBridgeStatus();
+
+    expect(result.status).toBe('available');
+    expect(result.action).toBeUndefined();
+    host.dispose();
+  });
+
+  it('maps a LongBridge timeout to a retry action, not an install prompt', async () => {
+    const host = new AgentKernelHost();
+    const marketData = lastMarketData as unknown as {
+      getLongBridgeStatus: () => Promise<Record<string, unknown>>;
+    };
+    marketData.getLongBridgeStatus = async () => ({
+      installed: true,
+      authed: true,
+      available: false,
+      status: 'timeout',
+      error: { code: 'LONGBRIDGE_TIMEOUT', message: 'LongBridge CLI timed out.' },
+    });
+
+    const result = await host.getLongBridgeStatus();
+
+    expect(typeof result.action).toBe('string');
+    expect(result.action).toContain('timed out');
+    expect(result.action).not.toContain('Install the LongBridge CLI');
+    host.dispose();
+  });
+
+  it('maps an unrecognised LongBridge failure to its own action', async () => {
+    const host = new AgentKernelHost();
+    const marketData = lastMarketData as unknown as {
+      getLongBridgeStatus: () => Promise<Record<string, unknown>>;
+    };
+    marketData.getLongBridgeStatus = async () => ({
+      installed: true,
+      authed: false,
+      available: false,
+      status: 'unknown',
+      error: { code: 'LONGBRIDGE_UNKNOWN', message: 'Unexpected failure.' },
+    });
+
+    const result = await host.getLongBridgeStatus();
+
+    expect(typeof result.action).toBe('string');
+    expect(result.action).not.toContain('Install the LongBridge CLI');
+    host.dispose();
+  });
+
   it('wraps market data errors into IPC results', async () => {
     const host = new AgentKernelHost();
     const { toIpcResult } = await import('./kernelHost.ts');

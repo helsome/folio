@@ -2591,6 +2591,10 @@ function getLongBridgeStatusAction(status: string) {
       return 'Run longbridge auth login to authenticate the LongBridge CLI.';
     case 'rate_limited':
       return 'LongBridge is rate-limited; market data requests are paused. Try again later.';
+    case 'timeout':
+      return 'LongBridge CLI timed out; market data requests are paused. Check your network or proxy and retry.';
+    case 'unknown':
+      return 'LongBridge CLI reported an unexpected error; run `longbridge --version` in a terminal to verify the install and retry.';
     default:
       return undefined;
   }

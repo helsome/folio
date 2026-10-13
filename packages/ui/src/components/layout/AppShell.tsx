@@ -70,7 +70,10 @@ const LongBridgeBanner: React.FC = () => {
 
   const message = error ?? status?.message ?? 'LongBridge CLI status is unavailable.';
   const action = status?.action ?? 'Install LongBridge CLI and run longbridge auth login.';
-  const title = status?.status === 'rate_limited' ? 'LongBridge paused: ' : 'LongBridge setup needed: ';
+  // `timeout` is a transient pause, not a setup problem: the CLI is installed
+  // and authenticated, the call just did not come back in time.
+  const paused = status?.status === 'rate_limited' || status?.status === 'timeout';
+  const title = paused ? 'LongBridge paused: ' : 'LongBridge setup needed: ';
 
   return (
     <div className="folio-banner border-b px-4 py-2">
