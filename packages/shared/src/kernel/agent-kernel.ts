@@ -1,5 +1,5 @@
 import { join } from 'node:path';
-import type { AgentRuntime, ApiResult, ToolDefinition } from '@finagent/core';
+import type { AgentRuntime, ApiResult, RunManifestContext, ToolDefinition } from '@finagent/core';
 import type { SkillHub } from '@finagent/skill-hub';
 import { JsonFileStore } from '../storage/json-file-store.ts';
 import { MessageRepository } from '../storage/message-repository.ts';
@@ -47,6 +47,13 @@ export interface AgentKernelOptions {
   searchTools?: string[];
   /** Runaway detector thresholds; unset fields fall back to `defaultRunawayPolicy()`. */
   runaway?: Partial<RunawayPolicy>;
+  /**
+   * Base manifest context for every run (#21). Wired by the host to its live
+   * settings so *all* run entry points — including evaluation runs started
+   * directly on the kernel — snapshot the same model/prompt/tool/search config
+   * instead of falling back to an empty manifest.
+   */
+  getRunManifestContext?: () => RunManifestContext | Promise<RunManifestContext>;
 }
 
 /**
@@ -87,6 +94,11 @@ export class AgentKernel {
       runaway: options.runaway,
       // issue #75：与 kernel 存储同目录落盘流事件日志，支持跨重启 replay。
       streamLogDir: join(options.storageDir, 'stream-events'),
+      // #21: fallback runtime mode for manifests when the host passes no context.
+      runtimeMode: options.provider === 'local' ? 'local' : 'pi',
+      // #21: the host's live settings, so evaluation runs started directly on
+      // the kernel still get a real manifest instead of the empty fallback.
+      getRunManifestContext: options.getRunManifestContext,
     });
   }
 
