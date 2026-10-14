@@ -189,7 +189,14 @@ export function projectTrace(input: TraceProjectionInput): FolioTrace {
       label: run.input.slice(0, 200),
       detail: run.status,
       timestamp: run.startedAt,
-      status: run.status === 'failed' ? 'error' : run.status === 'completed' ? 'success' : 'running',
+      status:
+        run.status === 'failed'
+          ? 'error'
+          : run.status === 'cancelled'
+            ? 'cancelled'
+            : run.status === 'completed'
+              ? 'success'
+              : 'running',
       source: 'run',
     });
   }

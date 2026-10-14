@@ -58,6 +58,24 @@ describe('projectTrace (V9.1)', () => {
     expect(ws?.value).toBe('');
   });
 
+  it('preserves a cancelled run status in the timeline', () => {
+    const trace = projectTrace(
+      inputWith({
+        run: {
+          ...baseRun,
+          status: 'cancelled',
+          completedAt: 15000,
+          answer: undefined,
+        },
+      })
+    );
+    const runStep = trace.steps.find((step) => step.kind === 'run');
+
+    expect(trace.status).toBe('cancelled');
+    expect(runStep?.status).toBe('cancelled');
+    expect(runStep?.detail).toBe('cancelled');
+  });
+
   it('marks evaluation-case context as evaluation-input, not recorded', () => {
     const caseDef: EvaluationCase = {
       id: 'case-1',
