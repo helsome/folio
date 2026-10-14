@@ -52,7 +52,7 @@ export function buildFinancialEvidence(input: BuildFinancialEvidenceInput): Fina
     const provider = stringValue(provenance.providerId) ?? stringValue(provenance.provider) ?? 'unknown';
     const retrievedAt = numberValue(provenance.fetchedAt) ?? toolCall.completedAt ?? toolCall.startedAt;
     const asOf = numberValue(provenance.marketTime) ?? inferAsOf(result.data);
-    const instrumentId = readInstrumentId(provenance) ?? canonicalInstrument(toolCall.args.symbol ?? inferSymbol(result.data));
+    const instrumentId = readInstrumentId(provenance) ?? readInstrumentId(result.data);
     const values = collectValues(result.data, result.evidence);
     const snapshot = redact(result.data);
     const resultHash = hashJson(snapshot);
@@ -170,17 +170,6 @@ function redact(value: unknown): unknown {
     output[key] = redact(child);
   }
   return output;
-}
-
-function canonicalInstrument(value: unknown): string | undefined {
-  if (typeof value !== 'string') return undefined;
-  const normalized = value.trim().toUpperCase();
-  return /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/.test(normalized) ? normalized : undefined;
-}
-
-function inferSymbol(data: unknown): unknown {
-  const record = asRecord(Array.isArray(data) ? data[0] : data);
-  return record.symbol;
 }
 
 function inferAsOf(data: unknown): number | undefined {
