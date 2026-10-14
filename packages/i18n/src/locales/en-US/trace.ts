@@ -89,6 +89,12 @@ export const trace = {
   footer: {
     completed: 'Completed · {{seconds}}s · {{steps}} steps',
     failed: 'Failed · {{tools}} tools',
+    stopped: 'Stopped early · {{reason}} · {{tools}} tools{{detail}}',
+    stopReasons: {
+      budget_exhausted: 'budget exhausted',
+      loop_detected: 'loop detected',
+      retry_storm: 'too many retries',
+    },
     trace: 'Trace',
   },
 } satisfies NamespaceResource;
