@@ -98,6 +98,18 @@ function result(
   };
 }
 
+function invalidEvidenceReason(input: ClaimVerificationInput): string | undefined {
+  for (const [index, item] of input.evidence.entries()) {
+    if (typeof item.id !== 'string' || item.id.trim() === '') {
+      return `invalid_evidence: evidence id must not be blank (index ${index})`;
+    }
+    if (typeof item.content !== 'string' || item.content.trim() === '') {
+      return `invalid_evidence: evidence content must not be blank (index ${index})`;
+    }
+  }
+  return undefined;
+}
+
 export function createClaimVerifier(client: JudgeClient): ClaimVerifier {
   return {
     async verify(input, signal) {
@@ -107,6 +119,11 @@ export function createClaimVerifier(client: JudgeClient): ClaimVerifier {
           'insufficient_evidence',
           'No source evidence was provided for this claim.',
         );
+      }
+
+      const invalidReason = invalidEvidenceReason(input);
+      if (invalidReason !== undefined) {
+        return result(input, 'insufficient_evidence', invalidReason);
       }
 
       try {
