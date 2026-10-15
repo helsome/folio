@@ -145,7 +145,7 @@ function collectValues(data: unknown, metadata?: StructuredResult['evidence']): 
         ...(metadata?.units?.[path] ? { unit: metadata.units[path] } : {}),
         ...(metadata?.currencies?.[path] ? { currency: metadata.currencies[path] } : {}),
         ...(metadata?.periods?.[path] ? { period: metadata.periods[path] } : {}),
-        ...(isTimeMetric(path) && typeof value === 'number' ? { asOf: value } : {}),
+        ...(isTimeMetric(path) && typeof value === 'number' ? { asOf: toEpochMs(value) } : {}),
       });
       return;
     }
@@ -183,9 +183,24 @@ function inferSymbol(data: unknown): unknown {
   return record.symbol;
 }
 
+/**
+ * Normalize a raw payload timestamp into the envelope's epoch-MS convention.
+ * Longbridge-sourced payload fields are epoch SECONDS (parser.ts
+ * toEpochSeconds; market-data.ts "Epoch seconds of the fiscal period end"),
+ * while provenance.marketTime is epoch MS (issue #162/#179/#181). Magnitude
+ * sniff instead of blind ×1000 so ms inputs are never double-scaled — the
+ * same defensive approach as answer-block-emitter's toIso().
+ */
+const SECONDS_MS_BOUNDARY = 1e11;
+
+function toEpochMs(value: number): number {
+  return value > 0 && value < SECONDS_MS_BOUNDARY ? value * 1000 : value;
+}
+
 function inferAsOf(data: unknown): number | undefined {
   const record = asRecord(Array.isArray(data) ? data[0] : data);
-  return numberValue(record.asOf) ?? numberValue(record.timestamp) ?? numberValue(record.time);
+  const raw = numberValue(record.asOf) ?? numberValue(record.timestamp) ?? numberValue(record.time);
+  return raw !== undefined ? toEpochMs(raw) : undefined;
 }
 
 function isTimeMetric(path: string): boolean {
