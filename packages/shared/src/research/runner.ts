@@ -3,6 +3,7 @@ import {
   type CapabilityRunStatus,
   type CapabilityRunSummary,
   type EvidenceRef,
+  type ResearchClaim,
   type ResearchReport,
   type ResearchRunStatus,
   type ResearchRunSummary,
@@ -19,6 +20,7 @@ import type { ResearchCheckpoint } from './checkpoint.ts';
 import type { SupportedLocale } from '@finagent/core';
 import type { CapabilityRegistry } from '@finagent/core';
 import { CapabilityExecutor, type RunOutcome } from '../capabilities/index.ts';
+import { claimIdOf, evidenceIdOf } from './claim-evidence.ts';
 import {
   buildCapabilityInput,
   planForStrategy,
@@ -317,22 +319,43 @@ function assembleReport(args: {
   const { runId, symbol, strategyId, generatedAt, plan, outcomes, synthesis, locale } = args;
 
   const outcomeByCapability = new Map(outcomes.map((o) => [o.record.capabilityId, o]));
+  const claims: ResearchClaim[] = [];
 
   const sections: ResearchSection[] = synthesis.sections.map((section) => {
     const outcome = outcomeByCapability.get(section.key);
+    const usable = outcome && outcome.record.status === 'success' ? outcome : undefined;
+    const claimId = claimIdOf(section.key, 0);
+    const evidenceId = usable
+      ? evidenceIdOf(usable.record.id, usable.record.capabilityId)
+      : undefined;
+
     const evidence: EvidenceRef[] = [];
-    if (outcome && outcome.record.status === 'success') {
+    if (usable) {
       const instrumentId =
-        outcome.result?.provenance?.instrumentId ?? readInstrumentId(outcome.result?.data);
+        usable.result?.provenance?.instrumentId ?? readInstrumentId(usable.result?.data);
       evidence.push({
-        capabilityId: outcome.record.capabilityId,
-        runId: outcome.record.id,
+        id: evidenceId,
+        capabilityId: usable.record.capabilityId,
+        runId: usable.record.id,
         claim: section.summary,
-        fetchedAt: outcome.record.provenance?.fetchedAt ?? generatedAt,
-        summary: outcome.result?.summary,
+        claimId,
+        fetchedAt: usable.record.provenance?.fetchedAt ?? generatedAt,
+        summary: usable.result?.summary,
         ...(instrumentId ? { instrumentId } : {}),
       });
     }
+
+    // Every section contributes one claim today; the id plus list shape already
+    // supports several per section. A section whose capability failed keeps its
+    // claim with no evidence behind it — visible as an unbacked edge rather
+    // than silently dropped.
+    claims.push({
+      id: claimId,
+      sectionKey: section.key,
+      text: section.summary,
+      evidenceRefs: evidenceId ? [evidenceId] : [],
+    });
+
     return { ...section, evidence };
   });
 
@@ -385,6 +408,9 @@ function assembleReport(args: {
     catalysts: synthesis.catalysts,
     risks: synthesis.risks,
     capabilityRuns,
+    // Claim ↔ evidence identity travels with the report, so the links are the
+    // same after persistence, reload and export (issue #13).
+    claims,
     runStatus: computeRunStatus(plan, successIds),
   };
 }
