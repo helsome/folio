@@ -22,17 +22,21 @@ export function collectCitationSources(message: Message): CitationIndex {
   for (const toolCall of message.toolCalls ?? []) {
     if (toolCall.status !== 'success') continue;
     const envelope = envelopeByToolCallId.get(toolCall.id);
+    const metadata = envelope ? {} : extractToolResultMetadata(toolCall.result);
     sources.push({
       id: toolCall.id,
       ...(envelope ? { envelopeId: envelope.id } : {}),
       kind: envelope ? 'financial' : inferSourceKind(toolCall.toolName),
       toolName: toolCall.toolName,
+      ...(envelope ? {} : { args: toolCall.args }),
       ...(envelope?.provider ? { provider: envelope.provider } : {}),
-      title: envelope ? summarizeEnvelope(envelope) : summarizeToolCall(toolCall),
-      ...extractUrl(toolCall.result),
+      title: envelope ? summarizeEnvelope(envelope) : summarizeToolCall(toolCall, metadata),
+      ...(metadata.url ? { url: metadata.url } : {}),
       retrievedAt: envelope?.retrievedAt ?? toolCall.completedAt ?? toolCall.startedAt,
       ...(envelope?.asOf !== undefined ? { asOf: envelope.asOf } : {}),
       ...(envelope ? { stale: envelope.stale } : {}),
+      ...(envelope?.delayed === true ? { delayed: true } : {}),
+      ...(envelope?.reconciliation ? { reconciliation: envelope.reconciliation } : {}),
       status: toolCall.status,
     });
   }
@@ -88,21 +92,27 @@ function summarizeEnvelope(envelope: FinancialEvidenceEnvelope): string {
     : subject;
 }
 
-function summarizeToolCall(toolCall: Message['toolCalls'] extends (infer T)[] | undefined ? T : never): string {
+function summarizeToolCall(
+  toolCall: Message['toolCalls'] extends (infer T)[] | undefined ? T : never,
+  metadata: { url?: string; title?: string } = {}
+): string {
+  if (metadata.title) return metadata.title;
   const symbol = typeof toolCall.args.symbol === 'string' ? toolCall.args.symbol.toUpperCase() : undefined;
   return symbol ? `${toolCall.toolName} · ${symbol}` : toolCall.toolName;
 }
 
-/** Best-effort URL extraction from a tool result payload (never throws). */
-function extractUrl(result: unknown): { url?: string } {
+/** Best-effort title/URL extraction from a tool result payload (never throws). */
+function extractToolResultMetadata(result: unknown): { url?: string; title?: string } {
   try {
     const record = result && typeof result === 'object' && !Array.isArray(result) ? result as Record<string, unknown> : {};
     const data = Array.isArray(record.data) ? record.data : result;
     const items = Array.isArray(data) ? data : [];
     for (const item of items) {
-      if (item && typeof item === 'object' && typeof (item as Record<string, unknown>).url === 'string') {
-        return { url: (item as Record<string, unknown>).url as string };
-      }
+      if (!item || typeof item !== 'object') continue;
+      const entry = item as Record<string, unknown>;
+      const url = typeof entry.url === 'string' ? entry.url : undefined;
+      const title = typeof entry.title === 'string' ? entry.title : undefined;
+      if (url || title) return { ...(url ? { url } : {}), ...(title ? { title } : {}) };
     }
   } catch {
     // Provenance labels are best-effort; a malformed payload stays silent.
