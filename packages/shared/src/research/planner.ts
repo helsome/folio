@@ -16,6 +16,7 @@ export const RESEARCH_CAPABILITY_PLAN = [
   'company.earnings',
   'company.ratings',
   'research.news',
+  'research.documents',
   'market.capitalFlow',
   'portfolio.positions',
 ] as const;
@@ -35,6 +36,7 @@ export const CAPABILITY_TITLES: Record<string, string> = {
   'company.dividends': 'Dividends',
   'company.ratings': 'Analyst Ratings',
   'research.news': 'News',
+  'research.documents': 'Primary Disclosures',
   'research.events': 'Upcoming Events',
   'market.capitalFlow': 'Capital Flow',
   'portfolio.positions': 'Portfolio Position',
@@ -90,6 +92,7 @@ export function planForStrategy(
  * query instead of a bare symbol.
  */
 export function buildCapabilityInput(capabilityId: string, symbol: string): unknown {
+  if (capabilityId === 'research.documents') return { symbol, evidenceQuery: 'revenue' };
   if (capabilityId === 'research.events') {
     return { eventType: 'financial', symbols: [symbol] };
   }
