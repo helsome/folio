@@ -14,6 +14,7 @@
     "./portfolio-risk": "./src/portfolio-risk/index.ts",
     "./portfolio-import": "./src/portfolio-import/index.ts",
     "./diagnostics": "./src/diagnostics/index.ts",
+    "./retrieval": "./src/retrieval/index.ts",
     "./providers/longbridge": "./src/providers/longbridge/index.ts",
     "./providers/massive": "./src/providers/massive/index.ts"
   },
