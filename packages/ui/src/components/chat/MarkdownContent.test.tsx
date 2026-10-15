@@ -113,5 +113,10 @@ describe('MarkdownContent', () => {
     expect(streamingContainer.querySelector('table')).not.toBeNull();
     expect(staticContainer.querySelector('table')).not.toBeNull();
     expect(streamingContainer.textContent).toBe(staticContainer.textContent);
+
+    act(() => {
+      streamingRoot.unmount();
+      staticRoot.unmount();
+    });
   });
 });
