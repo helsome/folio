@@ -10,6 +10,17 @@ export { ResearchRunner, type ResearchRunnerOptions, type ResearchRunRequest, ty
 export { LocalResearchSynthesizer } from './synthesizer-local.ts';
 export { createAgentSynthesizer, parseSynthesisJson, type ResearchAgentRunner } from './agent-synth.ts';
 export { ResearchReportRepository, type ReportSummary } from './repository.ts';
+export {
+  createSourceProvenanceSnapshot,
+  detectSourceDrift,
+  hashSourceText,
+  refreshSourceSnapshot,
+  snapshotCapabilityEvidence,
+  type LiveSourceObservation,
+  type SourceDriftCheck,
+  type SourceSnapshotInput,
+  type SourceSnapshotRefresher,
+} from './source-provenance.ts';
 export { ResearchService, type ResearchServiceOptions } from './service.ts';
 export {
   INJECTION_DEFENSE_RULES,

@@ -37,7 +37,43 @@ export interface EvidenceRef {
   summary?: string;
   /** Canonical instrument id linking this evidence to one listing. */
   instrumentId?: string;
+  /**
+   * The minimal, immutable source snapshots that were available when this
+   * evidence was added to the report. They are deliberately separate from a
+   * later live retrieval: a live response must never overwrite this record.
+   */
+  sourceSnapshots?: SourceProvenanceSnapshot[];
 }
+
+/** A privacy-bounded snapshot of the source material used as evidence. */
+export interface SourceProvenanceSnapshot {
+  /** Versioned so later snapshot formats remain distinguishable on reload. */
+  schemaVersion: 'folio-source-provenance/v1';
+  /** Stable identity for the document/source, independent of retrieval time. */
+  sourceId: string;
+  /** Provider document identity when one is available. */
+  documentId?: string;
+  /** Canonical HTTP(S) URL, with fragments and tracking parameters removed. */
+  canonicalUrl?: string;
+  title?: string;
+  author?: string;
+  /** Epoch milliseconds, when the source published a timestamp. */
+  publishedAt?: number;
+  /** Epoch milliseconds when Folio retrieved this source. */
+  retrievedAt: number;
+  /** Retrieval boundary, e.g. the provider and capability that supplied it. */
+  retrieval: { provider: string; method: string };
+  /** The smallest source span that was actually handed to the report path. */
+  excerpt: string;
+  excerptHash: string;
+  /** Hash of the minimal source content used to derive the excerpt. */
+  sourceContentHash: string;
+  /** Version/ETag/revision supplied by the source, when available. */
+  sourceVersion?: string;
+}
+
+/** Result of comparing a newly retrieved source with an original snapshot. */
+export type SourceDriftStatus = 'current' | 'source_drifted' | 'source_unavailable';
 
 /** Condensed outcome of one capability run, embedded in the report. */
 export interface CapabilityRunSummary {
