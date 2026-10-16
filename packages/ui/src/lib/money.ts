@@ -16,6 +16,22 @@ import {
 
 const SUPPORTED_CURRENCIES: Record<string, true> = { USD: true, HKD: true, CNY: true, SGD: true }
 
+/**
+ * Best-effort display currency for a routed symbol suffix (AAPL.US → USD).
+ *
+ * Mirrors `currencyForSymbol` in `@finagent/shared`'s answer-block-emitter:
+ * the agent answer blocks derive a quote's currency the same way, so a quote
+ * card and the message list beside it never show two currencies for one quote.
+ * The UI package can't import `@finagent/shared`, so keep this map in sync if
+ * the shared version ever changes.
+ */
+export function currencyForSymbol(symbol: string): string {
+  if (/\.HK$/i.test(symbol)) return 'HKD'
+  if (/\.SH$|\.SZ$/i.test(symbol)) return 'CNY'
+  if (/\.SG$/i.test(symbol)) return 'SGD'
+  return 'USD'
+}
+
 /** Format a money value with its ISO currency; unknown code → plain number + code. */
 export function formatMoney(value: number | undefined, currency?: string): string {
   if (value === undefined || !Number.isFinite(value)) return '—'
