@@ -162,3 +162,130 @@ describe('streaming Markdown fixtures (#28)', () => {
     await unmount(staticRoot);
   });
 });
+
+describe('streamed Markdown block rendering (#28)', () => {
+  /**
+   * Mount streamed Markdown wrapped in a Profiler that counts commits.
+   * Frame waits are deliberately generous (2-3x the 16ms coalescing
+   * interval): these tests assert on content and commit counts, not on
+   * wall-clock timing, so a loaded machine must not turn them flaky.
+   */
+  async function mountProfiled(content: string): Promise<{
+    container: HTMLDivElement;
+    root: Root;
+    commits: () => number;
+    render: (value: string) => void;
+  }> {
+    const container = document.createElement('div');
+    const root = createRoot(container);
+    let commitCount = 0;
+    const tree = (value: string) => (
+      <React.Profiler id="markdown-content" onRender={() => { commitCount += 1; }}>
+        <MarkdownContent content={value} streaming />
+      </React.Profiler>
+    );
+    await act(async () => {
+      root.render(tree(content));
+    });
+    await settle();
+    return { container, root, commits: () => commitCount, render: (value) => { root.render(tree(value)); } };
+  }
+
+  /** Let the 16ms coalescing buffer commit, with margin for slow machines. */
+  async function settle(): Promise<void> {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 50));
+    });
+  }
+
+  /** Fixed-size token deltas, the shape a real stream delivers. */
+  function chunkString(value: string, size: number): string[] {
+    const chunks: string[] = [];
+    for (let index = 0; index < value.length; index += size) {
+      chunks.push(value.slice(index, index + size));
+    }
+    return chunks;
+  }
+
+  it('keeps an unclosed fence one code block even with blank lines inside', async () => {
+    const fixture = fixtureNamed('fenced code block with internal blank lines');
+    const { container, root } = await mountStreaming(fixture.partial);
+
+    // The blank line inside the fence must not become a block boundary, or
+    // the tail of the code block would render as a separate paragraph.
+    expect(container.querySelectorAll('pre')).toHaveLength(1);
+    expect(container.querySelector('pre code')?.textContent).toContain('margin = 0.21');
+    expect(container.querySelector('pre code')?.textContent).toContain('fcf = 312');
+    expect(container.querySelector('p')).toBeNull();
+
+    await unmount(root);
+  });
+
+  it('keeps a loose list one list across blank lines', async () => {
+    const fixture = fixtureNamed('loose list across a blank line');
+    const { container, root } = await mountStreaming(fixture.partial);
+
+    expect(container.querySelectorAll('ol')).toHaveLength(1);
+    expect(container.querySelectorAll('ol li')).toHaveLength(2);
+
+    await unmount(root);
+  });
+
+  it('coalesces a token burst into a single committed frame', async () => {
+    const { container, root, commits, render } = await mountProfiled('');
+    const before = commits();
+
+    // A whole frame's worth of tokens delivered synchronously: the coalescing
+    // buffer must commit once, not once per delta.
+    let accumulated = '';
+    await act(async () => {
+      for (const chunk of chunkString(LONG_ANSWER_MARKDOWN, 40)) {
+        accumulated += chunk;
+        render(accumulated);
+      }
+    });
+    await settle();
+
+    // One commit for the batched burst, one for the coalesced frame — with
+    // headroom for React batching differences across versions. A per-delta
+    // pipeline would commit ~40 times here.
+    expect(commits() - before).toBeLessThanOrEqual(3);
+    // Nothing is lost while coalescing: the completed answer is fully rendered.
+    expect(container.textContent).toContain('cross-checked above');
+
+    await unmount(root);
+  });
+
+  it('streams a long financial answer in frames, not per token', async () => {
+    // Repeatable long-answer fixture in the shape #28 calls out: repeated
+    // sections of headings, tables and lists. ~6 KB streamed in 200-char
+    // deltas with one frame wait per delta.
+    const section =
+      '## Section\n\n| Asset | Weight |\n| --- | ---: |\n| Equities | 46% |\n\n- first point\n- second point\n\n';
+    const long = section.repeat(60);
+    const chunks = chunkString(long, 200);
+
+    const { container, root, commits, render } = await mountProfiled('');
+    let accumulated = '';
+    for (const chunk of chunks) {
+      accumulated += chunk;
+      await act(async () => {
+        render(accumulated);
+      });
+      await settle();
+    }
+    // Final flush so the last delta's frame is committed before asserting.
+    await settle();
+
+    expect(container.querySelectorAll('h2')).toHaveLength(60);
+    expect(container.querySelectorAll('table tbody tr')).toHaveLength(60);
+    expect(container.querySelectorAll('li')).toHaveLength(120);
+    expect(container.textContent).toContain('second point');
+    // At most two commits per delivered delta (the delta itself plus the
+    // coalesced frame it lands in) — never one per character. Completed
+    // blocks stay memoized, so only the arriving block is re-parsed.
+    expect(commits()).toBeLessThanOrEqual(chunks.length * 2 + 3);
+
+    await unmount(root);
+  });
+});

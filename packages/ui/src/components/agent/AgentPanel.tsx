@@ -27,6 +27,7 @@ import { ToolActivity } from './ToolActivity';
 import { ContextChip } from './ContextChip';
 import { TraceInspector } from '../trace/TraceInspector';
 import { loadSessionTraceSources, projectSessionTrace } from '../../lib/traceData';
+import { useAutoScrollFollow } from './autoScroll';
 import { QuoteCard } from './structured/QuoteCard';
 import { PortfolioRiskCard } from './structured/PortfolioRiskCard';
 import { AgentAmbientField, type AgentMotionState } from '../motion/AgentAmbientField';
@@ -104,9 +105,17 @@ export const AgentPanel: React.FC = () => {
   const [traceLoading, setTraceLoading] = useState(false);
   const bodyRef = useRef<HTMLDivElement>(null);
   const bodyEndRef = useRef<HTMLDivElement>(null);
-  const shouldAutoScrollRef = useRef(true);
 
   const isRunning = runView !== null && runView.infraError === undefined;
+
+  // Keep the live transcript pinned to the bottom while the user has not
+  // scrolled away (#28): scrolling up disarms following until the user
+  // returns to the bottom, so streamed deltas never yank the viewport.
+  const { onScroll: handleBodyScroll } = useAutoScrollFollow(bodyRef, bodyEndRef, [
+    messages,
+    runView?.answer,
+    runView?.toolCalls,
+  ]);
 
   // The run_completed event payload does not carry financial evidence (the
   // envelopes are built when the run settles). Once a run finishes, refresh the
@@ -129,18 +138,6 @@ export const AgentPanel: React.FC = () => {
         : isRunning
           ? 'thinking'
           : 'idle';
-
-  useEffect(() => {
-    if (!shouldAutoScrollRef.current) return;
-    bodyEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  }, [messages, runView?.answer, runView?.toolCalls]);
-
-  const handleBodyScroll = () => {
-    const body = bodyRef.current;
-    if (!body) return;
-    const distanceFromBottom = body.scrollHeight - body.scrollTop - body.clientHeight;
-    shouldAutoScrollRef.current = distanceFromBottom <= 24;
-  };
 
   const handleSend = async () => {
     const text = input.trim();
