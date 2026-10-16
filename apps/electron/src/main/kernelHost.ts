@@ -2220,10 +2220,7 @@ export class AgentKernelHost {
 
   async automationSaveRule(input: unknown): Promise<AutomationRule> {
     const request = requireObject(input);
-    const rule = request.rule as unknown as AutomationRule;
-    if (!rule || typeof rule.type !== 'string') {
-      throw createCodeError('AUTOMATION_RULE_INVALID', 'A valid automation rule is required.');
-    }
+    const rule = requireAutomationRule(request.rule);
     return this.automationRules.save(rule);
   }
 
@@ -2682,6 +2679,69 @@ function requireObject(value: unknown): Record<string, unknown> {
     throw createCodeError('INVALID_ARGUMENT', 'Expected an object payload.');
   }
   return value as Record<string, unknown>;
+}
+
+const AUTOMATION_TYPES: ReadonlySet<AutomationRule['type']> = new Set([
+  'watchlist-daily-review',
+  'portfolio-daily-brief',
+  'weekly-thesis-review',
+  'pre-earnings-research',
+  'post-earnings-research',
+]);
+
+function requireAutomationRule(value: unknown): AutomationRule {
+  const invalid = (message: string): never => {
+    throw createCodeError('AUTOMATION_RULE_INVALID', message);
+  };
+  if (!isRecord(value)) {
+    throw createCodeError('AUTOMATION_RULE_INVALID', 'A valid automation rule is required.');
+  }
+
+  if (typeof value.id !== 'string' || value.id.trim() === '') {
+    invalid('Automation rule id must be a non-empty string.');
+  }
+  if (typeof value.type !== 'string' || !AUTOMATION_TYPES.has(value.type as AutomationRule['type'])) {
+    invalid('Automation rule type is unsupported.');
+  }
+  if (typeof value.enabled !== 'boolean') {
+    invalid('Automation rule enabled must be a boolean.');
+  }
+  if (value.notify !== 'material-only' && value.notify !== 'all') {
+    invalid('Automation rule notify mode is unsupported.');
+  }
+  if (typeof value.createdAt !== 'number' || !Number.isFinite(value.createdAt) || value.createdAt < 0) {
+    invalid('Automation rule createdAt must be a non-negative timestamp.');
+  }
+  if (
+    value.hour !== undefined &&
+    (typeof value.hour !== 'number' || !Number.isFinite(value.hour) || value.hour < 0 || value.hour >= 24)
+  ) {
+    invalid('Automation rule hour must be between 0 (inclusive) and 24 (exclusive).');
+  }
+  if (value.days !== undefined) {
+    if (
+      !Array.isArray(value.days) ||
+      value.days.some((day) => !Number.isInteger(day) || day < 0 || day > 6) ||
+      new Set(value.days).size !== value.days.length
+    ) {
+      invalid('Automation rule days must contain unique weekday integers from 0 through 6.');
+    }
+  }
+  if (
+    value.symbols !== undefined &&
+    (!Array.isArray(value.symbols) ||
+      value.symbols.some((symbol) => typeof symbol !== 'string' || symbol.trim() === ''))
+  ) {
+    invalid('Automation rule symbols must be non-empty strings.');
+  }
+  if (
+    value.strategyId !== undefined &&
+    (typeof value.strategyId !== 'string' || !STRATEGY_IDS.includes(value.strategyId as StrategyId))
+  ) {
+    invalid('Automation rule strategyId is unsupported.');
+  }
+
+  return value as unknown as AutomationRule;
 }
 
 function createCodeError(code: string, message: string, action?: string) {
