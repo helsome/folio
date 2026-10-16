@@ -11,7 +11,10 @@ interface PortfolioRiskPanelProps {
 /** Renders the PortfolioRiskReport: summary, concentration, allocation, and signals. */
 export const PortfolioRiskPanel: React.FC<PortfolioRiskPanelProps> = ({ report }) => {
   const { t } = useTranslation();
-  const { summary, allocation, concentration, signals } = report;
+  const { summary, allocation, allocationCoverage, concentration, signals } = report;
+  const omitted = allocationCoverage?.excludedSymbols ?? [];
+  const subsetOnly = omitted.length > 0 && allocationCoverage?.basis === 'available-positions';
+  const concentrationUnavailable = subsetOnly || (omitted.length > 0 && allocation.length === 0);
   const earnings = signals.filter((s) => s.kind === 'upcoming_earnings');
   const otherSignals = signals.filter((s) => s.kind !== 'upcoming_earnings');
 
@@ -24,6 +27,15 @@ export const PortfolioRiskPanel: React.FC<PortfolioRiskPanelProps> = ({ report }
         <p className="text-[13px] leading-relaxed text-foreground/78">{summary}</p>
       </div>
 
+      {omitted.length > 0 && (
+        <p className="rounded-[12px] border border-amber-400/30 bg-amber-400/8 px-4 py-3 text-[12px] leading-relaxed text-foreground/75" role="status">
+          {t(subsetOnly ? 'portfolio.riskPartialSubset' : 'portfolio.riskPartialPortfolio', {
+            count: omitted.length,
+            symbols: omitted.join(', '),
+          })}
+        </p>
+      )}
+
       <div className="mac-stock-tile rounded-[14px] p-4">
         <h3 className="mb-3 text-[11px] font-semibold uppercase tracking-wide text-foreground/48">
           {t('portfolio.concentration')}
@@ -31,15 +43,15 @@ export const PortfolioRiskPanel: React.FC<PortfolioRiskPanelProps> = ({ report }
         <div className="grid grid-cols-3 gap-3">
           <ConcentrationMetric
             label={t('portfolio.topPosition')}
-            value={formatPercentRatio(concentration.top1Weight)}
+            value={concentrationUnavailable ? '—' : formatPercentRatio(concentration.top1Weight)}
           />
           <ConcentrationMetric
             label={t('portfolio.topFive')}
-            value={formatPercentRatio(concentration.top5Weight)}
+            value={concentrationUnavailable ? '—' : formatPercentRatio(concentration.top5Weight)}
           />
           <ConcentrationMetric
             label={t('portfolio.herfindahl')}
-            value={concentration.herfindahl.toFixed(2)}
+            value={concentrationUnavailable ? '—' : concentration.herfindahl.toFixed(2)}
           />
         </div>
       </div>
@@ -50,7 +62,7 @@ export const PortfolioRiskPanel: React.FC<PortfolioRiskPanelProps> = ({ report }
         </h3>
         {allocation.length === 0 ? (
           <div className="py-6 text-center text-[13px] text-foreground/44">
-            {t('portfolio.noPositions')}
+            {t(omitted.length > 0 ? 'portfolio.noComparablePositions' : 'portfolio.noPositions')}
           </div>
         ) : (
           <div className="space-y-2">
