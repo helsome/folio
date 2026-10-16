@@ -117,28 +117,35 @@ export interface ScreeningStrategyDef {
 
 // ── data extractors ─────────────────────────────────────────────────────────
 
-/** Daily closes, oldest first, defensive against unordered provider output. */
-function sortedCloses(kline: Kline[] | undefined): number[] {
+function positiveNumber(value: unknown): number | undefined {
+  const number = toFiniteNumber(value)
+  return number !== undefined && number > 0 ? number : undefined
+}
+
+/** Daily closes, oldest first. Missing bars stay in place so windows cannot shift. */
+function sortedCloses(kline: Kline[] | undefined): Array<number | undefined> {
   if (!kline) return []
   return [...kline]
     .sort((a, b) => a.timestamp - b.timestamp)
-    .map((bar) => toFiniteNumber(bar.close))
-    .filter((value): value is number => value !== undefined)
+    .map((bar) => positiveNumber(bar.close))
 }
 
-function sma(values: number[], window: number): number | undefined {
+function sma(values: Array<number | undefined>, window: number): number | undefined {
   if (values.length < window) return undefined
-  const slice = values.slice(-window)
-  const sum = slice.reduce((acc, value) => acc + value, 0)
+  const valid = values.slice(-window).filter((value): value is number => value !== undefined)
+  if (valid.length !== window) return undefined
+  const sum = valid.reduce((acc, value) => acc + value, 0)
   return sum / window
 }
 
 /** Percent price change over the trailing `bars` closes (undefined when short). */
-function pctReturn(values: number[], bars: number): number | undefined {
+function pctReturn(values: Array<number | undefined>, bars: number): number | undefined {
   if (values.length <= bars) return undefined
-  const latest = values[values.length - 1]
-  const base = values[values.length - 1 - bars]
-  if (base === undefined || base === 0) return undefined
+  const window = values.slice(-bars - 1)
+  if (window.some((value) => value === undefined)) return undefined
+  const latest = window[window.length - 1]
+  const base = window[0]
+  if (latest === undefined || base === undefined || base <= 0) return undefined
   return ((latest - base) / base) * 100
 }
 
@@ -296,7 +303,7 @@ const highVolume: ScreeningStrategyDef = {
     const volumeRatio = toFiniteNumber(ctx.data.valuation?.volumeRatio)
     const closes = sortedCloses(ctx.data.kline)
     const barVolumes = ctx.data.kline
-      ? [...ctx.data.kline].sort((a, b) => a.timestamp - b.timestamp).map((bar) => toFiniteNumber(bar.volume))
+      ? [...ctx.data.kline].sort((a, b) => a.timestamp - b.timestamp).map((bar) => positiveNumber(bar.volume))
       : []
     const klineRatio = (() => {
       // "Today" must be the actual latest bar by timestamp. Filtering out
@@ -345,10 +352,10 @@ const unusualMovement: ScreeningStrategyDef = {
       : []
     if (bars.length <= BREAKOUT_WINDOW) return null
     const amplitudeOf = (bar: Kline): number | undefined => {
-      const high = toFiniteNumber(bar.high)
-      const low = toFiniteNumber(bar.low)
-      const prevClose = toFiniteNumber(bar.close) // latest close proxies prev close for the prior bars
-      if (high === undefined || low === undefined || prevClose === undefined || prevClose === 0) return undefined
+      const high = positiveNumber(bar.high)
+      const low = positiveNumber(bar.low)
+      const prevClose = positiveNumber(bar.close) // latest close proxies prev close for the prior bars
+      if (high === undefined || low === undefined || prevClose === undefined || high < low) return undefined
       return ((high - low) / prevClose) * 100
     }
     const latest = bars[bars.length - 1]
@@ -358,7 +365,7 @@ const unusualMovement: ScreeningStrategyDef = {
     const amplitudes = prior
       .map(amplitudeOf)
       .filter((value): value is number => value !== undefined)
-    if (amplitudes.length === 0) return null
+    if (amplitudes.length !== BREAKOUT_WINDOW) return null
     const avg = amplitudes.reduce((acc, value) => acc + value, 0) / amplitudes.length
     if (avg === 0) return null
     const ratio = today / avg
@@ -515,21 +522,22 @@ const breakout: ScreeningStrategyDef = {
       : []
     if (bars.length <= BREAKOUT_WINDOW) return null
     const latest = bars[bars.length - 1]
-    const latestClose = toFiniteNumber(latest.close)
+    const latestClose = positiveNumber(latest.close)
     if (latestClose === undefined) return null
     const prior = bars.slice(-BREAKOUT_WINDOW - 1, -1)
-    const priorHigh = Math.max(
-      ...prior.map((bar) => toFiniteNumber(bar.high)).filter((v): v is number => v !== undefined)
-    )
-    if (!Number.isFinite(priorHigh) || latestClose <= priorHigh) return null
+    const priorHighs = prior
+      .map((bar) => positiveNumber(bar.high))
+      .filter((value): value is number => value !== undefined)
+    if (priorHighs.length !== BREAKOUT_WINDOW) return null
+    const priorHigh = Math.max(...priorHighs)
+    if (latestClose <= priorHigh) return null
     const priorVolumes = prior
-      .map((bar) => toFiniteNumber(bar.volume))
-      .filter((v): v is number => v !== undefined)
-    const avgVolume = priorVolumes.length > 0
-      ? priorVolumes.reduce((acc, value) => acc + value, 0) / priorVolumes.length
-      : 0
-    const latestVolume = toFiniteNumber(latest.volume)
-    if (avgVolume === 0 || latestVolume === undefined || latestVolume < avgVolume * BREAKOUT_VOLUME_MULT) {
+      .map((bar) => positiveNumber(bar.volume))
+      .filter((value): value is number => value !== undefined)
+    if (priorVolumes.length !== BREAKOUT_WINDOW) return null
+    const avgVolume = priorVolumes.reduce((acc, value) => acc + value, 0) / BREAKOUT_WINDOW
+    const latestVolume = positiveNumber(latest.volume)
+    if (latestVolume === undefined || latestVolume < avgVolume * BREAKOUT_VOLUME_MULT) {
       return null
     }
     const volumeRatio = latestVolume / avgVolume

@@ -224,6 +224,24 @@ describe('market-movers rules', () => {
     expect(result?.reasons.some((reason) => reason.includes('Market temp 72/100'))).toBe(true)
     expect(rule.compute(makeContext({ kline: bars(30, 100, 0), valuation: { symbol: 'AAPL.US', amplitude: 2.2 } }))).toBeNull()
   })
+
+  it('high-volume does not dilute its 20d baseline with a missing zero volume', () => {
+    const rule = getScreeningStrategy('high-volume')!
+    const klines = bars(30, 100, 1, 100_000)
+    klines[klines.length - 1] = { ...klines[klines.length - 1], volume: 400_000 }
+    klines[klines.length - 2] = { ...klines[klines.length - 2], volume: 0 }
+    expect(rule.compute(makeContext({ kline: klines }))).toBeNull()
+  })
+
+  it('unusual-movement does not call an incomplete baseline a 20d average', () => {
+    const rule = getScreeningStrategy('unusual-movement')!
+    const klines = bars(30, 100, 0)
+    klines[klines.length - 1] = { ...klines[klines.length - 1], high: 112, low: 90 }
+    expect(rule.compute(makeContext({ kline: klines }))).not.toBeNull()
+    // Massive maps a missing provider low to 0, skewing the average.
+    klines[klines.length - 2] = { ...klines[klines.length - 2], low: 0 }
+    expect(rule.compute(makeContext({ kline: klines }))).toBeNull()
+  })
 })
 
 describe('fundamental rules', () => {
@@ -328,6 +346,27 @@ describe('technical rules', () => {
     expect(rule.compute(makeContext({ kline: bars(10, 100, 5) }))).toBeNull()
   })
 
+  it('does not compress missing closes into a false 1m or 3m window', () => {
+    const rule = getScreeningStrategy('strong-momentum')!
+    const klines = bars(65, 80, 0)
+    klines[klines.length - 1] = { ...klines[klines.length - 1], close: 105 }
+    klines[1] = { ...klines[1], close: Number.NaN }
+    // Dropping this missing 3m baseline shifts the window to the earlier 80,
+    // inventing +31.25% instead of treating the 3m return as unknown.
+    expect(rule.compute(makeContext({ kline: klines }))).toBeNull()
+
+    // Massive maps a missing *intermediate* close to 0; the old return helper
+    // only checks its endpoints, so it accepts an incomplete 3m window.
+    const zeroInside = bars(65, 80, 0)
+    zeroInside[zeroInside.length - 1] = { ...zeroInside[zeroInside.length - 1], close: 105 }
+    zeroInside[2] = { ...zeroInside[2], close: 0 }
+    expect(rule.compute(makeContext({ kline: zeroInside }))).toBeNull()
+
+    const lastMissing = bars(65, 100, 1)
+    lastMissing[lastMissing.length - 1] = { ...lastMissing[lastMissing.length - 1], close: Number.NaN }
+    expect(rule.compute(makeContext({ kline: lastMissing }))).toBeNull()
+  })
+
   it('breakout needs a new high on expanding volume', () => {
     const rule = getScreeningStrategy('breakout')!
     const klines = bars(30, 100, 0.4, 100_000)
@@ -345,6 +384,19 @@ describe('technical rules', () => {
     const quiet = bars(30, 100, 0.4, 100_000)
     quiet[quiet.length - 1] = { ...quiet[quiet.length - 1], close: 115, high: 116, volume: avgVolume }
     expect(rule.compute(makeContext({ kline: quiet }))).toBeNull()
+  })
+
+  it('breakout requires all 20 prior highs and volumes', () => {
+    const rule = getScreeningStrategy('breakout')!
+    const klines = bars(30, 100, 0.4, 100_000)
+    klines[klines.length - 1] = { ...klines[klines.length - 1], close: 115, high: 116, volume: 200_000 }
+    expect(rule.compute(makeContext({ kline: klines }))).not.toBeNull()
+    const incompleteHigh = klines.map((bar) => ({ ...bar }))
+    incompleteHigh[incompleteHigh.length - 2].high = 0
+    expect(rule.compute(makeContext({ kline: incompleteHigh }))).toBeNull()
+    const incompleteVolume = klines.map((bar) => ({ ...bar }))
+    incompleteVolume[incompleteVolume.length - 2].volume = 0
+    expect(rule.compute(makeContext({ kline: incompleteVolume }))).toBeNull()
   })
 
   it('oversold requires close well below its 20d average and a 3m decline', () => {
