@@ -2,6 +2,7 @@ import type {
   CapabilityRegistry,
   Comparison,
   ComparisonCell,
+  ComparisonPriceHistory,
   ComparisonRow,
 } from '@finagent/core';
 import { CapabilityExecutor, type RunAllSpec } from '../capabilities/executor.ts';
@@ -115,7 +116,54 @@ export async function buildComparison(
     rows: buildRows(symbols, perSymbol),
     generatedAt: now(),
     errors,
+    priceHistory: buildPriceHistory(symbols, perSymbol),
   };
+}
+
+/**
+ * Normalize close prices to 100 from the earliest exact timestamp shared by
+ * every selected symbol. The union timestamp grid keeps non-trading dates as
+ * explicit nulls so chart consumers can render gaps instead of inventing data.
+ */
+function buildPriceHistory(
+  symbols: string[],
+  perSymbol: Record<string, Record<string, unknown>>
+): ComparisonPriceHistory {
+  const bySymbol = new Map<string, Map<number, number>>();
+  for (const symbol of symbols) {
+    const bars = extractKlines(perSymbol[symbol]?.['market.kline']);
+    const closes = new Map<number, number>();
+    for (const bar of bars) {
+      if (bar.close > 0) closes.set(bar.timestamp, bar.close);
+    }
+    bySymbol.set(symbol, closes);
+  }
+
+  if (symbols.length === 0 || [...bySymbol.values()].some((bars) => bars.size === 0)) {
+    return { commonStartTimestamp: null, series: Object.fromEntries(symbols.map((symbol) => [symbol, []])) };
+  }
+
+  const firstSymbolBars = bySymbol.get(symbols[0]!)!;
+  const commonStartTimestamp = [...firstSymbolBars.keys()]
+    .filter((timestamp) => symbols.every((symbol) => bySymbol.get(symbol)?.has(timestamp)))
+    .sort((a, b) => a - b)[0] ?? null;
+  if (commonStartTimestamp === null) {
+    return { commonStartTimestamp: null, series: Object.fromEntries(symbols.map((symbol) => [symbol, []])) };
+  }
+
+  const timestamps = [...new Set(
+    [...bySymbol.values()].flatMap((bars) => [...bars.keys()].filter((timestamp) => timestamp >= commonStartTimestamp))
+  )].sort((a, b) => a - b);
+  const series = Object.fromEntries(symbols.map((symbol) => {
+    const closes = bySymbol.get(symbol)!;
+    const base = closes.get(commonStartTimestamp)!;
+    return [symbol, timestamps.map((timestamp) => {
+      const close = closes.get(timestamp);
+      return { timestamp, value: close === undefined ? null : (close / base) * 100 };
+    })];
+  }));
+
+  return { commonStartTimestamp, series };
 }
 
 function buildRows(

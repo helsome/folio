@@ -183,4 +183,49 @@ describe('buildComparison', () => {
     expect(cell(comparison, '1M Return', 'AAPL.US')?.missing).toBe(true);
     expect(cell(comparison, '1Y Return', 'AAPL.US')?.missing).toBe(true);
   });
+
+  it('normalizes price history from the earliest shared close and preserves missing dates as gaps', async () => {
+    const registry = createCapabilityRegistry([
+      makeCap('market.kline', 'get_kline', (symbol) => symbol === 'AAPL.US'
+        ? [
+            { timestamp: 1, close: 10 },
+            { timestamp: 2, close: 15 },
+            { timestamp: 4, close: 20 },
+          ]
+        : [
+            { timestamp: 2, close: 20 },
+            { timestamp: 3, close: 10 },
+            { timestamp: 4, close: 40 },
+          ]),
+    ]);
+
+    const comparison = await buildComparison(['AAPL.US', 'MSFT.US'], registry, { now: () => 1 });
+
+    expect(comparison.priceHistory?.commonStartTimestamp).toBe(2);
+    const aapl = comparison.priceHistory?.series['AAPL.US'];
+    expect(aapl?.map(({ timestamp }) => timestamp)).toEqual([2, 3, 4]);
+    expect(aapl?.[0]?.value).toBe(100);
+    expect(aapl?.[1]?.value).toBeNull();
+    expect(aapl?.[2]?.value).toBeCloseTo((20 / 15) * 100, 8);
+    expect(comparison.priceHistory?.series['MSFT.US']).toEqual([
+      { timestamp: 2, value: 100 },
+      { timestamp: 3, value: 50 },
+      { timestamp: 4, value: 200 },
+    ]);
+  });
+
+  it('returns no normalized chart points when symbols have no common starting timestamp', async () => {
+    const registry = createCapabilityRegistry([
+      makeCap('market.kline', 'get_kline', (symbol) => symbol === 'AAPL.US'
+        ? [{ timestamp: 1, close: 10 }]
+        : [{ timestamp: 2, close: 20 }]),
+    ]);
+
+    const comparison = await buildComparison(['AAPL.US', 'MSFT.US'], registry, { now: () => 1 });
+
+    expect(comparison.priceHistory).toEqual({
+      commonStartTimestamp: null,
+      series: { 'AAPL.US': [], 'MSFT.US': [] },
+    });
+  });
 });

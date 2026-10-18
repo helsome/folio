@@ -17,10 +17,26 @@ export interface ComparisonRow {
   cells: Record<string, ComparisonCell>;
 }
 
+/** A base-100 close value; null marks a missing trading date and must render as a gap. */
+export interface ComparisonPricePoint {
+  timestamp: number;
+  value: number | null;
+}
+
+/** Deterministic normalized closes ready for the Compare price-history chart. */
+export interface ComparisonPriceHistory {
+  /** Earliest timestamp with a valid close for every compared symbol. */
+  commonStartTimestamp: number | null;
+  /** Each symbol shares the same timestamp grid; null values preserve market-data gaps. */
+  series: Record<string, ComparisonPricePoint[]>;
+}
+
 export interface Comparison {
   symbols: string[];
   rows: ComparisonRow[];
   generatedAt: number;
   /** symbol → fetch error message (rows still render with missing cells). */
   errors: Record<string, string>;
+  /** Optional for compatibility with older persisted/IPC comparison payloads. */
+  priceHistory?: ComparisonPriceHistory;
 }
