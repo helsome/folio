@@ -773,8 +773,14 @@ export class AgentKernelHost {
     return this.thesisService.saveFromReport(report);
   }
 
-  async thesisReEvaluate(symbol: unknown): Promise<ThesisImpact> {
-    return this.thesisService.reEvaluate(requireString(symbol, 'symbol').toUpperCase());
+  async thesisReEvaluate(payload: unknown): Promise<ThesisImpact> {
+    const request = requireObject(payload);
+    const symbol = requireString(request.symbol, 'symbol').toUpperCase();
+    const thesisId =
+      request.thesisId === undefined || request.thesisId === null
+        ? undefined
+        : requireString(request.thesisId, 'thesisId');
+    return this.thesisService.reEvaluate(symbol, undefined, thesisId);
   }
 
   async thesisUpdate(input: unknown): Promise<InvestmentThesis> {

@@ -165,13 +165,17 @@ export const ThesisPanel: React.FC = () => {
   };
 
   const handleReEvaluate = async (thesis: InvestmentThesis) => {
-    const impact = await reEvaluateThesis(symbol);
+    // Re-evaluate the thesis the user clicked, not the symbol's latest one, and
+    // update the card the result actually belongs to.
+    const impact = await reEvaluateThesis(symbol, thesis.id);
     if (!impact) return;
     setImpacts((current) => ({
       ...current,
       [symbol]: [impact, ...(current[symbol] ?? [])],
     }));
-    setTheses((current) => current.map((t) => (t.id === thesis.id ? impact.thesis : t)));
+    setTheses((current) =>
+      current.map((t) => (t.id === impact.thesisId ? impact.thesis : t))
+    );
     setLastImpact(impact.id);
   };
 

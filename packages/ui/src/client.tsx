@@ -260,7 +260,7 @@ export interface FinagentClient {
     list: (symbol?: string) => Promise<ApiResult<InvestmentThesis[]>>;
     getReport: (symbol: string) => Promise<ApiResult<ResearchReport | null>>;
     saveFromReport: (symbol: string) => Promise<ApiResult<InvestmentThesis>>;
-    reEvaluate: (symbol: string) => Promise<ApiResult<ThesisImpact>>;
+    reEvaluate: (payload: { symbol: string; thesisId?: string }) => Promise<ApiResult<ThesisImpact>>;
     update: (thesis: InvestmentThesis) => Promise<ApiResult<InvestmentThesis>>;
     listImpacts: (symbol: string) => Promise<ApiResult<ThesisImpact[]>>;
     onImpact: (callback: (impact: ThesisImpact) => void) => () => void;

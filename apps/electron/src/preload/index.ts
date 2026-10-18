@@ -71,7 +71,7 @@ export interface ElectronAPI {
     list: (symbol?: string) => Promise<unknown>;
     getReport: (symbol: string) => Promise<unknown>;
     saveFromReport: (symbol: string) => Promise<unknown>;
-    reEvaluate: (symbol: string) => Promise<unknown>;
+    reEvaluate: (payload: { symbol: string; thesisId?: string }) => Promise<unknown>;
     update: (thesis: unknown) => Promise<unknown>;
     listImpacts: (symbol: string) => Promise<unknown>;
     onImpact: (callback: (impact: unknown) => void) => () => void;
@@ -274,7 +274,8 @@ const electronAPI: ElectronAPI = {
     list: (symbol?: string) => ipcRenderer.invoke('thesis:list', symbol),
     getReport: (symbol: string) => ipcRenderer.invoke('thesis:getReport', symbol),
     saveFromReport: (symbol: string) => ipcRenderer.invoke('thesis:saveFromReport', symbol),
-    reEvaluate: (symbol: string) => ipcRenderer.invoke('thesis:reEvaluate', symbol),
+    reEvaluate: (payload: { symbol: string; thesisId?: string }) =>
+      ipcRenderer.invoke('thesis:reEvaluate', payload),
     update: (thesis: unknown) => ipcRenderer.invoke('thesis:update', thesis),
     listImpacts: (symbol: string) => ipcRenderer.invoke('thesis:listImpacts', symbol),
     onImpact: (callback: (impact: unknown) => void) => {

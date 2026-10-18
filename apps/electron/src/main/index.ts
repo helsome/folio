@@ -229,8 +229,8 @@ ipcMain.handle('thesis:saveFromReport', async (_event, symbol: unknown) =>
   toIpcResult(() => agentKernelHost.thesisSaveFromReport(symbol))
 );
 
-ipcMain.handle('thesis:reEvaluate', async (_event, symbol: unknown) =>
-  toIpcResult(() => agentKernelHost.thesisReEvaluate(symbol))
+ipcMain.handle('thesis:reEvaluate', async (_event, payload: unknown) =>
+  toIpcResult(() => agentKernelHost.thesisReEvaluate(payload))
 );
 
 ipcMain.handle('thesis:update', async (_event, input: unknown) =>

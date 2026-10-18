@@ -227,6 +227,41 @@ describe('ThesisService', () => {
     expect(refreshed?.evidenceRefs.map((e) => e.capabilityId)).toContain('market.quote');
   });
 
+  it('re-evaluates the thesis the user selected, not the symbol latest one', async () => {
+    const { service, repository } = buildService({
+      'market.quote': { symbol: 'NVDA.US', changePercent: 7 },
+    });
+    const selected = await service.saveFromReport(makeReport());
+    // A second, newer thesis for the same symbol (the repository keys by id, so a
+    // fresh id is enough to hold both).
+    const newer = await repository.save({
+      ...selected,
+      id: 'thesis-2',
+      summary: 'A different, newer view of the same symbol.',
+      updatedAt: 1500,
+    });
+    expect(newer.id).not.toBe(selected.id);
+
+    currentNow = 2000;
+    const impact = await service.reEvaluate('NVDA.US', undefined, selected.id);
+
+    // The impact must belong to the thesis that was clicked, not to `newer`.
+    expect(impact.thesisId).toBe(selected.id);
+    const untouched = await repository.get(newer.id);
+    expect(untouched?.updatedAt).not.toBe(2000);
+  });
+
+  it('rejects a thesis id that does not belong to the symbol', async () => {
+    const { service } = buildService({
+      'market.quote': { symbol: 'NVDA.US', changePercent: 7 },
+    });
+    const selected = await service.saveFromReport(makeReport());
+
+    await expect(
+      service.reEvaluate('AAPL.US', undefined, selected.id)
+    ).rejects.toMatchObject({ code: 'THESIS_NOT_FOUND' });
+  });
+
   it('throws THESIS_NOT_FOUND when no thesis exists for the symbol', async () => {
     const { service } = buildService();
     await expect(service.reEvaluate('MISSING.US')).rejects.toMatchObject({

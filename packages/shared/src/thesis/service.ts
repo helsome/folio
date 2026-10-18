@@ -70,10 +70,24 @@ export class ThesisService {
    * Re-evaluate the latest thesis for a symbol: fetch fresh data, ask the
    * evaluator for a verdict, persist the impact and the updated thesis snapshot.
    */
-  async reEvaluate(symbol: string, trigger?: ThesisImpactInput['trigger']): Promise<ThesisImpact> {
-    const thesis = await this.latestThesis(symbol);
+  async reEvaluate(
+    symbol: string,
+    trigger?: ThesisImpactInput['trigger'],
+    thesisId?: string
+  ): Promise<ThesisImpact> {
+    // Manual re-evaluation names the thesis the user clicked; only the automated
+    // monitor may fall back to the symbol's latest one. Resolving by id also keeps
+    // the impact bound to the thesis that was actually reviewed.
+    const thesis = thesisId
+      ? (await this.repository.getBySymbol(symbol)).find((item) => item.id === thesisId)
+      : await this.latestThesis(symbol);
     if (!thesis) {
-      throw createCodeError('THESIS_NOT_FOUND', `No thesis exists for symbol "${symbol}".`);
+      throw createCodeError(
+        'THESIS_NOT_FOUND',
+        thesisId
+          ? `Thesis "${thesisId}" does not belong to symbol "${symbol}".`
+          : `No thesis exists for symbol "${symbol}".`
+      );
     }
 
     const outcomes = await this.fetchFresh(symbol);
