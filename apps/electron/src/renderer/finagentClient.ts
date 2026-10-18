@@ -97,6 +97,11 @@ function createElectronClient(): FinagentClient {
     portfolioRisk: {
       analyze: () => ipcResult(window.electronAPI.portfolioRisk.analyze()),
     },
+    portfolioLedger: {
+      importEntries: (input) => ipcResult(window.electronAPI.portfolioLedger.importEntries(input)),
+      coverage: (input) => ipcResult(window.electronAPI.portfolioLedger.coverage(input)),
+      twr: (input) => ipcResult(window.electronAPI.portfolioLedger.twr(input)),
+    },
     llm: {
       getState: () => ipcResult(window.electronAPI.llm.getState()),
       listModels: () => ipcResult(window.electronAPI.llm.listModels()),

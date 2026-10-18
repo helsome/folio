@@ -117,6 +117,8 @@ import {
   SCREENING_STRATEGIES,
   ResearchDiffRepository,
   ManualPortfolioRepository,
+  PortfolioLedgerRepository,
+  PortfolioLedgerService,
   buildDiff,
   buildBrief,
   runAutomation,
@@ -277,6 +279,7 @@ export class AgentKernelHost {
   private readonly screeningService: ScreeningService;
   private readonly diffRepository: ResearchDiffRepository;
   private readonly importRepository: ManualPortfolioRepository;
+  private readonly portfolioLedger: PortfolioLedgerService;
   private readonly pulseService: PulseService;
   private readonly performanceService: PerformanceService;
   private readonly automationRules: AutomationRuleRepository;
@@ -397,6 +400,10 @@ export class AgentKernelHost {
     // evaluated when their horizon is reached (spec §29–35).
     this.outcomeRepository = new OutcomeRepository(new JsonFileStore(userData));
     this.outcomeService = new OutcomeService({ repository: this.outcomeRepository });
+    // Real-money performance ledger (#335): import-idempotent entries + TWR.
+    this.portfolioLedger = new PortfolioLedgerService(
+      new PortfolioLedgerRepository(new JsonFileStore(userData))
+    );
 
     // V5 screening + import services (spec §5–10, §43–49).
     this.screeningService = new ScreeningService({
@@ -803,6 +810,31 @@ export class AgentKernelHost {
 
   async portfolioRiskAnalyze(): Promise<PortfolioRiskReport> {
     return this.portfolioRisk.analyze();
+  }
+
+  // -- Portfolio performance ledger (#335) -----------------------------------
+
+  /** Import ledger entries (idempotent by stable identity). */
+  async portfolioLedgerImport(input: unknown) {
+    const request = requireObject(input);
+    const portfolioId = requireString(request.portfolioId, 'portfolioId');
+    const entries = Array.isArray(request.entries) ? request.entries : [];
+    return this.portfolioLedger.importEntries(portfolioId, entries as never[]);
+  }
+
+  async portfolioLedgerCoverage(input: unknown) {
+    const request = requireObject(input);
+    return this.portfolioLedger.coverage(requireString(request.portfolioId, 'portfolioId'));
+  }
+
+  async portfolioLedgerTwr(input: unknown) {
+    const request = requireObject(input);
+    const portfolioId = requireString(request.portfolioId, 'portfolioId');
+    const baseCurrency =
+      typeof request.baseCurrency === 'string' && request.baseCurrency.length > 0
+        ? request.baseCurrency
+        : undefined;
+    return this.portfolioLedger.computeTwr(portfolioId, { baseCurrency });
   }
 
   // -- Alerts (v2 engine) ----------------------------------------------------

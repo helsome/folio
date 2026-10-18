@@ -82,6 +82,11 @@ export interface ElectronAPI {
   portfolioRisk: {
     analyze: () => Promise<unknown>;
   };
+  portfolioLedger: {
+    importEntries: (input: { portfolioId: string; entries: unknown[] }) => Promise<unknown>;
+    coverage: (input: { portfolioId: string }) => Promise<unknown>;
+    twr: (input: { portfolioId: string; baseCurrency?: string }) => Promise<unknown>;
+  };
   llm: {
     getState: () => Promise<unknown>;
     listModels: () => Promise<unknown>;
@@ -290,6 +295,14 @@ const electronAPI: ElectronAPI = {
   },
   portfolioRisk: {
     analyze: () => ipcRenderer.invoke('portfolioRisk:analyze'),
+  },
+  portfolioLedger: {
+    importEntries: (input: { portfolioId: string; entries: unknown[] }) =>
+      ipcRenderer.invoke('portfolioLedger:import', input),
+    coverage: (input: { portfolioId: string }) =>
+      ipcRenderer.invoke('portfolioLedger:coverage', input),
+    twr: (input: { portfolioId: string; baseCurrency?: string }) =>
+      ipcRenderer.invoke('portfolioLedger:twr', input),
   },
   llm: {
     getState: () => ipcRenderer.invoke('llm:getState'),

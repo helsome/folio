@@ -247,6 +247,15 @@ ipcMain.handle('compare:build', async (_event, input: unknown) =>
 
 ipcMain.handle('portfolioRisk:analyze', async () =>
   toIpcResult(() => agentKernelHost.portfolioRiskAnalyze())
+)
+ipcMain.handle('portfolioLedger:import', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.portfolioLedgerImport(input))
+)
+ipcMain.handle('portfolioLedger:coverage', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.portfolioLedgerCoverage(input))
+)
+ipcMain.handle('portfolioLedger:twr', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.portfolioLedgerTwr(input))
 );
 
 ipcMain.handle('alerts:loadRules', async () =>
