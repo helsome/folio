@@ -1,6 +1,7 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
 import { useAtom, useAtomValue, useSetAtom } from 'jotai'
 import { useTranslation } from 'react-i18next'
+import { formatDateTime } from '@finagent/i18n'
 import type { SupportedLocale } from '@finagent/i18n'
 import type { ScreeningCandidate, ScreeningRun, ScreeningStrategy } from '@finagent/core'
 import { activeSymbolAtom, addToWatchlistAtom, navSectionAtom, watchlistAtom, settingsTabAtom } from '../../atoms'
@@ -468,7 +469,7 @@ function HistoryList({
                 {task ? strategyTitle(run.strategy) : run.strategy}
               </div>
               <div className="text-[11.5px] text-foreground/44">
-                {new Date(run.createdAt).toLocaleString()} · {t('discover.candidates', { count: run.candidates.length })}
+                {formatDateTime(run.createdAt)} · {t('discover.candidates', { count: run.candidates.length })}
               </div>
             </div>
             <button

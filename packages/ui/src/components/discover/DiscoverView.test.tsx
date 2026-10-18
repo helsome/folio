@@ -3,6 +3,7 @@ import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { getDefaultStore } from 'jotai'
 import type { ApiResult, ScreeningRun } from '@finagent/core'
+import { formatDateTime, i18nSetCurrentLocale } from '@finagent/i18n'
 import { fallbackClient, FinagentClientProvider, type FinagentClient } from '../../client'
 import { compareSymbolsAtom } from '../../atoms/compareAtoms'
 import { activeSymbolAtom, navSectionAtom, watchlistAtom } from '../../atoms'
@@ -345,5 +346,26 @@ describe('DiscoverView', () => {
     expect(resultText).not.toContain('3.6824877250409163')
     expect(container.querySelector('[data-testid="discover-provider-warning"]')?.textContent).toContain('部分行情数据可能不可用')
     expect(container.querySelector('[data-testid="discover-goto-connections"]')?.textContent).toContain('前往连接设置')
+  })
+
+  it('renders the history timestamp through the i18n locale policy, not the host locale', async () => {
+    const host = new Date(RUN.createdAt).toLocaleString()
+    // `makeTestI18n` builds a raw i18next instance and therefore does NOT sync
+    // the module-level formatter locale that `formatDate*`/`formatNumber` read,
+    // so pin it explicitly here to a locale that differs from the host locale.
+    let expected = ''
+    for (const locale of ['zh-CN', 'en-US'] as const) {
+      i18nSetCurrentLocale(locale)
+      const rendered = formatDateTime(RUN.createdAt)
+      if (rendered !== host) {
+        expected = rendered
+        break
+      }
+    }
+    expect(expected).not.toBe('')
+
+    const { container } = await renderDiscoverView(clientWithScreening(), 'en-US')
+    expect(container.textContent ?? '').toContain(expected)
+    i18nSetCurrentLocale('en-US')
   })
 })
