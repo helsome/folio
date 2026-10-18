@@ -4,7 +4,7 @@ import type { LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next';
 import { useAtomValue, useSetAtom } from 'jotai'
-import type { AlertTriggerEvent, ApiResult, CalendarEvent, InvestmentThesis, ResearchReport } from '@finagent/core'
+import type { AlertTriggerEvent, ApiResult, CalendarEvent, HeatmapTile, InvestmentThesis, ResearchReport } from '@finagent/core'
 import {
   activeSymbolAtom,
   alertStateAtom,
@@ -34,6 +34,8 @@ import { SectionState, TodaySection } from './TodaySection'
 import { DailyBriefSection } from './DailyBriefSection'
 import { AutomationRulesView } from '../automation/AutomationRulesView'
 import { MarketPulse } from '../pulse/MarketPulse'
+import { HeatmapPanel } from '../heatmap/HeatmapPanel'
+import { watchlistHeatmapSource } from '../heatmap/heatmapSource'
 
 const MOVER_ROWS = 5
 const EVENT_ROWS = 10
@@ -79,6 +81,7 @@ export const TodayView: React.FC = () => {
   const portfolioCache = useAtomValue(portfolioCacheAtom)
   const alertState = useAtomValue(alertStateAtom)
   const activeSymbol = useAtomValue(activeSymbolAtom)
+  const heatmapSource = React.useMemo(() => watchlistHeatmapSource(watchlist), [watchlist])
 
   const setActiveSymbol = useSetAtom(activeSymbolAtom)
   const setNavSection = useSetAtom(navSectionAtom)
@@ -143,6 +146,12 @@ export const TodayView: React.FC = () => {
   const handleAnalyzePortfolio = (): void => {
     setNavSection('portfolio')
     void analyzeRisk().catch(() => undefined)
+  }
+
+  const handleHeatmapResearch = (tile: HeatmapTile): void => {
+    setActiveSymbol(tile.workspaceSymbol)
+    setResearchOrigin({ from: 'today', label: tile.workspaceSymbol })
+    setNavSection('research')
   }
 
   const handleCompare = (): void => {
@@ -368,6 +377,14 @@ export const TodayView: React.FC = () => {
           <TodaySection title={t('today.recentResearch')}>{researchContent}</TodaySection>
           <TodaySection title={t('today.thesesNeedingReview')}>{thesesContent}</TodaySection>
         </div>
+        <section className="folio-stitch-card mt-4" data-testid="today-heatmap">
+          <div className="folio-stitch-card-heading"><h2>{t('portfolio.heatmap.title')}</h2>{quotesAreDemo && <DemoBadge />}</div>
+          <HeatmapPanel
+            source={heatmapSource}
+            onSelect={(tile) => setActiveSymbol(tile.workspaceSymbol)}
+            onResearch={handleHeatmapResearch}
+          />
+        </section>
       </div>
 
       <Dialog open={automationOpen} onClose={() => setAutomationOpen(false)} title={t('today.automation')}>

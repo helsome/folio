@@ -611,19 +611,25 @@ function mapKlines(symbol: string, payload: unknown): Kline[] {
 /**
  * Maps ticker details into the core `StaticInfo` subset the free tier can
  * actually fill: `symbol`, `name`, `exchange` (primary_exchange), and
- * `currency` (currency_name). Left empty on purpose:
- *   - `description`/`sic_description`/`homepage_url`/`market` have no field on
- *     `StaticInfo` (core is not extended — see decision doc), so they are
- *     dropped rather than smuggled onto the neutral shape.
+ * `currency` (currency_name), and optional SIC industry classification.
+ * Left empty on purpose:
+ *   - `description`/`homepage_url`/`market` have no field on `StaticInfo`.
  *   - `lotSize`/`totalShares`/`circulatingShares`/`eps`/`epsTtm`/`bps`/
  *     `dividend` are not served by the ticker-details endpoint.
  */
 function mapProfile(symbol: string, payload: unknown): StaticInfo {
   const root = isRecord(payload) ? payload : {}
   const results = isRecord(root.results) ? root.results : {}
+  const industryName = typeof results.sic_description === 'string' ? results.sic_description.trim() : ''
+  const industryCode = typeof results.sic_code === 'string' ? results.sic_code.trim() : ''
   return {
     symbol,
     name: typeof results.name === 'string' ? results.name : '',
+    ...(industryName ? { industry: {
+      name: industryName,
+      classification: 'SIC' as const,
+      ...(/^\d{4}$/.test(industryCode) ? { code: industryCode } : {}),
+    } } : {}),
     exchange: typeof results.primary_exchange === 'string' ? results.primary_exchange : undefined,
     currency: typeof results.currency_name === 'string' ? results.currency_name : undefined,
   }

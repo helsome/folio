@@ -1,6 +1,7 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { join } from 'node:path';
-import type { AgentEvent, AutomationRule } from '@finagent/core';
+import type { AgentEvent, AutomationRule, ProviderProvenance, Quote } from '@finagent/core';
+import { HeatmapService, parseHeatmapSource } from '../../../../packages/shared/src/heatmap/service.ts';
 
 let lastKernelOptions: Record<string, unknown> | null = null;
 let lastMarketData: FakeMarketDataService | null = null;
@@ -31,6 +32,16 @@ class FakeMarketDataService {
   async getKline(input: unknown) {
     return [{ input }];
   }
+
+  async getQuoteResult(symbol: string, _signal?: AbortSignal): Promise<{ data: Quote; provenance: ProviderProvenance }> {
+    return {
+      data: { symbol, lastPrice: 101, change: 1, changePercent: 1, timestamp: Date.now() / 1000, prevClose: 100, high: 101, low: 100, open: 100, volume: 10 },
+      provenance: { providerId: 'fixture', providerName: 'Fixture', instrumentId: 'XNAS:AAPL', fetchedAt: Date.now(), marketTime: Date.now(), stale: false },
+    };
+  }
+
+  async getStaticInfo(symbol: string) { return { symbol, name: 'Apple Inc.' }; }
+  async getMarketStatus() { return [{ market: 'US', status: 'Open' }]; }
 
   async getPortfolio() {
     return {
@@ -117,6 +128,8 @@ const noopStore = class {
 };
 
 mock.module('@finagent/shared', () => ({
+  HeatmapService,
+  parseHeatmapSource,
   AgentKernel: FakeAgentKernel,
   MarketDataService: class extends FakeMarketDataService {
     constructor(options?: { fetchers?: unknown }) {
@@ -532,6 +545,35 @@ describe('AgentKernelHost', () => {
     const host = new AgentKernelHost();
 
     expect(lastMarketData?.options?.fetchers).toBe(routerFetchers);
+    host.dispose();
+  });
+
+  it('validates heatmap IPC snapshots and binds canonical listing identity', async () => {
+    const host = new AgentKernelHost();
+    const source = { schemaVersion: 1, id: 'watch', revision: 'v1', kind: 'watchlist', capturedAt: Date.now(), entries: [{ symbol: 'AAPL.US' }] };
+    const result = await host.getHeatmap({ requestId: 'test-1', source }, 1);
+    expect(result.tiles[0]?.instrument.instrumentId).toBe('XNAS:AAPL');
+    expect(result.tiles[0]?.workspaceSymbol).toBe('AAPL.US');
+    expect(result.source.revision).toBe('v1');
+    await expect(host.getHeatmap({ requestId: 'test-2', source: { ...source, schemaVersion: 2 } }, 1)).rejects.toThrow('Invalid heatmap');
+    host.dispose();
+  });
+
+  it('isolates heatmap cancellation by renderer owner', async () => {
+    const host = new AgentKernelHost();
+    let providerSignal: AbortSignal | undefined;
+    lastMarketData!.getQuoteResult = (_symbol, signal) => new Promise((_resolve, reject) => {
+      providerSignal = signal;
+      signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    });
+    const source = { schemaVersion: 1, id: 'watch', revision: 'v1', kind: 'watchlist', capturedAt: Date.now(), entries: [{ symbol: 'AAPL.US' }] };
+    const pending = host.getHeatmap({ requestId: 'same-id', source }, 10);
+    await waitFor(() => providerSignal !== undefined);
+    host.cancelHeatmap('same-id', 11);
+    expect(providerSignal?.aborted).toBe(false);
+    host.cancelHeatmap('same-id', 10);
+    await expect(pending).rejects.toThrow('aborted');
+    expect(providerSignal?.aborted).toBe(true);
     host.dispose();
   });
 
