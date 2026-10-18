@@ -258,6 +258,7 @@ describe('DEFAULT_INSTRUMENT_CATALOG', () => {
 
     expect(getProviderSymbol(resolver.get('XNAS:AAPL')!, 'longbridge')).toBe('AAPL.US');
     expect(getProviderSymbol(resolver.get('XNAS:AAPL')!, 'massive')).toBe('AAPL');
+    expect(getProviderSymbol(resolver.get('XNAS:AAPL')!, 'yahoo')).toBe('AAPL');
   });
 });
 

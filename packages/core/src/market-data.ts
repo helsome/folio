@@ -1,4 +1,16 @@
 /**
+ * Display attribution copied onto a payload so the UI can name the provider
+ * that actually answered. This is the neutral projection of
+ * `ProviderProvenance` — not a vendor-specific field.
+ */
+export interface MarketSource {
+  providerId: string;
+  providerName: string;
+  /** True when the provider's contract is delayed or end-of-day. */
+  delayed?: boolean;
+}
+
+/**
  * Provider-neutral market-data output types (V4).
  *
  * These are the LONG-TAIL (phase-2) shapes providers normalize raw vendor

@@ -40,6 +40,8 @@ export const connections = {
   installSetup: '安装 / 设置',
   byokNote:
     '你自己的密钥决定使用情况。免费套餐可能返回当日结束后的数据（每分钟 5 次调用）并要求注明来源（“Powered by Polygon.io”）。',
+  freeDelayedNote:
+    '无需 API 密钥。行情为延迟数据。此接口非官方且仅供个人使用，可能随时变更或被限流。',
   dismissError: '关闭错误',
   dismiss: '关闭',
   portfolioReady: '投资组合 ✓',
