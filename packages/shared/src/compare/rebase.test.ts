@@ -205,3 +205,104 @@ describe('buildRebasedPriceSeries', () => {
     expect(result.symbols).toEqual([]);
   });
 });
+
+/**
+ * Yahoo Finance adapter (#353) shape compatibility — offline fixtures only,
+ * isomorphic to what `mapKlines` in providers/yahoo/adapter.ts emits:
+ *   - second-epoch open-time timestamps (e.g. 14:30 UTC = 9:30 ET open),
+ *   - bars whose OHLC is null (halted/missing sessions) are skipped upstream,
+ *   - ascending order, `volume` absent from this contract.
+ *
+ * These fixtures assert timestamp pass-through, common effective start, and
+ * gap preservation against that exact shape; they never hit the network.
+ */
+describe('buildRebasedPriceSeries: Yahoo Finance kline shape', () => {
+  const SESSION = 86_400; // seconds
+  // 2023-11-08 (Wed) 14:30 UTC — same open-time convention as the
+  // providers/yahoo/yahoo.test.ts chart fixtures.
+  const WED = 1_699_472_640;
+  const THU = WED + SESSION;
+  const FRI = THU + SESSION;
+  // Weekend skip: the next session is Monday.
+  const MON = FRI + 3 * SESSION;
+  const TUE = MON + SESSION;
+
+  function yahooBars(timestamps: number[], closes: number[]): RebaseBar[] {
+    return timestamps.map((timestamp, i) => ({ timestamp, close: closes[i] }));
+  }
+
+  it('rebases Yahoo daily candles with second-epoch open-time timestamps', () => {
+    // AAPL has bars all week; NVDA's first bar lands on Friday.
+    const aapl = yahooBars([WED, THU, FRI, MON, TUE], [189, 190.2, 188, 191, 192]);
+    const nvda = yahooBars([FRI, MON, TUE], [475, 480, 470]);
+
+    const result = buildRebasedPriceSeries([input('AAPL.US', aapl), input('NVDA.US', nvda)]);
+
+    expect(result.comparable).toBe(true);
+    if (!result.comparable) return;
+    // Timestamp pass-through: base/point timestamps keep the input's
+    // second-epoch values — no unit conversion, no rounding, no shift.
+    expect(result.baseTimestamp).toBe(FRI);
+    expect(result.baseCloses).toEqual({ 'AAPL.US': 188, 'NVDA.US': 475 });
+    expect(result.points.map((p) => p.timestamp)).toEqual([FRI, MON, TUE]);
+    expect(result.points[0].values).toEqual({ 'AAPL.US': 100, 'NVDA.US': 100 });
+    expect(result.points[2].values['AAPL.US']).toBeCloseTo((192 / 188) * 100, 10);
+    expect(result.points[2].values['NVDA.US']).toBeCloseTo((470 / 475) * 100, 10);
+  });
+
+  it('keeps Yahoo null-OHLC skips as gaps instead of zero- or forward-filling', () => {
+    // In raw Yahoo responses, halted/missing sessions carry null OHLC and
+    // `mapKlines` drops those bars entirely: MSFT simply has no bar on THU
+    // and TUE. The rebased curve must keep those days `undefined`.
+    const aapl = yahooBars([WED, THU, FRI, MON, TUE], [189, 190.2, 188, 191, 192]);
+    const msft = yahooBars([WED, FRI, MON], [370, 372, 371]);
+
+    const result = buildRebasedPriceSeries([input('AAPL.US', aapl), input('MSFT.US', msft)]);
+
+    expect(result.comparable).toBe(true);
+    if (!result.comparable) return;
+    expect(result.baseTimestamp).toBe(WED);
+    expect(result.points.map((p) => p.timestamp)).toEqual([WED, THU, FRI, MON, TUE]);
+    // Gaps stay undefined — a missing Yahoo bar is never 0 or the last close.
+    expect(result.points[1].values['MSFT.US']).toBeUndefined();
+    expect(result.points[4].values['MSFT.US']).toBeUndefined();
+    // Sessions with a bar normalize as usual.
+    expect(result.points[2].values['MSFT.US']).toBeCloseTo((372 / 370) * 100, 10);
+  });
+
+  it('rebases Yahoo weekly candles on the same second-epoch grid', () => {
+    // interval=1wk: timestamps are each week's first session open
+    // (Monday 14:30 UTC), one week = 604800 seconds apart.
+    const WEEK = 7 * SESSION;
+    const W1 = 1_699_299_840; // 2023-11-06 (Mon) 14:30 UTC
+    const aapl = yahooBars([W1, W1 + WEEK, W1 + 2 * WEEK], [189, 193, 190]);
+    const msft = yahooBars([W1, W1 + 2 * WEEK], [370, 373]); // misses week 2
+
+    const result = buildRebasedPriceSeries([input('AAPL.US', aapl), input('MSFT.US', msft)]);
+
+    expect(result.comparable).toBe(true);
+    if (!result.comparable) return;
+    expect(result.baseTimestamp).toBe(W1);
+    expect(result.points.map((p) => p.timestamp)).toEqual([W1, W1 + WEEK, W1 + 2 * WEEK]);
+    expect(result.points[1].values['MSFT.US']).toBeUndefined();
+    expect(result.points[2].values['MSFT.US']).toBeCloseTo((373 / 370) * 100, 10);
+    expect(result.points[2].values['AAPL.US']).toBeCloseTo((190 / 189) * 100, 10);
+  });
+
+  it('reports no-overlap when timestamp units are mixed across symbols', () => {
+    // Defense for the unit-passthrough contract: a second-epoch Yahoo feed
+    // mixed with a millisecond-epoch feed shares no timestamp, so the series
+    // is reported non-comparable instead of being silently rebased.
+    const secondsFeed = yahooBars([WED, THU, FRI], [189, 190.2, 188]);
+    const millisFeed = yahooBars([WED * 1000, THU * 1000, FRI * 1000], [370, 372, 371]);
+
+    const result = buildRebasedPriceSeries([
+      input('AAPL.US', secondsFeed),
+      input('MSFT.US', millisFeed),
+    ]);
+
+    expect(result.comparable).toBe(false);
+    if (result.comparable) return;
+    expect(result.reason).toBe('no-overlap');
+  });
+});

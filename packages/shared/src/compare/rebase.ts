@@ -21,6 +21,12 @@
  * convention (e.g. exchange calendar dates). Bars are deduplicated by
  * timestamp (last one wins) and sorted ascending internally, so provider
  * ordering quirks cannot change the output.
+ *
+ * Timestamp units pass through unchanged: the Yahoo Finance adapter (#353)
+ * emits second-epoch open-time candles (daily and weekly), while other
+ * gateways may emit milliseconds — mixing units across symbols in one call
+ * yields no shared timestamps and is reported as non-comparable rather than
+ * silently rebased. See the Yahoo-shape fixture tests in rebase.test.ts.
  */
 
 export interface RebaseBar {
@@ -45,7 +51,10 @@ export interface RebasedPoint {
 export interface RebasedSeries {
   comparable: true;
   symbols: string[];
-  /** Trading day (ms epoch) every valid symbol's series is normalized to (= 100). */
+  /**
+   * Trading-day epoch every valid symbol's series is normalized to (= 100).
+   * The unit passes through the input bars (the Yahoo adapter emits seconds).
+   */
   baseTimestamp: number;
   /** symbol → close on `baseTimestamp` (the normalization denominator). */
   baseCloses: Record<string, number>;
