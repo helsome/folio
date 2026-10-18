@@ -134,4 +134,31 @@ describe('ConnectionsCenter', () => {
       config: { routingRole: 'fallback' },
     });
   });
+
+  it('explains the no-key delayed provider on its connection card', async () => {
+    const yahoo: ConnectionEntry = {
+      ...ENTRY,
+      providerId: 'yahoo',
+      kind: 'financial-data',
+      name: 'Yahoo Finance',
+      hasAccount: false,
+      accountLabel: null,
+      coverage: {
+        providerId: 'yahoo',
+        capabilities: ['market.quote', 'market.kline', 'company.profile'],
+        markets: [{ id: 'US', name: 'United States' }],
+        dataAccess: 'delayed',
+        credentialRequirement: 'none',
+      },
+    };
+    const { container } = await render(
+      clientWith({
+        list: async () => ({ ok: true, data: [yahoo] }) as ApiResult<ConnectionEntry[]>,
+      })
+    );
+    const note = container.querySelector('[data-testid="free-data-note-yahoo"]');
+    expect(note?.textContent).toContain('No API key');
+    expect(note?.textContent).toContain('personal use');
+    expect(container.textContent).toContain('Yahoo Finance');
+  });
 });

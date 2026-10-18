@@ -481,8 +481,10 @@ export class ProviderRouter implements FinancialProviderRouter {
         providerId: provider.id,
         capabilities: provider.capabilities(),
         markets: provider.markets(),
-        dataAccess: provider.id === 'massive' ? 'end-of-day' : 'live',
-        credentialRequirement: provider.id === 'massive' ? 'api-key' : 'device-login',
+        dataAccess:
+          provider.id === 'massive' ? 'end-of-day' : provider.id === 'yahoo' ? 'delayed' : 'live',
+        credentialRequirement:
+          provider.id === 'massive' ? 'api-key' : provider.id === 'yahoo' ? 'none' : 'device-login',
         quota: provider.id === 'massive' ? { limit: 5, window: 'minute' } : undefined,
       };
     }

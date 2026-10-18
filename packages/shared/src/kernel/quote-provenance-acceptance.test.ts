@@ -170,7 +170,10 @@ describe('quote provenance acceptance slice (#101, controlled fixture)', () => {
     const tool = makeQuoteTool();
     const toolResult = await tool.execute('quote-1', { symbol: 'aapl.us' }, new AbortController().signal);
 
-    expect(toolResult.details).toEqual(quote);
+    expect(toolResult.details).toEqual({
+      ...quote,
+      source: { providerId: 'massive', providerName: 'Massive', delayed: true },
+    });
     expect(toolResult.provenance).toMatchObject({
       provider: 'massive',
       providerId: 'massive',
