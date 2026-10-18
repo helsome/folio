@@ -1,6 +1,13 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { join } from 'node:path';
 import type { AgentEvent, AutomationRule } from '@finagent/core';
+// `@finagent/shared` is mocked wholesale below, so the *real* manifest helpers
+// are pulled in from source: the IPC read-path tests must exercise the actual
+// redaction/diff implementation, not a stub of it.
+import {
+  diffRunManifests as realDiffRunManifests,
+  redactManifestSecrets as realRedactManifestSecrets,
+} from '../../../../packages/shared/src/kernel/run-manifest.ts';
 
 let lastKernelOptions: Record<string, unknown> | null = null;
 let lastMarketData: FakeMarketDataService | null = null;
@@ -8,7 +15,17 @@ let lastAutomationContext: unknown = null;
 let forwardedEvents: unknown[] = [];
 /** Evaluation runs handed to EvaluationStore.addRun (observability path). */
 const savedEvalRuns: Array<Record<string, unknown>> = [];
+let storedRuns: StoredRun[] = [];
 const routerFetchers = { getQuote: async () => ({ symbol: 'AAPL.US' }) };
+
+interface StoredRun {
+  id: string;
+  sessionId: string;
+  status: string;
+  input: string;
+  startedAt: number;
+  manifest?: unknown;
+}
 
 /** Poll until `predicate` holds; the settle path is fire-and-forget (`void`). */
 async function waitFor(predicate: () => boolean, timeoutMs = 1000): Promise<void> {
@@ -64,7 +81,7 @@ const fakeSessions = {
   }),
   deleteSession: async () => undefined,
   listMessages: async (sessionId: string) => [{ id: 'm1', role: 'user', content: sessionId, timestamp: 1 }],
-  listRuns: async () => [],
+  listRuns: async () => storedRuns,
   getSession: async () => undefined,
 };
 
@@ -342,12 +359,11 @@ mock.module('@finagent/shared', () => ({
     redactToolCall = (toolCall: unknown) => toolCall;
   },
   PiRuntimeAdapter: class {},
-  // #21 run-manifest helpers used by kernelHost's manifest IPC.
-  diffRunManifests: () => ({
-    changed: false,
-    fields: [],
-    groups: { model: false, prompt: false, tools: false, config: false, versions: false },
-  }),
+  // #21 run-manifest helpers used by kernelHost's manifest IPC. Redaction and
+  // diffing are the real implementations: the IPC read-path tests assert on
+  // what actually leaves the main process.
+  diffRunManifests: realDiffRunManifests,
+  redactManifestSecrets: realRedactManifestSecrets,
   exportRunManifest: (manifest: unknown) => JSON.stringify(manifest, null, 2),
   manifestToLangfuseMetadata: (manifest: { runId: string }) => ({ folioRunId: manifest.runId }),
   sanitizeSettings: (input: unknown) => input,
@@ -378,6 +394,7 @@ beforeEach(() => {
   lastAutomationContext = null;
   forwardedEvents = [];
   savedEvalRuns.length = 0;
+  storedRuns = [];
 });
 
 afterEach(() => {
@@ -711,6 +728,67 @@ describe('AgentKernelHost', () => {
     expect(savedEvalRuns[0]).toMatchObject({ id: 'r2', status: 'failed' });
 
     fakeRuns.subscribe = originalSubscribe;
+    host.dispose();
+  });
+});
+
+describe('AgentKernelHost run manifest IPC (#21)', () => {
+  // A manifest written before capture-time redaction existed (or by a caller
+  // bug) must not be able to hand a credential to the renderer.
+  const dirtyManifest = (runId: string, overrides: Record<string, unknown> = {}) => ({
+    schemaVersion: 1,
+    runId,
+    createdAt: 1,
+    runtimeMode: 'pi',
+    model: 'gpt-4o',
+    modelParams: { apiKey: 'sk-live', maxTokens: 4096 },
+    ...overrides,
+  });
+
+  const storedRun = (runId: string, manifest: unknown): StoredRun => ({
+    id: runId,
+    sessionId: 's1',
+    status: 'done',
+    input: 'hi',
+    startedAt: 1,
+    manifest,
+  });
+
+  it('redacts credentials when a copilot run manifest is read over IPC', async () => {
+    storedRuns = [storedRun('r1', dirtyManifest('r1'))];
+    const host = new AgentKernelHost();
+
+    const manifest = await host.getRunManifest({ sessionId: 's1', runId: 'r1' });
+
+    expect((manifest?.modelParams as Record<string, unknown>).apiKey).toBe('[redacted]');
+    expect(manifest?.modelParams?.maxTokens).toBe(4096);
+    host.dispose();
+  });
+
+  it('redacts credentials when a Deep Research manifest is read over IPC', async () => {
+    const host = new AgentKernelHost();
+    const research = (
+      host as unknown as { researchService: { getRun: (runId: string) => Promise<unknown> } }
+    ).researchService;
+    research.getRun = async () => ({ manifest: dirtyManifest('research-1') });
+
+    const manifest = await host.getResearchManifest({ runId: 'research-1' });
+
+    expect((manifest?.modelParams as Record<string, unknown>).apiKey).toBe('[redacted]');
+    host.dispose();
+  });
+
+  it('redacts both sides of a manifest comparison', async () => {
+    storedRuns = [
+      storedRun('r1', dirtyManifest('r1')),
+      storedRun('r2', dirtyManifest('r2', { model: 'gpt-4o-mini' })),
+    ];
+    const host = new AgentKernelHost();
+
+    const diff = await host.compareRunManifests({ sessionId: 's1', runIdA: 'r1', runIdB: 'r2' });
+
+    expect(JSON.stringify(diff)).not.toContain('sk-live');
+    expect(diff.fields.map((field) => field.path)).toContain('model');
     host.dispose();
   });
 });

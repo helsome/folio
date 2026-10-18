@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'bun:test';
-import type { Run, RunManifest, RunManifestContext } from '@finagent/core';
+import type { Run, RunManifest, RunManifestContext, RunManifestTool } from '@finagent/core';
 import {
   captureRunManifest,
   diffRunManifests,
@@ -62,6 +62,40 @@ describe('captureRunManifest', () => {
     expect(ctx.tools).toHaveLength(2);
   });
 
+  it('deep-copies nested config so later settings mutations cannot rewrite the snapshot', () => {
+    const ctx = baseContext();
+    const manifest = captureRunManifest(makeRun(), ctx);
+
+    // Mutate every nested structure the context handed over, as a live settings
+    // object would be mutated by a later settings change.
+    ctx.model = 'gpt-4o-mini';
+    (ctx.modelParams as Record<string, unknown>).thinkingLevel = 'high';
+    (ctx.search?.routing as Record<string, unknown>).primary = 'massive';
+    (ctx.featureFlags as Record<string, unknown>).demoData = true;
+    (ctx.tools as RunManifestTool[])[0]!.name = 'mutated';
+    ctx.prompt!.hash = 'mutated';
+
+    expect(manifest.model).toBe('gpt-4o');
+    expect(manifest.modelParams?.thinkingLevel).toBe('low');
+    expect(manifest.search?.routing?.primary).toBe('longbridge');
+    expect(manifest.featureFlags?.demoData).toBe(false);
+    expect(manifest.tools[0]?.name).toBe('market.quote');
+    expect(manifest.prompt?.hash).toBe('abc');
+  });
+
+  it('keeps the context independent of the returned snapshot in the other direction', () => {
+    const ctx: RunManifestContext = {
+      ...baseContext(),
+      budget: { effective: { modelCalls: 3 }, clamped: [] },
+    };
+    const manifest = captureRunManifest(makeRun(), ctx);
+    (manifest.budget?.effective as Record<string, number>).modelCalls = 99;
+    manifest.tools[0]!.name = 'mutated';
+
+    expect(ctx.budget?.effective?.modelCalls).toBe(3);
+    expect(ctx.tools?.[0]?.name).toBe('market.quote');
+  });
+
   it('defaults tools to an empty list when the context omits them', () => {
     const ctx: RunManifestContext = { runtimeMode: 'local' };
     const manifest = captureRunManifest(makeRun(), ctx);
@@ -69,19 +103,19 @@ describe('captureRunManifest', () => {
     expect(manifest.runtimeMode).toBe('local');
   });
 
-  it('never carries a credential even if one sneaks into the context', () => {
-    // The capture itself copies verbatim; the redaction safety net is what
-    // guarantees no secret leaves the process. The context must never include
-    // secrets by construction — this test pins the contract.
+  it('redacts a credential that sneaks into the context before it is ever stored', () => {
+    // Capture is the boundary: a caller bug must not be able to put a key into
+    // the persisted manifest, so redaction happens here and not only on export.
     const ctx: RunManifestContext = {
       ...baseContext(),
       // @ts-expect-error intentional: simulate a caller bug
-      modelParams: { apiKey: 'sk-secret' },
+      modelParams: { apiKey: 'sk-secret', maxTokens: 4096 },
     };
     const manifest = captureRunManifest(makeRun(), ctx);
-    expect((manifest.modelParams as Record<string, unknown>).apiKey).toBe('sk-secret');
-    const exported = exportRunManifest(manifest);
-    expect(exported).not.toContain('sk-secret');
+    expect((manifest.modelParams as Record<string, unknown>).apiKey).toBe('[redacted]');
+    // Sizing params are not credentials — losing them would make the snapshot
+    // unable to explain the limits the run obeyed.
+    expect(manifest.modelParams?.maxTokens).toBe(4096);
   });
 });
 
@@ -105,6 +139,32 @@ describe('redactManifestSecrets', () => {
   it('leaves an already-clean object untouched', () => {
     const clean = { a: 1, b: 'x', c: { d: true } };
     expect(redactManifestSecrets(clean)).toEqual(clean);
+  });
+
+  it('keeps token/context sizing config, which is not a credential', () => {
+    const clean = redactManifestSecrets({
+      modelParams: { maxTokens: 4096, maxOutputTokens: 8192, contextWindow: 128_000 },
+      budget: { tokenBudget: 1000 },
+      tokenCount: 12,
+    });
+    expect(clean.modelParams).toEqual({ maxTokens: 4096, maxOutputTokens: 8192, contextWindow: 128_000 });
+    expect(clean.budget.tokenBudget).toBe(1000);
+    expect(clean.tokenCount).toBe(12);
+  });
+
+  it('still redacts token-shaped keys that are credentials', () => {
+    const clean = redactManifestSecrets({
+      token: 't-9',
+      apiToken: 'a-1',
+      authToken: 'b-2',
+      refreshToken: 'c-3',
+      credentials: { user: 'u', pass: 'p' },
+    }) as Record<string, unknown>;
+    expect(clean.token).toBe('[redacted]');
+    expect(clean.apiToken).toBe('[redacted]');
+    expect(clean.authToken).toBe('[redacted]');
+    expect(clean.refreshToken).toBe('[redacted]');
+    expect(clean.credentials).toBe('[redacted]');
   });
 });
 
@@ -183,6 +243,16 @@ describe('exportRunManifest', () => {
     const out = exportRunManifest(manifest);
     expect(out).not.toContain('sk-leak');
     expect(out).toContain('[redacted]');
+  });
+
+  it('keeps sizing config in the exported JSON', () => {
+    const manifest = captureRunManifest(makeRun(), {
+      ...baseContext(),
+      modelParams: { maxTokens: 4096, contextWindow: 128_000 },
+    });
+    const out = exportRunManifest(manifest);
+    expect(out).toContain('"maxTokens": 4096');
+    expect(out).toContain('"contextWindow": 128000');
   });
 });
 

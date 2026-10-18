@@ -20,9 +20,20 @@ import type {
  * runtime + settings; `run` supplies the identity anchors. The manifest is a
  * plain data object — the caller persists it and must never overwrite it with
  * later global settings (#21 immutability requirement).
+ *
+ * The snapshot is **deep-copied and redacted before it is returned**:
+ *
+ * - The context holds references to live settings objects (`modelParams`,
+ *   `search`, `budget`, …). Copying only the top level would let a later
+ *   settings mutation rewrite a manifest that is supposed to be frozen, so the
+ *   whole graph is cloned here.
+ * - Redaction happens at capture — not just on export — so the persisted
+ *   manifest and every read path (`getRunManifest` / `getResearchManifest`)
+ *   are credential-free by construction, with `exportRunManifest` keeping its
+ *   own pass as a second line of defence.
  */
 export function captureRunManifest(run: Run, context: RunManifestContext): RunManifest {
-  return {
+  const manifest: RunManifest = {
     schemaVersion: 1,
     runId: run.id,
     createdAt: run.startedAt,
@@ -35,23 +46,75 @@ export function captureRunManifest(run: Run, context: RunManifestContext): RunMa
     modelParams: context.modelParams,
     prompt: context.prompt,
     strategy: context.strategy,
-    tools: (context.tools ?? []).map((tool) => ({ ...tool })),
+    tools: context.tools ?? [],
     search: context.search,
     featureFlags: context.featureFlags,
     budget: context.budget,
     locale: context.locale,
     evaluation: context.evaluation,
   };
+  return redactManifestSecrets(cloneManifestData(manifest));
+}
+
+/**
+ * Recursively copy plain objects and arrays so a captured manifest shares no
+ * mutable structure with the context it was built from.
+ *
+ * Deliberately not `structuredClone`: capture runs inside run creation, and a
+ * non-cloneable value in a caller-supplied context must never be able to abort
+ * a run. Manifest data is plain objects/arrays/primitives; anything else is
+ * passed through unchanged.
+ */
+function cloneManifestData<T>(value: T): T {
+  if (Array.isArray(value)) {
+    return value.map((entry) => cloneManifestData(entry)) as unknown as T;
+  }
+  if (value !== null && typeof value === 'object') {
+    const prototype = Object.getPrototypeOf(value);
+    if (prototype !== Object.prototype && prototype !== null) return value;
+    const out: Record<string, unknown> = {};
+    for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
+      out[key] = cloneManifestData(child);
+    }
+    return out as unknown as T;
+  }
+  return value;
 }
 
 /** Keys whose values are treated as secrets and stripped from a manifest. */
 const SECRET_KEY_PATTERN = /(api[_-]?key|apikey|secret|token|password|passwd|private[_-]?key|credential|authorization|auth)/i;
 
 /**
- * Defensive redaction: recursively walk a manifest and replace the *values*
- * of any secret-shaped keys with `[redacted]`. A manifest must never contain
- * credentials (#21, #19); this is a safety net so a future caller bug cannot
- * leak a key through the JSON export or the IPC surface.
+ * Secret-shaped keys that are **not** credentials: token / context sizing.
+ *
+ * `maxTokens`, `maxOutputTokens`, `contextWindow`, `tokenBudget` … are part of
+ * what a run actually obeyed, so redacting them would leave a historical
+ * manifest unable to explain its own limits. A bare `token` is *not* covered —
+ * it only stops being a secret when a sizing qualifier is present.
+ */
+const SIZING_KEY_PATTERN =
+  /^(?:(?:max|min|num|total|input|output|prompt|completion|context|reasoning)[_-]?)+(?:tokens?|window|chars?|size)$|^token[_-]?(?:limit|budget|count|quota)$/i;
+
+/**
+ * Whether a key/value pair is a credential that must be stripped.
+ *
+ * Three things are deliberately *not* treated as secrets: known sizing knobs
+ * (see `SIZING_KEY_PATTERN`), numbers and booleans — a credential is a string
+ * or a nested structure, so `maxTokens: 4096` and `tokenCount: 12` survive and
+ * the manifest stays reproducible.
+ */
+function isSecretEntry(key: string, value: unknown): boolean {
+  if (!SECRET_KEY_PATTERN.test(key)) return false;
+  if (typeof value === 'number' || typeof value === 'boolean') return false;
+  return !SIZING_KEY_PATTERN.test(key);
+}
+
+/**
+ * Defensive redaction: recursively walk a value and replace the *values* of
+ * any secret-shaped keys with `[redacted]`. A manifest must never contain
+ * credentials (#21, #19); it runs on capture (so the persisted snapshot is
+ * already clean) and again on export / IPC read, so a caller bug cannot leak a
+ * key through the JSON export or the IPC surface.
  *
  * Only values are replaced — the key names are preserved so the structure
  * stays self-describing and the diff/export paths are stable.
@@ -63,7 +126,7 @@ export function redactManifestSecrets<T>(value: T): T {
   if (value !== null && typeof value === 'object') {
     const out: Record<string, unknown> = {};
     for (const [key, child] of Object.entries(value as Record<string, unknown>)) {
-      if (SECRET_KEY_PATTERN.test(key) && child !== null && child !== undefined && child !== '') {
+      if (isSecretEntry(key, child) && child !== null && child !== undefined && child !== '') {
         out[key] = '[redacted]';
       } else {
         out[key] = redactManifestSecrets(child);

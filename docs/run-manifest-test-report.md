@@ -96,10 +96,14 @@ overwrite the historical run's record.
 
 ## Secret scan — PASS
 
-The manifest schema has no credential field and `exportRunManifest` runs every manifest
-through the existing redactor before serialisation (#19). Two independent checks agree:
+The manifest schema has no credential field. `captureRunManifest` deep-copies and
+redacts the snapshot **before it is persisted**, so the stored manifest, the IPC read
+paths (`getRunManifest` / `getResearchManifest`) and `exportRunManifest` are all
+credential-free by construction (#19, #21 review). Two independent checks agree:
 
-- The acceptance asserts `secretScan.apiKeyPresentInManifests === false`.
+- The acceptance scans the three real manifests it captured —
+  `secretScan.apiKeyPresentInManifests` is computed from their serialised form, not
+  hard-coded.
 - A grep for the live API key across all eleven committed artifacts returns **0** matches.
 
 ## Committed artifacts
