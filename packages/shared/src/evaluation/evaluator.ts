@@ -14,6 +14,7 @@ import type {
   EvaluationSettings,
   ToolCallRecord,
 } from '@finagent/core';
+import { redactError } from '../privacy/deep-redact.ts';
 
 export interface EvaluationContext {
   case: EvaluationCase;
@@ -97,7 +98,10 @@ export class EvaluatorRegistry {
           metric: definition.metric,
           metricVersion: definition.version,
           score: null,
-          reason: error instanceof Error ? error.message : String(error),
+          // Judge failures echo provider HTTP bodies (401/429 with key
+          // material) — scores persist to eval artifacts, so redact here
+          // (issue #19).
+          reason: redactError(error).message,
         });
       }
     }

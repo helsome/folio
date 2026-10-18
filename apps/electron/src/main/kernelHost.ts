@@ -183,6 +183,7 @@ import {
   type DiagnosticsBundle,
   type FinancialProviderSummary,
 } from '@finagent/shared/diagnostics';
+import { redactError } from '@finagent/shared/privacy';
 import { CredentialStore, redactSecrets } from './credentialStore.ts';
 import { executeLongBridge } from '@finagent/longbridge-tools';
 
@@ -930,7 +931,8 @@ export class AgentKernelHost {
       this.window?.webContents.send('thesis:impact', impact);
     } catch (error) {
       // An alert must never crash the engine tick; the trigger is already logged.
-      console.error('thesis impact evaluation failed:', error);
+      const { message } = redactError(error);
+      console.error('thesis impact evaluation failed:', message);
     }
   }
 
@@ -1363,7 +1365,11 @@ export class AgentKernelHost {
       answer: this.evaluationRedactor.redactAnswer(pending.answer),
       toolCalls: toolCalls.map((toolCall) => this.evaluationRedactor.redactToolCall(toolCall)),
       failureModes: [],
-      error: pending.error,
+      // Run errors are persisted to eval artifacts — redact at the boundary
+      // (issue #19); failure messages echo provider responses verbatim.
+      error: pending.error
+        ? { ...pending.error, message: redactSecrets(pending.error.message) }
+        : pending.error,
     };
     try {
       await this.evaluationStore.addRun(run);
