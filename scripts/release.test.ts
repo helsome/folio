@@ -148,6 +148,13 @@ describe('trusted release prerequisites', () => {
 describe('verified optional Apple signing', () => {
   const configured = Object.fromEntries(appleKeys.map((key) => [key, 'fake-fixture']));
   const requirement = 'designated => identifier "com.finagent.app" and anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = TEAMFIXTURE';
+  const identity = 'Identifier=com.finagent.app\nAuthority=Developer ID Application: Fixture (TEAMFIXTURE)\nTeamIdentifier=TEAMFIXTURE\n';
+  function signatureOutput(_command: string, args: string[]) {
+    if (args.includes('--requirements')) return requirement;
+    if (args.includes('--verbose=4')) return identity;
+    return '';
+  }
+
   it('requires explicit opt-in and a complete existing Apple configuration', () => {
     expect(appleSigningEnabled('darwin', configured)).toBe(false);
     expect(appleSigningEnabled('win32', { ...configured, FOLIO_ALLOW_APPLE_SIGNING: '1' })).toBe(false);
@@ -159,20 +166,42 @@ describe('verified optional Apple signing', () => {
     const calls: string[] = [];
     const result = verifyMacSigning('/fake/Folio.app', 'TEAMFIXTURE', (command: string, args: string[]) => {
       calls.push(command + ' ' + args.join(' '));
-      return command === 'codesign' && args[0] === '--display' ? requirement : '';
+      return signatureOutput(command, args);
     });
     expect(result).toEqual({ signing: 'developer-id', notarized: true });
-    expect(calls).toHaveLength(4);
-    expect(calls[2]).toBe('xcrun stapler validate /fake/Folio.app');
-    expect(calls[3]).toBe('spctl --assess --type execute /fake/Folio.app');
+    expect(calls).toHaveLength(5);
+    expect(calls[3]).toBe('xcrun stapler validate /fake/Folio.app');
+    expect(calls[4]).toBe('spctl --assess --type execute /fake/Folio.app');
   });
   it('rejects ad-hoc signatures, mismatched teams and missing notarization', () => {
     expect(() => verifyMacSigning('/fake', 'TEAMFIXTURE', () => 'adhoc')).toThrow('Developer ID');
-    expect(() => verifyMacSigning('/fake', 'OTHERTEAM', () => requirement)).toThrow('Developer ID');
-    expect(() => verifyMacSigning('/fake', 'TEAMFIXTURE', (command: string) => {
+    expect(() => verifyMacSigning('/fake', 'OTHERTEAM', signatureOutput)).toThrow('Developer ID');
+    expect(() => verifyMacSigning('/fake', 'TEAMFIXTURE', (command: string, args: string[]) => {
       if (command === 'xcrun') throw new Error('private-signing-fixture');
-      return requirement;
+      return signatureOutput(command, args);
     })).toThrow('tool output suppressed');
+  });
+  it('rejects a Team ID that only matches the configured prefix', () => {
+    const otherRequirement = requirement.replace('TEAMFIXTURE', 'TEAMFIXTURE2');
+    for (const quote of [false, true]) {
+      const changedRequirement = quote ? otherRequirement.replace('= TEAMFIXTURE2', '= "TEAMFIXTURE2"') : otherRequirement;
+      expect(() => verifyMacSigning('/fake', 'TEAMFIXTURE', (command: string, args: string[]) => {
+        if (args.includes('--requirements')) return changedRequirement;
+        if (args.includes('--verbose=4')) return identity.replaceAll('TEAMFIXTURE', 'TEAMFIXTURE2');
+        return '';
+      })).toThrow('Developer ID');
+    }
+  });
+  it('rejects missing, duplicate or conflicting identity fields', () => {
+    for (const details of [identity.replace('TeamIdentifier=TEAMFIXTURE', ''),
+      identity + 'TeamIdentifier=TEAMFIXTURE2\n', identity.replace('com.finagent.app', 'com.other.app'),
+      identity.replace('TeamIdentifier=TEAMFIXTURE', 'TeamIdentifier=TEAMFIXTURE2')]) {
+      expect(() => verifyMacSigning('/fake', undefined, (command: string, args: string[]) =>
+        args.includes('--verbose=4') ? details : signatureOutput(command, args))).toThrow('Developer ID');
+    }
+    expect(verifyMacSigning('/fake', 'TEAMFIXTURE', (command: string, args: string[]) =>
+      args.includes('--requirements') ? requirement.replace('= TEAMFIXTURE', '= "TEAMFIXTURE"') : signatureOutput(command, args)))
+      .toEqual({ signing: 'developer-id', notarized: true });
   });
   it('requires installed verification evidence for a signed manifest and rejects signed Windows claims', () => {
     const dir = fixture();

@@ -115,3 +115,22 @@ Follow-up local verification (same Linux/Bun/Node environment):
   explicit Apple opt-in, complete configuration, required verification commands,
   ad-hoc/team/notarization rejection, and signed-manifest validation evidence.
   Apple tests use synthetic command responses and do not claim real signing success.
+
+## Final static review hardening
+
+- Reproduced the Team ID prefix vulnerability: the old verifier accepted
+  `TEAMFIXTURE2` when configured for `TEAMFIXTURE` (targeted regression failed).
+  The verifier now captures codesign stdout/stderr without logging, parses exactly
+  one `TeamIdentifier` and bundle `Identifier`, and requires full equality with the
+  expected team and exactly parsed designated-requirement OU. Tests reject quoted
+  and unquoted prefix matches, missing/duplicate fields and inconsistent identities.
+- All five Apple secret expressions and signing opt-in now require
+  `matrix.platform == 'darwin'`; Windows packaging receives no Apple secret values.
+- Manual release documentation requires selecting the matching tag ref. The actual
+  workflow preflight now rejects a branch at the identical SHA before git/API calls.
+  Executed the extracted preflight script with mocked GitHub/git responses: same-SHA
+  branch rejected, matching tag accepted. No workflow was dispatched.
+- `bun test --isolate scripts/release.test.ts`: **20 pass / 0 fail**, 62 assertions.
+- `bun test --isolate`: **1979 pass / 7 skip / 0 fail**, 215 files.
+- Workflow schemas, Node syntax, secret scan and diff checks passed. Native evidence
+  is still pending. PR remains Draft; no enable retry, tag or release was performed.

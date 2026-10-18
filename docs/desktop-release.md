@@ -29,7 +29,9 @@ Upload happens only after these assertions pass. Main builds are downloadable Ac
 artifacts, not GitHub Releases. `desktop.yml` also supports manual build-only dispatch.
 
 `release.yml` runs on `v*` tags and manual dispatch. Both require an existing tag
-matching root and Electron package versions and pointing at the selected commit;
+matching root and Electron package versions. Manual dispatch must select that **tag ref**
+(`refs/tags/v<version>`), not a branch even when it points to the same SHA;
+the tag must point at the selected workflow commit;
 the tagged commit must be an ancestor of main. Existing releases are never overwritten.
 The next proposed version is **0.4.0-beta.3** because beta.2 already exists.
 Do not create that tag before the PR review and native build evidence are complete.
@@ -65,7 +67,7 @@ Windows has no Authenticode integration and remains explicitly unsigned.
 No stable/signed Windows release is claimed; Gatekeeper/SmartScreen may block unsigned
 downloads. Never disable or bypass system security.
 
-Trusted tag/manual releases preserve the repository's existing optional Apple path:
+Trusted tag/manual releases (macOS jobs only) preserve the repository's existing optional Apple path:
 `APPLE_CERTIFICATE_BASE64`, `APPLE_CERT_PASSWORD`, `APPLE_ID`,
 `APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. These are the prior secret names;
 no values, secrets or credential grants are created/configured by this change.
@@ -139,9 +141,16 @@ prerequisites are available, create a NEW tag at the reviewed main commit:
 git fetch origin main --tags
 git tag v0.4.0-beta.3 <reviewed-main-sha>
 git push origin refs/tags/v0.4.0-beta.3
-# Or re-run the existing tag without overwriting a release:
+# Manual release: select the TAG ref (not main/a branch), with the matching tag input.
+# This can retry a failed run only while no release already exists:
 gh workflow run release.yml --repo helsome/folio --ref v0.4.0-beta.3 -f tag=v0.4.0-beta.3
 ```
+
+In GitHub's Run workflow UI, select the version **tag**, then enter that same tag in
+`tag`. In the REST dispatch body, `ref` must resolve to that tag; the `tag` input alone
+does not change a selected branch into a tag. A branch dispatch at the identical
+commit is rejected in preflight and cannot complete release. Standalone `desktop.yml`
+build-only dispatch on `main` remains separate and never publishes.
 
 The cloud task's shell `gh` token was invalid and direct git push had no credential;
 the connected GitHub API can create branch/commit/PR but exposes no enable/dispatch/

@@ -42,8 +42,9 @@ jobs:
             if (!/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/.test(tag) || tag !== `v${version}` || version !== appVersion) {
               throw new Error('Tag and both package versions must match');
             }
+            if (context.ref !== `refs/tags/${tag}`) throw new Error(`Select refs/tags/${tag} for dispatch; a branch at the same SHA is not a release ref`);
             const sha = execFileSync('git', ['rev-parse', `${tag}^{commit}`], {encoding:'utf8'}).trim();
-            if (sha !== context.sha) throw new Error('Select the tagged commit when dispatching');
+            if (sha !== context.sha) throw new Error('The selected tag must point to the workflow commit');
             execFileSync('git', ['merge-base', '--is-ancestor', sha, 'origin/main']);
             try {
               await github.rest.repos.getReleaseByTag({...context.repo, tag});
