@@ -84,8 +84,8 @@ function createElectronClient(): FinagentClient {
     thesis: {
       list: (symbol?) => ipcResult(window.electronAPI.thesis.list(symbol)),
       getReport: (symbol) => ipcResult(window.electronAPI.thesis.getReport(symbol)),
-      saveFromReport: (symbol) => ipcResult(window.electronAPI.thesis.saveFromReport(symbol)),
-      reEvaluate: (symbol) => ipcResult(window.electronAPI.thesis.reEvaluate(symbol)),
+      saveFromReport: (input) => ipcResult(window.electronAPI.thesis.saveFromReport(input)),
+      reEvaluate: (input) => ipcResult(window.electronAPI.thesis.reEvaluate(input)),
       update: (thesis) => ipcResult(window.electronAPI.thesis.update(thesis)),
       listImpacts: (symbol) => ipcResult(window.electronAPI.thesis.listImpacts(symbol)),
       onImpact: (callback) =>

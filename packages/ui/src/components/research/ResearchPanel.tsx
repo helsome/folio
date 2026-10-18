@@ -3,9 +3,10 @@ import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Check, Search } from 'lucide-react';
 import type { ResearchRunSummary, ResearchReport, StrategyId } from '@finagent/core';
-import { activeSymbolAtom, navSectionAtom } from '../../atoms';
+import { activeSymbolAtom, navSectionAtom, selectedReportIdAtom } from '../../atoms';
 import { pendingResearchStrategyAtom, researchOriginAtom } from '../../atoms/discoverAtoms';
 import {
+  pendingResearchReportIdAtom,
   researchRunsAtom,
   researchReportAtom,
   researchLoadingAtom,
@@ -54,6 +55,8 @@ export const ResearchPanel: React.FC = () => {
   const [symbolInput, setSymbolInput] = useState('');
   const [symbolError, setSymbolError] = useState<string | null>(null);
   const [thesisSaved, setThesisSaved] = useState(false);
+  const [pendingReportId, setPendingReportId] = useAtom(pendingResearchReportIdAtom);
+  const setSelectedReportId = useSetAtom(selectedReportIdAtom);
 
   // Discover → Research: a candidate card carries a recommended strategy.
   useEffect(() => {
@@ -83,22 +86,70 @@ export const ResearchPanel: React.FC = () => {
     return () => { alive = false; };
   }, [setRuns, setActiveSymbol]);
 
+  // Symbol switch resets the per-symbol workspace state (#331): a slow
+  // response for the previous symbol must never overwrite the new selection,
+  // and a report from another symbol must not linger as "the" report.
   useEffect(() => {
+    let alive = true;
     if (!symbol) {
       setReports([]);
       setReport(null);
       setThesisSaved(false);
-      return;
+      return () => {
+        alive = false;
+      };
     }
     setThesisSaved(false);
-    void loadSymbolReports(symbol).then(setReports);
+    setReport((current) => (current && current.symbol !== symbol ? null : current));
+    void loadSymbolReports(symbol).then((loaded) => {
+      if (alive) setReports(loaded);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [symbol, setReport, setReports]);
+
+  // The report currently shown IS the workspace's selected version (#331):
+  // mirror it into the shared selection identity so the agent context and the
+  // save-as-thesis path bind to exactly this version.
+  useEffect(() => {
+    setSelectedReportId(report ? report.id : null);
+  }, [report, setSelectedReportId]);
+
+  // Without an explicit version intent, resolving the newest finished run's
+  // report is the ONLY "latest" resolution (#331) — and it never overrides a
+  // report the user already selected for this symbol.
+  useEffect(() => {
+    if (!symbol || pendingReportId) return;
+    if (report?.symbol === symbol) return;
     const latest = runs.find((run) => run.symbol === symbol && run.reportId);
-    if (latest?.reportId && !report) {
-      void loadResearchReport(latest.reportId).then((loaded) => {
-        if (loaded) setReport(loaded);
-      });
-    }
-  }, [symbol, setReport, setReports, runs, report]);
+    if (!latest?.reportId) return;
+    let alive = true;
+    void loadResearchReport(latest.reportId).then((loaded) => {
+      if (alive && loaded && loaded.symbol === symbol) setReport(loaded);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [symbol, pendingReportId, runs, report, setReport]);
+
+  // A deep link asked for a specific historical version: load THAT report,
+  // never the symbol's latest (#327/#331).
+  useEffect(() => {
+    if (!pendingReportId) return;
+    let alive = true;
+    void loadResearchReport(pendingReportId).then((loaded) => {
+      if (!alive) return;
+      setPendingReportId(null);
+      if (loaded) {
+        setActiveSymbol(loaded.symbol.toUpperCase());
+        setReport(loaded);
+      }
+    });
+    return () => {
+      alive = false;
+    };
+  }, [pendingReportId, setPendingReportId, setActiveSymbol, setReport]);
 
   // Poll the newest active run for this symbol while it is non-terminal.
   const activeRun = runs.find(
@@ -174,7 +225,10 @@ export const ResearchPanel: React.FC = () => {
   /** V9: research complete → one-click save as investment thesis. */
   const handleSaveThesis = async () => {
     if (!symbol) return;
-    const created = await saveThesisFromReport(symbol);
+    // Save the version the user is actually looking at (#327): never the
+    // symbol's latest report behind their back.
+    if (!report || report.symbol !== symbol) return;
+    const created = await saveThesisFromReport(symbol, report.id);
     if (created) {
       setThesisSaved(true);
     } else {
@@ -362,7 +416,9 @@ export const ResearchPanel: React.FC = () => {
           </ContentReveal>
         )}
 
-        {symbol && !activeRun && !report && (
+        // Run history stays reachable even when a report is already open
+        // (#327): the user must always be able to switch to another version.
+        {symbol && !activeRun && (!report || symbolRuns.some((run) => run.reportId)) && (
           <RunHistory
             runs={symbolRuns}
             onSelect={async (reportId) => {

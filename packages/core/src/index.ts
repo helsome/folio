@@ -424,6 +424,14 @@ export interface WorkspaceContext {
   selectedPosition?: string;
   /** Set when the Compare workspace is focused; feeds the compare agent context. */
   comparisonSymbols?: string[];
+  /**
+   * Historical research report version the user explicitly opened (#331).
+   * Present only when the selection is version-scoped: absent means "latest",
+   * never a silently re-resolved latest.
+   */
+  selectedReportId?: string;
+  /** Thesis the user last explicitly selected/acted on (#331). */
+  selectedThesisId?: string;
 }
 
 export interface AgentRunInput {
