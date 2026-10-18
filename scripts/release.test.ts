@@ -1,3 +1,5 @@
+import { appleSigningEnabled, verifyMacSigning, appleKeys } from './mac-signing.mjs';
+import { releaseProviderEnv, withoutReleaseSecrets, checkReleaseProvider, longbridgeAssetFor } from './release-provider.mjs';
 import { execFileSync } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'bun:test';
 import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, readlinkSync, symlinkSync } from 'node:fs';
@@ -95,5 +97,95 @@ describe('release gates', () => {
     const child = spawnApp(process.execPath, ['-e', 'setInterval(() => {}, 1000)'], { stdio: 'ignore' });
     await stopApp(child);
     expect(child.exitCode !== null || child.signalCode !== null).toBe(true);
+  });
+});
+
+describe('trusted release prerequisites', () => {
+  const content = 'LONGBRIDGE_APP_KEY=fake-app-key\nLONGBRIDGE_APP_SECRET="fake-app-secret"\nLONGBRIDGE_ACCESS_TOKEN=fake-access-token\nNODE_OPTIONS=malicious\nANTHROPIC_API_KEY=unrelated';
+  it('reuses only supported Longbridge fields without persisting the secret file', () => {
+    const env = releaseProviderEnv({ FINAGENT_ENV_FILE_CONTENT: content, APPLE_CERT_PASSWORD: 'unrelated-signing-secret', PATH: '/test/bin' });
+    expect(env.LONGBRIDGE_APP_KEY).toBe('fake-app-key');
+    expect(env.LONGBRIDGE_APP_SECRET).toBe('fake-app-secret');
+    expect(env.LONGBRIDGE_ACCESS_TOKEN).toBe('fake-access-token');
+    expect(env.FINAGENT_ENV_FILE_CONTENT).toBeUndefined();
+    expect(env.APPLE_CERT_PASSWORD).toBeUndefined();
+    expect(env.NODE_OPTIONS).toBeUndefined();
+    expect(env.ANTHROPIC_API_KEY).toBeUndefined();
+    expect(env.PATH).toBe('/test/bin');
+    expect(withoutReleaseSecrets({ LONGBRIDGE_ACCESS_TOKEN: 'private', PATH: '/bin' })).toEqual({ PATH: '/bin' });
+  });
+  it('reports missing field names without revealing existing values', () => {
+    let message = '';
+    try { releaseProviderEnv({ FINAGENT_ENV_FILE_CONTENT: 'LONGBRIDGE_APP_KEY=private-fixture' }); }
+    catch (error) { message = String(error); }
+    expect(message).toContain('LONGBRIDGE_APP_SECRET');
+    expect(message).toContain('LONGBRIDGE_ACCESS_TOKEN');
+    expect(message).not.toContain('private-fixture');
+  });
+  it('rejects attempts to replace real release gates with demo data', () => {
+    expect(() => releaseProviderEnv({ FINAGENT_ENV_FILE_CONTENT: content, FINAGENT_DEMO_DATA: '1' })).toThrow('demo data');
+    expect(() => releaseProviderEnv({ FINAGENT_ENV_FILE_CONTENT: content + '\nFINAGENT_DEMO_DATA=1' })).toThrow('demo data');
+  });
+  it('probes the locked CLI with a read-only quote, without OAuth login', () => {
+    const calls: string[][] = [];
+    checkReleaseProvider({}, (_command: string, args: string[]) => {
+      calls.push(args);
+      return args[0] === '--version' ? 'longbridge 0.17.0\n' : '[{"symbol":"NVDA.US","last":"120.5"}]';
+    });
+    expect(calls).toEqual([['--version'], ['quote', 'NVDA.US', '--format', 'json']]);
+    expect(longbridgeAssetFor('darwin', 'arm64').sha256).toHaveLength(64);
+    expect(() => longbridgeAssetFor('linux', 'x64')).toThrow();
+  });
+  it('fails closed on unusable quotes and suppresses provider diagnostics', () => {
+    expect(() => checkReleaseProvider({}, (_command: string, args: string[]) => args[0] === '--version' ? 'longbridge 0.17.0' : '[]')).toThrow('no usable');
+    let message = '';
+    try { checkReleaseProvider({}, () => { throw new Error('private-provider-fixture'); }); }
+    catch (error) { message = String(error); }
+    expect(message).toContain('Release blocked');
+    expect(message).not.toContain('private-provider-fixture');
+  });
+});
+describe('verified optional Apple signing', () => {
+  const configured = Object.fromEntries(appleKeys.map((key) => [key, 'fake-fixture']));
+  const requirement = 'designated => identifier "com.finagent.app" and anchor apple generic and certificate leaf[field.1.2.840.113635.100.6.1.13] /* exists */ and certificate leaf[subject.OU] = TEAMFIXTURE';
+  it('requires explicit opt-in and a complete existing Apple configuration', () => {
+    expect(appleSigningEnabled('darwin', configured)).toBe(false);
+    expect(appleSigningEnabled('win32', { ...configured, FOLIO_ALLOW_APPLE_SIGNING: '1' })).toBe(false);
+    expect(appleSigningEnabled('darwin', { FOLIO_ALLOW_APPLE_SIGNING: '1' })).toBe(false);
+    expect(appleSigningEnabled('darwin', { ...configured, FOLIO_ALLOW_APPLE_SIGNING: '1' })).toBe(true);
+    expect(() => appleSigningEnabled('darwin', { APPLE_ID: 'fake-fixture', FOLIO_ALLOW_APPLE_SIGNING: '1' })).toThrow('Incomplete');
+  });
+  it('requires code validation, Developer ID/team identity, staple and Gatekeeper acceptance', () => {
+    const calls: string[] = [];
+    const result = verifyMacSigning('/fake/Folio.app', 'TEAMFIXTURE', (command: string, args: string[]) => {
+      calls.push(command + ' ' + args.join(' '));
+      return command === 'codesign' && args[0] === '--display' ? requirement : '';
+    });
+    expect(result).toEqual({ signing: 'developer-id', notarized: true });
+    expect(calls).toHaveLength(4);
+    expect(calls[2]).toBe('xcrun stapler validate /fake/Folio.app');
+    expect(calls[3]).toBe('spctl --assess --type execute /fake/Folio.app');
+  });
+  it('rejects ad-hoc signatures, mismatched teams and missing notarization', () => {
+    expect(() => verifyMacSigning('/fake', 'TEAMFIXTURE', () => 'adhoc')).toThrow('Developer ID');
+    expect(() => verifyMacSigning('/fake', 'OTHERTEAM', () => requirement)).toThrow('Developer ID');
+    expect(() => verifyMacSigning('/fake', 'TEAMFIXTURE', (command: string) => {
+      if (command === 'xcrun') throw new Error('private-signing-fixture');
+      return requirement;
+    })).toThrow('tool output suppressed');
+  });
+  it('requires installed verification evidence for a signed manifest and rejects signed Windows claims', () => {
+    const dir = fixture();
+    const file = join(dir, 'manifest-darwin-arm64.json');
+    const manifest = JSON.parse(readFileSync(file, 'utf8'));
+    manifest.signing = 'developer-id'; manifest.notarized = true;
+    writeFileSync(file, JSON.stringify(manifest));
+    expect(() => verifyRelease(dir, version, sha)).toThrow('Missing native validation');
+    const verified = join(dir, 'verified-darwin-arm64.json');
+    const evidence = JSON.parse(readFileSync(verified, 'utf8'));
+    evidence.signatureVerification = 'passed'; evidence.notarizationVerification = 'passed';
+    writeFileSync(verified, JSON.stringify(evidence));
+    expect(verifyRelease(dir, version, sha)).toHaveLength(3);
+    expect(() => stageManifest(dir, version, targets[2], sha, { signing: 'developer-id', notarized: true })).toThrow('Invalid signing');
   });
 });

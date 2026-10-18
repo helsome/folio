@@ -64,7 +64,8 @@ installers. Product E2E assertions were retained rather than removed or made adv
 - Enable `pr.yml` and approve/run the Draft PR workflow using an existing authorized
   GitHub session. No shell push/dispatch or workflow-enable access is available here.
 - Existing golden/v5 product gates require working real Longbridge capability data;
-  current hosted runner setup has not established that prerequisite. Release must fail
+  trusted runner setup now installs the pinned CLI and probes the existing secret,
+  but actual credential availability has not yet been established. Release must fail
   until it is available. No fake demo success is substituted.
 - Independent review, Ready/merge decision, new beta.3 tag and complete prerelease.
   No tag or release was created by this task. No DMG/EXE success is claimed.
@@ -81,3 +82,36 @@ before checking both unchanged link targets and reading the installed framework.
 - `bun test --isolate`: 1968 pass / 7 skip / 0 fail, 215 files.
 - `node --check scripts/verify-installer.mjs`, source secret scan and diff check: clean.
 - Native DMG mounting and application startup remain unexecuted pending Actions.
+
+## Independent review follow-up: live prerequisites and optional signing
+
+- Investigated the repository's auth/setup docs and official Longbridge v0.17.0 source
+  at `e46c5f3ae8d3b80bd151a862b14c9cafc3eaf4ab`. Despite the OAuth-focused README,
+  `src/openapi/context.rs` supports all three `LONGBRIDGE_*` API-key environment fields.
+- Reused the existing `FINAGENT_ENV_FILE_CONTENT` secret name, passing it explicitly
+  only from the trusted release caller. Parse only the three supported fields, perform
+  a captured/sanitized read-only quote preflight, never create OAuth credentials.
+- Added native job-local CLI installation pinned to v0.17.0 and digests from
+  [official release assets](https://github.com/longbridge/longbridge-terminal/releases/expanded_assets/v0.17.0).
+  PR/main/build-only runs do not install this dependency or receive vendor secrets.
+- Restored the original five optional Apple secret names. Complete trusted credentials
+  enable signing/notarization with output verification; no credentials means unsigned
+  internal output, incomplete credentials or failed verification fail the job.
+- Signed apps must pass code validation, Developer ID/team requirements, staple and
+  Gatekeeper assessment both before staging and after DMG installation. Windows stays
+  unsigned; publication remains an explicitly labeled internal prerelease.
+- Availability of existing secret values, actual native CLI download, authenticated
+  quote access and Apple verification remain **unexecuted** in this Linux environment.
+  Secret inventory is not available through the connector; no values were inspected.
+
+Follow-up local verification (same Linux/Bun/Node environment):
+
+- `bun test --isolate scripts/release.test.ts`: **18 pass / 0 fail**, 55 assertions.
+- `bun test --isolate`: **1977 pass / 7 skip / 0 fail**, 215 files.
+- Node syntax checks for installer/provider/signing scripts, workflow schema validation,
+  source secret scan and diff whitespace validation passed.
+- Added tests for credential allowlisting/compartmentalization, missing-field error
+  redaction, demo-mode rejection, read-only preflight, sanitized provider failures,
+  explicit Apple opt-in, complete configuration, required verification commands,
+  ad-hoc/team/notarization rejection, and signed-manifest validation evidence.
+  Apple tests use synthetic command responses and do not claim real signing success.

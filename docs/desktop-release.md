@@ -37,8 +37,21 @@ Do not create that tag before the PR review and native build evidence are comple
 Release additionally retains the existing golden-path A–H and v5 product assertions
 on the installed app, on every native target. **These are not offline fixtures:**
 `FINAGENT_AGENT_PROVIDER=local` only makes synthesis deterministic; several assertions
-still need authenticated Longbridge capability data. Hosted runners currently have no
-verified CLI/auth setup. Missing prerequisites or failed assertions block release.
+still need authenticated Longbridge capability data. Trusted release jobs now install **Longbridge 0.17.0** from exact upstream native
+assets, with pinned SHA256 digests, into RUNNER_TEMP and update only that job's PATH.
+No floating shell installer or OAuth login is run. A separate preflight extracts only
+`LONGBRIDGE_APP_KEY`, `LONGBRIDGE_APP_SECRET`, `LONGBRIDGE_ACCESS_TOKEN` from the existing
+`FINAGENT_ENV_FILE_CONTENT` secret (direct process env is also accepted locally).
+The CLI supports this API-key environment authentication in its pinned
+[upstream context implementation](https://github.com/longbridge/longbridge-terminal/blob/v0.17.0/src/openapi/context.rs).
+Only a trusted version-tag release receives this secret; PR/main/build-only calls
+receive none. No `.env`, token, keychain credential or new persistent credential is
+created. The parsed credentials stay in the preflight/product-harness child process
+environments; they are not passed to package builds, offline smoke/fresh-install,
+GITHUB_ENV, logs or artifacts. Provider command output is captured and suppressed.
+The preflight requires the locked CLI version and a usable real NVDA quote before
+building, and repeats before installed golden/v5 gates. Missing prerequisites or
+failed assertions block release with field names/status only.
 No demo-data switch, skip, or `continue-on-error` substitutes for those gates.
 A build-only report records these gates as `not-run`; the final release verifier
 rejects such reports. The separate nightly live LLM/judge benchmark also remains
@@ -46,14 +59,35 @@ independent; its missing provider/judge prerequisites are not a code-CI pass.
 
 ## Signing and publication
 
-This implementation deliberately produces **unsigned internal previews only**:
-macOS is not Developer-ID signed/notarized; Windows has no Authenticode signature.
-Ambient signing credentials are removed from the packager child environment and no
-new credentials are created. A local ad-hoc macOS signature, if Electron tooling
-requires one, is not a verified publisher identity. No stable/signed release is claimed.
-OS Gatekeeper/SmartScreen may block an unsigned download; do not disable or bypass
-system security. A trusted signed release requires a separately reviewed integration
-with output signature and notarization verification, not just checking for secrets.
+Build-only PR/main runs produce **unsigned internal previews**. macOS Apple Silicon
+gets the required ad-hoc signature; this is not a verified publisher identity.
+Windows has no Authenticode integration and remains explicitly unsigned.
+No stable/signed Windows release is claimed; Gatekeeper/SmartScreen may block unsigned
+downloads. Never disable or bypass system security.
+
+Trusted tag/manual releases preserve the repository's existing optional Apple path:
+`APPLE_CERTIFICATE_BASE64`, `APPLE_CERT_PASSWORD`, `APPLE_ID`,
+`APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. These are the prior secret names;
+no values, secrets or credential grants are created/configured by this change.
+No Apple secrets means unsigned internal output. A partially configured set fails
+with missing **names** rather than silently claiming signing. A complete set is
+available only to the electron-builder child, which imports the existing certificate,
+requires Developer ID signing, hardened runtime and notarization. The general build
+commands and installed-app tests do not receive these signing credentials.
+
+Presence of secrets is never evidence of successful signing. Before staging a signed
+manifest, verify `codesign --verify --deep --strict`, the Developer ID designated
+requirement and expected team, `xcrun stapler validate`, and `spctl --assess --type execute`.
+After copying from the actual DMG with unchanged relative symlinks, repeat output
+verification against the installed app before recording a passing report. The final
+asset verifier rejects signed manifests without installed signature/notarization
+verification evidence. Any failure fails the native job; no unsigned fallback occurs
+after an attempted signing/notarization failure. The DMG contains the verified signed
+app; no separate DMG-container signature claim is made.
+
+Because Windows remains unsigned and the version is beta, complete releases are still
+internal **prereleases**, never marked latest. Release notes report each target's
+actual manifest signing/notarization result.
 
 Build jobs have `contents: read`. Only the final publish job has `contents: write`.
 After ALL quality and native gates succeed, it downloads the current run's three
@@ -112,4 +146,14 @@ gh workflow run release.yml --repo helsome/folio --ref v0.4.0-beta.3 -f tag=v0.4
 The cloud task's shell `gh` token was invalid and direct git push had no credential;
 the connected GitHub API can create branch/commit/PR but exposes no enable/dispatch/
 release-create operation. A maintainer must perform the above actions through an
-existing session. No credential values were printed, generated or stored.
+existing session.
+
+Before release, the maintainer must confirm the **already-existing**
+`FINAGENT_ENV_FILE_CONTENT` secret contains all three supported `LONGBRIDGE_*` fields
+with valid existing market-data and read-account authorization. The cloud connector
+cannot inspect secret inventory or availability, and no credential values were read.
+If absent, this task stops at build artifacts: selecting/authorizing credential setup
+is a separate user action, not something this workflow fabricates. Do not supply new
+credentials in PR comments or conversation. Optional Apple configuration uses only the
+five existing secret names listed above. The preflight is the definitive availability
+check; neither the secret name in YAML nor local unit fixtures proves authentication. No credential values were printed, generated or stored.

@@ -72,7 +72,14 @@ jobs:
     uses: ./.github/workflows/desktop.yml
     with:
       release_gates: true
-    # No inherited secrets; native jobs only have contents:read.
+    # Only trusted tag/manual runs pass existing secrets; PR/main callers pass none.
+    secrets:
+      FINAGENT_ENV_FILE_CONTENT: ${{ secrets.FINAGENT_ENV_FILE_CONTENT }}
+      APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
+      APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
+      APPLE_ID: ${{ secrets.APPLE_ID }}
+      APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
+      APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
   publish:
     needs: [preflight, quality, desktop]
     runs-on: ubuntu-24.04
@@ -101,12 +108,14 @@ jobs:
             const fs = require('fs');
             const path = require('path');
             const tag = process.env.RELEASE_TAG;
+            const manifests = fs.readdirSync('dist/release').filter(n => n.startsWith('manifest-')).map(n => JSON.parse(fs.readFileSync(path.join('dist/release', n))));
+            const signing = manifests.map(m => `${m.platform}/${m.arch}: ${m.signing}; notarized=${m.notarized}`).join('\n');
             let release;
             try {
               release = (await github.rest.repos.createRelease({...context.repo, tag_name: tag,
-                name: `Folio ${tag} — unsigned internal preview`, target_commitish: context.sha,
+                name: `Folio ${tag} — internal preview`, target_commitish: context.sha,
                 draft: true, prerelease: true, make_latest: 'false',
-                body: `Build: ${context.sha}\n\nInternal testing preview: macOS arm64 + x64 DMG and Windows x64 NSIS EXE. Unsigned; macOS is not notarized, Windows has no Authenticode signature. Gatekeeper/SmartScreen may block execution. No bypass of OS security is recommended. Not a stable or signed release.\n\nAll three installers were installed/mounted and their architecture, bundled resources, startup, local agent, first launch, golden path and v5 gates verified on native runners. These product checks do not establish full nightly live LLM/judge evaluation success.\n\nSHA256SUMS.txt and per-platform validation reports are attached.`
+                body: `Build: ${context.sha}\n\nInternal testing preview: macOS arm64 + x64 DMG and Windows x64 NSIS EXE. Signature verification results:\n${signing}\nWindows has no Authenticode signature. macOS Developer ID/notarization is claimed only after codesign, stapler and spctl verification; absent credentials produce unsigned internal previews. Gatekeeper/SmartScreen may block execution. No bypass of OS security is recommended. Not a stable release; any unsigned target remains an internal testing preview.\n\nAll three installers were installed/mounted and their architecture, bundled resources, startup, local agent, first launch, golden path and v5 gates verified on native runners. These product checks do not establish full nightly live LLM/judge evaluation success.\n\nSHA256SUMS.txt and per-platform validation reports are attached.`
               })).data;
               for (const name of fs.readdirSync('dist/release').sort()) {
                 const data = fs.readFileSync(path.join('dist/release', name));

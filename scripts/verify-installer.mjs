@@ -6,6 +6,8 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifyMacSigning } from './mac-signing.mjs';
+import { releaseProviderEnv, withoutReleaseSecrets, checkReleaseProvider } from './release-provider.mjs';
 import { copyMacApp, installerName, sha256, targetFor } from './release-lib.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const appRoot = join(root, 'apps/electron');
@@ -18,6 +20,8 @@ if (sha256(installer) !== manifest.sha256) throw new Error('Installer checksum m
 const work = mkdtempSync(join(tmpdir(), 'folio-install-'));
 const installDir = join(work, 'installed');
 let binary, resources;
+let signatureVerification = 'not-applicable';
+let notarizationVerification = 'not-applicable';
 function run(command, args, options = {}) {
   return execFileSync(command, args, { stdio: 'inherit', cwd: tmpdir(), timeout: 600_000, ...options });
 }
@@ -29,6 +33,10 @@ try {
     run('hdiutil', ['attach', '-readonly', '-nobrowse', '-mountpoint', mount, installer]);
     try { copyMacApp(join(mount, 'Folio.app'), join(installDir, 'Folio.app')); }
     finally { run('hdiutil', ['detach', mount]); }
+    if (manifest.signing === 'developer-id') {
+      verifyMacSigning(join(installDir, 'Folio.app'));
+      signatureVerification = 'passed'; notarizationVerification = 'passed';
+    }
     binary = join(installDir, 'Folio.app/Contents/MacOS/Folio');
     resources = join(installDir, 'Folio.app/Contents/Resources');
     const arch = execFileSync('lipo', ['-archs', binary], { encoding: 'utf8' }).trim();
@@ -65,15 +73,19 @@ try {
   const skillCount = readdirSync(join(resources, 'skills'), { recursive: true }).filter((name) => /SKILL\.md$/.test(name)).length;
   if (skillCount < 10) throw new Error('Missing packaged skills');
   console.log(`Installed resources/architecture verified: ${target.platform}/${target.arch}, ${skillCount} skills`);
-  const env = { ...process.env, FOLIO_PACKAGED_BINARY: binary, FINAGENT_AGENT_PROVIDER: 'local' };
+  const env = { ...withoutReleaseSecrets(process.env), FOLIO_PACKAGED_BINARY: binary, FINAGENT_AGENT_PROVIDER: 'local' };
   const releaseGates = process.env.FOLIO_RELEASE_GATES === '1';
-  // PR/main need no vendor credentials. Releases retain the existing stronger gates.
-  const harnesses = releaseGates ? ['package-smoke', 'fresh-install', 'run', 'v5'] : ['package-smoke', 'fresh-install'];
-  for (const harness of harnesses) {
+  for (const harness of ['package-smoke', 'fresh-install']) {
     run('node', [join(appRoot, 'e2e', `${harness}.mjs`)], { env });
+  }
+  if (releaseGates) {
+    const liveEnv = { ...releaseProviderEnv(process.env), FOLIO_PACKAGED_BINARY: binary };
+    checkReleaseProvider(liveEnv);
+    for (const harness of ['run', 'v5']) run('node', [join(appRoot, 'e2e', `${harness}.mjs`)], { env: liveEnv });
   }
   writeFileSync(join(staging, `verified-${target.platform}-${target.arch}.json`), JSON.stringify({
     platform: target.platform, arch: target.arch, buildSha: manifest.buildSha, installerSha256: manifest.sha256,
+    signatureVerification, notarizationVerification,
     installerSmoke: 'passed', freshInstall: 'passed', goldenPath: releaseGates ? 'passed' : 'not-run', v5: releaseGates ? 'passed' : 'not-run', skillCount,
   }, null, 2) + '\n');
 } finally {

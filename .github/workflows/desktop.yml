@@ -7,6 +7,19 @@ on:
         description: Run existing golden-path and v5 gates with real provider prerequisites
         type: boolean
         default: false
+    secrets:
+      FINAGENT_ENV_FILE_CONTENT:
+        required: false
+      APPLE_CERTIFICATE_BASE64:
+        required: false
+      APPLE_CERT_PASSWORD:
+        required: false
+      APPLE_ID:
+        required: false
+      APPLE_APP_SPECIFIC_PASSWORD:
+        required: false
+      APPLE_TEAM_ID:
+        required: false
   workflow_dispatch:
 
 permissions:
@@ -47,10 +60,27 @@ jobs:
       - name: Verify native runner architecture
         run: node -e "if (process.platform !== '${{ matrix.platform }}' || process.arch !== '${{ matrix.arch }}') process.exit(1)"
       - run: bun install --frozen-lockfile
-      - name: Build unsigned native installer (publishing disabled)
+      - name: Install pinned Longbridge CLI for trusted release gates
+        if: inputs.release_gates && startsWith(github.ref, 'refs/tags/v')
+        run: node scripts/install-longbridge.mjs
+      - name: Verify existing release provider credentials and real quote access
+        if: inputs.release_gates
+        run: node scripts/release-provider-check.mjs
+        env:
+          FINAGENT_ENV_FILE_CONTENT: ${{ startsWith(github.ref, 'refs/tags/v') && secrets.FINAGENT_ENV_FILE_CONTENT || '' }}
+      - name: Build native installer (publishing disabled; Apple signing opt-in)
         run: node scripts/release-package.mjs
+        env:
+          FOLIO_ALLOW_APPLE_SIGNING: ${{ inputs.release_gates && startsWith(github.ref, 'refs/tags/v') && '1' || '0' }}
+          APPLE_CERTIFICATE_BASE64: ${{ inputs.release_gates && startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_CERTIFICATE_BASE64 || '' }}
+          APPLE_CERT_PASSWORD: ${{ inputs.release_gates && startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_CERT_PASSWORD || '' }}
+          APPLE_ID: ${{ inputs.release_gates && startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_ID || '' }}
+          APPLE_APP_SPECIFIC_PASSWORD: ${{ inputs.release_gates && startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_APP_SPECIFIC_PASSWORD || '' }}
+          APPLE_TEAM_ID: ${{ inputs.release_gates && startsWith(github.ref, 'refs/tags/v') && secrets.APPLE_TEAM_ID || '' }}
       - name: Install, inspect and launch distributed app outside repository
         run: node scripts/verify-installer.mjs
+        env:
+          FINAGENT_ENV_FILE_CONTENT: ${{ inputs.release_gates && startsWith(github.ref, 'refs/tags/v') && secrets.FINAGENT_ENV_FILE_CONTENT || '' }}
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-${{ matrix.platform }}-${{ matrix.arch }}

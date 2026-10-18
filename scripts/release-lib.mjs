@@ -25,10 +25,11 @@ export function installerName(version, target) {
 export function sha256(path) {
   return createHash('sha256').update(readFileSync(path)).digest('hex');
 }
-export function stageManifest(dir, version, target, buildSha) {
+export function stageManifest(dir, version, target, buildSha, security = { signing: 'unsigned', notarized: false }) {
+  if (!validSecurity(target, security)) throw new Error('Invalid signing/notarization state');
   const name = installerName(version, target);
   if (!statSync(join(dir, name)).isFile() || statSync(join(dir, name)).size === 0) throw new Error('Missing/empty installer');
-  const manifest = { version, buildSha, platform: target.platform, arch: target.arch, signing: 'unsigned', notarized: false,
+  const manifest = { version, buildSha, platform: target.platform, arch: target.arch, signing: security.signing, notarized: security.notarized,
     installer: name, sha256: sha256(join(dir, name)) };
   writeFileSync(join(dir, `manifest-${target.platform}-${target.arch}.json`), JSON.stringify(manifest, null, 2) + '\n');
   writeFileSync(join(dir, `SHA256SUMS-${target.platform}-${target.arch}.txt`), `${manifest.sha256}  ${name}\n`);
@@ -42,13 +43,14 @@ export function verifyRelease(dir, version, buildSha) {
     const m = JSON.parse(readFileSync(join(dir, `manifest-${t.platform}-${t.arch}.json`), 'utf8'));
     const name = installerName(version, t);
     if (m.version !== version || m.buildSha !== buildSha || m.platform !== t.platform || m.arch !== t.arch ||
-        m.installer !== name || m.signing !== 'unsigned' || m.notarized !== false || m.sha256 !== sha256(join(dir, name))) {
+        m.installer !== name || !validSecurity(t, m) || m.sha256 !== sha256(join(dir, name))) {
       throw new Error(`Invalid manifest/checksum: ${name}`);
     }
     const evidence = JSON.parse(readFileSync(join(dir, `verified-${t.platform}-${t.arch}.json`), 'utf8'));
     if (evidence.buildSha !== buildSha || evidence.installerSha256 !== m.sha256 || evidence.arch !== t.arch ||
         evidence.platform !== t.platform || evidence.installerSmoke !== 'passed' || evidence.freshInstall !== 'passed' ||
-        evidence.goldenPath !== 'passed' || evidence.v5 !== 'passed') throw new Error(`Missing native validation: ${name}`);
+        evidence.goldenPath !== 'passed' || evidence.v5 !== 'passed' ||
+        (m.signing === 'developer-id' && (evidence.signatureVerification !== 'passed' || evidence.notarizationVerification !== 'passed'))) throw new Error(`Missing native validation: ${name}`);
     return m;
   });
   writeFileSync(join(dir, 'SHA256SUMS.txt'), manifests.map((m) => `${m.sha256}  ${m.installer}`).join('\n') + '\n');
@@ -58,4 +60,9 @@ export function verifyRelease(dir, version, buildSha) {
 export function copyMacApp(source, destination) {
   // Preserve framework links exactly so they remain valid after detaching the DMG.
   cpSync(source, destination, { recursive: true, dereference: false, verbatimSymlinks: true });
+}
+
+function validSecurity(target, state) {
+  return (state.signing === 'unsigned' && state.notarized === false) ||
+    (target.platform === 'darwin' && state.signing === 'developer-id' && state.notarized === true);
 }
