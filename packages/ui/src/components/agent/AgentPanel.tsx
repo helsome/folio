@@ -106,6 +106,8 @@ export const AgentPanel: React.FC = () => {
   const bodyRef = useRef<HTMLDivElement>(null);
   const bodyEndRef = useRef<HTMLDivElement>(null);
   const shouldAutoScrollRef = useRef(true);
+  /** Guards against a second start before the run_started event flips isRunning. */
+  const sendingRef = useRef(false);
 
   const isRunning = runView !== null && runView.infraError === undefined;
 
@@ -143,12 +145,22 @@ export const AgentPanel: React.FC = () => {
     shouldAutoScrollRef.current = distanceFromBottom <= 24;
   };
 
-  const handleSend = async () => {
-    const text = input.trim();
-    if (!text || !activeSessionId || isRunning) return;
+  /**
+   * Start a run. `explicitText` is the message to send; without it the composer
+   * content is used. Suggestion cards pass their own text instead of calling
+   * `setInput()` and reading `input` back: React state does not update the
+   * closure of the render that is already executing, so the old path could send
+   * a stale draft — or nothing at all (#329).
+   */
+  const handleSend = async (explicitText?: string) => {
+    const text = (explicitText ?? input).trim();
+    if (!text || !activeSessionId || isRunning || sendingRef.current) return;
 
-    setInput('');
+    // Only the composer-owned path clears the composer; picking a suggestion
+    // must not discard text the user already typed.
+    if (explicitText === undefined) setInput('');
     setSendError(null);
+    sendingRef.current = true;
     // V9.1 §2: capture the ACTUAL context this live run starts with so the
     // run footer's trace can show it as 'Live' — never guessed later.
     setLastRun((previous) => ({
@@ -159,10 +171,17 @@ export const AgentPanel: React.FC = () => {
       toolCount: 0,
       workspaceContext,
     }));
-    const result = await client.kernel.startRun(activeSessionId, text, workspaceContext);
-    if (!result.ok) {
-      setSendError(result.error.message);
-      setInput(text);
+    try {
+      const result = await client.kernel.startRun(activeSessionId, text, workspaceContext);
+      if (!result.ok) {
+        setSendError(result.error.message);
+        // Keep the question the user actually tried to send available for a
+        // retry, without overwriting a draft typed while the request was in
+        // flight.
+        setInput((current) => (current.trim() === '' ? text : current));
+      }
+    } finally {
+      sendingRef.current = false;
     }
   };
 
@@ -307,12 +326,7 @@ export const AgentPanel: React.FC = () => {
           {quote && <QuoteCard quote={quote} />}
           {portfolio && <PortfolioRiskCard portfolio={portfolio} />}
           {messages.length === 0 && !isRunning && (
-            <SuggestionChips
-              onPick={(text) => {
-                setInput(text);
-                void handleSend();
-              }}
-            />
+            <SuggestionChips onPick={(text) => void handleSend(text)} />
           )}
           <MessageList messages={messages} isLoading={isRunning} />
           {isRunning && <StreamingBlock answer={runView?.answer ?? ''} />}
