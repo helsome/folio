@@ -149,13 +149,13 @@ Generated screenshots and JSON reports go to `apps/electron/e2e/artifacts/heatma
 
 The focused tests generate 100 fixture instruments and use the production
 service/cache/scheduler plus the renderer's actual D3 layout function. One
-recorded run loaded the cold fixture in 41.8ms and the warm fixture in 3.3ms:
+recorded run loaded the cold fixture in 43.3ms and the warm fixture in 0.8ms:
 100 quote fetches, 100 profile fetches and one status fetch in total, with four
 concurrent quote operations maximum and no additional warm-cache calls. Each
 fake quote intentionally waits 1ms. The 100-rectangle D3 layout took 0.9ms.
 
 The browser harness's `?count=100` mode renders 100 synthetic identities through
 the real React component; one warm Vite navigation-to-100-tiles measurement was
-292ms. These are reproducible fixture measurements, not live-provider latency
+196ms. These are reproducible fixture measurements, not live-provider latency
 or a production performance guarantee. The harness writes measured durations
 to `report.json` on every run.
