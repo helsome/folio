@@ -132,31 +132,50 @@ export const loadAlertsAtom = atom(null, async (_get, set, client: FinagentClien
   }
 });
 
-export const addAlertAtom = atom(
-  null,
-  async (get, set, input: { client: FinagentClient; rule: AlertRule }) => {
-    const rules = [...get(alertStateAtom).rules, input.rule];
-    set(alertStateAtom, (state) => ({ ...state, rules }));
-    await saveAlertRules(input.client, rules);
+/**
+ * Create / pause / delete all report whether the change was *persisted*, not
+ * just applied: an optimistic update that never reaches the store would tell
+ * the user a reminder is active while a restart silently loses it (#328).
+ * Every mutation therefore returns `true` only after `saveRules` succeeded and
+ * rolls the visible state back when it did not.
+ */
+export const addAlertAtom = atom(null, async (get, set, input: { client: FinagentClient; rule: AlertRule }) => {
+  const previousRules = get(alertStateAtom).rules;
+  const rules = [...previousRules, input.rule];
+  set(alertStateAtom, (state) => ({ ...state, rules }));
+  const saved = await saveAlertRules(input.client, rules);
+  if (!saved) {
+    set(alertStateAtom, (state) => ({ ...state, rules: previousRules }));
   }
-);
+  return saved;
+});
 
 export const removeAlertAtom = atom(
   null,
   async (get, set, input: { client: FinagentClient; ruleId: string }) => {
-    const rules = get(alertStateAtom).rules.filter((rule) => rule.id !== input.ruleId);
+    const previousRules = get(alertStateAtom).rules;
+    const rules = previousRules.filter((rule) => rule.id !== input.ruleId);
     set(alertStateAtom, (state) => ({ ...state, rules }));
-    await saveAlertRules(input.client, rules);
+    const saved = await saveAlertRules(input.client, rules);
+    if (!saved) {
+      set(alertStateAtom, (state) => ({ ...state, rules: previousRules }));
+    }
+    return saved;
   }
 );
 
 export const toggleAlertAtom = atom(
   null,
   async (get, set, input: { client: FinagentClient; ruleId: string }) => {
-    const rules = get(alertStateAtom).rules.map((rule) =>
+    const previousRules = get(alertStateAtom).rules;
+    const rules = previousRules.map((rule) =>
       rule.id === input.ruleId ? { ...rule, enabled: !rule.enabled } : rule
     );
     set(alertStateAtom, (state) => ({ ...state, rules }));
-    await saveAlertRules(input.client, rules);
+    const saved = await saveAlertRules(input.client, rules);
+    if (!saved) {
+      set(alertStateAtom, (state) => ({ ...state, rules: previousRules }));
+    }
+    return saved;
   }
 );

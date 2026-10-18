@@ -15,6 +15,10 @@ export const alerts = {
   removeAlert: 'Remove alert',
   createAlert: 'Create Alert',
   editAlert: 'Edit Alert',
+  persistFailedCreate:
+    'The alert could not be saved, so it is not active. Your draft is still here — try again.',
+  persistFailedToggle: 'The alert status could not be saved. The previous state was restored.',
+  persistFailedRemove: 'The alert could not be deleted. It was restored to the list.',
   status: {
     active: 'Active',
     triggered: 'Triggered',
@@ -50,6 +54,7 @@ export const alerts = {
     maxWeight: 'Max Weight %',
     drawdownThreshold: 'Drawdown Threshold %',
     create: 'Create Alert',
+    saving: 'Saving…',
     symbolRequired: 'Symbol is required',
     symbolInvalid: 'Invalid format. Use: AAPL.US, 0700.HK',
     targetPricePositive: 'Enter a positive target price',

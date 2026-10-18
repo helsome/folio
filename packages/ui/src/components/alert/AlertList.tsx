@@ -30,6 +30,12 @@ export const AlertList: React.FC<{ initialSymbol?: string }> = ({ initialSymbol 
   const [formSymbol, setFormSymbol] = useState(initialSymbol);
   const [query, setQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'paused'>('all');
+  /** A create whose `saveRules` has not resolved yet — blocks duplicate submits. */
+  const [submitting, setSubmitting] = useState(false);
+  /** Create failure; the dialog stays open so the draft can be retried. */
+  const [submitError, setSubmitError] = useState<string | null>(null);
+  /** Pause/delete failure; the atom already restored the previous state. */
+  const [persistError, setPersistError] = useState<string | null>(null);
 
   useEffect(() => {
     setFormSymbol(initialSymbol);
@@ -39,9 +45,42 @@ export const AlertList: React.FC<{ initialSymbol?: string }> = ({ initialSymbol 
     loadAlerts(client);
   }, [client, loadAlerts]);
 
-  const handleCreateAlert = (draft: AlertRuleDraft) => {
-    addAlert({ client, rule: buildAlertRule(draft) });
-    setShowForm(false);
+  const handleCreateAlert = async (draft: AlertRuleDraft) => {
+    if (submitting) return;
+    setSubmitting(true);
+    setSubmitError(null);
+    try {
+      // Close the dialog only once the rule is actually persisted (#328):
+      // otherwise the user believes the reminder is armed and a restart loses it.
+      const saved = await addAlert({ client, rule: buildAlertRule(draft) });
+      if (saved) {
+        setShowForm(false);
+      } else {
+        setSubmitError(t('alerts.persistFailedCreate'));
+      }
+    } catch (error) {
+      setSubmitError(error instanceof Error ? error.message : t('alerts.persistFailedCreate'));
+    } finally {
+      setSubmitting(false);
+    }
+  };
+
+  const handleToggleAlert = async (ruleId: string) => {
+    setPersistError(null);
+    const saved = await toggleAlert({ client, ruleId });
+    if (!saved) setPersistError(t('alerts.persistFailedToggle'));
+  };
+
+  const handleRemoveAlert = async (ruleId: string) => {
+    setPersistError(null);
+    const saved = await removeAlert({ client, ruleId });
+    if (!saved) setPersistError(t('alerts.persistFailedRemove'));
+  };
+
+  /** Opening the dialog always starts from a clean failure state. */
+  const openForm = () => {
+    setSubmitError(null);
+    setShowForm(true);
   };
 
   const normalizedQuery = query.trim().toLowerCase();
@@ -64,7 +103,7 @@ export const AlertList: React.FC<{ initialSymbol?: string }> = ({ initialSymbol 
               {t('alerts.count', { count: state.rules.length })}
             </div>
           </div>
-          <Button size="sm" onClick={() => setShowForm(true)}>
+          <Button size="sm" onClick={openForm}>
             {t('alerts.new')}
           </Button>
         </div>
@@ -96,6 +135,16 @@ export const AlertList: React.FC<{ initialSymbol?: string }> = ({ initialSymbol 
       </div>
 
       <div className="flex-1 space-y-3 overflow-y-auto p-3">
+        {persistError && (
+          <div
+            role="alert"
+            data-testid="alerts-persist-error"
+            className="rounded-[10px] border border-destructive/26 bg-destructive/6 px-3 py-2 text-[12px] text-destructive"
+          >
+            {persistError}
+          </div>
+        )}
+
         {state.loading && (
           <div className="rounded-[10px] border border-border bg-surface-raised px-4 py-10 text-center text-[12px] text-foreground/45">
             {t('alerts.loading')}
@@ -105,7 +154,7 @@ export const AlertList: React.FC<{ initialSymbol?: string }> = ({ initialSymbol 
         {!state.loading && state.rules.length === 0 && state.events.length === 0 && (
           <div className="rounded-[10px] border border-dashed border-border bg-surface-raised px-4 py-10 text-center text-[12px] text-foreground/45">
             <p>{t('alerts.noAlerts')}</p>
-            <Button size="sm" onClick={() => setShowForm(true)} className="mt-2">
+            <Button size="sm" onClick={openForm} className="mt-2">
               {t('alerts.createFirst')}
             </Button>
           </div>
@@ -121,8 +170,8 @@ export const AlertList: React.FC<{ initialSymbol?: string }> = ({ initialSymbol 
           <AlertCard
             key={rule.id}
             rule={rule}
-            onToggle={() => toggleAlert({ client, ruleId: rule.id })}
-            onRemove={() => removeAlert({ client, ruleId: rule.id })}
+            onToggle={() => void handleToggleAlert(rule.id)}
+            onRemove={() => void handleRemoveAlert(rule.id)}
           />
         ))}
 
@@ -147,11 +196,13 @@ export const AlertList: React.FC<{ initialSymbol?: string }> = ({ initialSymbol 
         )}
       </div>
 
-      <Dialog open={showForm} onClose={() => setShowForm(false)}>
+      <Dialog open={showForm} onClose={() => { if (!submitting) setShowForm(false); }}>
         <AlertForm
           key={formSymbol || 'generic'}
           symbol={formSymbol}
-          onSubmit={handleCreateAlert}
+          pending={submitting}
+          error={submitError}
+          onSubmit={(draft) => void handleCreateAlert(draft)}
           onCancel={() => setShowForm(false)}
         />
       </Dialog>
