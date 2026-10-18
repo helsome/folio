@@ -60,6 +60,26 @@ export const watchlistLatestTimestampAtom = atom<number | undefined>((get) => {
   return latest;
 });
 
+/**
+ * Actual quote-source summary across loaded watchlist quotes (#332): distinct
+ * provider names from routing provenance, plus whether any quote is delayed.
+ * Quotes without provenance contribute nothing — the header must not fall
+ * back to an assumed provider name.
+ */
+export const watchlistProviderSummaryAtom = atom<{ names: string[]; delayed: boolean }>((get) => {
+  const watchlist = get(watchlistAtom);
+  const names = new Set<string>();
+  let delayed = false;
+  for (const symbol of watchlist) {
+    const provenance = get(quoteCacheAtomFamily(symbol)).data?.provenance;
+    if (!provenance) continue;
+    if (provenance.delayed) delayed = true;
+    const name = provenance.providerName ?? provenance.providerId;
+    if (name) names.add(name);
+  }
+  return { names: [...names], delayed };
+});
+
 // Add symbol to watchlist
 export const addToWatchlistAtom = atom(
   null,

@@ -11,6 +11,7 @@ import type {
   Quote,
   StaticInfo,
 } from '@finagent/core';
+import type { CapabilityFetchResult } from '../capabilities/fetchers.ts';
 import type {
   CalendarEvent,
   CapitalFlow,
@@ -62,6 +63,12 @@ export interface MarketDataServiceOptions {
 
 export interface MarketDataFetchers {
   getQuote: (symbol: string) => Promise<Quote>;
+  /**
+   * Provenance-aware quote fetch (router-backed). When present, `getQuote`
+   * prefers it and stamps the returned quote with the actual provider routing
+   * provenance; raw `getQuote` erases routing and leaves the source unknown.
+   */
+  getQuoteResult?: (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<Quote>>;
   getKline: (options: GetKlineOptions) => Promise<Kline[]>;
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
   getPortfolio: () => Promise<PortfolioSnapshot>;
@@ -138,8 +145,15 @@ export class MarketDataService {
     this.now = options.now ?? Date.now;
   }
 
-  getQuote(symbol: string) {
-    return this.cached(`quote:${symbol}`, this.quoteTTL, () => this.fetchers.getQuote(symbol));
+  getQuote(symbol: string): Promise<Quote> {
+    return this.cached(`quote:${symbol}`, this.quoteTTL, async () => {
+      const quoteResult = this.fetchers.getQuoteResult;
+      if (quoteResult) {
+        const fetched = await quoteResult(symbol);
+        return { ...fetched.data, provenance: fetched.provenance };
+      }
+      return this.fetchers.getQuote(symbol);
+    });
   }
 
   getKline(options: GetKlineOptions) {

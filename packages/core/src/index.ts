@@ -3,6 +3,7 @@
 import type { SupportedLocale } from './locale.ts';
 import type { FinancialEvidenceEnvelope } from './financial-evidence.ts';
 import type { MarketSource } from './market-data.ts';
+import type { ProviderProvenance } from './provider.ts';
 
 export type { SupportedLocale, LocalePreference } from './locale.ts';
 
@@ -24,6 +25,14 @@ export interface Quote {
   prevClose: number;
   /** Provider that produced this quote, when the router fetcher stamped it. */
   source?: MarketSource;
+  /**
+   * Full routing provenance of the fetch, present only when the fetch path
+   * preserved it (router-backed fetchers): actual provider with failover
+   * trail, retrieval/market times and stale state. Complements `source` —
+   * consumers that need only a display name read `source`; traceability
+   * consumers read this and must show unknown when absent.
+   */
+  provenance?: ProviderProvenance;
 }
 
 export interface Position {

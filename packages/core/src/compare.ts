@@ -3,11 +3,21 @@
  * data. Cells that have no data are explicit (`missing: true`), never inferred.
  */
 
+import type { CapabilityProvenance } from './capability.ts';
+
 export interface ComparisonCell {
   value?: string | number;
   /** Formatted value for display; "—" when missing. */
   display: string;
   missing: boolean;
+  /**
+   * Provenance of the capability result this cell was built from — the same
+   * record that produced `value`, never re-stamped. Absent when the producing
+   * run carried no provenance; consumers must show `unknown`, not assume a
+   * provider. A mixed table therefore keeps per-cell sources instead of one
+   * table-level badge.
+   */
+  provenance?: CapabilityProvenance;
 }
 
 export interface ComparisonRow {
