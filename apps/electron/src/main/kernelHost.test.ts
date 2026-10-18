@@ -6,6 +6,8 @@ let lastKernelOptions: Record<string, unknown> | null = null;
 let lastMarketData: FakeMarketDataService | null = null;
 let lastAutomationContext: unknown = null;
 let forwardedEvents: unknown[] = [];
+// Providers the mocked ProviderRouter reports as registered (default: none).
+let routerProviderList: Array<Record<string, unknown>> = [];
 const routerFetchers = { getQuote: async () => ({ symbol: 'AAPL.US' }) };
 
 class FakeMarketDataService {
@@ -86,6 +88,8 @@ class FakeAgentKernel {
 mock.module('electron', () => ({
   app: {
     getPath: () => '/tmp/finagent-test',
+    getVersion: () => '0.0.0-test',
+    isPackaged: false,
   },
   safeStorage: {
     isEncryptionAvailable: () => true,
@@ -177,7 +181,7 @@ mock.module('@finagent/shared', () => ({
     register = () => undefined;
     setRouting = () => undefined;
     get = () => undefined;
-    list = () => [];
+    list = () => routerProviderList;
     coverage = () => [];
   },
   ConnectionStore: class {
@@ -352,6 +356,7 @@ beforeEach(() => {
   lastMarketData = null;
   lastAutomationContext = null;
   forwardedEvents = [];
+  routerProviderList = [];
 });
 
 afterEach(() => {
@@ -433,6 +438,36 @@ describe('AgentKernelHost', () => {
     await expect(host.startRun({ sessionId: '', content: 'x' })).rejects.toMatchObject({
       code: 'INVALID_ARGUMENT',
     });
+    host.dispose();
+  });
+
+  it('reports the broker as disconnected when the broker has no signed-in account', async () => {
+    routerProviderList = [
+      {
+        id: 'longbridge-broker',
+        kind: 'broker-account',
+        accounts: async () => ({ ok: false, error: { code: 'AUTH_EXPIRED' } }),
+      },
+    ];
+    const host = new AgentKernelHost();
+
+    const bundle = await host.collectDiagnostics();
+    expect(bundle.providers.broker).toEqual({ connected: false, accountCount: 0 });
+    host.dispose();
+  });
+
+  it('reports the connected broker account count from the broker itself', async () => {
+    routerProviderList = [
+      {
+        id: 'longbridge-broker',
+        kind: 'broker-account',
+        accounts: async () => ({ ok: true, data: [{ id: 'acct-1', name: 'Default (acct-1)' }] }),
+      },
+    ];
+    const host = new AgentKernelHost();
+
+    const bundle = await host.collectDiagnostics();
+    expect(bundle.providers.broker).toEqual({ connected: true, accountCount: 1 });
     host.dispose();
   });
 
