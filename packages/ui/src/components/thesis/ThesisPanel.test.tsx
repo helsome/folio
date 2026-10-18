@@ -140,7 +140,7 @@ it('re-evaluates the thesis the user clicked and updates that card', async () =>
     },
   });
   try {
-    const button = [...container.querySelectorAll('button')].find((el) =>
+    const button = Array.from(container.querySelectorAll('button')).find((el) =>
       (el.textContent ?? '').includes('Re-evaluate')
     );
     expect(button).toBeDefined();
