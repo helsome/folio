@@ -1,5 +1,6 @@
+import { execFileSync } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'bun:test';
-import { mkdtempSync, rmSync, writeFileSync, readFileSync } from 'node:fs';
+import { mkdtempSync, mkdirSync, rmSync, writeFileSync, readFileSync, readlinkSync, symlinkSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { installerName, stageManifest, targets, targetFor, validateVersion, verifyRelease } from './release-lib.mjs';
@@ -22,6 +23,27 @@ function fixture() {
   return dir;
 }
 describe('release gates', () => {
+  it('preserves framework relative symlinks after the DMG source is removed', () => {
+    const dir = mkdtempSync(join(tmpdir(), 'folio-framework-test-')); dirs.push(dir);
+    const source = join(dir, 'mount', 'Folio.app');
+    const installed = join(dir, 'installed', 'Folio.app');
+    const frameworkPath = 'Contents/Frameworks/Electron Framework.framework';
+    const framework = join(source, frameworkPath);
+    mkdirSync(join(framework, 'Versions', 'A'), { recursive: true });
+    writeFileSync(join(framework, 'Versions', 'A', 'Electron Framework'), 'framework-binary');
+    symlinkSync('A', join(framework, 'Versions', 'Current'), 'dir');
+    symlinkSync('Versions/Current/Electron Framework', join(framework, 'Electron Framework'), 'file');
+    // The real installer verifier runs under Node, so test Node's cp semantics too.
+    const moduleUrl = new URL('./release-lib.mjs', import.meta.url).href;
+    execFileSync('node', ['--input-type=module', '-e',
+      `import { copyMacApp } from ${JSON.stringify(moduleUrl)}; copyMacApp(process.argv[1], process.argv[2]);`,
+      source, installed]);
+    rmSync(join(dir, 'mount'), { recursive: true });
+    const copied = join(installed, frameworkPath);
+    expect(readlinkSync(join(copied, 'Versions', 'Current'))).toBe('A');
+    expect(readlinkSync(join(copied, 'Electron Framework'))).toBe('Versions/Current/Electron Framework');
+    expect(readFileSync(join(copied, 'Electron Framework'), 'utf8')).toBe('framework-binary');
+  });
   it('rejects tag/version mismatch and unsupported native targets', () => {
     expect(validateVersion(version, version, `v${version}`)).toBe(version);
     expect(() => validateVersion(version, '0.4.0-beta.2')).toThrow();

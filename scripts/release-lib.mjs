@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
+import { cpSync, readFileSync, readdirSync, statSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 
 export const targets = [
@@ -53,4 +53,9 @@ export function verifyRelease(dir, version, buildSha) {
   });
   writeFileSync(join(dir, 'SHA256SUMS.txt'), manifests.map((m) => `${m.sha256}  ${m.installer}`).join('\n') + '\n');
   return manifests;
+}
+
+export function copyMacApp(source, destination) {
+  // Preserve framework links exactly so they remain valid after detaching the DMG.
+  cpSync(source, destination, { recursive: true, dereference: false, verbatimSymlinks: true });
 }

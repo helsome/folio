@@ -68,3 +68,16 @@ installers. Product E2E assertions were retained rather than removed or made adv
   until it is available. No fake demo success is substituted.
 - Independent review, Ready/merge decision, new beta.3 tag and complete prerelease.
   No tag or release was created by this task. No DMG/EXE success is claimed.
+
+## Independent review follow-up: macOS framework symlinks
+
+The Node copy operation previously rewrote relative framework symlinks to absolute
+paths under the DMG mount. A Node subprocess regression fixture reproduced the
+failure (8 pass / 1 fail), then passed after preserving links with
+`verbatimSymlinks: true`. The fixture removes the entire source mount directory
+before checking both unchanged link targets and reading the installed framework.
+
+- `bun test --isolate scripts/release.test.ts`: 9 pass / 0 fail, 20 assertions.
+- `bun test --isolate`: 1968 pass / 7 skip / 0 fail, 215 files.
+- `node --check scripts/verify-installer.mjs`, source secret scan and diff check: clean.
+- Native DMG mounting and application startup remain unexecuted pending Actions.

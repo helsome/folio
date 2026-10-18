@@ -2,11 +2,11 @@
 // Mount/install the actual distributable, inspect it, and test that installed copy.
 import { execFileSync } from 'node:child_process';
 import { createRequire } from 'node:module';
-import { cpSync, existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { installerName, sha256, targetFor } from './release-lib.mjs';
+import { copyMacApp, installerName, sha256, targetFor } from './release-lib.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const appRoot = join(root, 'apps/electron');
 const target = targetFor(process.platform, process.arch);
@@ -27,7 +27,7 @@ try {
     run('hdiutil', ['verify', installer]);
     const mount = join(work, 'mount');
     run('hdiutil', ['attach', '-readonly', '-nobrowse', '-mountpoint', mount, installer]);
-    try { cpSync(join(mount, 'Folio.app'), join(installDir, 'Folio.app'), { recursive: true, dereference: false }); }
+    try { copyMacApp(join(mount, 'Folio.app'), join(installDir, 'Folio.app')); }
     finally { run('hdiutil', ['detach', mount]); }
     binary = join(installDir, 'Folio.app/Contents/MacOS/Folio');
     resources = join(installDir, 'Folio.app/Contents/Resources');
