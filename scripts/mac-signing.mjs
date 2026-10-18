@@ -41,3 +41,16 @@ export function verifyMacSigning(appPath, expectedTeam, execute = capturedComman
   run('spctl', ['--assess', '--type', 'execute', appPath]);
   return { signing: 'developer-id', notarized: true };
 }
+
+export function verifyMacAdhoc(appPath, execute = capturedCommand) {
+  let details;
+  try {
+    execute('codesign', ['--verify', '--deep', '--strict', appPath], { encoding: 'utf8', stdio: 'pipe', timeout: 120_000 });
+    details = execute('codesign', ['--display', '--verbose=4', appPath], { encoding: 'utf8', stdio: 'pipe', timeout: 120_000 });
+  } catch { throw new Error('macOS ad-hoc code integrity verification failed; tool output suppressed'); }
+  if (singleField(details, 'Signature') !== 'adhoc' || singleField(details, 'Identifier') !== 'com.finagent.app' ||
+      singleField(details, 'TeamIdentifier') !== 'not set' || /^Authority=/m.test(details)) {
+    throw new Error('Expected ad-hoc signature without a Developer ID publisher identity');
+  }
+  return { signing: 'ad-hoc', notarized: false };
+}

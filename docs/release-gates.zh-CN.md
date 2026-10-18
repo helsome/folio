@@ -138,13 +138,10 @@
 
 ## 签名策略
 
-- 无 Apple 凭证 → 未签名的 `internal` 构建，标记为 NOT RELEASEABLE
-- `beta`/`stable` 通道要求 CI 中配置签名 + 公证（凭密钥保护）；缺少它们时
-  流水线不得产出“release”。
+按用户最新授权，内部预览采用 macOS ad-hoc 签名和 Windows 构建期临时自签名证书，
+验证代码完整性，不宣称可信发行者；macOS 无 Apple 公证。私钥只在进程内存中存在，
+不得保存或导出，也不向任何系统信任库安装证书，不指导绕过安全提示。
 
-## 原生桌面发布补充
-
-Apple Silicon / Intel DMG 与 Windows x64 NSIS EXE 的构建、安装验证和操作步骤见
-[桌面发布流程](desktop-release.md)。全部发布门禁通过后，未签名 `internal` 构建仅可作为明确标注的
-GitHub prerelease 分发；不得宣称稳定版、可信签名版或已公证。缺外部数据条件时发布保持阻塞，
-不得改用 demo 数据伪造真实门禁通过。
+自签名决定不放宽安装启动、真实外部数据与产品测试门禁。全部门禁成功后仅允许明确标注的
+internal GitHub prerelease。原有正式 Apple 签名/公证保留为手动选择的可选路径，
+不是本次发布的前提。详见 [桌面发布流程](desktop-release.md)。

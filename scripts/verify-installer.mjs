@@ -6,8 +6,9 @@ import { existsSync, mkdtempSync, readFileSync, readdirSync, rmSync, writeFileSy
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { verifyMacSigning } from './mac-signing.mjs';
+import { verifyMacSigning, verifyMacAdhoc } from './mac-signing.mjs';
 import { releaseProviderEnv, withoutReleaseSecrets, checkReleaseProvider } from './release-provider.mjs';
+import { windowsSelfSignature } from './windows-signing.mjs';
 import { copyMacApp, installerName, sha256, targetFor } from './release-lib.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const appRoot = join(root, 'apps/electron');
@@ -22,6 +23,8 @@ const installDir = join(work, 'installed');
 let binary, resources;
 let signatureVerification = 'not-applicable';
 let notarizationVerification = 'not-applicable';
+let publisherTrust = 'not-trusted';
+let certificateSha256;
 function run(command, args, options = {}) {
   return execFileSync(command, args, { stdio: 'inherit', cwd: tmpdir(), timeout: 600_000, ...options });
 }
@@ -35,13 +38,18 @@ try {
     finally { run('hdiutil', ['detach', mount]); }
     if (manifest.signing === 'developer-id') {
       verifyMacSigning(join(installDir, 'Folio.app'));
-      signatureVerification = 'passed'; notarizationVerification = 'passed';
+      signatureVerification = 'passed'; notarizationVerification = 'passed'; publisherTrust = 'developer-id';
+    } else {
+      verifyMacAdhoc(join(installDir, 'Folio.app'));
+      signatureVerification = 'passed';
     }
     binary = join(installDir, 'Folio.app/Contents/MacOS/Folio');
     resources = join(installDir, 'Folio.app/Contents/Resources');
     const arch = execFileSync('lipo', ['-archs', binary], { encoding: 'utf8' }).trim();
     if (arch !== (target.arch === 'x64' ? 'x86_64' : 'arm64')) throw new Error(`Wrong Mach-O architecture: ${arch}`);
   } else {
+    const verified = windowsSelfSignature('verify', installer, manifest.certificateSha256);
+    signatureVerification = 'passed'; certificateSha256 = verified.certificateSha256;
     // /D must be the LAST NSIS argument. Silent per-user installation, not extraction.
     run(installer, ['/S', '/currentuser', `/D=${installDir}`]);
     binary = join(installDir, 'Folio.exe');
@@ -85,7 +93,7 @@ try {
   }
   writeFileSync(join(staging, `verified-${target.platform}-${target.arch}.json`), JSON.stringify({
     platform: target.platform, arch: target.arch, buildSha: manifest.buildSha, installerSha256: manifest.sha256,
-    signatureVerification, notarizationVerification,
+    signatureVerification, notarizationVerification, publisherTrust, ...(certificateSha256 ? { certificateSha256 } : {}),
     installerSmoke: 'passed', freshInstall: 'passed', goldenPath: releaseGates ? 'passed' : 'not-run', v5: releaseGates ? 'passed' : 'not-run', skillCount,
   }, null, 2) + '\n');
 } finally {

@@ -30,6 +30,7 @@ export function stageManifest(dir, version, target, buildSha, security = { signi
   const name = installerName(version, target);
   if (!statSync(join(dir, name)).isFile() || statSync(join(dir, name)).size === 0) throw new Error('Missing/empty installer');
   const manifest = { version, buildSha, platform: target.platform, arch: target.arch, signing: security.signing, notarized: security.notarized,
+    ...(security.certificateSha256 ? { certificateSha256: security.certificateSha256 } : {}),
     installer: name, sha256: sha256(join(dir, name)) };
   writeFileSync(join(dir, `manifest-${target.platform}-${target.arch}.json`), JSON.stringify(manifest, null, 2) + '\n');
   writeFileSync(join(dir, `SHA256SUMS-${target.platform}-${target.arch}.txt`), `${manifest.sha256}  ${name}\n`);
@@ -49,7 +50,8 @@ export function verifyRelease(dir, version, buildSha) {
     const evidence = JSON.parse(readFileSync(join(dir, `verified-${t.platform}-${t.arch}.json`), 'utf8'));
     if (evidence.buildSha !== buildSha || evidence.installerSha256 !== m.sha256 || evidence.arch !== t.arch ||
         evidence.platform !== t.platform || evidence.installerSmoke !== 'passed' || evidence.freshInstall !== 'passed' ||
-        evidence.goldenPath !== 'passed' || evidence.v5 !== 'passed' ||
+        evidence.goldenPath !== 'passed' || evidence.v5 !== 'passed' || evidence.signatureVerification !== 'passed' ||
+        (m.signing === 'self-signed' && (evidence.publisherTrust !== 'not-trusted' || evidence.certificateSha256 !== m.certificateSha256)) ||
         (m.signing === 'developer-id' && (evidence.signatureVerification !== 'passed' || evidence.notarizationVerification !== 'passed'))) throw new Error(`Missing native validation: ${name}`);
     return m;
   });
@@ -63,6 +65,7 @@ export function copyMacApp(source, destination) {
 }
 
 function validSecurity(target, state) {
-  return (state.signing === 'unsigned' && state.notarized === false) ||
+  return (target.platform === 'darwin' && state.signing === 'ad-hoc' && state.notarized === false) ||
+    (target.platform === 'win32' && state.signing === 'self-signed' && state.notarized === false && /^[a-f0-9]{64}$/.test(state.certificateSha256 || '')) ||
     (target.platform === 'darwin' && state.signing === 'developer-id' && state.notarized === true);
 }

@@ -134,3 +134,45 @@ Follow-up local verification (same Linux/Bun/Node environment):
 - `bun test --isolate`: **1979 pass / 7 skip / 0 fail**, 215 files.
 - Workflow schemas, Node syntax, secret scan and diff checks passed. Native evidence
   is still pending. PR remains Draft; no enable retry, tag or release was performed.
+
+## User-authorized self-signing update
+
+The user explicitly accepted self-signing. The trust requirement changed; native
+installation/startup, real Longbridge preflight, golden/v5 and complete-asset release
+gates did not. Default macOS signing is now ad-hoc on both arm64 and x64, verified
+before staging and after DMG copy. Formal Developer ID/notarization remains available
+through explicit optional manual input, not a prerequisite for this preview.
+
+Windows now generates a temporary .NET CertificateRequest code-signing certificate
+and RSA key in memory, checks `RSACng.Key.IsEphemeral`, signs the final installer,
+and disposes key/certificate. No PFX/PEM export, key/certificate store import, root
+trust change, execution-policy override, or persistent-key fallback is present.
+Embedded CMS cryptographic signature and native SIP PE content digest must both
+verify, a section-byte tamper copy must fail, the normal trust result must remain
+NotTrusted, and the public signer fingerprint must match the manifest at installation.
+A trust error alone is never accepted as proof of content integrity.
+
+Local verification:
+
+- `bun test --isolate scripts/release.test.ts`: **25 pass / 0 fail**, 79 assertions.
+- `bun test --isolate`: **1984 pass / 7 skip / 0 fail**, 215 files.
+- PowerShell 7.4.19 extracted into `/tmp` from Microsoft's package repository:
+  PowerShell Parser accepted `scripts/windows/self-sign.ps1`; `Add-Type` compiled
+  `AuthenticodeIntegrity.cs`. This is syntax/compile evidence only, not execution of
+  Windows native APIs or proof that ephemeral native signing succeeds.
+- Node syntax, workflow schemas, tracked-source secret scan and diff checks passed.
+- All native signing, DMG/EXE building, tamper rejection and installed-app startup
+  remain pending real macOS/Windows Actions execution. Mock reports are not artifacts.
+
+One enable retry was made under the user's new explicit authorization. It still
+failed during metadata GET, before an enable PUT:
+`Get "https://api.github.com/repos/helsome/folio/actions/workflows/pr.yml": Forbidden`.
+A separate unauthenticated public repo request returned `CONNECT tunnel failed,
+response 403`, HTTP status `000`, proving the shell API path is proxy/transport-blocked.
+`gh auth status` also reported the current GH_TOKEN invalid; because API connectivity
+is blocked, actual GitHub-side token/workflow permissions cannot be established here.
+The observed workflow page remained Disabled. No alternative identity, new persistent
+credential, permission change or repeated enable retry was used. Minimum user action:
+open the PR checks Actions page using an existing authorized GitHub browser session,
+choose Enable workflow, then trigger the Draft PR via synchronize/reopen. The
+connector still lacks workflow-enable/dispatch tools; it remains usable for commits/PR.

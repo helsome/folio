@@ -61,35 +61,50 @@ independent; its missing provider/judge prerequisites are not a code-CI pass.
 
 ## Signing and publication
 
-Build-only PR/main runs produce **unsigned internal previews**. macOS Apple Silicon
-gets the required ad-hoc signature; this is not a verified publisher identity.
-Windows has no Authenticode integration and remains explicitly unsigned.
-No stable/signed Windows release is claimed; Gatekeeper/SmartScreen may block unsigned
-downloads. Never disable or bypass system security.
+The user authorized self-signing for this preview. It changes the publisher-trust
+requirement only: installation, startup, real provider and product gates remain required.
 
-Trusted tag/manual releases (macOS jobs only) preserve the repository's existing optional Apple path:
+By default **both macOS architectures** use ad-hoc signing (`identity=-`). Before
+staging and again after copying the actual DMG, `codesign --verify --deep --strict`
+checks code integrity and captured signing metadata must show `Signature=adhoc`, the
+Folio bundle identifier and no Developer ID team/authority. This is **not Developer ID
+signing** and has **no Apple notarization**. It does not establish a trusted publisher.
+
+Windows uses a temporary RSA code-signing certificate created with .NET
+`CertificateRequest` entirely in the signing process. The key must report
+`RSACng.Key.IsEphemeral`; the workflow never exports PFX/PEM, writes a private key,
+imports a certificate into any personal/root/trusted-publisher store, or changes OS
+trust/execution policy. The certificate and key are disposed immediately after use.
+`Set-AuthenticodeSignature` signs the final NSIS EXE with SHA256 and embeds only the
+public signer certificate. If native signing cannot use the ephemeral key, the build
+fails; there is no persistent-key fallback.
+
+Windows integrity verification is independent of trust: .NET `SignedCms.CheckSignature`
+validates the embedded CMS signature and the native Windows
+[CryptSIPVerifyIndirectData](https://learn.microsoft.com/en-us/windows/win32/api/mssip/nf-mssip-cryptsipverifyindirectdata)
+validates the actual PE content digest. A tampered section-byte copy must be rejected
+before staging. Normal Authenticode verification must still report `NotTrusted`;
+that trust error is **never** used as evidence of integrity. The signer public
+certificate SHA256 fingerprint is stored in the manifest and checked again against
+the distributed EXE before installation. The embedded main executable is covered by
+the installer payload; this change does not claim a separate trusted signature on it.
+
+Gatekeeper/SmartScreen may block these downloads. Generated-file runner smoke tests
+verify installation/startup, not trust of an internet-downloaded application. Do not
+install a root certificate, disable quarantine, or bypass system security prompts.
+
+The existing optional formal Apple path remains available only for trusted macOS
+release jobs, via explicit manual input `formal_apple_signing=true` (default false):
 `APPLE_CERTIFICATE_BASE64`, `APPLE_CERT_PASSWORD`, `APPLE_ID`,
-`APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. These are the prior secret names;
-no values, secrets or credential grants are created/configured by this change.
-No Apple secrets means unsigned internal output. A partially configured set fails
-with missing **names** rather than silently claiming signing. A complete set is
-available only to the electron-builder child, which imports the existing certificate,
-requires Developer ID signing, hardened runtime and notarization. The general build
-commands and installed-app tests do not receive these signing credentials.
+`APPLE_APP_SPECIFIC_PASSWORD`, `APPLE_TEAM_ID`. Existing Apple secrets are neither
+required nor injected for this default self-signed release. Formal signing still
+requires complete existing credentials, exact Developer ID/Team verification,
+`codesign`, `stapler` and `spctl` verification before staging and after DMG installation.
+It never silently falls back after an attempted formal-signing failure.
 
-Presence of secrets is never evidence of successful signing. Before staging a signed
-manifest, verify `codesign --verify --deep --strict`, the Developer ID designated
-requirement and expected team, `xcrun stapler validate`, and `spctl --assess --type execute`.
-After copying from the actual DMG with unchanged relative symlinks, repeat output
-verification against the installed app before recording a passing report. The final
-asset verifier rejects signed manifests without installed signature/notarization
-verification evidence. Any failure fails the native job; no unsigned fallback occurs
-after an attempted signing/notarization failure. The DMG contains the verified signed
-app; no separate DMG-container signature claim is made.
-
-Because Windows remains unsigned and the version is beta, complete releases are still
-internal **prereleases**, never marked latest. Release notes report each target's
-actual manifest signing/notarization result.
+Complete preview releases remain internal **prereleases**, never marked latest.
+Release notes report each target's actual ad-hoc/self-signed/formal signing and
+notarization results. Self-signing proves integrity, not a trusted publisher identity.
 
 Build jobs have `contents: read`. Only the final publish job has `contents: write`.
 After ALL quality and native gates succeed, it downloads the current run's three
@@ -152,7 +167,16 @@ does not change a selected branch into a tag. A branch dispatch at the identical
 commit is rejected in preflight and cannot complete release. Standalone `desktop.yml`
 build-only dispatch on `main` remains separate and never publishes.
 
-The cloud task's shell `gh` token was invalid and direct git push had no credential;
+The latest authorized enable retry failed during the metadata GET, before any enable
+PUT: `Get "https://api.github.com/repos/helsome/folio/actions/workflows/pr.yml": Forbidden`.
+An unauthenticated public API probe also failed with `CONNECT tunnel failed, response
+403` and HTTP status `000`: the local proxy/transport blocked API connectivity, so no
+GitHub permission rejection can be established from this error. `gh auth status`
+separately reported the current GH_TOKEN as invalid; no alternate identity was used.
+The PR workflow's live page still showed Disabled. Stop retrying this path; the minimum
+user action is to open the PR checks Actions page in an existing authorized GitHub
+session, choose Enable workflow, then trigger a normal PR synchronize/reopen event.
+Direct git push has no shell credential;
 the connected GitHub API can create branch/commit/PR but exposes no enable/dispatch/
 release-create operation. A maintainer must perform the above actions through an
 existing session.
@@ -165,4 +189,4 @@ If absent, this task stops at build artifacts: selecting/authorizing credential 
 is a separate user action, not something this workflow fabricates. Do not supply new
 credentials in PR comments or conversation. Optional Apple configuration uses only the
 five existing secret names listed above. The preflight is the definitive availability
-check; neither the secret name in YAML nor local unit fixtures proves authentication. No credential values were printed, generated or stored.
+check; neither the secret name in YAML nor local unit fixtures proves authentication. No service credential values were printed and no persistent credentials were created.

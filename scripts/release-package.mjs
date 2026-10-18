@@ -5,7 +5,8 @@ import { copyFileSync, mkdirSync, readdirSync, readFileSync, rmSync } from 'node
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
-import { appleKeys, appleSigningEnabled, verifyMacSigning } from './mac-signing.mjs';
+import { appleKeys, appleSigningEnabled, verifyMacSigning, verifyMacAdhoc } from './mac-signing.mjs';
+import { windowsSelfSignature } from './windows-signing.mjs';
 import { installerName, stageManifest, targetFor, validateVersion } from './release-lib.mjs';
 const root = join(dirname(fileURLToPath(import.meta.url)), '..');
 const app = join(root, 'apps/electron');
@@ -35,17 +36,20 @@ if (signing) {
   builderEnv.CSC_KEY_PASSWORD = process.env.APPLE_CERT_PASSWORD;
   builderEnv.CSC_IDENTITY_AUTO_DISCOVERY = 'true';
   signingArgs.push('--config.mac.identity=', '--config.forceCodeSigning=true', '--config.mac.notarize=true', '--config.mac.hardenedRuntime=true');
-} else if (target.platform === 'darwin' && target.arch === 'arm64') {
-  // Apple Silicon requires an ad-hoc code signature; this is not a publisher identity.
-  signingArgs.push('--config.mac.identity=-');
+} else if (target.platform === 'darwin') {
+  // Both Mac architectures use verified ad-hoc integrity, not a publisher identity.
+  signingArgs.push('--config.mac.identity=-', '--config.mac.notarize=false');
 }
 execFileSync('node', [builder, target.platform === 'darwin' ? '--mac' : '--win', target.platform === 'darwin' ? 'dmg' : 'nsis', `--${target.arch}`, '--publish', 'never',
   `--config.extraMetadata.folio.buildSha=${buildSha}`, '--config.extraMetadata.folio.channel=internal', ...signingArgs], { cwd: app, env: builderEnv, stdio: 'inherit' });
 const expected = installerName(version, target);
 const installers = readdirSync(output).filter((n) => /\.(dmg|exe)$/.test(n));
 if (installers.length !== 1 || installers[0] !== expected) throw new Error(`Expected only ${expected}; got ${installers.join(', ')}`);
+const packagedApp = join(output, target.arch === 'arm64' ? 'mac-arm64' : 'mac', 'Folio.app');
+const security = target.platform === 'win32'
+  ? windowsSelfSignature('sign', join(output, expected))
+  : signing ? verifyMacSigning(packagedApp, process.env.APPLE_TEAM_ID) : verifyMacAdhoc(packagedApp);
 mkdirSync(staging, { recursive: true });
 copyFileSync(join(output, expected), join(staging, expected));
-const security = signing ? verifyMacSigning(join(output, target.arch === 'arm64' ? 'mac-arm64' : 'mac', 'Folio.app'), process.env.APPLE_TEAM_ID) : { signing: 'unsigned', notarized: false };
 stageManifest(staging, version, target, buildSha, security);
 console.log(`Staged ${expected}: ${security.signing}, notarized=${security.notarized}, internal preview.`);

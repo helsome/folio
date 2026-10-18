@@ -1,4 +1,5 @@
-import { appleSigningEnabled, verifyMacSigning, appleKeys } from './mac-signing.mjs';
+import { windowsSelfSignature } from './windows-signing.mjs';
+import { appleSigningEnabled, verifyMacSigning, verifyMacAdhoc, appleKeys } from './mac-signing.mjs';
 import { releaseProviderEnv, withoutReleaseSecrets, checkReleaseProvider, longbridgeAssetFor } from './release-provider.mjs';
 import { execFileSync } from 'node:child_process';
 import { afterEach, describe, expect, it } from 'bun:test';
@@ -16,10 +17,12 @@ function fixture() {
   const dir = mkdtempSync(join(tmpdir(), 'folio-release-test-')); dirs.push(dir);
   for (const target of targets) {
     writeFileSync(join(dir, installerName(version, target)), `fake-installer-${target.platform}-${target.arch}`);
-    const manifest = stageManifest(dir, version, target, sha);
+    const security = target.platform === 'darwin' ? { signing: 'ad-hoc', notarized: false } : { signing: 'self-signed', notarized: false, certificateSha256: 'c'.repeat(64) };
+    const manifest = stageManifest(dir, version, target, sha, security);
     writeFileSync(join(dir, `verified-${target.platform}-${target.arch}.json`), JSON.stringify({
       buildSha: sha, platform: target.platform, arch: target.arch, installerSha256: manifest.sha256,
-      installerSmoke: 'passed', freshInstall: 'passed', goldenPath: 'passed', v5: 'passed',
+      installerSmoke: 'passed', freshInstall: 'passed', goldenPath: 'passed', v5: 'passed', signatureVerification: 'passed',
+      publisherTrust: 'not-trusted', ...(target.platform === 'win32' ? { certificateSha256: security.certificateSha256 } : {}),
     }));
   }
   return dir;
@@ -216,5 +219,50 @@ describe('verified optional Apple signing', () => {
     writeFileSync(verified, JSON.stringify(evidence));
     expect(verifyRelease(dir, version, sha)).toHaveLength(3);
     expect(() => stageManifest(dir, version, targets[2], sha, { signing: 'developer-id', notarized: true })).toThrow('Invalid signing');
+  });
+});
+
+describe('untrusted preview signing', () => {
+  it('verifies ad-hoc code integrity without claiming Developer ID or notarization', () => {
+    const calls: string[] = [];
+    const verified = verifyMacAdhoc('/fake/Folio.app', (command: string, args: string[]) => {
+      calls.push(command + ' ' + args.join(' '));
+      return args.includes('--display') ? 'Identifier=com.finagent.app\nSignature=adhoc\nTeamIdentifier=not set\n' : '';
+    });
+    expect(verified).toEqual({ signing: 'ad-hoc', notarized: false });
+    expect(calls).toHaveLength(2);
+    expect(calls[0]).toContain('--verify --deep --strict');
+  });
+  it('rejects corrupt ad-hoc output and false publisher identities', () => {
+    expect(() => verifyMacAdhoc('/fake', () => { throw new Error('private-diagnostic'); })).toThrow('output suppressed');
+    expect(() => verifyMacAdhoc('/fake', () => 'Identifier=com.finagent.app\nSignature=adhoc\nTeamIdentifier=DEVELOPER')).toThrow('Expected ad-hoc');
+  });
+  const report = { signing: 'self-signed', notarized: false, certificateSha256: 'c'.repeat(64),
+    integrity: 'passed', publisherTrust: 'not-trusted', privateKeyPersisted: false, tamperRejected: true };
+  it('requires Windows cryptographic integrity, untrusted-publisher and ephemeral-key evidence', () => {
+    const calls: string[][] = [];
+    expect(windowsSelfSignature('sign', '/fake/installer.exe', undefined, (_command: string, args: string[]) => {
+      calls.push(args); return JSON.stringify(report);
+    })).toEqual(report);
+    expect(calls[0]).not.toContain('-ExecutionPolicy');
+    for (const changed of [{ integrity: 'failed' }, { publisherTrust: 'trusted' }, { privateKeyPersisted: true }, { tamperRejected: false }]) {
+      expect(() => windowsSelfSignature('sign', '/fake', undefined, () => JSON.stringify({ ...report, ...changed }))).toThrow('required');
+    }
+  });
+  it('rejects a different Windows signer and suppresses native failure diagnostics', () => {
+    expect(() => windowsSelfSignature('verify', '/fake', 'b'.repeat(64), () => JSON.stringify(report))).toThrow('required');
+    expect(() => windowsSelfSignature('sign', '/fake', undefined, () => { throw new Error('private-native-diagnostic'); })).toThrow('output suppressed');
+  });
+  it('rejects unverified ad-hoc/self-signed release reports and unsigned installers', () => {
+    const dir = fixture();
+    const file = join(dir, 'verified-win32-x64.json');
+    const evidence = JSON.parse(readFileSync(file, 'utf8'));
+    evidence.signatureVerification = 'not-run'; writeFileSync(file, JSON.stringify(evidence));
+    expect(() => verifyRelease(dir, version, sha)).toThrow('Missing native validation');
+    evidence.signatureVerification = 'passed'; evidence.certificateSha256 = 'b'.repeat(64);
+    writeFileSync(file, JSON.stringify(evidence));
+    expect(() => verifyRelease(dir, version, sha)).toThrow('Missing native validation');
+    expect(() => stageManifest(dir, version, targets[0], sha, { signing: 'unsigned', notarized: false })).toThrow('Invalid signing');
+    expect(() => stageManifest(dir, version, targets[2], sha, { signing: 'self-signed', notarized: false })).toThrow('Invalid signing');
   });
 });
