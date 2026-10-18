@@ -339,30 +339,34 @@ export function rankRetrievalSources(
     relations: Array<{ sourceId: string; relation: DuplicateRelation }>;
   }> = [];
   for (const candidate of ranked) {
-    let match:
-      | {
-          group: (typeof groups)[number];
-          relation: DuplicateRelation;
-        }
-      | undefined;
+    const matches: Array<{
+      group: (typeof groups)[number];
+      relation: DuplicateRelation;
+    }> = [];
     for (const group of groups) {
       for (const member of group.members) {
         const relation = duplicateRelation(candidate, member, threshold);
         if (relation) {
-          match = { group, relation };
+          matches.push({ group, relation });
           break;
         }
       }
-      if (match) break;
     }
-    if (match) {
-      match.group.members.push(candidate);
-      match.group.relations.push({
-        sourceId: candidate.source.id,
-        relation: match.relation,
-      });
-    } else {
+    if (matches.length === 0) {
       groups.push({ members: [candidate], relations: [] });
+      continue;
+    }
+
+    // A source can bridge existing clusters; merge every matching group.
+    const target = matches[0].group;
+    target.members.push(candidate);
+    for (const { group, relation } of matches) {
+      target.relations.push({ sourceId: candidate.source.id, relation });
+      if (group !== target) {
+        target.members.push(...group.members);
+        target.relations.push(...group.relations);
+        groups.splice(groups.indexOf(group), 1);
+      }
     }
   }
 
