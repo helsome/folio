@@ -7,7 +7,13 @@ import {
   marketCurrencyOf,
   quoteToFacts,
 } from '@finagent/core';
-import type { FinanceCapability, FinancialFact, Quote } from '@finagent/core';
+import type {
+  FactTiming,
+  FinanceCapability,
+  FinancialFact,
+  ProviderProvenance,
+  Quote,
+} from '@finagent/core';
 import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
@@ -40,33 +46,47 @@ export function createMarketQuoteCapability(
         : undefined;
       const quote = fetched?.data ?? await fetchers.getQuote(symbol);
       if (fetched) reportProvider?.(fetched.provenance);
-      const instrumentId = readInstrumentId(quote) ?? resolveCanonicalInstrumentId(symbol);
-      const fetchedAt = (ctx?.now ?? Date.now)();
+      const prov = fetched?.provenance;
+      const instrumentId =
+        readInstrumentId(quote) ?? prov?.instrumentId ?? resolveCanonicalInstrumentId(symbol);
+      const provider = prov?.providerId ?? 'longbridge';
+      const providerName = prov?.providerName ?? 'Longbridge';
+      const fetchedAt = prov?.fetchedAt ?? (ctx?.now ?? Date.now)();
+      const timing: FactTiming = resolveFactTiming(prov);
+      const stale = prov?.stale ?? false;
+
       // Native currency is derived from the market code (structured, not free
-      // text). Quotes are real-time by contract; the `delayed`/`eod` variants
-      // are produced by callers that know a delay applies.
+      // text). Timing, provider, and retrievedAt faithfully mirror the actual
+      // provider provenance when available, falling back safely without guessing.
       const facts = quoteToFacts(quote, {
         instrumentId,
-        provider: 'longbridge',
+        provider,
         currency: marketCurrencyOf(symbol),
-        timing: 'live',
+        timing,
         retrievedAt: Math.floor(fetchedAt / 1000),
       });
       return {
         data: quote,
         facts,
         provenance: {
-          provider: 'longbridge',
-          providerName: 'Longbridge',
+          provider,
+          providerName,
           ...(instrumentId ? { instrumentId } : {}),
           fetchedAt,
           marketTime: quote.timestamp * 1000,
-          stale: false,
+          ...(prov?.delayed !== undefined ? { delayed: prov.delayed } : {}),
+          stale,
         },
         summary: formatQuote(quote, facts),
       };
     },
   });
+}
+
+function resolveFactTiming(provenance?: ProviderProvenance): FactTiming {
+  if (provenance?.delayed === true) return 'delayed';
+  if (provenance?.delayed === false) return 'live';
+  return 'unknown';
 }
 
 function resolveCanonicalInstrumentId(symbol: string): string | undefined {

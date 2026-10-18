@@ -87,6 +87,74 @@ describe('market.quote manifest', () => {
     expect(result.provenance.marketTime).toBe(quote.timestamp * 1000);
   });
 
+  it('maps provenance from getQuoteResult onto facts and result (non-Longbridge, delayed, cached fetchedAt)', async () => {
+    const cachedFetchedAt = 1710000000000;
+    const cap = createMarketQuoteCapability(fetchers({
+      getQuoteResult: async () => ({
+        data: quote,
+        provenance: {
+          providerId: 'massive',
+          providerName: 'Massive',
+          instrumentId: 'XNAS:AAPL',
+          fetchedAt: cachedFetchedAt,
+          delayed: true,
+          stale: false,
+        },
+      }),
+    }));
+
+    const result = await cap.execute({ symbol: 'AAPL.US' }, { now: () => 1710000999000 });
+
+    expect(result.provenance).toMatchObject({
+      provider: 'massive',
+      providerName: 'Massive',
+      fetchedAt: cachedFetchedAt,
+      delayed: true,
+      instrumentId: 'XNAS:AAPL',
+    });
+    expect(result.facts?.every((fact) => fact.provider === 'massive')).toBe(true);
+    expect(result.facts?.every((fact) => fact.timing === 'delayed')).toBe(true);
+    expect(result.facts?.every((fact) => fact.retrievedAt === Math.floor(cachedFetchedAt / 1000))).toBe(true);
+  });
+
+  it('preserves unknown timing when provenance does not declare delayed status', async () => {
+    const cap = createMarketQuoteCapability(fetchers({
+      getQuoteResult: async () => ({
+        data: quote,
+        provenance: {
+          providerId: 'custom-vendor',
+          providerName: 'Custom Vendor',
+          fetchedAt: 12345000,
+          stale: false,
+        },
+      }),
+    }));
+
+    const result = await cap.execute({ symbol: 'AAPL.US' }, {});
+    expect(result.facts?.every((fact) => fact.timing === 'unknown')).toBe(true);
+    expect(result.facts?.every((fact) => fact.provider === 'custom-vendor')).toBe(true);
+    expect(result.provenance.provider).toBe('custom-vendor');
+  });
+
+  it('maps delayed: false to live timing on facts', async () => {
+    const cap = createMarketQuoteCapability(fetchers({
+      getQuoteResult: async () => ({
+        data: quote,
+        provenance: {
+          providerId: 'longbridge',
+          providerName: 'Longbridge',
+          fetchedAt: 12345000,
+          delayed: false,
+          stale: false,
+        },
+      }),
+    }));
+
+    const result = await cap.execute({ symbol: 'AAPL.US' }, {});
+    expect(result.facts?.every((fact) => fact.timing === 'live')).toBe(true);
+    expect(result.provenance.delayed).toBe(false);
+  });
+
   it('registers under the expected id, tool name, auth, and category', () => {
     const cap = createMarketQuoteCapability(fetchers());
     expect(cap.id).toBe('market.quote');
