@@ -1,0 +1,59 @@
+name: Desktop installers
+
+on:
+  workflow_call:
+    inputs:
+      release_gates:
+        description: Run existing golden-path and v5 gates with real provider prerequisites
+        type: boolean
+        default: false
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  installers:
+    name: ${{ matrix.platform }} ${{ matrix.arch }} installer
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - runner: macos-15
+            platform: darwin
+            arch: arm64
+          - runner: macos-15-intel
+            platform: darwin
+            arch: x64
+          - runner: windows-2025
+            platform: win32
+            arch: x64
+    runs-on: ${{ matrix.runner }}
+    timeout-minutes: 60
+    env:
+      FINAGENT_BUILD_SHA: ${{ github.sha }}
+      CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+      FOLIO_RELEASE_GATES: ${{ inputs.release_gates && '1' || '0' }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - name: Verify native runner architecture
+        run: node -e "if (process.platform !== '${{ matrix.platform }}' || process.arch !== '${{ matrix.arch }}') process.exit(1)"
+      - run: bun install --frozen-lockfile
+      - name: Build unsigned native installer (publishing disabled)
+        run: node scripts/release-package.mjs
+      - name: Install, inspect and launch distributed app outside repository
+        run: node scripts/verify-installer.mjs
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-${{ matrix.platform }}-${{ matrix.arch }}
+          path: dist/release/*
+          if-no-files-found: error
+          retention-days: 14

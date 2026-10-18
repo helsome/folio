@@ -2,97 +2,124 @@ name: Release
 
 on:
   push:
-    tags:
-      - 'v*'
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      tag:
+        description: 'Existing version tag (must point to this selected commit, e.g. v0.4.0-beta.3)'
+        required: true
+        type: string
 
 permissions:
-  contents: write
+  contents: read
+
+concurrency:
+  group: release-${{ github.event.inputs.tag || github.ref_name }}
+  cancel-in-progress: false
 
 jobs:
-  release:
-    runs-on: macos-latest
-    timeout-minutes: 60
+  preflight:
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.tag.outputs.tag }}
     steps:
-      - name: Checkout
-        uses: actions/checkout@v4
+      - uses: actions/checkout@v4
         with:
           fetch-depth: 0
-
-      - name: Setup Bun
-        uses: oven-sh/setup-bun@v2
+          persist-credentials: false
+      - name: Validate version, tag ancestry and unused release
+        id: tag
+        uses: actions/github-script@v7
+        env:
+          REQUESTED_TAG: ${{ github.event.inputs.tag || github.ref_name }}
         with:
-          bun-version: latest
-
-      - name: Install dependencies
-        run: bun install --frozen-lockfile
-
-      - name: Unit/integration tests
-        run: bun test
-
-      - name: Typecheck
-        run: bun run typecheck
-
-      - name: Build
-        run: bun run build
-
-      - name: Electron E2E (local provider)
-        working-directory: apps/electron
-        run: bun run test:e2e
+          script: |
+            const fs = require('fs');
+            const { execFileSync } = require('child_process');
+            const tag = process.env.REQUESTED_TAG;
+            const version = JSON.parse(fs.readFileSync('package.json')).version;
+            const appVersion = JSON.parse(fs.readFileSync('apps/electron/package.json')).version;
+            if (!/^v\d+\.\d+\.\d+(?:-[0-9A-Za-z]+(?:[.-][0-9A-Za-z]+)*)?$/.test(tag) || tag !== `v${version}` || version !== appVersion) {
+              throw new Error('Tag and both package versions must match');
+            }
+            const sha = execFileSync('git', ['rev-parse', `${tag}^{commit}`], {encoding:'utf8'}).trim();
+            if (sha !== context.sha) throw new Error('Select the tagged commit when dispatching');
+            execFileSync('git', ['merge-base', '--is-ancestor', sha, 'origin/main']);
+            try {
+              await github.rest.repos.getReleaseByTag({...context.repo, tag});
+              throw new Error('Release already exists; choose a new version. Existing releases are never overwritten.');
+            } catch (e) { if (e.status !== 404) throw e; }
+            core.setOutput('tag', tag);
+  quality:
+    needs: preflight
+    runs-on: ubuntu-24.04
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: oven-sh/setup-bun@v2
+        with:
+          bun-version: '1.4.2'
+      - run: bun install --frozen-lockfile
+      - run: node scripts/secret-scan.mjs
+      - run: bun test --isolate
+      - run: bun run typecheck
+      - run: bun run i18n:check
+      - run: bun run build
+  desktop:
+    needs: preflight
+    uses: ./.github/workflows/desktop.yml
+    with:
+      release_gates: true
+    # No inherited secrets; native jobs only have contents:read.
+  publish:
+    needs: [preflight, quality, desktop]
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/download-artifact@v4
+        with:
+          pattern: desktop-*
+          path: dist/release
+          merge-multiple: true
+      - name: Recheck complete asset set, commit identity and SHA256
+        run: node scripts/verify-release.mjs
         env:
-          FINAGENT_AGENT_PROVIDER: local
-
-      # Signing/notarization are opt-in: a build is only releaseable when every
-      # Apple secret is present. The values are consumed below; never echo them.
-      - name: Classify build (signed vs internal)
-        id: buildtype
-        run: |
-          if [ -n "$APPLE_CERTIFICATE_BASE64" ] && [ -n "$APPLE_CERT_PASSWORD" ] && [ -n "$APPLE_ID" ] && [ -n "$APPLE_APP_SPECIFIC_PASSWORD" ] && [ -n "$APPLE_TEAM_ID" ]; then
-            echo "internal=false" >> "$GITHUB_OUTPUT"
-            echo "channel=beta" >> "$GITHUB_OUTPUT"
-          else
-            echo "internal=true" >> "$GITHUB_OUTPUT"
-            echo "channel=internal" >> "$GITHUB_OUTPUT"
-          fi
-        env:
-          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
-          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
-      - name: Package (DMG + checksums)
-        run: bun run release:package
-        env:
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
           FINAGENT_BUILD_SHA: ${{ github.sha }}
-          FINAGENT_CHANNEL: ${{ steps.buildtype.outputs.channel }}
-          APPLE_CERTIFICATE_BASE64: ${{ secrets.APPLE_CERTIFICATE_BASE64 }}
-          APPLE_CERT_PASSWORD: ${{ secrets.APPLE_CERT_PASSWORD }}
-          APPLE_ID: ${{ secrets.APPLE_ID }}
-          APPLE_APP_SPECIFIC_PASSWORD: ${{ secrets.APPLE_APP_SPECIFIC_PASSWORD }}
-          APPLE_TEAM_ID: ${{ secrets.APPLE_TEAM_ID }}
-
-      - name: Packaged smoke
-        working-directory: apps/electron
-        run: bun run test:package-smoke
-
-      - name: Verify checksums
-        working-directory: dist/release
-        run: shasum -a 256 -c SHA256SUMS.txt
-
-      - name: Write release notes
-        run: |
-          if [ "${{ steps.buildtype.outputs.internal }}" = "true" ]; then
-            printf '%s\n\n%s\n' "# Folio ${{ github.ref_name }}" "INTERNAL BUILD — NOT RELEASEABLE" > release-notes.md
-          else
-            printf '%s\n\n%s\n' "# Folio ${{ github.ref_name }}" "Signed and notarized." > release-notes.md
-          fi
-
-      - name: Upload release assets
-        uses: softprops/action-gh-release@v2
-        with:
-          files: |
-            dist/release/*.dmg
-            dist/release/SHA256SUMS.txt
-          body_path: release-notes.md
+      - name: Stage all assets as draft, then publish prerelease atomically
+        uses: actions/github-script@v7
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          RELEASE_TAG: ${{ needs.preflight.outputs.tag }}
+        with:
+          script: |
+            const fs = require('fs');
+            const path = require('path');
+            const tag = process.env.RELEASE_TAG;
+            let release;
+            try {
+              release = (await github.rest.repos.createRelease({...context.repo, tag_name: tag,
+                name: `Folio ${tag} — unsigned internal preview`, target_commitish: context.sha,
+                draft: true, prerelease: true, make_latest: 'false',
+                body: `Build: ${context.sha}\n\nInternal testing preview: macOS arm64 + x64 DMG and Windows x64 NSIS EXE. Unsigned; macOS is not notarized, Windows has no Authenticode signature. Gatekeeper/SmartScreen may block execution. No bypass of OS security is recommended. Not a stable or signed release.\n\nAll three installers were installed/mounted and their architecture, bundled resources, startup, local agent, first launch, golden path and v5 gates verified on native runners. These product checks do not establish full nightly live LLM/judge evaluation success.\n\nSHA256SUMS.txt and per-platform validation reports are attached.`
+              })).data;
+              for (const name of fs.readdirSync('dist/release').sort()) {
+                const data = fs.readFileSync(path.join('dist/release', name));
+                await github.rest.repos.uploadReleaseAsset({...context.repo, release_id: release.id, name, data,
+                  headers: {'content-type':'application/octet-stream', 'content-length': data.length}});
+              }
+              const uploaded = await github.paginate(github.rest.repos.listReleaseAssets, {...context.repo, release_id: release.id});
+              const local = fs.readdirSync('dist/release');
+              if (uploaded.length !== local.length || uploaded.some(a => a.state !== 'uploaded' || a.size !== fs.statSync(path.join('dist/release',a.name)).size)) {
+                throw new Error('Incomplete release upload');
+              }
+              await github.rest.repos.updateRelease({...context.repo, release_id:release.id, draft:false, prerelease:true, make_latest:'false'});
+            } catch (error) {
+              if (release) await github.rest.repos.deleteRelease({...context.repo, release_id:release.id});
+              throw error;
+            }

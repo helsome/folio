@@ -204,9 +204,9 @@ FINAGENT_AGENT_PROVIDER=local FINAGENT_DEMO_DATA=1 bun run dev
 | `bun run eval:smoke` | 运行 PR 级确定性 Agent 回归评测 |
 | `bun run eval:full` | 运行完整 Agent benchmark 与实验流程 |
 | `bun run release:check` | 运行发布门槛检查 |
-| `bun run release:package` | 构建 macOS arm64 应用、DMG 与 SHA256 校验和 |
+| `bun run release:package` | 在原生 macOS/Windows 上构建 DMG/NSIS EXE 与 SHA256 校验和 |
 
-打包产物暂存于 `dist/release/`。
+打包产物暂存于 `dist/release/`。原生架构矩阵、安装验证与发布操作见 [桌面发布流程](docs/desktop-release.md)。
 
 ## 安全与产品边界
 

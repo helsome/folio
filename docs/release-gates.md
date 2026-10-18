@@ -146,6 +146,11 @@ Simulate a real new user — no git repo, no `.env`, no terminal:
 
 ## Signing policy
 
-- No Apple credentials → unsigned `internal` build, labeled NOT RELEASEABLE
+Unsigned internal previews may be distributed as explicitly labeled GitHub **prereleases**
+after all release gates pass; they are never stable/signed releases. See
+[desktop-release.md](desktop-release.md) for the native matrix and validation contract.
+
+
+- No signing credentials → unsigned `internal` build, not eligible for a trusted beta/stable release
 - `beta`/`stable` channels REQUIRE signing + notarization configured in CI
   (secrets-gated); the pipeline must not emit a "release" without them.

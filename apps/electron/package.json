@@ -1,6 +1,6 @@
 {
   "name": "@finagent/electron",
-  "version": "0.4.0-beta.2",
+  "version": "0.4.0-beta.3",
   "private": true,
   "folio": {
     "channel": "beta"
@@ -58,10 +58,12 @@
     "directories": {
       "output": "../../dist/electron"
     },
-    "electronDist": "node_modules/electron/dist",
     "files": [
-      "src/**/*",
-      "dist/renderer/**/*"
+      "src/main/index.js",
+      "src/preload/index.cjs",
+      "dist/renderer/**/*",
+      "!**/*.test.*",
+      "!**/.env*"
     ],
     "extraResources": [
       {
@@ -75,11 +77,31 @@
     ],
     "mac": {
       "target": [
-        "dir",
         "dmg"
       ],
       "icon": "assets/icon.icns",
-      "identity": null
+      "identity": null,
+      "artifactName": "Folio-${version}-mac-${arch}.${ext}",
+      "notarize": false
+    },
+    "artifactName": "Folio-${version}-${os}-${arch}.${ext}",
+    "win": {
+      "target": [
+        {
+          "target": "nsis",
+          "arch": [
+            "x64"
+          ]
+        }
+      ],
+      "artifactName": "Folio-${version}-win-${arch}.${ext}",
+      "signAndEditExecutable": false
+    },
+    "nsis": {
+      "oneClick": false,
+      "perMachine": false,
+      "allowToChangeInstallationDirectory": true,
+      "runAfterFinish": false
     }
   }
 }

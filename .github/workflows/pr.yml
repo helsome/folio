@@ -1,8 +1,8 @@
 name: PR checks
 
 # PR 只阻塞高信号检查：类型、变更工作区测试、Secret Scan。
-# 全仓测试在 PR 中仅作提示，在 main 上仍然是硬门禁。
-# Live eval / Electron E2E 保留在 nightly / release 流程，避免贡献 PR 被外部环境噪音阻塞。
+# 全仓测试在 PR 和 main 上都是硬门禁。
+# PR/main 验证原生安装包与离线启动；真实外部评测与产品 E2E 发布门禁保持独立。
 
 on:
   pull_request:
@@ -16,6 +16,9 @@ on:
       - '**/*.md'
       - 'docs/**'
       - 'artifacts/**'
+
+permissions:
+  contents: read
 
 concurrency:
   group: pr-checks-${{ github.event.pull_request.number || github.ref }}
@@ -32,6 +35,8 @@ jobs:
     timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
@@ -39,6 +44,10 @@ jobs:
         run: bun install --frozen-lockfile
       - name: Typecheck
         run: bun run typecheck
+      - name: Check i18n parity
+        run: bun run i18n:check
+      - name: Build application
+        run: bun run build
 
   focused-tests:
     name: Focused tests
@@ -48,6 +57,7 @@ jobs:
     steps:
       - uses: actions/checkout@v4
         with:
+          persist-credentials: false
           fetch-depth: 0
       - uses: oven-sh/setup-bun@v2
         with:
@@ -88,14 +98,15 @@ jobs:
             fi
           done
 
-  full-unit-advisory:
-    name: Full unit tests (advisory)
+  full-unit-pr:
+    name: Full unit tests (PR)
     if: github.event_name == 'pull_request'
-    continue-on-error: true
     runs-on: ubuntu-latest
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
@@ -111,6 +122,8 @@ jobs:
     timeout-minutes: 30
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - uses: oven-sh/setup-bun@v2
         with:
           bun-version: ${{ env.BUN_VERSION }}
@@ -125,23 +138,11 @@ jobs:
     timeout-minutes: 5
     steps:
       - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
       - name: Scan for high-signal secret patterns
-        shell: bash
-        run: |
-          set -uo pipefail
-          # 测试 fixture、文档示例和 lockfile 不参与扫描。
-          # 若命中，只打印文件名，不把疑似 secret 原文写入 Actions 日志。
-          MATCHED_FILES=$(grep -rIlE \
-            --exclude-dir=node_modules \
-            --exclude-dir=docs \
-            --exclude='*.test.ts' --exclude='*.test.tsx' --exclude='bun.lock' \
-            'ghp_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{20,}|sk-[A-Za-z0-9]{20,}|AKIA[0-9A-Z]{16}|-----BEGIN [A-Z ]*PRIVATE KEY-----' \
-            . || true)
+        run: node scripts/secret-scan.mjs
 
-          if [ -n "$MATCHED_FILES" ]; then
-            echo '::error::Possible secret patterns found in the following files:'
-            printf '%s\n' "$MATCHED_FILES"
-            exit 1
-          fi
-
-          echo 'No secret patterns found.'
+  desktop:
+    name: Native desktop build and installer verification
+    uses: ./.github/workflows/desktop.yml

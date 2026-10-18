@@ -269,3 +269,5 @@ bun run typecheck
 ```
 
 For UI changes, include a screenshot or a short visual QA note when the layout or interaction changes materially.
+
+Desktop installers and release operations: [desktop-release.md](docs/desktop-release.md).

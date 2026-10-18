@@ -4,11 +4,11 @@
 //   bun run release:check
 //
 // Enforces the hard release gates from docs/release-gates.md in order:
-//   1. unit/integration tests (`bun test`)
+//   1. unit/integration tests (`bun test --isolate`)
 //   2. typecheck (`bun run typecheck`)
 //   3. build (`bun run build`)
 //   4. electron e2e golden path, local provider (FINAGENT_AGENT_PROVIDER=local)
-//   5. package (`bun run release:package` — DMG + SHA256SUMS.txt)
+//   5. package (`bun run release:package` — native installer + checksums)
 //   6. packaged smoke (`bun run test:package-smoke`)
 //
 // Exits non-zero on the first gate failure; a red run is NOT RELEASEABLE.
@@ -25,7 +25,7 @@ const GATES = [
   {
     name: 'unit/integration tests',
     command: 'bun',
-    args: ['test'],
+    args: ['test', '--isolate'],
     cwd: repoRoot,
   },
   {
@@ -48,7 +48,7 @@ const GATES = [
     env: { FINAGENT_AGENT_PROVIDER: 'local' },
   },
   {
-    name: 'package (DMG + checksums)',
+    name: 'package (native installer + checksums)',
     command: 'bun',
     args: ['run', 'release:package'],
     cwd: repoRoot,
@@ -74,7 +74,6 @@ const GATES = [
   },
 ];
 
-let failures = 0;
 const startedAt = Date.now();
 
 GATES.forEach((gate, index) => {
@@ -90,18 +89,13 @@ GATES.forEach((gate, index) => {
   const elapsed = ((Date.now() - gateStartedAt) / 1000).toFixed(1);
 
   if (result.status !== 0) {
-    failures += 1;
-    console.error(`\nFAIL  ${gate.name} (exit ${result.status}, ${elapsed}s)`);
+    console.error(`\nFAIL  ${gate.name} (exit ${result.status}, ${elapsed}s). NOT RELEASEABLE.`);
+    process.exit(1);
   } else {
     console.log(`\nPASS  ${gate.name} (${elapsed}s)`);
   }
 });
 
 const total = ((Date.now() - startedAt) / 1000).toFixed(1);
-
-if (failures > 0) {
-  console.error(`\nrelease:check FAILED — ${failures}/${GATES.length} gate(s) red. NOT RELEASEABLE. (${total}s)`);
-  process.exit(1);
-}
 
 console.log(`\nrelease:check PASSED — all ${GATES.length} release gates green. (${total}s)`);
