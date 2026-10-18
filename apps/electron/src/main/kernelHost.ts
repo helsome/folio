@@ -155,6 +155,7 @@ import {
   EvaluationRedactor,
   diffRunManifests,
   exportRunManifest,
+  redactManifestSecrets,
   manifestToLangfuseMetadata,
   PiRuntimeAdapter,
   sanitizeSettings,
@@ -736,13 +737,20 @@ export class AgentKernelHost {
 
   // -- Run manifests (#21) ---------------------------------------------------
 
-  /** Immutable run-config snapshot for a copilot run, or undefined if absent. */
+  /**
+   * Immutable run-config snapshot for a copilot run, or undefined if absent.
+   *
+   * Redacted on the way out as well: capture already strips credentials, but a
+   * manifest persisted before that guarantee (or by a caller bug) must not be
+   * able to hand a key to the renderer through this IPC.
+   */
   async getRunManifest(input: unknown): Promise<RunManifest | undefined> {
     const request = requireObject(input);
     const sessionId = requireString(request.sessionId, 'sessionId');
     const runId = requireString(request.runId, 'runId');
     const runs = await this.kernel.sessions.listRuns(sessionId);
-    return runs.find((run) => run.id === runId)?.manifest;
+    const manifest = runs.find((run) => run.id === runId)?.manifest;
+    return manifest ? redactManifestSecrets(manifest) : undefined;
   }
 
   /** Pretty-printed, secret-redacted JSON export of a copilot run manifest. */
@@ -763,14 +771,16 @@ export class AgentKernelHost {
     if (!before || !after) {
       throw createCodeError('RUN_MANIFEST_NOT_FOUND', 'Both runs must have a manifest to compare.');
     }
-    return diffRunManifests(before, after);
+    // A diff echoes field values back to the renderer, so it must be redacted too.
+    return diffRunManifests(redactManifestSecrets(before), redactManifestSecrets(after));
   }
 
   /** Immutable run-config snapshot for a Deep Research run, or undefined. */
   async getResearchManifest(input: unknown): Promise<RunManifest | undefined> {
     const request = requireObject(input);
     const runId = requireString(request.runId, 'runId');
-    return (await this.researchService.getRun(runId))?.manifest;
+    const manifest = (await this.researchService.getRun(runId))?.manifest;
+    return manifest ? redactManifestSecrets(manifest) : undefined;
   }
 
   /** Structured diff between two Deep Research run manifests. */
@@ -783,7 +793,7 @@ export class AgentKernelHost {
     if (!before || !after) {
       throw createCodeError('RUN_MANIFEST_NOT_FOUND', 'Both runs must have a manifest to compare.');
     }
-    return diffRunManifests(before, after);
+    return diffRunManifests(redactManifestSecrets(before), redactManifestSecrets(after));
   }
 
   /** Stream Event replay（ADR 0001 §Reconnect）：按 lastSequence 补发或明确不可恢复。 */

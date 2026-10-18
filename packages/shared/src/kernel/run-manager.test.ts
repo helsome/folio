@@ -8,6 +8,7 @@ import type {
   AgentRunInput,
   AgentRuntime,
   ApiResult,
+  RunManifestContext,
   RuntimeSession,
   ToolDefinition,
 } from '@finagent/core';
@@ -793,6 +794,35 @@ describe('RunManager run manifest (#21)', () => {
       prompt: { hash: 'abc123', version: 'v1', source: 'skill-index' },
       tools: [{ name: 'get_portfolio', capability: 'portfolio.read', enabled: true }],
     });
+  });
+
+  it('persists a detached, credential-free snapshot even if the host context drifts', async () => {
+    // The host hands over *live* settings objects. The persisted manifest must
+    // be a frozen copy of that moment and must never carry a credential, even
+    // when a caller bug slips one into the context (#21 review).
+    const hostContext: RunManifestContext = {
+      runtimeMode: 'pi',
+      model: 'gpt-4o',
+      // @ts-expect-error intentional: simulate a caller bug
+      modelParams: { apiKey: 'sk-live', maxTokens: 4096 },
+      search: { providerId: 'longbridge', routing: { primary: 'longbridge' } },
+    };
+    const { sessions, runs } = makeKernel(completedScript('Done'), {
+      getRunManifestContext: () => hostContext,
+    });
+    const session = await sessions.createSession('Manifest snapshot');
+    const run = await runs.startRun(session.id, 'hello');
+    await waitFor(async () => !runs.isRunning());
+
+    // A later settings change mutates the very object the manifest was built from.
+    hostContext.model = 'gpt-4o-mini';
+    (hostContext.search?.routing as Record<string, unknown>).primary = 'massive';
+
+    const manifest = (await sessions.getRun(session.id, run.id))?.manifest;
+    expect(manifest?.model).toBe('gpt-4o');
+    expect(manifest?.search?.routing?.primary).toBe('longbridge');
+    expect((manifest?.modelParams as Record<string, unknown>).apiKey).toBe('[redacted]');
+    expect(manifest?.modelParams?.maxTokens).toBe(4096);
   });
 
   it('keeps each run manifest independent of later runs', async () => {

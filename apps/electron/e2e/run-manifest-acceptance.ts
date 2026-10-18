@@ -697,7 +697,7 @@ async function main(): Promise<void> {
       historicalRunId: readback.manifest.runId,
       preserved: readback.manifest.model === RUN_A.model,
     },
-    secretScan: { apiKeyPresentInManifests: false },
+    secretScan: { apiKeyPresentInManifests: serialized.includes(process.env.DEEPSEEK_API_KEY!) },
   };
 
   await save('run-a-manifest.json', manifestA);
