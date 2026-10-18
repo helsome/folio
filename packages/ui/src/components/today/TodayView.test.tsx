@@ -1,12 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { Provider, createStore } from 'jotai'
 import type { PortfolioSnapshot, Quote } from '@finagent/core'
 import { formatCurrency } from '@finagent/i18n'
 import { fallbackClient, FinagentClientProvider, type FinagentClient } from '../../client'
 import { installHappyDom } from '../../test/setupHappyDom'
 import { makeTestI18n, I18nextProvider } from '../../test/i18nTest'
 import { TodayView } from './TodayView'
+import { activeSymbolAtom, navSectionAtom } from '../../atoms'
 
 let restoreDom: (() => void) | undefined
 
@@ -147,6 +149,41 @@ describe('TodayView', () => {
     await act(async () => {
       root.unmount()
     })
+    container.remove()
+  })
+
+  it('switches to the heatmap and opens research for the clicked watchlist symbol', async () => {
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    const store = createStore()
+
+    await act(async () => {
+      root.render(
+        <Provider store={store}>
+          <I18nextProvider i18n={makeTestI18n('en-US')}>
+            <FinagentClientProvider client={clientWithPortfolio()}>
+              <TodayView />
+            </FinagentClientProvider>
+          </I18nextProvider>
+        </Provider>
+      )
+    })
+    await flushAsync()
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="today-watchlist-heatmap-toggle"]')?.click()
+    })
+    expect(container.querySelector('[data-testid="watchlist-heatmap"]')).not.toBeNull()
+    expect(container.querySelectorAll('[data-testid^="heatmap-tile-"]')).toHaveLength(3)
+
+    await act(async () => {
+      container.querySelector<HTMLButtonElement>('[data-testid="heatmap-tile-NVDA.US"]')?.click()
+    })
+    expect(store.get(activeSymbolAtom)).toBe('NVDA.US')
+    expect(store.get(navSectionAtom)).toBe('research')
+
+    await act(async () => root.unmount())
     container.remove()
   })
 })

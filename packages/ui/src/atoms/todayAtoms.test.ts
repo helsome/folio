@@ -1,6 +1,8 @@
 import { describe, expect, it } from 'bun:test'
+import { createStore } from 'jotai'
 import type { CalendarEvent, InvestmentThesis, Quote } from '@finagent/core'
-import { mapUpcomingEvents, thesesNeedingReview, topMovers } from './todayAtoms'
+import { mapUpcomingEvents, thesesNeedingReview, topMovers, watchlistHeatmapItemsAtom } from './todayAtoms'
+import { quoteCacheAtomFamily, watchlistAtom } from './quoteAtoms'
 
 function makeQuote(symbol: string, changePercent: number): Quote {
   return {
@@ -60,6 +62,21 @@ describe('topMovers', () => {
 
   it('returns an empty list for empty input', () => {
     expect(topMovers([])).toEqual([])
+  })
+})
+
+describe('watchlistHeatmapItemsAtom', () => {
+  it('keeps every watchlist symbol and leaves missing quotes unavailable', () => {
+    const store = createStore()
+    store.set(watchlistAtom, ['AAPL.US', 'MSFT.US'])
+    store.set(quoteCacheAtomFamily('AAPL.US'), {
+      data: makeQuote('AAPL.US', 2.5), timestamp: Date.now(), loading: false, error: null, isDemo: false,
+    })
+
+    expect(store.get(watchlistHeatmapItemsAtom)).toEqual([
+      expect.objectContaining({ symbol: 'AAPL.US', changePercent: 2.5, isDemo: false }),
+      expect.objectContaining({ symbol: 'MSFT.US', changePercent: null, fetchedAt: null, isDemo: false }),
+    ])
   })
 })
 

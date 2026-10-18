@@ -47,6 +47,28 @@ export const watchlistMoversAtom = atom<WatchlistMover[]>((get) => {
   return topMovers(quotes)
 })
 
+export interface WatchlistHeatmapItem {
+  symbol: string
+  changePercent: number | null
+  fetchedAt: number | null
+  isDemo: boolean
+}
+
+/** Heatmap rows use the same watchlist and quote cache as the existing list. */
+export const watchlistHeatmapItemsAtom = atom<WatchlistHeatmapItem[]>((get) => {
+  return get(watchlistAtom).map((symbol) => {
+    const quote = get(quoteCacheAtomFamily(symbol))
+    const change = quote.data?.changePercent
+    const hasChange = typeof change === 'number' && Number.isFinite(change)
+    return {
+      symbol,
+      changePercent: hasChange ? change : null,
+      fetchedAt: quote.data ? quote.timestamp : null,
+      isDemo: quote.isDemo,
+    }
+  })
+})
+
 /**
  * Theses that need a fresh review. The core `InvestmentThesis` contract has no
  * status field, so "needs review" = the thesis changed after its last review
