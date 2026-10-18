@@ -50,11 +50,15 @@ const THESIS: InvestmentThesis = {
 };
 
 /** Renders ThesisPanel against a stubbed `window.electronAPI.thesis` channel. */
-async function renderThesisPanel(report: ResearchReport | null) {
+async function renderThesisPanel(
+  report: ResearchReport | null,
+  overrides: Record<string, unknown> = {}
+) {
   const thesis = {
     list: async () => ({ ok: true as const, data: [THESIS] }),
     getReport: async () => ({ ok: true as const, data: report }),
     listImpacts: async () => ({ ok: true as const, data: [] }),
+    ...overrides,
   };
   (window as unknown as { electronAPI: unknown }).electronAPI = { thesis };
 
@@ -104,6 +108,53 @@ it('shows the no-report prompt exactly once when there is no report', async () =
   const { container, cleanup } = await renderThesisPanel(null);
   try {
     expect(occurrences(container.textContent ?? '', NO_REPORT_COPY)).toBe(1);
+  } finally {
+    await cleanup();
+  }
+});
+
+it('re-evaluates the thesis the user clicked and updates that card', async () => {
+  const newer: InvestmentThesis = {
+    ...THESIS,
+    id: 'thesis-2',
+    summary: 'A different, newer view of the same symbol.',
+  };
+  const payloads: unknown[] = [];
+  const { container, cleanup } = await renderThesisPanel(REPORT, {
+    list: async () => ({ ok: true as const, data: [THESIS, newer] }),
+    reEvaluate: async (payload: unknown) => {
+      payloads.push(payload);
+      return {
+        ok: true as const,
+        data: {
+          id: 'impact-1',
+          thesisId: THESIS.id,
+          symbol: SYMBOL,
+          evaluatedAt: 2,
+          kind: 'unchanged',
+          summary: 'Still fine.',
+          evidence: [],
+          thesis: { ...THESIS, summary: 'Re-evaluated the selected thesis.' },
+        },
+      };
+    },
+  });
+  try {
+    const button = [...container.querySelectorAll('button')].find((el) =>
+      (el.textContent ?? '').includes('Re-evaluate')
+    );
+    expect(button).toBeDefined();
+    await act(async () => {
+      button?.click();
+      await new Promise((r) => setTimeout(r, 25));
+    });
+
+    // The selected thesis travels with the request...
+    expect(payloads).toHaveLength(1);
+    expect(payloads[0]).toMatchObject({ symbol: SYMBOL, thesisId: THESIS.id });
+    // ...and the card that changes is the one the result belongs to.
+    expect(container.textContent).toContain('Re-evaluated the selected thesis.');
+    expect(container.textContent).toContain('A different, newer view of the same symbol.');
   } finally {
     await cleanup();
   }
