@@ -152,14 +152,18 @@ export const PortfolioSection: React.FC = () => {
     view.accounts.length > 1 || manualState.portfolios.length > 0;
   const freshnessProvider = isManualAccountId(selectedAccount)
     ? t('portfolio.manualPortfolio')
-    : 'Longbridge';
+    : cache.isDemo
+      ? undefined
+      : cache.data?.source?.providerName;
 
   return (
     <div className="folio-portfolio-view space-y-4 overflow-y-auto bg-[#f7f8fa] p-4" data-testid="portfolio-view">
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">{t('portfolio.title')}</h2>
-          <div className="mt-1 text-[11px] text-foreground/44">{freshnessProvider}</div>
+          {freshnessProvider ? (
+            <div className="mt-1 text-[11px] text-foreground/44">{freshnessProvider}</div>
+          ) : null}
         </div>
         <Button variant="default" size="sm" onClick={() => setImportOpen(true)}>
           {t('portfolio.importButton')}

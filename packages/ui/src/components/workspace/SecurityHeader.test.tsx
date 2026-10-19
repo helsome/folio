@@ -36,10 +36,14 @@ function occurrences(haystack: string, needle: string): number {
 }
 
 /** Renders the header for `symbol` with a stubbed market channel. */
-async function renderHeader(symbol: string, staticInfo: StaticInfo | null) {
+async function renderHeader(
+  symbol: string,
+  staticInfo: StaticInfo | null,
+  source?: Quote['source']
+) {
   const market = {
     ...fallbackClient.market,
-    getQuote: async () => ({ ok: true as const, data: quote(symbol) }),
+    getQuote: async () => ({ ok: true as const, data: { ...quote(symbol), ...(source ? { source } : {}) } }),
     getStaticInfo: async () =>
       staticInfo
         ? { ok: true as const, data: staticInfo }
@@ -84,6 +88,22 @@ it('prices a Hong Kong instrument in HKD, never a bare $', async () => {
     expect(occurrences(text, 'HK$350')).toBe(1);
     expect(occurrences(text, 'HK$')).toBe(5);
     expect(text).not.toContain('$350.00 HK');
+  } finally {
+    await cleanup();
+  }
+});
+
+it('labels the quote with the provider that actually returned it', async () => {
+  const { container, cleanup } = await renderHeader('AAPL.US', null, {
+    providerId: 'yahoo',
+    providerName: 'Yahoo Finance',
+    delayed: true,
+  });
+  try {
+    const text = container.textContent ?? '';
+    expect(text).toContain('Yahoo Finance');
+    expect(text).toContain('Delayed');
+    expect(text).not.toContain('Longbridge');
   } finally {
     await cleanup();
   }

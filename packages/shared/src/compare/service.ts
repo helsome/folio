@@ -110,12 +110,42 @@ export async function buildComparison(
     perSymbol[symbol][outcome.record.capabilityId] = outcome.result.data;
   }
 
+  const sources = collectSources(perSymbol);
   return {
     symbols,
     rows: buildRows(symbols, perSymbol),
     generatedAt: now(),
     errors,
+    ...(sources.names.length > 0 ? { sources: sources.names, delayed: sources.delayed } : {}),
   };
+}
+
+function collectSources(perSymbol: Record<string, Record<string, unknown>>): {
+  names: string[];
+  delayed: boolean;
+} {
+  const names: string[] = [];
+  let delayed = false;
+  for (const data of Object.values(perSymbol)) {
+    for (const capabilityId of ['market.quote', 'market.kline'] as const) {
+      const source = readMarketSource(data[capabilityId]);
+      if (!source) continue;
+      if (!names.includes(source.name)) names.push(source.name);
+      if (source.delayed) delayed = true;
+    }
+  }
+  return { names, delayed };
+}
+
+function readMarketSource(data: unknown): { name: string; delayed: boolean } | undefined {
+  const records = Array.isArray(data) ? data : [data];
+  for (const record of records) {
+    if (!isRecord(record) || !isRecord(record.source)) continue;
+    const name = record.source.providerName;
+    if (typeof name !== 'string' || name.trim() === '') continue;
+    return { name, delayed: record.source.delayed === true };
+  }
+  return undefined;
 }
 
 function buildRows(

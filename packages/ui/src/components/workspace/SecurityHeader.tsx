@@ -181,7 +181,8 @@ export const SecurityHeader: React.FC = () => {
             {formatSigned(quote.change)} ({formatPercent(quote.changePercent)})
           </div>
           <DataFreshness
-            providerName="Longbridge"
+            providerName={quote.source?.providerName}
+            delayed={quote.source?.delayed === true}
             updatedAtMs={quote.timestamp ? quote.timestamp * 1000 : undefined}
             className="mt-1.5"
           />
