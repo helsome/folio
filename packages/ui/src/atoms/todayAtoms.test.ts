@@ -70,11 +70,11 @@ describe('watchlistHeatmapItemsAtom', () => {
     const store = createStore()
     store.set(watchlistAtom, ['AAPL.US', 'MSFT.US'])
     store.set(quoteCacheAtomFamily('AAPL.US'), {
-      data: makeQuote('AAPL.US', 2.5), timestamp: Date.now(), loading: false, error: null, isDemo: false,
+      data: { ...makeQuote('AAPL.US', 2.5), source: { providerId: 'yahoo', providerName: 'Yahoo Finance', delayed: true } }, timestamp: Date.now(), loading: false, error: null, isDemo: false,
     })
 
     expect(store.get(watchlistHeatmapItemsAtom)).toEqual([
-      expect.objectContaining({ symbol: 'AAPL.US', changePercent: 2.5, isDemo: false }),
+      expect.objectContaining({ symbol: 'AAPL.US', changePercent: 2.5, isDemo: false, providerName: 'Yahoo Finance', delayed: true }),
       expect.objectContaining({ symbol: 'MSFT.US', changePercent: null, fetchedAt: null, isDemo: false }),
     ])
   })

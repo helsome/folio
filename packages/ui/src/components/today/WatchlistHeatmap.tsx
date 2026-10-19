@@ -50,7 +50,10 @@ export const WatchlistHeatmap: React.FC<WatchlistHeatmapProps> = ({ items, onSel
               ? t('today.heatmapCached') : t('today.heatmapCurrent')
           const change = item.changePercent === null ? t('today.heatmapUnavailable') : formatPercent(item.changePercent)
           const fetched = item.fetchedAt === null ? t('today.heatmapNoTimestamp') : new Date(item.fetchedAt).toLocaleString()
-          const label = t('today.heatmapTileLabel', { symbol: item.symbol, change, status })
+          const source = item.providerName
+            ? `${item.providerName}${item.delayed ? ` · ${t('today.heatmapDelayed')}` : ''}`
+            : null
+          const label = `${t('today.heatmapTileLabel', { symbol: item.symbol, change, status })}${source ? `, ${source}` : ''}`
           return (
             <button
               key={item.symbol}
@@ -64,9 +67,8 @@ export const WatchlistHeatmap: React.FC<WatchlistHeatmapProps> = ({ items, onSel
             >
               <span className="text-[12px] font-semibold text-foreground">{item.symbol}</span>
               <span className="text-[11px] font-semibold text-foreground/80">{change}</span>
-              <span className="text-[10px] text-foreground/60">
-                {item.isDemo ? t('today.heatmapSampleData') : status}
-              </span>
+              <span className="text-[10px] text-foreground/60">{item.isDemo ? t('today.heatmapSampleData') : status}</span>
+              {source && <span className="text-[10px] text-foreground/60">{source}</span>}
             </button>
           )
         })}

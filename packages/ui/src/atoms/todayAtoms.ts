@@ -52,6 +52,8 @@ export interface WatchlistHeatmapItem {
   changePercent: number | null
   fetchedAt: number | null
   isDemo: boolean
+  providerName?: string
+  delayed?: boolean
 }
 
 /** Heatmap rows use the same watchlist and quote cache as the existing list. */
@@ -65,6 +67,8 @@ export const watchlistHeatmapItemsAtom = atom<WatchlistHeatmapItem[]>((get) => {
       changePercent: hasChange ? change : null,
       fetchedAt: quote.data ? quote.timestamp : null,
       isDemo: quote.isDemo,
+      providerName: quote.data?.source?.providerName,
+      delayed: quote.data?.source?.delayed === true,
     }
   })
 })

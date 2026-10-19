@@ -34,6 +34,7 @@ export const today = {
   heatmapFetchedAt: '获取时间：{{time}}',
   heatmapSampleData: '示例数据',
   heatmapTileLabel: '{{symbol}}，{{change}}，{{status}}',
+  heatmapDelayed: '延迟行情',
   triggeredAlerts: '已触发提醒',
   upcomingEvents: '即将发生的事件',
   recentResearch: '最近研究',

@@ -31,6 +31,7 @@ export const today = {
   heatmapFetchedAt: 'Fetched {{time}}',
   heatmapSampleData: 'Sample data',
   heatmapTileLabel: '{{symbol}}, {{change}}, {{status}}',
+  heatmapDelayed: 'delayed',
   triggeredAlerts: 'Triggered alerts',
   upcomingEvents: 'Upcoming events',
   recentResearch: 'Recent research',

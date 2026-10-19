@@ -29,7 +29,7 @@ describe('WatchlistHeatmap', () => {
         <I18nextProvider i18n={makeTestI18n('en-US')}>
           <WatchlistHeatmap
             items={[
-              { symbol: 'AAPL.US', changePercent: 2.5, fetchedAt: Date.now(), isDemo: false },
+              { symbol: 'AAPL.US', changePercent: 2.5, fetchedAt: Date.now(), isDemo: false, providerName: 'Yahoo Finance', delayed: true },
               { symbol: 'MSFT.US', changePercent: null, fetchedAt: null, isDemo: false },
             ]}
             onSelect={onSelect}
@@ -40,6 +40,11 @@ describe('WatchlistHeatmap', () => {
 
     const unavailable = container.querySelector('[data-testid="heatmap-tile-MSFT.US"]')
     expect(unavailable?.getAttribute('aria-label')).toContain('Unavailable')
+    const apple = container.querySelector('[data-testid="heatmap-tile-AAPL.US"]')
+    expect(apple?.getAttribute('aria-label')).toContain('Yahoo Finance')
+    expect(apple?.getAttribute('aria-label')).toContain('delayed')
+    expect(apple?.textContent).toContain('Yahoo Finance')
+    expect(apple?.textContent).toContain('delayed')
     expect(container.textContent).toContain('Industry data is not available')
 
     await act(async () => {
