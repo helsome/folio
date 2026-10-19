@@ -39,4 +39,8 @@ export interface Comparison {
   errors: Record<string, string>;
   /** Optional for compatibility with older persisted/IPC comparison payloads. */
   priceHistory?: ComparisonPriceHistory;
+  /** Display names of the providers that actually supplied quote or candle data. */
+  sources?: string[];
+  /** True when any contributing market-data source is delayed. */
+  delayed?: boolean;
 }

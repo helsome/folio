@@ -38,11 +38,16 @@ export function createMarketKlineCapability(
       period: Type.Optional(KlinePeriod),
       limit: Type.Optional(Type.Number({ default: 100, minimum: 1, maximum: 1000 })),
     }),
-    async execute(input, ctx) {
+    async execute(input, ctx, reportProvider) {
       const symbol = normalizeSymbol(input.symbol);
       const period = input.period ?? '1d';
       const limit = input.limit ?? 100;
-      const klines = await fetchers.getKline({ symbol, period, limit });
+      const options = { symbol, period, limit };
+      const fetched = fetchers.getKlineResult
+        ? await fetchers.getKlineResult(options, ctx?.signal)
+        : undefined;
+      const klines = fetched?.data ?? await fetchers.getKline(options);
+      if (fetched) reportProvider?.(fetched.provenance);
       // Kline.timestamp is epoch SECONDS (see formatKline below); every other
       // producer writes provenance.marketTime in epoch MS (market.quote does
       // `timestamp * 1000`, longbridge's marketTimeMsFrom() the same).

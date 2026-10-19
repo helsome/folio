@@ -95,6 +95,7 @@ import {
   LocalResearchSynthesizer,
   MarketDataService,
   MassiveFinancialDataProvider,
+  YahooChartFinancialDataProvider,
   parseImpactJson,
   parseSynthesisJson,
   PortfolioRiskService,
@@ -332,8 +333,11 @@ export class AgentKernelHost {
 
     // V4 provider platform: the capability registry is built on top of the
     // provider router, which owns the Longbridge (primary) and Massive
-    // (fallback) adapters. Business layers see only the neutral capability
-    // surface — vendor specifics stay inside the adapters.
+    // (fallback) adapters. Yahoo Finance is always registered as a no-key US
+    // backup: the router tries it after the configured chain fails, and
+    // Connections can promote it to primary or fallback. Business layers see
+    // only the neutral capability surface — vendor specifics stay inside the
+    // adapters.
     this.connectionStore = new ConnectionStore(new JsonFileStore(userData));
     this.providerRouter = new ProviderRouter({
       resolveRouting: () => this.connectionStore.getRouting(DEFAULT_PROVIDER_ROUTING),
@@ -349,6 +353,7 @@ export class AgentKernelHost {
     this.providerRouter.register(longbridgeData);
     this.providerRouter.register(longbridgeBroker);
     this.providerRouter.register(massive);
+    this.providerRouter.register(new YahooChartFinancialDataProvider());
     this.providerRouter.setRouting(DEFAULT_PROVIDER_ROUTING);
 
     // Keep renderer IPC and agent tools on the same provider gateway.  The
@@ -1775,7 +1780,9 @@ export class AgentKernelHost {
       configured:
         provider.id === 'massive'
           ? Boolean(await this.credentials.getCredential(MASSIVE_CREDENTIAL_ID))
-          : health?.status === 'connected',
+          : provider.id === 'yahoo'
+            ? config?.enabled !== false
+            : health?.status === 'connected',
       hasAccount,
       accountLabel,
       error: state?.error ?? null,
@@ -1799,6 +1806,22 @@ export class AgentKernelHost {
   async connectProvider(input: unknown): Promise<{ status: 'connecting' | 'connected'; verificationUrl?: string }> {
     const request = requireObject(input);
     const providerId = requireString(request.providerId, 'providerId');
+    if (providerId === 'yahoo') {
+      const existing = await this.connectionStore.getConfig(providerId);
+      await this.connectionStore.setConfig(providerId, {
+        enabled: true,
+        endpoint: existing?.endpoint,
+        region: existing?.region,
+      });
+      const now = Date.now();
+      await this.connectionStore.update({
+        providerId,
+        status: 'connected',
+        lastCheck: now,
+        connectedAt: now,
+      });
+      return { status: 'connected' };
+    }
     if (providerId !== 'longbridge') {
       throw createCodeError('CONFIG_UNSUPPORTED', 'Connect is only supported for the Longbridge CLI.');
     }
@@ -1881,6 +1904,15 @@ export class AgentKernelHost {
       await longbridgeLogout({ exec: executeLongBridgeCli });
     } else if (providerId === 'massive') {
       await this.credentials.removeCredential(MASSIVE_CREDENTIAL_ID);
+    } else if (providerId === 'yahoo') {
+      const existing = await this.connectionStore.getConfig(providerId);
+      await this.connectionStore.setConfig(providerId, {
+        enabled: false,
+        endpoint: existing?.endpoint,
+        region: existing?.region,
+      });
+      const yahoo = this.providerRouter.get('yahoo');
+      if (yahoo instanceof YahooChartFinancialDataProvider) yahoo.clearCache();
     }
     await this.connectionStore.update({ providerId, status: 'not-connected', lastCheck: Date.now() });
     return this.entryFor(provider);
@@ -1970,10 +2002,21 @@ export class AgentKernelHost {
       await this.connectionStore.setRouting(next);
       this.providerRouter.setRouting(next);
     }
-    await this.connectionStore.update({ providerId, status: 'not-connected', lastCheck: Date.now() });
+    const yahooReady = providerId === 'yahoo' && enabled !== false;
+    const now = Date.now();
+    await this.connectionStore.update({
+      providerId,
+      status: yahooReady ? 'connected' : 'not-connected',
+      lastCheck: now,
+      ...(yahooReady ? { connectedAt: now } : {}),
+    });
     const massive = this.providerRouter.get('massive');
     if (massive instanceof MassiveFinancialDataProvider) {
       massive.clearCache();
+    }
+    const yahoo = this.providerRouter.get('yahoo');
+    if (yahoo instanceof YahooChartFinancialDataProvider) {
+      yahoo.clearCache();
     }
     return this.entryFor(provider);
   }

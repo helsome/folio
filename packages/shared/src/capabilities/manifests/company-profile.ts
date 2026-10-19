@@ -21,9 +21,13 @@ export function createCompanyProfileCapability(
     inputSchema: Type.Object({
       symbol: Type.String({ description: 'Stock symbol, e.g. AAPL.US', examples: ['AAPL.US'] }),
     }),
-    async execute(input, ctx) {
+    async execute(input, ctx, reportProvider) {
       const symbol = normalizeSymbol(input.symbol);
-      const info = await fetchers.getStaticInfo(symbol);
+      const fetched = fetchers.getStaticInfoResult
+        ? await fetchers.getStaticInfoResult(symbol, ctx?.signal)
+        : undefined;
+      const info = fetched?.data ?? await fetchers.getStaticInfo(symbol);
+      if (fetched) reportProvider?.(fetched.provenance);
       return {
         data: info,
         provenance: { provider: 'longbridge', fetchedAt: (ctx?.now ?? Date.now)(), stale: false },

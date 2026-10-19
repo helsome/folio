@@ -70,9 +70,11 @@ export interface CapabilityFetchers {
   getQuote: (symbol: string) => Promise<Quote>;
   getQuoteResult?: (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<Quote>>;
   getKline: (options: GetKlineOptions) => Promise<Kline[]>;
+  getKlineResult?: (options: GetKlineOptions, signal?: AbortSignal) => Promise<CapabilityFetchResult<Kline[]>>;
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
   getMarketStatus: () => Promise<MarketStatus[]>;
   getStaticInfo: (symbol: string) => Promise<StaticInfo>;
+  getStaticInfoResult?: (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<StaticInfo>>;
   getCalcIndex: (symbol: string) => Promise<CalcIndex>;
   getNews: (symbol: string) => Promise<NewsItem[]>;
   getPortfolio: () => Promise<PortfolioSnapshot>;

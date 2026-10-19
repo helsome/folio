@@ -39,6 +39,8 @@ export const connections = {
   installSetup: 'Install / Setup',
   byokNote:
     'Your own key governs usage. Free tiers may return end-of-day data (5 calls/min) and require attribution ("Powered by Polygon.io").',
+  freeDelayedNote:
+    'No API key is required. Quotes are delayed. This endpoint is unofficial and meant for personal use; it may change or rate-limit without notice.',
   dismissError: 'Dismiss error',
   dismiss: 'Dismiss',
   portfolioReady: 'Portfolio ✓',

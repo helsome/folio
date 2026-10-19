@@ -104,6 +104,25 @@ describe('buildComparison', () => {
     expect(cell(comparison, 'Momentum', 'AAPL.US')?.display).toBe('Strong');
   });
 
+  it('reports the actual market-data providers and whether any source is delayed', async () => {
+    const registry = createCapabilityRegistry([
+      makeCap('market.quote', 'get_quote', (symbol) => ({
+        symbol,
+        lastPrice: 100,
+        source: { providerId: 'yahoo', providerName: 'Yahoo Finance', delayed: true },
+      })),
+      makeCap('market.kline', 'get_kline', () => defaultBars().map((bar) => ({
+        ...bar,
+        source: { providerId: 'longbridge', providerName: 'Longbridge', delayed: false },
+      }))),
+    ]);
+
+    const comparison = await buildComparison(['AAPL.US'], registry, { now: () => 1 });
+
+    expect(comparison.sources).toEqual(['Yahoo Finance', 'Longbridge']);
+    expect(comparison.delayed).toBe(true);
+  });
+
   it('renders missing cells as — when capabilities are absent', async () => {
     const registry = createCapabilityRegistry([
       makeCap('market.quote', 'get_quote', () => FULL_DATA['market.quote']),
