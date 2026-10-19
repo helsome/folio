@@ -1,6 +1,5 @@
 import {
   summarizeInstrument,
-  type MarketSource,
   type AccountAssets,
   type CalcIndex,
   type CashFlowRecord,
@@ -35,6 +34,7 @@ import type {
   GetKlineOptions,
 } from '@finagent/longbridge-tools';
 import { attachResolvedInstrument, type InstrumentQueryResolver } from './instrument.ts';
+import { marketSourceOf } from './market-source.ts';
 import type { CapabilityFetchResult } from '../capabilities/fetchers.ts';
 
 /**
@@ -125,14 +125,6 @@ async function fetch<T>(
   input: unknown
 ): Promise<T> {
   return (await fetchResult<T>(router, capabilityId, input)).data;
-}
-
-function marketSourceOf(provenance: ProviderProvenance): MarketSource {
-  return {
-    providerId: provenance.providerId,
-    providerName: provenance.providerName,
-    ...(provenance.delayed === true ? { delayed: true } : {}),
-  };
 }
 
 /** Attach the answering provider so UI freshness lines are not hard-coded. */

@@ -1,5 +1,6 @@
 import type { Holding } from './account.ts';
 import type { CanonicalInstrument } from './instrument.ts';
+import type { MarketSource } from './market-data.ts';
 import type { ProviderProvenance, ProviderResult } from './provider.ts';
 import type { Quote } from './index.ts';
 
@@ -48,6 +49,8 @@ export interface HeatmapCell {
   quoteStatus: HeatmapQuoteStatus;
   /** Original epoch seconds from Quote; never replaced with render time. */
   quoteTimestamp?: number;
+  /** Same MarketSource projection as router-backed quotes, from actual provenance. */
+  source?: MarketSource;
   provenance?: ProviderProvenance;
   errorCode?: string;
   /** Fraction of the full snapshot, 0..1. null disables area encoding. */

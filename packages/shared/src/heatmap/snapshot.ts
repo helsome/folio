@@ -5,12 +5,13 @@ import type {
   HeatmapSnapshot,
   HeatmapWeightIssue,
 } from '@finagent/core';
+import { marketSourceOf } from '../providers/market-source.ts';
 
 const code = (value: string): string => value.trim().toUpperCase();
 const finite = (value: unknown): value is number => typeof value === 'number' && Number.isFinite(value);
 
 function quoteFields(entry: HeatmapEntry): Pick<
-  HeatmapCell, 'changePercent' | 'quoteStatus' | 'quoteTimestamp' | 'provenance' | 'errorCode'
+  HeatmapCell, 'changePercent' | 'quoteStatus' | 'quoteTimestamp' | 'source' | 'provenance' | 'errorCode'
 > {
   const result = entry.quote;
   if (!result) return { changePercent: null, quoteStatus: 'missing' };
@@ -31,6 +32,7 @@ function quoteFields(entry: HeatmapEntry): Pick<
     quoteStatus: !finite(data.changePercent) ? 'missing'
       : provenance.stale ? 'stale' : provenance.delayed ? 'delayed' : 'available',
     ...(finite(data.timestamp) ? { quoteTimestamp: data.timestamp } : {}),
+    source: marketSourceOf(provenance),
     provenance: {
       ...provenance,
       ...(provenance.failoverTrail ? {

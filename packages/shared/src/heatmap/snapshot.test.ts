@@ -133,6 +133,27 @@ describe('buildHeatmapSnapshot', () => {
     ] }).groups[0].cells[0]
     expect(cell).toMatchObject({ changePercent: null, quoteStatus: 'identity-unknown' })
     expect(cell.provenance).toBeUndefined()
+    expect(cell.source).toBeUndefined()
+  })
+
+  it('derives MarketSource from provenance even when the input quote carries a different source', () => {
+    for (const delayed of [true, false, undefined]) {
+      const response = quote(AAPL, 0, { stale: true })
+      if (!response.ok) throw new Error('Invalid fixture')
+      response.provenance.delayed = delayed
+      response.data.source = { providerId: 'wrong', providerName: 'Wrong', delayed: true }
+      const cell = buildHeatmapSnapshot({ snapshotId: 'source', mode: 'watchlist', entries: [
+        entry(AAPL, '', undefined, response),
+      ] }).groups[0].cells[0]
+      expect(cell.source).toEqual({
+        providerId: 'fixture', providerName: 'Fixture', ...(delayed === true ? { delayed: true } : {}),
+      })
+      expect(cell.quoteStatus).toBe('stale')
+      expect(cell.changePercent).toBe(0)
+      cell.source!.providerName = 'changed'
+      expect(response.provenance.providerName).toBe('Fixture')
+      expect(response.data.source.providerName).toBe('Wrong')
+    }
   })
 
   it('accepts provenance-bound identity when the quote has no instrumentId', () => {

@@ -32,6 +32,10 @@ const heatmap = buildHeatmapSnapshot({
   canonical 身份；两者冲突或缺少绑定时不输出涨跌幅，不用 provider ticker 猜身份。
 - 缺报价、接口错误和非有限涨跌幅都输出 `changePercent: null`，真实平盘保留 0。
   保留实际 provider、原始报价时间、延迟/过期标记与 failover trail。
+  `cell.source` 复用 router fetchers 的 `MarketSource` 投影函数，从实际响应的
+  `ProviderProvenance` 生成，字段含义与 `Quote.source` 相同；不相信行情中冲突的
+  `source`。`delayed` 只在为 true 时投影；完整 `stale`、`fetchedAt`、`marketTime`
+  和 `failoverTrail` 仍留在 `provenance`。报价秒级时间与 provenance 毫秒级时间不混用。
 - 组合面积只使用账户边界已经提供的 `marketValueBase`，或明确与基准币种相同的
   `marketValue`。不把 HKD/USD 等原币金额直接相加，不推测基准币种或 FX。
 - 负数量/负市值不取绝对值；缺少数量、不可比较的估值、空头、零分母或数值溢出
@@ -49,3 +53,27 @@ UI 必须把 `missing`、`error`、`identity-*`、`stale` 状态灰显或明确�
 
 单元测试使用合成行情与持仓 fixture，包括 100 个标的的确定性投影与刷新后的
 canonical 选择键稳定性；它不等于真实 provider、UI 渲染/请求性能或端到端验证。
+
+## 与 Yahoo / 现有行情路由接线
+
+沿用 `createRouterFetchers(router, { resolve })` 和 canonical resolver，勿新增直连行情
+请求。`getQuoteResult` 返回 `{ data, provenance }`；成功时调用方可传入
+`quote: { ok: true, ...result }`。失败时它抛出 `ProviderFetchError`，调用方应把规范化
+错误传为 `{ ok: false, error: { code: error.code, message: error.message } }`，不能填 0。
+UI 应继续消费列表同一个快照；投影函数本身不持有 router，也不发起请求。
+
+Yahoo 是免密钥、**非官方、仅供个人使用**的美股延迟行情源，可能限流或不可用。
+支持报价、日/周 K 线和简要公司资料，不支持券商账户/持仓、财报、新闻、期权或
+分钟行情。简要公司资料当前不含行业，调用方不传 `sector` 时单元格保留 null；
+不能从名称猜行业。账户估值仍来自现有账户边界，Yahoo 报价不能冒充持仓数据。
+完整限制见 [Yahoo 行情说明](./yahoo-finance.zh-CN.md)。
+
+`bun test packages/shared/src/heatmap --isolate` 使用明确标注的 HTTP fixture，经过
+真实 Yahoo adapter → router → router fetchers → heatmap，验证来源一致、延迟标记、
+Longbridge/Massive 失败记录、原始时间、缺失行业以及限流错误。这不是联网成功证据。
+
+可单独运行 `bun scripts/heatmap-yahoo-smoke.ts`，真实请求 AAPL 报价与简要资料；
+每次 provider 调用限时 12 秒，无密钥、无 fixture，不读取 connected 状态作判断。
+成功时输出带 `live: true` 的快照（含实际时间和来源），失败时输出规范化错误码并
+以非零状态退出；失败不能算作真实取数通过。该命令只验证一个标的的数据链路，
+不证明 UI 或完整 #333 验收通过，也不覆盖真实账户或真实供应商 failover。
