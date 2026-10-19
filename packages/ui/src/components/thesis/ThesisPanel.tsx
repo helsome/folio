@@ -2,7 +2,7 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import type { InvestmentThesis, ThesisStance } from '@finagent/core';
-import { activeSymbolAtom, navSectionAtom } from '../../atoms';
+import { activeSymbolAtom, navSectionAtom, selectedThesisIdAtom } from '../../atoms';
 import {
   getImpactsForSymbol,
   getThesesForSymbol,
@@ -109,6 +109,7 @@ export const ThesisPanel: React.FC = () => {
   const { t } = useTranslation();
   const symbol = useAtomValue(activeSymbolAtom);
   const setNavSection = useSetAtom(navSectionAtom);
+  const setSelectedThesisId = useSetAtom(selectedThesisIdAtom);
   const [theses, setTheses] = useAtom(thesesAtom);
   const [impacts, setImpacts] = useAtom(thesisImpactsAtom);
   const [report, setReport] = useAtom(researchReportAtomFamily(symbol ?? ''));
@@ -165,13 +166,18 @@ export const ThesisPanel: React.FC = () => {
   };
 
   const handleReEvaluate = async (thesis: InvestmentThesis) => {
-    const impact = await reEvaluateThesis(symbol);
+    // Bind the re-evaluation to the clicked thesis (#326): the service must
+    // evaluate THIS version, and the impact answers with the same thesisId.
+    setSelectedThesisId(thesis.id);
+    const impact = await reEvaluateThesis(symbol, thesis.id);
     if (!impact) return;
     setImpacts((current) => ({
       ...current,
       [symbol]: [impact, ...(current[symbol] ?? [])],
     }));
-    setTheses((current) => current.map((t) => (t.id === thesis.id ? impact.thesis : t)));
+    // Update by the REAL evaluated thesis id — a mismatched response must not
+    // silently replace a card the user did not act on.
+    setTheses((current) => current.map((t) => (t.id === impact.thesisId ? impact.thesis : t)));
     setLastImpact(impact.id);
   };
 

@@ -767,19 +767,42 @@ export class AgentKernelHost {
     return reports[0] ?? null;
   }
 
-  async thesisSaveFromReport(symbol: unknown): Promise<InvestmentThesis> {
-    const report = await this.thesisGetReport(symbol);
-    if (!report) {
+  /**
+   * Save a thesis from a research report (#327). Accepts `{ symbol, reportId? }`
+   * (or a legacy bare symbol string): with an explicit reportId the EXACT
+   * version the user has open is persisted — a reportId that does not resolve
+   * to that symbol is rejected instead of silently saving another version.
+   */
+  async thesisSaveFromReport(input: unknown): Promise<InvestmentThesis> {
+    const request = typeof input === 'string' ? { symbol: input } : requireObject(input);
+    const symbol = requireString(request.symbol, 'symbol').toUpperCase();
+    const reportId =
+      typeof request.reportId === 'string' && request.reportId.length > 0
+        ? request.reportId
+        : undefined;
+    const report = reportId
+      ? await this.researchService.getReport(reportId)
+      : await this.thesisGetReport(symbol);
+    if (!report || report.symbol.toUpperCase() !== symbol) {
       throw createCodeError(
         'REPORT_NOT_FOUND',
-        'No research report for this symbol. Run Deep Research first.'
+        reportId
+          ? `Research report "${reportId}" not found for symbol "${symbol}".`
+          : 'No research report for this symbol. Run Deep Research first.'
       );
     }
     return this.thesisService.saveFromReport(report);
   }
 
-  async thesisReEvaluate(symbol: unknown): Promise<ThesisImpact> {
-    return this.thesisService.reEvaluate(requireString(symbol, 'symbol').toUpperCase());
+  /** Re-evaluate a thesis (#326): an explicit thesisId selects THAT thesis. */
+  async thesisReEvaluate(input: unknown): Promise<ThesisImpact> {
+    const request = typeof input === 'string' ? { symbol: input } : requireObject(input);
+    const symbol = requireString(request.symbol, 'symbol').toUpperCase();
+    const thesisId =
+      typeof request.thesisId === 'string' && request.thesisId.length > 0
+        ? request.thesisId
+        : undefined;
+    return this.thesisService.reEvaluate(symbol, undefined, thesisId);
   }
 
   async thesisUpdate(input: unknown): Promise<InvestmentThesis> {
@@ -2102,17 +2125,34 @@ export class AgentKernelHost {
   async researchGetDiff(input: unknown): Promise<ResearchDiff | undefined> {
     const request = requireObject(input);
     const symbol = requireString(request.symbol, 'symbol').toUpperCase();
-    const cached = await this.diffRepository.getBySymbol(symbol);
-    if (cached) return cached;
-    // Fallback: build on demand from the two latest reports.
+    const reportId =
+      typeof request.reportId === 'string' && request.reportId.length > 0
+        ? request.reportId
+        : undefined;
     const reports = await this.researchService.listReports(symbol);
-    if (reports.length < 2) return undefined;
     const sorted = [...reports].sort((a, b) => b.generatedAt - a.generatedAt);
-    const diff = await buildDiff(sorted[1]!, sorted[0]!, {
+    if (sorted.length === 0) return undefined;
+    // Latest report (no explicit version): serve the stored diff, or build and
+    // persist it from the two latest reports — unchanged behavior.
+    if (!reportId || sorted[0]!.id === reportId) {
+      const cached = await this.diffRepository.getBySymbol(symbol);
+      if (cached) return cached;
+      if (sorted.length < 2) return undefined;
+      const diff = await buildDiff(sorted[1]!, sorted[0]!, {
+        thesis: await this.latestThesisFor(symbol),
+      });
+      await this.diffRepository.save(diff);
+      return diff;
+    }
+    // Historical version (#327): diff against ITS predecessor without
+    // overwriting the cached latest diff. No predecessor → undefined.
+    const index = sorted.findIndex((report) => report.id === reportId);
+    if (index === -1) return undefined;
+    const previous = sorted[index + 1];
+    if (!previous) return undefined;
+    return buildDiff(previous, sorted[index]!, {
       thesis: await this.latestThesisFor(symbol),
     });
-    await this.diffRepository.save(diff);
-    return diff;
   }
 
   async outcomeListOpinions(input: unknown): Promise<ResearchOpinion[]> {

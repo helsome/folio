@@ -5,7 +5,7 @@ import { Provider, createStore } from 'jotai';
 import type { InvestmentThesis, ResearchReport } from '@finagent/core';
 import { installHappyDom } from '../../test/setupHappyDom';
 import { TestI18n } from '../../test/testI18n';
-import { activeSymbolAtom } from '../../atoms/workspaceAtoms';
+import { activeSymbolAtom, selectedThesisIdAtom } from '../../atoms/workspaceAtoms';
 
 let restore: () => void;
 let ThesisPanel: typeof import('./ThesisPanel')['ThesisPanel'];
@@ -106,5 +106,62 @@ it('shows the no-report prompt exactly once when there is no report', async () =
     expect(occurrences(container.textContent ?? '', NO_REPORT_COPY)).toBe(1);
   } finally {
     await cleanup();
+  }
+});
+
+it('re-evaluate binds the clicked thesis id and updates by the returned one (#326)', async () => {
+  const calls: Array<{ symbol: string; thesisId?: string }> = [];
+  const impact = {
+    id: 'impact-1',
+    thesisId: 'thesis-1',
+    symbol: SYMBOL,
+    evaluatedAt: 2,
+    kind: 'strengthened',
+    summary: 'Thesis holds.',
+    thesis: { ...THESIS, updatedAt: 2, lastReviewedAt: 2 },
+  };
+  const thesis = {
+    list: async () => ({ ok: true as const, data: [THESIS] }),
+    getReport: async () => ({ ok: true as const, data: REPORT }),
+    listImpacts: async () => ({ ok: true as const, data: [] }),
+    reEvaluate: async (input: { symbol: string; thesisId?: string }) => {
+      calls.push(input);
+      return { ok: true as const, data: impact };
+    },
+  };
+  (window as unknown as { electronAPI: unknown }).electronAPI = { thesis };
+  const store = createStore();
+  store.set(activeSymbolAtom, SYMBOL);
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => {
+      root.render(
+        <TestI18n>
+          <Provider store={store}>
+            <ThesisPanel />
+          </Provider>
+        </TestI18n>
+      );
+      await new Promise((r) => setTimeout(r, 25));
+    });
+    const button = Array.from(container.querySelectorAll('button')).find(
+      (b) => b.textContent === 'Re-evaluate'
+    );
+    expect(button).toBeDefined();
+    await act(async () => {
+      button!.click();
+      await new Promise((r) => setTimeout(r, 10));
+    });
+    // The manual action carries the clicked thesis's id end to end.
+    expect(calls).toEqual([{ symbol: SYMBOL, thesisId: 'thesis-1' }]);
+    expect(store.get(selectedThesisIdAtom)).toBe('thesis-1');
+    // The card updates from the impact's real thesis id.
+    expect(container.textContent).toContain('Re-evaluation complete');
+  } finally {
+    await act(async () => root.unmount());
+    container.remove();
+    delete (window as unknown as { electronAPI?: unknown }).electronAPI;
   }
 });

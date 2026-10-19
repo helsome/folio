@@ -16,6 +16,7 @@ import {
   portfolioViewAtom,
   watchlistAtom,
 } from '../../atoms'
+import { pendingResearchReportIdAtom } from '../../atoms/researchAtoms'
 import { researchOriginAtom } from '../../atoms/discoverAtoms'
 import { watchlistMoversAtom, mapUpcomingEvents, thesesNeedingReview } from '../../atoms/todayAtoms'
 import { watchlistQuotesAreDemoAtom } from '../../atoms/quoteAtoms'
@@ -82,6 +83,7 @@ export const TodayView: React.FC = () => {
 
   const setActiveSymbol = useSetAtom(activeSymbolAtom)
   const setNavSection = useSetAtom(navSectionAtom)
+  const setPendingReportId = useSetAtom(pendingResearchReportIdAtom)
   const setResearchOrigin = useSetAtom(researchOriginAtom)
   const fetchPortfolio = useSetAtom(fetchPortfolioAtom)
   const fetchQuote = useSetAtom(fetchQuoteAtom)
@@ -283,6 +285,10 @@ export const TodayView: React.FC = () => {
             <button
               type="button"
               onClick={() => {
+                // Deep-link the EXACT version the user clicked (#327/#331):
+                // the research panel must open this reportId, not re-resolve
+                // the symbol's latest report.
+                setPendingReportId(report.id)
                 setActiveSymbol(report.symbol)
                 setResearchOrigin({ from: 'today', label: t('today.continueLabel') })
                 setNavSection('research')
