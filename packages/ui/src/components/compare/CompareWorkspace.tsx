@@ -51,7 +51,8 @@ export const CompareWorkspace: React.FC = () => {
           <p className="folio-compare-subtitle">{t('compare.agentContext')}</p>
         </div>
         <DataFreshness
-          providerName="Longbridge"
+          providerName={state.data?.sources?.join(', ')}
+          delayed={state.data?.delayed === true}
           updatedAtMs={state.data?.generatedAt}
           className="shrink-0 pt-0.5"
         />

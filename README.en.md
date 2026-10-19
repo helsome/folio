@@ -126,7 +126,7 @@ Folio is local-first: sessions, credentials, and research state stay on the devi
 ## How It Works
 
 ```text
-Longbridge / Massive providers
+Longbridge / Massive / Yahoo Finance providers
               │
               ▼
      Capability Registry
@@ -146,7 +146,7 @@ The core boundary is deliberately small: providers return normalized data with p
 
 ## Flexible Integrations
 
-- **Market data:** Longbridge is the primary connector for US/HK/CN market data and brokerage portfolio access; Massive is available as a secondary US market-data provider.
+- **Market data:** Longbridge is the primary connector for US/HK/CN market data and brokerage portfolio access; Massive is available as a secondary US market-data provider. [Yahoo Finance](docs/yahoo-finance.md) is a free, no-key backup for delayed US quotes and daily/weekly candles when Longbridge and Massive are not configured. It is unofficial and for personal use.
 - **Agent runtime:** Pi runtime for configured LLM providers, with a deterministic local provider for development and offline golden paths.
 - **Desktop:** Electron with a macOS arm64 packaged build. The renderer, preload bridge, and main-process kernel are separated by context isolation and a whitelisted IPC surface.
 - **Skills:** Vendored `SKILL.md` resources with references, enable/disable state, triggers, and capability requirements.
@@ -160,7 +160,7 @@ Download the latest macOS build from the [Releases page](https://github.com/hels
 
 1. The full workspace is browsable on first launch — built-in sample data (badged “Sample data”) is shown until services are connected.
 2. Configure an LLM provider in **Settings → Models**, or use the local provider for a deterministic demo.
-3. Connect Longbridge in **Settings → Connections** for live market data and portfolio access; sample data switches to live data automatically.
+3. Connect Longbridge in **Settings → Connections** for live market data and portfolio access; sample data switches to live data automatically. Yahoo Finance is already listed there and can serve delayed US quotes and candles with no API key.
 4. Select a symbol from the Watchlist and open **Deep Research**.
 
 Longbridge authentication can also be completed from the terminal:

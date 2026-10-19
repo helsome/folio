@@ -29,6 +29,23 @@ export const quoteCacheAtomFamily = atomFamily((symbol: string) =>
 // Watchlist atoms
 export const watchlistAtom = atom<string[]>(['AAPL.US', 'TSLA.US', 'NVDA.US']);
 
+/** Provider names actually stamped on watchlist quotes, for the §34 freshness line. */
+export const watchlistMarketSourceAtom = atom<{ providerName?: string; delayed: boolean }>((get) => {
+  const watchlist = get(watchlistAtom);
+  const names: string[] = [];
+  let delayed = false;
+  for (const symbol of watchlist) {
+    const source = get(quoteCacheAtomFamily(symbol)).data?.source;
+    if (!source?.providerName) continue;
+    if (!names.includes(source.providerName)) names.push(source.providerName);
+    if (source.delayed) delayed = true;
+  }
+  return {
+    providerName: names.length > 0 ? names.join(', ') : undefined,
+    delayed,
+  };
+});
+
 /** Newest quote timestamp (epoch seconds) across the watchlist, for the §34 freshness line. */
 export const watchlistLatestTimestampAtom = atom<number | undefined>((get) => {
   const watchlist = get(watchlistAtom);

@@ -1,5 +1,6 @@
 import {
   summarizeInstrument,
+  type MarketSource,
   type AccountAssets,
   type CalcIndex,
   type CashFlowRecord,
@@ -96,6 +97,12 @@ export interface RouterCapabilityFetchers {
   getCashFlow: (options?: GetCashFlowOptions) => Promise<CashFlowRecord[]>;
 }
 
+const SOURCE_CAPABILITIES = new Set([
+  'market.quote',
+  'market.kline',
+  'portfolio.summary',
+]);
+
 async function fetchResult<T>(
   router: FinancialProviderRouter,
   capabilityId: string,
@@ -104,7 +111,10 @@ async function fetchResult<T>(
 ): Promise<CapabilityFetchResult<T>> {
   const result: ProviderResult<T> = await router.execute<T>(capabilityId, input, signal);
   if (result.ok) {
-    return { data: result.data, provenance: cloneProvenance(result.provenance) };
+    const data = SOURCE_CAPABILITIES.has(capabilityId)
+      ? stampMarketSource(result.data, result.provenance)
+      : result.data;
+    return { data, provenance: cloneProvenance(result.provenance) };
   }
   throw new ProviderFetchError(result.error);
 }
@@ -115,6 +125,28 @@ async function fetch<T>(
   input: unknown
 ): Promise<T> {
   return (await fetchResult<T>(router, capabilityId, input)).data;
+}
+
+function marketSourceOf(provenance: ProviderProvenance): MarketSource {
+  return {
+    providerId: provenance.providerId,
+    providerName: provenance.providerName,
+    ...(provenance.delayed === true ? { delayed: true } : {}),
+  };
+}
+
+/** Attach the answering provider so UI freshness lines are not hard-coded. */
+function stampMarketSource<T>(data: T, provenance: ProviderProvenance): T {
+  const source = marketSourceOf(provenance);
+  if (Array.isArray(data)) {
+    return data.map((item) =>
+      typeof item === 'object' && item !== null ? { ...item, source } : item
+    ) as T;
+  }
+  if (typeof data === 'object' && data !== null) {
+    return { ...data, source };
+  }
+  return data;
 }
 
 function cloneProvenance(provenance: ProviderProvenance): ProviderProvenance {
