@@ -155,6 +155,44 @@ describe('market.quote manifest', () => {
     expect(result.provenance.delayed).toBe(false);
   });
 
+  it('maps Yahoo Finance provenance to delayed facts, canonical instrument, and real provider', async () => {
+    const yahooFetchedAt = 1715000000000;
+    const yahooQuote = {
+      ...quote,
+      symbol: 'AAPL',
+      instrumentId: undefined,
+    };
+    const cap = createMarketQuoteCapability(fetchers({
+      getQuoteResult: async () => ({
+        data: yahooQuote,
+        provenance: {
+          providerId: 'yahoo',
+          providerName: 'Yahoo Finance',
+          fetchedAt: yahooFetchedAt,
+          delayed: true,
+          stale: false,
+        },
+      }),
+    }));
+
+    const result = await cap.execute({ symbol: 'AAPL' }, { now: () => 1715000999000 });
+
+    expect(result.provenance).toMatchObject({
+      provider: 'yahoo',
+      providerName: 'Yahoo Finance',
+      instrumentId: 'XNAS:AAPL',
+      fetchedAt: yahooFetchedAt,
+      delayed: true,
+      stale: false,
+    });
+    expect(result.facts?.length).toBeGreaterThan(0);
+    expect(result.facts?.every((fact) => fact.provider === 'yahoo')).toBe(true);
+    expect(result.facts?.every((fact) => fact.timing === 'delayed')).toBe(true);
+    expect(result.facts?.every((fact) => fact.instrumentId === 'XNAS:AAPL')).toBe(true);
+    expect(result.facts?.every((fact) => fact.currency === 'USD')).toBe(true);
+    expect(result.facts?.every((fact) => fact.retrievedAt === Math.floor(yahooFetchedAt / 1000))).toBe(true);
+  });
+
   it('registers under the expected id, tool name, auth, and category', () => {
     const cap = createMarketQuoteCapability(fetchers());
     expect(cap.id).toBe('market.quote');
@@ -162,6 +200,46 @@ describe('market.quote manifest', () => {
     expect(cap.auth).toBe('public');
     expect(cap.category).toBe('market');
     expect(cap.riskLevel).toBe('read');
+  });
+});
+
+describe('market.kline manifest', () => {
+  it('maps Yahoo Finance kline provenance to facts with canonical instrument and timing', async () => {
+    const yahooFetchedAt = 1715000000000;
+    const yahooKlines = [
+      { symbol: 'AAPL', timestamp: 1714900000, open: 180, high: 182, low: 179, close: 181, volume: 5000 },
+      { symbol: 'AAPL', timestamp: 1714986400, open: 181, high: 185, low: 180, close: 184, volume: 8000 },
+    ];
+    const cap = createMarketKlineCapability(fetchers({
+      getKlineResult: async () => ({
+        data: yahooKlines,
+        provenance: {
+          providerId: 'yahoo',
+          providerName: 'Yahoo Finance',
+          fetchedAt: yahooFetchedAt,
+          delayed: true,
+          stale: false,
+        },
+      }),
+    }));
+
+    const result = await cap.execute({ symbol: 'AAPL', period: '1d' }, { now: () => 1715000999000 });
+
+    expect(result.provenance).toMatchObject({
+      provider: 'yahoo',
+      providerName: 'Yahoo Finance',
+      instrumentId: 'XNAS:AAPL',
+      fetchedAt: yahooFetchedAt,
+      delayed: true,
+      stale: false,
+      marketTime: 1714986400 * 1000,
+    });
+    expect(result.facts?.length).toBe(10);
+    expect(result.facts?.every((fact) => fact.provider === 'yahoo')).toBe(true);
+    expect(result.facts?.every((fact) => fact.timing === 'eod')).toBe(true);
+    expect(result.facts?.every((fact) => fact.instrumentId === 'XNAS:AAPL')).toBe(true);
+    expect(result.facts?.every((fact) => fact.currency === 'USD')).toBe(true);
+    expect(result.facts?.every((fact) => fact.retrievedAt === Math.floor(yahooFetchedAt / 1000))).toBe(true);
   });
 });
 

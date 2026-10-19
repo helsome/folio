@@ -1,7 +1,5 @@
 import { Type } from '@sinclair/typebox';
 import {
-  DEFAULT_INSTRUMENT_CATALOG,
-  InstrumentResolver,
   readInstrumentId,
   describeFact,
   marketCurrencyOf,
@@ -18,8 +16,7 @@ import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
 import { defaultCapabilityFetchers } from '../fetchers.ts';
-
-const DEFAULT_INSTRUMENT_RESOLVER = new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG);
+import { resolveCanonicalInstrument } from '../instruments.ts';
 
 export function createMarketQuoteCapability(
   fetchers: CapabilityFetchers = defaultCapabilityFetchers
@@ -47,21 +44,23 @@ export function createMarketQuoteCapability(
       const quote = fetched?.data ?? await fetchers.getQuote(symbol);
       if (fetched) reportProvider?.(fetched.provenance);
       const prov = fetched?.provenance;
-      const instrumentId =
-        readInstrumentId(quote) ?? prov?.instrumentId ?? resolveCanonicalInstrumentId(symbol);
       const provider = prov?.providerId ?? 'longbridge';
       const providerName = prov?.providerName ?? 'Longbridge';
+      const canonical = resolveCanonicalInstrument(symbol, prov?.providerId);
+      const instrumentId =
+        readInstrumentId(quote) ?? prov?.instrumentId ?? canonical?.instrumentId;
+      const currency = marketCurrencyOf(symbol) ?? canonical?.currency;
       const fetchedAt = prov?.fetchedAt ?? (ctx?.now ?? Date.now)();
       const timing: FactTiming = resolveFactTiming(prov);
       const stale = prov?.stale ?? false;
 
-      // Native currency is derived from the market code (structured, not free
-      // text). Timing, provider, and retrievedAt faithfully mirror the actual
+      // Native currency is derived from the market code or canonical instrument.
+      // Timing, provider, and retrievedAt faithfully mirror the actual
       // provider provenance when available, falling back safely without guessing.
       const facts = quoteToFacts(quote, {
         instrumentId,
         provider,
-        currency: marketCurrencyOf(symbol),
+        currency,
         timing,
         retrievedAt: Math.floor(fetchedAt / 1000),
       });
@@ -87,11 +86,6 @@ function resolveFactTiming(provenance?: ProviderProvenance): FactTiming {
   if (provenance?.delayed === true) return 'delayed';
   if (provenance?.delayed === false) return 'live';
   return 'unknown';
-}
-
-function resolveCanonicalInstrumentId(symbol: string): string | undefined {
-  const resolution = DEFAULT_INSTRUMENT_RESOLVER.resolve(symbol, { providerId: 'longbridge' });
-  return resolution.status === 'resolved' ? resolution.instrument.instrumentId : undefined;
 }
 
 function formatQuote(quote: Quote, facts: FinancialFact[]) {
