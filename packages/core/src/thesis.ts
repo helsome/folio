@@ -10,6 +10,7 @@ export type ThesisStance = 'bullish' | 'bearish' | 'neutral';
 export interface InvestmentThesis {
   id: string;
   symbol: string;
+  sourceReportId?: string;
   stance: ThesisStance;
   /** Core thesis statement. */
   summary: string;
