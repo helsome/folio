@@ -230,6 +230,32 @@ describe('buildComparison cell provenance (#332)', () => {
     expect(cell(comparison, 'PB', 'AAPL.US')?.provenance).toBe(pe?.provenance);
   });
 
+  it('keeps table-level sources (from stamped payloads) alongside per-cell provenance (#353+#332)', async () => {
+    const stampedQuote = {
+      ...FULL_DATA['market.quote'],
+      source: { providerId: 'massive', providerName: 'Massive', delayed: true },
+    };
+    const registry = createCapabilityRegistry([
+      makeCap('market.quote', 'get_quote', () => stampedQuote, {
+        provider: 'massive',
+        providerId: 'massive',
+        providerName: 'Massive',
+        fetchedAt: 5_000,
+        delayed: true,
+        stale: false,
+      }),
+    ]);
+
+    const comparison = await buildComparison(['AAPL.US'], registry, { now: () => 1 });
+
+    // Table-level summary (#353) survives.
+    expect(comparison.sources).toEqual(['Massive']);
+    expect(comparison.delayed).toBe(true);
+    // Per-metric provenance (#332) rides on the same cell.
+    const price = cell(comparison, 'Price', 'AAPL.US');
+    expect(price?.provenance).toMatchObject({ provider: 'massive', fetchedAt: 5_000, delayed: true });
+  });
+
   it('stamps kline-derived cells with the bar series source and the latest bar as as_of', async () => {
     const klineProvenance: CapabilityProvenance = {
       provider: 'longbridge',

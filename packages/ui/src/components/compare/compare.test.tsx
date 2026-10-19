@@ -38,12 +38,17 @@ const LONGBRIDGE_PROVENANCE = {
   stale: false,
 };
 
-function comparisonWith(cells: Record<string, ComparisonCell>): Comparison {
+function comparisonWith(
+  cells: Record<string, ComparisonCell>,
+  summary: { sources?: string[]; delayed?: boolean } = {}
+): Comparison {
   return {
     symbols: ['AAPL.US', 'MSFT.US'],
     rows: [{ metric: 'Price', cells }],
     generatedAt: 1_710_000_002_000,
     errors: {},
+    ...(summary.sources ? { sources: summary.sources } : {}),
+    ...(summary.delayed !== undefined ? { delayed: summary.delayed } : {}),
   };
 }
 
@@ -142,38 +147,45 @@ describe('CompareWorkspace header source summary (#332)', () => {
     return { container, root };
   }
 
-  it('names the single actual provider instead of a hardcoded badge', async () => {
+  it('names the table sources from the service summary instead of a hardcoded badge', async () => {
     const { container, root } = await renderWorkspaceWith(
-      comparisonWith({
-        'AAPL.US': { value: 100, missing: false, display: '$100.00', provenance: MASSIVE_PROVENANCE },
-        'MSFT.US': { value: 90, missing: false, display: '$90.00', provenance: MASSIVE_PROVENANCE },
-      })
+      comparisonWith(
+        {
+          'AAPL.US': { value: 100, missing: false, display: '$100.00', provenance: MASSIVE_PROVENANCE },
+          'MSFT.US': { value: 90, missing: false, display: '$90.00', provenance: MASSIVE_PROVENANCE },
+        },
+        { sources: ['Massive'], delayed: true }
+      )
     );
     try {
       const header = container.querySelector('[data-testid="compare-workspace"]')?.textContent ?? '';
       expect(header).toContain('Massive');
+      expect(header).toContain('Delayed');
       expect(header).not.toContain('Longbridge ·');
     } finally {
       await cleanup(root, container);
     }
   });
 
-  it('labels a mixed-source table as mixed instead of one provider', async () => {
+  it('lists mixed table sources instead of presenting one provider', async () => {
     const { container, root } = await renderWorkspaceWith(
-      comparisonWith({
-        'AAPL.US': { value: 100, missing: false, display: '$100.00', provenance: MASSIVE_PROVENANCE },
-        'MSFT.US': { value: 90, missing: false, display: '$90.00', provenance: LONGBRIDGE_PROVENANCE },
-      })
+      comparisonWith(
+        {
+          'AAPL.US': { value: 100, missing: false, display: '$100.00', provenance: MASSIVE_PROVENANCE },
+          'MSFT.US': { value: 90, missing: false, display: '$90.00', provenance: LONGBRIDGE_PROVENANCE },
+        },
+        { sources: ['Massive', 'Longbridge'] }
+      )
     );
     try {
       const header = container.querySelector('[data-testid="compare-workspace"]')?.textContent ?? '';
-      expect(header).toContain('Mixed sources');
+      expect(header).toContain('Massive, Longbridge');
     } finally {
       await cleanup(root, container);
     }
   });
 
-  it('shows no provider name when no cell carries provenance', async () => {
+  it('shows no provider name when the table carries no source summary', async () => {
     const { container, root } = await renderWorkspaceWith(
       comparisonWith({
         'AAPL.US': { value: 100, missing: false, display: '$100.00' },
@@ -184,7 +196,6 @@ describe('CompareWorkspace header source summary (#332)', () => {
       const header = container.querySelector('[data-testid="compare-workspace"]')?.textContent ?? '';
       expect(header).not.toContain('Longbridge');
       expect(header).not.toContain('Massive');
-      expect(header).not.toContain('Mixed sources');
     } finally {
       await cleanup(root, container);
     }

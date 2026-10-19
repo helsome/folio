@@ -9,7 +9,6 @@ export const compare = {
   addTwo: '至少添加两个标的以生成对比。',
   agentContext: '当对比工作台处于焦点时，Agent 上下文会携带这些标的。',
   unavailable: '当前环境无法进行对比。',
-  mixedSources: '多来源混合',
   source: {
     provider: '来源',
     asOf: '数据时点',

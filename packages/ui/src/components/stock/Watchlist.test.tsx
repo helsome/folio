@@ -128,6 +128,7 @@ it.each([false, true])('renders failed rows as unavailable without sample prices
     if (allFailed) { expect(container.textContent).not.toContain('Yahoo Finance'); expect(container.textContent).not.toContain('Updated'); }
     else expect(container.textContent).toContain('Yahoo Finance');
   } finally { await act(async () => root.unmount()); container.remove(); }
+});
 
 it('header names the stamped sources; row tooltip carries full provenance (#332)', async () => {
   const market = {
@@ -169,5 +170,4 @@ it('never falls back to a hardcoded provider when quotes carry no source', async
     await act(async () => root.unmount());
     container.remove();
   }
-});
 });

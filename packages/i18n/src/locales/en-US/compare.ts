@@ -8,7 +8,6 @@ export const compare = {
   addTwo: 'Add at least two symbols to build a comparison.',
   agentContext: 'The agent context carries these symbols while the Compare workspace is focused.',
   unavailable: 'Comparison is unavailable in this environment.',
-  mixedSources: 'Mixed sources',
   source: {
     provider: 'Source',
     asOf: 'As of',
