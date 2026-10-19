@@ -1,5 +1,5 @@
-import React, { useEffect, useState } from 'react';
-import { useAtom, useAtomValue, useSetAtom } from 'jotai';
+import React, { useEffect, useRef, useState } from 'react';
+import { useAtom, useAtomValue, useSetAtom, useStore } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import { Check, Search } from 'lucide-react';
 import type { ResearchRunSummary, ResearchReport, StrategyId } from '@finagent/core';
@@ -8,6 +8,7 @@ import { pendingResearchStrategyAtom, researchOriginAtom } from '../../atoms/dis
 import {
   researchRunsAtom,
   researchReportAtom,
+  selectedReportIdAtom,
   researchLoadingAtom,
   startResearch,
   cancelResearch,
@@ -17,6 +18,7 @@ import {
   loadResearchReport,
   TERMINAL_RUN_STATUSES,
 } from '../../atoms/researchAtoms';
+import { researchSelectionAtom } from '../../atoms/researchSelectionAtoms';
 import { saveThesisFromReport } from '../../client/thesis';
 import { ResearchReportView } from './ResearchReportView';
 import { ResearchMarketWorkspace } from './ResearchMarketWorkspace';
@@ -39,12 +41,14 @@ function lastStrategyKey(symbol: string): string {
 export const ResearchPanel: React.FC = () => {
   const { t } = useTranslation();
   const client = useFinagentClient();
+  const store = useStore();
   const symbol = useAtomValue(activeSymbolAtom);
   const setActiveSymbol = useSetAtom(activeSymbolAtom);
   const setNavSection = useSetAtom(navSectionAtom);
   const [runs, setRuns] = useAtom(researchRunsAtom);
-  const [reports, setReports] = useState<ResearchReport[]>([]);
+  const [reportHistory, setReportHistory] = useState<{ symbol: string; reports: ResearchReport[] } | null>(null);
   const [report, setReport] = useAtom(researchReportAtom);
+  const [selectedReportId, setSelectedReportId] = useAtom(selectedReportIdAtom);
   const [loading, setLoading] = useAtom(researchLoadingAtom);
   const [error, setError] = useState<string | null>(null);
   const [strategyId, setStrategyId] = useState<StrategyId>(DEFAULT_STRATEGY_ID);
@@ -54,6 +58,19 @@ export const ResearchPanel: React.FC = () => {
   const [symbolInput, setSymbolInput] = useState('');
   const [symbolError, setSymbolError] = useState<string | null>(null);
   const [thesisSaved, setThesisSaved] = useState(false);
+  const pendingActionRef = useRef(0);
+  const pendingSymbolRef = useRef(symbol);
+  const contextRef = useRef({ symbol, selectedReportId });
+  if (contextRef.current.symbol !== symbol || contextRef.current.selectedReportId !== selectedReportId) {
+    contextRef.current = { symbol, selectedReportId };
+  }
+  useEffect(() => {
+    setLoading(false);
+    return () => {
+      pendingActionRef.current++;
+      contextRef.current = { symbol: null, selectedReportId: null };
+    };
+  }, [setLoading]);
 
   // Discover → Research: a candidate card carries a recommended strategy.
   useEffect(() => {
@@ -78,73 +95,107 @@ export const ResearchPanel: React.FC = () => {
       setRuns(loaded);
       const validRuns = loaded.filter((run) => SYMBOL_REGEX.test(run.symbol));
       const recent = validRuns.find((run) => run.status === 'interrupted' || !(run.status in TERMINAL_RUN_STATUSES)) ?? validRuns[0];
-      if (recent) setActiveSymbol((current) => current ?? recent.symbol);
+      const saved = store.get(researchSelectionAtom);
+      const restoredSymbol = saved && SYMBOL_REGEX.test(saved.symbol) && typeof saved.reportId === 'string'
+        ? saved.symbol : null;
+      setActiveSymbol((current) => current ?? restoredSymbol ?? recent?.symbol ?? null);
     });
     return () => { alive = false; };
-  }, [setRuns, setActiveSymbol]);
+  }, [setRuns, setActiveSymbol, store]);
 
   useEffect(() => {
-    if (!symbol) {
-      setReports([]);
-      setReport(null);
-      setThesisSaved(false);
-      return;
+    setError(null);
+    if (pendingSymbolRef.current !== symbol) {
+      pendingActionRef.current++;
+      pendingSymbolRef.current = symbol;
+      setLoading(false);
     }
-    setThesisSaved(false);
-    void loadSymbolReports(symbol).then(setReports);
-    const latest = runs.find((run) => run.symbol === symbol && run.reportId);
-    if (latest?.reportId && !report) {
-      void loadResearchReport(latest.reportId).then((loaded) => {
-        if (loaded) setReport(loaded);
-      });
-    }
-  }, [symbol, setReport, setReports, runs, report]);
+  }, [symbol, setLoading]);
 
-  // Poll the newest active run for this symbol while it is non-terminal.
+  useEffect(() => {
+    let alive = true;
+    if (symbol) void loadSymbolReports(symbol).then((loaded) => {
+      if (alive) setReportHistory({ symbol, reports: loaded.filter((item) => item.symbol === symbol)
+        .sort((a, b) => b.generatedAt - a.generatedAt) });
+    });
+    return () => { alive = false; };
+  }, [symbol, runs]);
+
+  const reports = reportHistory?.symbol === symbol ? reportHistory.reports : [];
   const activeRun = runs.find(
     (run) => run.symbol === symbol && !(run.status in TERMINAL_RUN_STATUSES)
   );
+  const latestReportId = reports[0]?.id;
+  useEffect(() => {
+    if (symbol && !selectedReportId && !activeRun && !loading && latestReportId) setSelectedReportId(latestReportId);
+  }, [symbol, selectedReportId, activeRun?.id, loading, latestReportId, setSelectedReportId]);
+
+  useEffect(() => {
+    let alive = true;
+    setThesisSaved(false);
+    if (!symbol || !selectedReportId) {
+      setReport(null);
+    } else {
+      void loadResearchReport(selectedReportId).then((loaded) => {
+        if (!alive || store.get(activeSymbolAtom) !== symbol || store.get(selectedReportIdAtom) !== selectedReportId) return;
+        if (loaded?.symbol === symbol && loaded.id === selectedReportId) setReport(loaded);
+        else { setReport(null); setError(t('research.reportUnavailable')); }
+      });
+    }
+    return () => { alive = false; };
+  }, [symbol, selectedReportId, setReport, store, t]);
+
+  // Poll the newest active run for this symbol while it is non-terminal.
   useEffect(() => {
     if (!activeRun) return;
     let alive = true;
+    let polling = false;
     const timer = setInterval(async () => {
+      if (polling) return;
+      polling = true;
       const updated = await loadResearchRun(activeRun.id);
-      if (!alive || !updated) return;
+      polling = false;
+      if (!alive || !updated || updated.symbol !== symbol || store.get(activeSymbolAtom) !== symbol) return;
       setRuns((current) => {
         const next = [updated, ...current.filter((run) => run.id !== updated.id)];
         return next;
       });
       if (updated.status in TERMINAL_RUN_STATUSES && updated.reportId) {
-        const loaded = await loadResearchReport(updated.reportId);
-        if (alive && loaded) {
-          setReport(loaded);
-          void loadSymbolReports(updated.symbol).then(setReports);
-        }
+        setSelectedReportId((current) => current ?? updated.reportId!);
       }
     }, POLL_MS);
     return () => {
       alive = false;
       clearInterval(timer);
     };
-  }, [activeRun?.id, setRuns, setReport]);
+  }, [activeRun?.id, symbol, setRuns, setSelectedReportId, store]);
 
   const handleStart = async (targetSymbol = symbol) => {
-    if (!targetSymbol || loading || activeRun) return;
+    if (!targetSymbol || (targetSymbol === symbol && (loading || activeRun))) return;
+    const context = contextRef.current.symbol === targetSymbol ? contextRef.current : null;
+    const selectedAtStart = store.get(selectedReportIdAtom);
+    const request = ++pendingActionRef.current;
+    pendingSymbolRef.current = targetSymbol;
+    const isCurrent = () => pendingActionRef.current === request && store.get(activeSymbolAtom) === targetSymbol &&
+      (context ? contextRef.current === context : store.get(selectedReportIdAtom) === selectedAtStart);
     setLoading(true);
     setError(null);
     try {
       const started = await startResearch({ symbol: targetSymbol, strategyId });
       if (started) {
         setRuns((current) => [started, ...current.filter((run) => run.id !== started.id)]);
+        if (isCurrent()) {
+          setSelectedReportId(started.reportId ?? null);
+        }
         // Remember this strategy for the symbol so the next run defaults to it.
         writePersisted(lastStrategyKey(targetSymbol), strategyId);
       } else {
-        setError(t('research.notAvailable'));
+        if (isCurrent()) setError(t('research.notAvailable'));
       }
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
+      if (isCurrent()) setError(caught instanceof Error ? caught.message : String(caught));
     } finally {
-      setLoading(false);
+      if (pendingActionRef.current === request) setLoading(false);
     }
   };
 
@@ -173,8 +224,10 @@ export const ResearchPanel: React.FC = () => {
 
   /** V9: research complete → one-click save as investment thesis. */
   const handleSaveThesis = async () => {
-    if (!symbol) return;
-    const created = await saveThesisFromReport(symbol);
+    if (!symbol || !report) return;
+    const context = contextRef.current;
+    const created = await saveThesisFromReport(symbol, report.id);
+    if (contextRef.current !== context || store.get(selectedReportIdAtom) !== report.id) return;
     if (created) {
       setThesisSaved(true);
     } else {
@@ -190,25 +243,32 @@ export const ResearchPanel: React.FC = () => {
     setResearchOrigin(null);
   };
 
-  const symbolRuns = runs.filter((run) => run.symbol === symbol);
   const recoverableRuns = runs.filter((run) => (!symbol || run.symbol === symbol) &&
     (run.status === 'interrupted' || (run.status === 'failed' && run.error)));
 
   const handleRecovery = async (runId: string, action: 'resume' | 'restart' | 'discard') => {
+    const context = contextRef.current;
+    const request = ++pendingActionRef.current;
+    pendingSymbolRef.current = symbol;
     setLoading(true);
     setError(null);
     try {
       const method = client.research?.[action];
       if (!method) throw new Error(t('research.notAvailable'));
       const result = await method({ runId });
+      if (pendingActionRef.current !== request) return;
       if (!result.ok) throw new Error(result.error.message);
-      if (action !== 'discard' && result.data) {
+      const loaded = await loadResearchRuns();
+      if (pendingActionRef.current !== request) return;
+      setRuns(loaded);
+      if (contextRef.current === context && action !== 'discard' && result.data) {
         setActiveSymbol((result.data as ResearchRunSummary).symbol);
       }
-      setRuns(await loadResearchRuns());
     } catch (caught) {
-      setError(caught instanceof Error ? caught.message : String(caught));
-    } finally { setLoading(false); }
+      if (contextRef.current === context) setError(caught instanceof Error ? caught.message : String(caught));
+    } finally {
+      if (pendingActionRef.current === request) setLoading(false);
+    }
   };
 
   return (
@@ -309,7 +369,15 @@ export const ResearchPanel: React.FC = () => {
         {!symbol && <SymbolEntry error={symbolError} value={symbolInput} onChange={setSymbolInput} onSubmit={handleSymbolEntrySubmit} />}
 
         {symbol && (
+          <ReportHistory reports={reports} selectedReportId={selectedReportId} onSelect={(reportId) => {
+            setError(null);
+            setSelectedReportId(reportId);
+          }} />
+        )}
+
+        {symbol && (
           <ResearchMarketWorkspace
+            key={symbol}
             symbol={symbol}
             report={report && report.symbol === symbol ? report : null}
             activeRun={activeRun?.status ?? null}
@@ -341,6 +409,7 @@ export const ResearchPanel: React.FC = () => {
         {report && symbol && report.symbol === symbol && (
           <ContentReveal testId="research-report-reveal">
             <ResearchReportView
+              key={report.id}
               report={report}
               nextAction={
                 thesisSaved ? (
@@ -362,15 +431,6 @@ export const ResearchPanel: React.FC = () => {
           </ContentReveal>
         )}
 
-        {symbol && !activeRun && !report && (
-          <RunHistory
-            runs={symbolRuns}
-            onSelect={async (reportId) => {
-              const loaded = await loadResearchReport(reportId);
-              if (loaded) setReport(loaded);
-            }}
-          />
-        )}
       </div>
     </div>
   );
@@ -530,30 +590,34 @@ const SemanticStageList: React.FC<{ run: ResearchRunSummary }> = ({ run }) => {
   );
 };
 
-const RunHistory: React.FC<{
-  runs: ResearchRunSummary[];
+const ReportHistory: React.FC<{
+  reports: ResearchReport[];
+  selectedReportId: string | null;
   onSelect: (reportId: string) => void;
-}> = ({ runs, onSelect }) => {
+}> = ({ reports, selectedReportId, onSelect }) => {
   const { t } = useTranslation();
-  if (runs.length === 0) return <EmptyState />;
   return (
-    <div className="flex flex-col gap-1.5">
-      {runs.map((run) => (
+    <section className="flex flex-col gap-1.5" data-testid="research-history" aria-label={t('research.history')}>
+      <h3 className="text-[12.5px] font-semibold text-foreground">{t('research.history')}</h3>
+      {reports.length === 0 && <EmptyState />}
+      {reports.map((item) => (
         <button
-          key={run.id}
-          onClick={() => {
-            if (run.reportId) onSelect(run.reportId);
-          }}
+          key={item.id}
+          data-report-id={item.id}
+          aria-pressed={selectedReportId === item.id}
+          onClick={() => onSelect(item.id)}
           className="mac-list-row flex w-full items-center justify-between rounded-[8px] px-3 py-2 text-left"
         >
-          <span className="text-[12.5px] font-semibold text-foreground">{run.symbol}</span>
+          <span className="flex items-center gap-1.5 text-[12.5px] font-semibold text-foreground">
+            {selectedReportId === item.id && <Check className="h-3.5 w-3.5 text-accent" aria-hidden="true" />}
+            {item.symbol}
+          </span>
           <span className="tnum text-[11px] text-text-muted">
-            {t(`research.runStatus.${run.status}`)}
-            {run.finishedAt ? ` · ${new Date(run.finishedAt).toLocaleTimeString()}` : ''}
+            {t(`research.runStatus.${item.runStatus}`)} · {new Date(item.generatedAt).toLocaleString()}
           </span>
         </button>
       ))}
-    </div>
+    </section>
   );
 };
 

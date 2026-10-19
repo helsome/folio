@@ -73,6 +73,7 @@ describe('reportToThesis', () => {
 
     expect(thesis.id).toBe('thesis-1');
     expect(thesis.symbol).toBe('NVDA.US');
+    expect(thesis.sourceReportId).toBe('report-1');
     expect(thesis.stance).toBe('bullish');
     expect(thesis.summary).toBe('NVDA leads the AI compute build-out.');
     expect(thesis.bullCase).toEqual(['Data-center demand is compounding']);
@@ -91,6 +92,11 @@ describe('reportToThesis', () => {
 });
 
 describe('parseThesisDraftJson', () => {
+  it('preserves source report identity through validation', () => {
+    const thesis = reportToThesis(makeReport(), () => 'thesis-1');
+    const parsed = parseThesisDraftJson(JSON.stringify({ ...thesis, sourceReportId: 'report-old' }));
+    expect(parsed.sourceReportId).toBe('report-old');
+  });
   it('accepts raw JSON', () => {
     const draft = JSON.stringify({
       id: 't-1',

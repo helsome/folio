@@ -185,6 +185,7 @@ mock.module('@finagent/shared', () => ({
   MassiveFinancialDataProvider: class {
     clearCache = () => undefined;
   },
+  YahooChartFinancialDataProvider: class {},
   ProviderRouter: class {
     register = () => undefined;
     setRouting = () => undefined;

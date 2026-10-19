@@ -1,6 +1,20 @@
-import { atom } from 'jotai';
+import { atom, type SetStateAction } from 'jotai';
 import type { ResearchReport, ResearchRunSummary, ResearchRunStatus } from '@finagent/core';
 import { unwrapIpcResult } from '../client/unwrap';
+import { activeSymbolAtom } from './workspaceAtoms';
+import { researchSelectionAtom } from './researchSelectionAtoms';
+
+export const selectedReportIdAtom = atom(
+  (get) => {
+    const selection = get(researchSelectionAtom);
+    return selection?.symbol === get(activeSymbolAtom) ? selection?.reportId ?? null : null;
+  },
+  (get, set, next: SetStateAction<string | null>) => {
+    const reportId = typeof next === 'function' ? next(get(selectedReportIdAtom)) : next;
+    const symbol = get(activeSymbolAtom);
+    set(researchSelectionAtom, symbol && reportId ? { symbol, reportId } : null);
+  }
+);
 
 /**
  * Deep Research view state.
@@ -14,7 +28,14 @@ import { unwrapIpcResult } from '../client/unwrap';
 export const researchRunsAtom = atom<ResearchRunSummary[]>([]);
 
 /** The report currently shown in the report view. */
-export const researchReportAtom = atom<ResearchReport | null>(null);
+const loadedReportAtom = atom<ResearchReport | null>(null);
+export const researchReportAtom = atom(
+  (get) => {
+    const report = get(loadedReportAtom);
+    return report?.symbol === get(activeSymbolAtom) && report?.id === get(selectedReportIdAtom) ? report : null;
+  },
+  (_get, set, report: ResearchReport | null) => set(loadedReportAtom, report)
+);
 
 /** Reports available for the active symbol (hydrated from `research:listReports`). */
 export const symbolReportsAtom = atom<ResearchReport[]>([]);
