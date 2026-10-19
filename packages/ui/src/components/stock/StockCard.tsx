@@ -1,5 +1,6 @@
 import React from 'react';
 import type { Quote } from '@finagent/core';
+import { currencyForSymbol, formatMoney } from '../../lib/money';
 
 interface StockCardProps {
   quote: Quote;
@@ -10,6 +11,8 @@ export const StockCard: React.FC<StockCardProps> = ({ quote, onClick }) => {
   const isPositive = quote.change >= 0;
   const changeColor = isPositive ? 'text-[var(--mac-green)]' : 'text-[var(--mac-red)]';
   const bgColor = isPositive ? 'border-[rgba(48,209,88,0.22)]' : 'border-[rgba(255,69,58,0.22)]';
+  // A tile shows one instrument, so every price uses that instrument's currency.
+  const currency = currencyForSymbol(quote.symbol);
 
   return (
     <div
@@ -20,7 +23,7 @@ export const StockCard: React.FC<StockCardProps> = ({ quote, onClick }) => {
         <div>
           <div className="text-[13px] font-semibold text-foreground/72">{quote.symbol}</div>
           <div className="mt-1 text-2xl font-semibold tracking-tight text-foreground">
-            ${quote.lastPrice.toFixed(2)}
+            {formatMoney(quote.lastPrice, currency)}
           </div>
         </div>
         <div className={`text-right ${changeColor}`}>
@@ -34,7 +37,7 @@ export const StockCard: React.FC<StockCardProps> = ({ quote, onClick }) => {
       </div>
       <div className="mt-3 flex justify-between text-[12px] text-foreground/48">
         <span>Vol: {quote.volume.toLocaleString()}</span>
-        <span>H: ${quote.high.toFixed(2)} L: ${quote.low.toFixed(2)}</span>
+        <span>H: {formatMoney(quote.high, currency)} L: {formatMoney(quote.low, currency)}</span>
       </div>
     </div>
   );

@@ -21,3 +21,14 @@ export {
   type SanitizePolicy,
   type SanitizeResult,
 } from './sanitize.ts';
+export {
+  CLAIM_VERIFIER_VERSION,
+  createClaimVerifier,
+  verifyReportClaims,
+  type ClaimVerificationInput,
+  type ClaimVerificationResult,
+  type ClaimVerificationStatus,
+  type ClaimVerifier,
+  type ClaimVerifierEvidence,
+  type ReportClaimVerificationSummary,
+} from './claim-verifier.ts';

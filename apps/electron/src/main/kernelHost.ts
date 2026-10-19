@@ -96,6 +96,7 @@ import {
   LocalResearchSynthesizer,
   MarketDataService,
   MassiveFinancialDataProvider,
+  YahooChartFinancialDataProvider,
   parseImpactJson,
   parseSynthesisJson,
   PortfolioRiskService,
@@ -238,6 +239,15 @@ interface StartRunRequest {
 /** Experiment id for runs observed outside explicit evaluation experiments. */
 const OBSERVABILITY_EXPERIMENT_ID = '__observability__';
 
+/**
+ * `RunManager` reports a user cancel as `run_failed` carrying this code and
+ * normalizes it to `cancelled` on the stream channel. The observability store
+ * has to read the same code, otherwise a deliberate cancel is recorded as a
+ * task failure and lands in the evaluated-quality bucket instead of `skipped`
+ * (`isSkippedRun` keys off `status === 'cancelled'`).
+ */
+const RUN_CANCELLED_CODE = 'RUN_CANCELLED';
+
 interface PendingEvalRun {
   sessionId: string;
   startedAt: number;
@@ -324,8 +334,11 @@ export class AgentKernelHost {
 
     // V4 provider platform: the capability registry is built on top of the
     // provider router, which owns the Longbridge (primary) and Massive
-    // (fallback) adapters. Business layers see only the neutral capability
-    // surface — vendor specifics stay inside the adapters.
+    // (fallback) adapters. Yahoo Finance is always registered as a no-key US
+    // backup: the router tries it after the configured chain fails, and
+    // Connections can promote it to primary or fallback. Business layers see
+    // only the neutral capability surface — vendor specifics stay inside the
+    // adapters.
     this.connectionStore = new ConnectionStore(new JsonFileStore(userData));
     this.providerRouter = new ProviderRouter({
       resolveRouting: () => this.connectionStore.getRouting(DEFAULT_PROVIDER_ROUTING),
@@ -341,6 +354,7 @@ export class AgentKernelHost {
     this.providerRouter.register(longbridgeData);
     this.providerRouter.register(longbridgeBroker);
     this.providerRouter.register(massive);
+    this.providerRouter.register(new YahooChartFinancialDataProvider());
     this.providerRouter.setRouting(DEFAULT_PROVIDER_ROUTING);
 
     // Keep renderer IPC and agent tools on the same provider gateway.  The
@@ -1328,21 +1342,25 @@ export class AgentKernelHost {
       pending.answer = event.payload.answer;
     } else if (event.type === 'run_completed' || event.type === 'run_failed') {
       if (event.type === 'run_failed') pending.error = event.payload.error;
-      const completed = event.type === 'run_completed';
-      void this.settleEvaluationRun(event.runId, event.sessionId, completed, event.timestamp);
+      const status: EvaluationRunStatus =
+        event.type === 'run_completed'
+          ? 'completed'
+          : event.payload.error?.code === RUN_CANCELLED_CODE
+            ? 'cancelled'
+            : 'failed';
+      void this.settleEvaluationRun(event.runId, event.sessionId, status, event.timestamp);
     }
   }
 
   private async settleEvaluationRun(
     runId: string,
     sessionId: string,
-    completed: boolean,
+    status: EvaluationRunStatus,
     endedAt: number
   ): Promise<void> {
     const pending = this.evalRuns.get(runId);
     this.evalRuns.delete(runId);
     if (!pending) return;
-    const status: EvaluationRunStatus = completed ? 'completed' : 'failed';
     const toolCalls: ToolCallRecord[] = pending.toolCalls.map((toolCall) => ({
       id: toolCall.id,
       toolName: toolCall.toolName,
@@ -1389,7 +1407,7 @@ export class AgentKernelHost {
       answer: run.answer,
       toolCalls: run.toolCalls,
       error: pending.error,
-      completed,
+      completed: status === 'completed',
     });
     if (ref) {
       await this.persistTraceLink(runId, ref);
@@ -1764,7 +1782,9 @@ export class AgentKernelHost {
       configured:
         provider.id === 'massive'
           ? Boolean(await this.credentials.getCredential(MASSIVE_CREDENTIAL_ID))
-          : health?.status === 'connected',
+          : provider.id === 'yahoo'
+            ? config?.enabled !== false
+            : health?.status === 'connected',
       hasAccount,
       accountLabel,
       error: state?.error ?? null,
@@ -1788,6 +1808,22 @@ export class AgentKernelHost {
   async connectProvider(input: unknown): Promise<{ status: 'connecting' | 'connected'; verificationUrl?: string }> {
     const request = requireObject(input);
     const providerId = requireString(request.providerId, 'providerId');
+    if (providerId === 'yahoo') {
+      const existing = await this.connectionStore.getConfig(providerId);
+      await this.connectionStore.setConfig(providerId, {
+        enabled: true,
+        endpoint: existing?.endpoint,
+        region: existing?.region,
+      });
+      const now = Date.now();
+      await this.connectionStore.update({
+        providerId,
+        status: 'connected',
+        lastCheck: now,
+        connectedAt: now,
+      });
+      return { status: 'connected' };
+    }
     if (providerId !== 'longbridge') {
       throw createCodeError('CONFIG_UNSUPPORTED', 'Connect is only supported for the Longbridge CLI.');
     }
@@ -1870,6 +1906,15 @@ export class AgentKernelHost {
       await longbridgeLogout({ exec: executeLongBridgeCli });
     } else if (providerId === 'massive') {
       await this.credentials.removeCredential(MASSIVE_CREDENTIAL_ID);
+    } else if (providerId === 'yahoo') {
+      const existing = await this.connectionStore.getConfig(providerId);
+      await this.connectionStore.setConfig(providerId, {
+        enabled: false,
+        endpoint: existing?.endpoint,
+        region: existing?.region,
+      });
+      const yahoo = this.providerRouter.get('yahoo');
+      if (yahoo instanceof YahooChartFinancialDataProvider) yahoo.clearCache();
     }
     await this.connectionStore.update({ providerId, status: 'not-connected', lastCheck: Date.now() });
     return this.entryFor(provider);
@@ -1959,10 +2004,21 @@ export class AgentKernelHost {
       await this.connectionStore.setRouting(next);
       this.providerRouter.setRouting(next);
     }
-    await this.connectionStore.update({ providerId, status: 'not-connected', lastCheck: Date.now() });
+    const yahooReady = providerId === 'yahoo' && enabled !== false;
+    const now = Date.now();
+    await this.connectionStore.update({
+      providerId,
+      status: yahooReady ? 'connected' : 'not-connected',
+      lastCheck: now,
+      ...(yahooReady ? { connectedAt: now } : {}),
+    });
     const massive = this.providerRouter.get('massive');
     if (massive instanceof MassiveFinancialDataProvider) {
       massive.clearCache();
+    }
+    const yahoo = this.providerRouter.get('yahoo');
+    if (yahoo instanceof YahooChartFinancialDataProvider) {
+      yahoo.clearCache();
     }
     return this.entryFor(provider);
   }
@@ -2222,10 +2278,7 @@ export class AgentKernelHost {
 
   async automationSaveRule(input: unknown): Promise<AutomationRule> {
     const request = requireObject(input);
-    const rule = request.rule as unknown as AutomationRule;
-    if (!rule || typeof rule.type !== 'string') {
-      throw createCodeError('AUTOMATION_RULE_INVALID', 'A valid automation rule is required.');
-    }
+    const rule = requireAutomationRule(request.rule);
     return this.automationRules.save(rule);
   }
 
@@ -2593,6 +2646,10 @@ function getLongBridgeStatusAction(status: string) {
       return 'Run longbridge auth login to authenticate the LongBridge CLI.';
     case 'rate_limited':
       return 'LongBridge is rate-limited; market data requests are paused. Try again later.';
+    case 'timeout':
+      return 'LongBridge CLI timed out; market data requests are paused. Check your network or proxy and retry.';
+    case 'unknown':
+      return 'LongBridge CLI reported an unexpected error; run `longbridge --version` in a terminal to verify the install and retry.';
     default:
       return undefined;
   }
@@ -2684,6 +2741,69 @@ function requireObject(value: unknown): Record<string, unknown> {
     throw createCodeError('INVALID_ARGUMENT', 'Expected an object payload.');
   }
   return value as Record<string, unknown>;
+}
+
+const AUTOMATION_TYPES: ReadonlySet<AutomationRule['type']> = new Set([
+  'watchlist-daily-review',
+  'portfolio-daily-brief',
+  'weekly-thesis-review',
+  'pre-earnings-research',
+  'post-earnings-research',
+]);
+
+function requireAutomationRule(value: unknown): AutomationRule {
+  const invalid = (message: string): never => {
+    throw createCodeError('AUTOMATION_RULE_INVALID', message);
+  };
+  if (!isRecord(value)) {
+    throw createCodeError('AUTOMATION_RULE_INVALID', 'A valid automation rule is required.');
+  }
+
+  if (typeof value.id !== 'string' || value.id.trim() === '') {
+    invalid('Automation rule id must be a non-empty string.');
+  }
+  if (typeof value.type !== 'string' || !AUTOMATION_TYPES.has(value.type as AutomationRule['type'])) {
+    invalid('Automation rule type is unsupported.');
+  }
+  if (typeof value.enabled !== 'boolean') {
+    invalid('Automation rule enabled must be a boolean.');
+  }
+  if (value.notify !== 'material-only' && value.notify !== 'all') {
+    invalid('Automation rule notify mode is unsupported.');
+  }
+  if (typeof value.createdAt !== 'number' || !Number.isFinite(value.createdAt) || value.createdAt < 0) {
+    invalid('Automation rule createdAt must be a non-negative timestamp.');
+  }
+  if (
+    value.hour !== undefined &&
+    (typeof value.hour !== 'number' || !Number.isFinite(value.hour) || value.hour < 0 || value.hour >= 24)
+  ) {
+    invalid('Automation rule hour must be between 0 (inclusive) and 24 (exclusive).');
+  }
+  if (value.days !== undefined) {
+    if (
+      !Array.isArray(value.days) ||
+      value.days.some((day) => !Number.isInteger(day) || day < 0 || day > 6) ||
+      new Set(value.days).size !== value.days.length
+    ) {
+      invalid('Automation rule days must contain unique weekday integers from 0 through 6.');
+    }
+  }
+  if (
+    value.symbols !== undefined &&
+    (!Array.isArray(value.symbols) ||
+      value.symbols.some((symbol) => typeof symbol !== 'string' || symbol.trim() === ''))
+  ) {
+    invalid('Automation rule symbols must be non-empty strings.');
+  }
+  if (
+    value.strategyId !== undefined &&
+    (typeof value.strategyId !== 'string' || !STRATEGY_IDS.includes(value.strategyId as StrategyId))
+  ) {
+    invalid('Automation rule strategyId is unsupported.');
+  }
+
+  return value as unknown as AutomationRule;
 }
 
 function createCodeError(code: string, message: string, action?: string) {

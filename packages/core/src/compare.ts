@@ -23,4 +23,8 @@ export interface Comparison {
   generatedAt: number;
   /** symbol → fetch error message (rows still render with missing cells). */
   errors: Record<string, string>;
+  /** Display names of the providers that actually supplied quote or candle data. */
+  sources?: string[];
+  /** True when any contributing market-data source is delayed. */
+  delayed?: boolean;
 }

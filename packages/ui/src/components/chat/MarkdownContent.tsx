@@ -56,7 +56,7 @@ function useStreamingContent(content: string, streaming: boolean): string {
     let cancelled = false;
     const timer = setTimeout(() => {
       cancelFrame.current = null;
-      if (!cancelled) setDisplayContent(pendingContent.current);
+      if (!cancelled && typeof window !== 'undefined') setDisplayContent(pendingContent.current);
     }, 16);
     cancelFrame.current = () => {
       cancelled = true;

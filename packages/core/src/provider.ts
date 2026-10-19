@@ -240,7 +240,16 @@ export interface BrokerAccountProvider {
 
   getPortfolio(accountId?: string, signal?: AbortSignal): Promise<ProviderResult<PortfolioSnapshot>>;
   getPositions(accountId?: string, signal?: AbortSignal): Promise<ProviderResult<PortfolioSnapshot['holdings']>>;
-  getAssets(accountId?: string, signal?: AbortSignal): Promise<ProviderResult<AccountAssets[]>>;
+  /**
+   * Account asset overview (one entry per reporting currency). `currency`
+   * narrows the result to a single reporting currency; a provider that cannot
+   * filter ignores it rather than failing.
+   */
+  getAssets(
+    accountId?: string,
+    signal?: AbortSignal,
+    currency?: string
+  ): Promise<ProviderResult<AccountAssets[]>>;
   getCashFlow(
     accountId?: string,
     options?: unknown,

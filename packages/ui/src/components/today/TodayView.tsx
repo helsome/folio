@@ -26,6 +26,7 @@ import { loadSymbolReports } from '../../atoms/researchAtoms'
 import { loadTheses } from '../../client/thesis'
 import { useFinagentClient, type FinagentClient } from '../../client'
 import { formatMoney, formatPercent } from '../../lib/money'
+import { portfolioFailureDetail } from '../../lib/portfolioFailure'
 import { PortfolioCard } from '../portfolio/PortfolioCard'
 import { Button } from '../primitives/Button'
 import { Dialog } from '../primitives/Dialog'
@@ -167,7 +168,7 @@ export const TodayView: React.FC = () => {
     if (failure?.kind === 'not-connected' || failure?.kind === 'no-account-permission') {
       return <SectionState kind="empty" message={t('today.connectPortfolio')} />
     }
-    if (failure) return <SectionState kind="error" message={failure.message} />
+    if (failure) return <SectionState kind="error" message={portfolioFailureDetail(t, failure)} />
     if (portfolioCache.error) return <SectionState kind="error" message={portfolioCache.error} />
     return <SectionState kind="empty" message={t('today.noPortfolioData')} />
   })()

@@ -13,12 +13,15 @@ export const portfolio = {
   noHoldingsToDisplay: '暂无持仓可展示',
   other: '其他',
   riskSummary: '风险摘要',
+  riskPartialPortfolio: '{{count}} 个持仓缺少基币金额，未纳入分析：{{symbols}}。其余权重按组合总市值计算，实际风险可能更高。',
+  riskPartialSubset: '{{count}} 个持仓缺少基币金额，未纳入分析：{{symbols}}。百分比仅反映可用持仓，无法判断整个组合的集中度。',
   concentration: '集中度',
   topPosition: '最大持仓',
   topFive: '前五持仓',
   herfindahl: '赫芬达尔指数',
   allocation: '配置',
   noPositions: '暂无持仓。',
+  noComparablePositions: '没有可按组合基币比较的持仓金额。',
   upcomingEarnings: '即将到来的财报',
   account: '账户',
   allAccounts: '全部账户',
@@ -41,6 +44,16 @@ export const portfolio = {
     providerError: '投资组合不可用',
     parseError: '无法读取投资组合数据',
     timeout: '投资组合请求超时',
+  },
+  /** Long-form detail under a `failure` heading: heading = label, this = sentence. */
+  failureDetail: {
+    notConnected: '长桥尚未连接，请安装或配置 CLI 后重试。',
+    noPermission: '该长桥账户未授予投资组合访问权限，请重新连接或检查权限。',
+    empty: '暂无投资组合数据。',
+    partial: '账户总额已加载，但无法读取持仓。',
+    providerError: '长桥未能返回投资组合数据。',
+    parseError: '投资组合数据的格式不符合预期，无法读取。',
+    timeout: '长桥响应超时。',
   },
   import: {
     title: '导入投资组合',
@@ -80,5 +93,10 @@ export const portfolio = {
     high: '高',
     review: '复核',
     needsReview: '需复核',
+  },
+  severity: {
+    high: '高',
+    medium: '中',
+    low: '低',
   },
 } satisfies SameKeysAs<typeof enPortfolio>;

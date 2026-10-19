@@ -83,31 +83,43 @@ export interface LocaleParityIssue {
   detail?: string;
 }
 
-/** Structural parity check between the two locales (used by i18n:check + boot). */
+/**
+ * Structural parity check between the locales (used by `i18n:check` + boot).
+ *
+ * Each difference is reported exactly once, and its `locale` always names the
+ * side that is out of line: `missing` = that locale lacks a reference key,
+ * `extra` = that locale defines a key the reference does not,
+ * `interpolation-mismatch` = that locale's `{{var}}` set differs from the
+ * reference. This keeps `issues.length` — which `i18n:check` prints as the
+ * user-visible `N issue(s)` count — equal to the number of real differences;
+ * walking both directions reported a single gap twice (once as `missing`, once
+ * as `extra`) and labelled the `extra` copy with the wrong locale.
+ */
 export function checkKeyParity(): LocaleParityIssue[] {
   const issues: LocaleParityIssue[] = [];
-  for (const locale of SUPPORTED_LOCALES_FOR_RESOURCES) {
-    const other = locale === 'en-US' ? 'zh-CN' : 'en-US';
-    const flat = flattenLocale(locale);
-    const otherFlat = flattenLocale(other);
+  const [reference, ...others] = SUPPORTED_LOCALES_FOR_RESOURCES;
+  if (!reference) return issues;
+  const flat = flattenLocale(reference);
+  for (const locale of others) {
+    const otherFlat = flattenLocale(locale);
     for (const key of Object.keys(flat)) {
       if (!(key in otherFlat)) {
-        issues.push({ type: 'missing', locale: other, key });
-      } else {
-        const aVars = interpolationVars(flat[key]);
-        const bVars = interpolationVars(otherFlat[key]);
-        if (aVars.length > 0 || bVars.length > 0) {
-          const missing =
-            aVars.some((v) => !bVars.includes(v)) || bVars.some((v) => !aVars.includes(v));
-          if (missing) {
-            issues.push({
-              type: 'interpolation-mismatch',
-              locale,
-              key,
-              detail: `${JSON.stringify(aVars)} vs ${JSON.stringify(bVars)}`,
-            });
-          }
-        }
+        issues.push({ type: 'missing', locale, key });
+        continue;
+      }
+      const referenceVars = interpolationVars(flat[key]);
+      const localeVars = interpolationVars(otherFlat[key]);
+      if (referenceVars.length === 0 && localeVars.length === 0) continue;
+      const mismatch =
+        referenceVars.some((v) => !localeVars.includes(v)) ||
+        localeVars.some((v) => !referenceVars.includes(v));
+      if (mismatch) {
+        issues.push({
+          type: 'interpolation-mismatch',
+          locale,
+          key,
+          detail: `${JSON.stringify(referenceVars)} vs ${JSON.stringify(localeVars)}`,
+        });
       }
     }
     for (const key of Object.keys(otherFlat)) {

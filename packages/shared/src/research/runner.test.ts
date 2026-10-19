@@ -107,6 +107,117 @@ describe('ResearchRunner', () => {
     expect(result.report!.runStatus).toBe('failed');
   });
 
+  it('deduplicates and records ranked news before synthesis', async () => {
+    const news = fakeCap('research.news');
+    news.execute = async () => ({
+      data: [
+        {
+          id: 'wire',
+          title: 'NVIDIA announces quarterly results',
+          summary: 'NVIDIA reported quarterly revenue and guidance.',
+          url: 'https://reuters.com/technology/nvidia-results?utm_source=feed',
+          timestamp: 1_700_000_000,
+          symbols: ['NVDA.US'],
+        },
+        {
+          id: 'wire-copy',
+          title: 'NVIDIA announces quarterly results',
+          summary: 'NVIDIA reported quarterly revenue and guidance.',
+          url: 'https://copy.test/nvidia-results',
+          timestamp: 1_700_000_000,
+          symbols: ['NVDA.US'],
+        },
+        {
+          id: 'filing',
+          title: 'NVIDIA quarterly report',
+          summary: 'Official filing for NVIDIA quarterly results.',
+          url: 'https://sec.gov/Archives/edgar/data/1/report',
+          timestamp: 1_700_000_000,
+          symbols: ['NVDA.US'],
+        },
+      ],
+      provenance: {
+        provider: 'test',
+        fetchedAt: 1_700_000_000_000,
+        stale: false,
+      },
+    });
+    const registry = createCapabilityRegistry([news]);
+    const local = new LocalResearchSynthesizer();
+    let observed: Record<string, unknown> = {};
+    const runner = new ResearchRunner({
+      registry,
+      synthesizer: {
+        async synthesize(input, signal) {
+          observed = JSON.parse(input.dataBundle) as Record<string, unknown>;
+          return local.synthesize(input, signal);
+        },
+      },
+      now: () => 1_700_000_000_000,
+    });
+
+    await runner.run({ symbol: 'NVDA.US', runId: 'ranked-news' });
+
+    const newsBundle = observed['research.news'] as {
+      trust: string;
+      provider: string;
+      items: Array<Record<string, unknown>>;
+    };
+    const selected = newsBundle.items;
+    const metadata = observed['research.news:ranking'] as {
+      policyVersion: string;
+      independentSourceCount: number;
+      decisions: Array<{
+        sourceId: string;
+        originalRank: number;
+        clusterId: string;
+        selected: boolean;
+        reason: string;
+      }>;
+    };
+    expect(newsBundle.trust).toBe('untrusted');
+    expect(newsBundle.provider).toBe('test');
+    expect(selected).toHaveLength(2);
+    expect(selected[0].id).toBe('filing');
+    expect(selected[0].sourceClass).toBe('regulator');
+    expect(metadata.policyVersion).toBe('folio-retrieval-v1');
+    expect(metadata.independentSourceCount).toBe(2);
+    expect(metadata.decisions).toContainEqual({
+      sourceId: 'wire-copy',
+      originalRank: 1,
+      clusterId: expect.any(String),
+      selected: false,
+      reason: 'duplicate_of:wire',
+    });
+  });
+
+  it('keeps malformed news payloads inside the untrusted envelope', async () => {
+    const news = fakeCap('research.news');
+    news.execute = async () => ({
+      data: { message: 'provider returned an unexpected payload' },
+      provenance: { provider: 'test', fetchedAt: 1, stale: false },
+    });
+    let observed: Record<string, unknown> = {};
+    const runner = new ResearchRunner({
+      registry: createCapabilityRegistry([news]),
+      synthesizer: {
+        async synthesize(input) {
+          observed = JSON.parse(input.dataBundle) as Record<string, unknown>;
+          return new LocalResearchSynthesizer().synthesize(input);
+        },
+      },
+    });
+
+    await runner.run({ symbol: 'NVDA.US', runId: 'malformed-news' });
+
+    expect(observed['research.news']).toEqual({
+      trust: 'untrusted',
+      provider: 'test',
+      items: { message: 'provider returned an unexpected payload' },
+    });
+    expect(observed['research.news:ranking']).toBeUndefined();
+  });
+
   it('cancels mid-fetch when the signal aborts', async () => {
     const runner = makeRunner([
       ['company.profile', 'success'],

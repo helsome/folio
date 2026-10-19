@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useState } from 'react';
+import type { TFunction } from 'i18next';
 import { useTranslation } from 'react-i18next';
 import { useFinagentClient } from '../../client';
 import {
@@ -199,7 +200,7 @@ export const DiagnosticsTab: React.FC = () => {
 
 const FinancialProviderRow: React.FC<{
   provider: DiagnosticsFinancialProvider;
-  t: (key: string) => string;
+  t: TFunction;
 }> = ({ provider, t }) => (
   <div className="rounded-[10px] border mac-section-divider p-3">
     <div className="flex items-baseline justify-between">
@@ -207,10 +208,10 @@ const FinancialProviderRow: React.FC<{
       <span className="font-mono text-[12px] text-foreground/72">{provider.status}</span>
     </div>
     <div className="mt-1 text-[11px] text-foreground/52">
-      {t('diagnostics.markets')}: {provider.coverage.markets.join(', ') || '—'}
+      {t('diagnostics.markets', { list: provider.coverage.markets.join(', ') || '—' })}
     </div>
     <div className="text-[11px] text-foreground/52">
-      {t('diagnostics.capabilities')}: {provider.coverage.capabilities.join(', ') || '—'}
+      {t('diagnostics.capabilities', { list: provider.coverage.capabilities.join(', ') || '—' })}
     </div>
   </div>
 );

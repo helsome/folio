@@ -189,7 +189,14 @@ export function projectTrace(input: TraceProjectionInput): FolioTrace {
       label: run.input.slice(0, 200),
       detail: run.status,
       timestamp: run.startedAt,
-      status: run.status === 'failed' ? 'error' : run.status === 'completed' ? 'success' : 'running',
+      status:
+        run.status === 'failed'
+          ? 'error'
+          : run.status === 'cancelled'
+            ? 'cancelled'
+            : run.status === 'completed'
+              ? 'success'
+              : 'running',
       source: 'run',
     });
   }
@@ -291,7 +298,11 @@ export function projectTrace(input: TraceProjectionInput): FolioTrace {
     startedAt,
     completedAt,
     latencyMs,
-    input: run?.input ?? evaluationRun?.answer ?? '',
+    // The evaluation run record carries no input of its own; the benchmark
+    // case prompt is the authoritative input for that run (spec §9). Falling
+    // back to `answer` would project the OUTPUT as the input, which is the
+    // exact reconstruction-from-run-state the projection must never do.
+    input: run?.input ?? evaluationCase?.input.prompt ?? '',
     answer,
     error: run?.error?.message ?? evaluationRun?.error?.message,
     completeness: deriveCompleteness(Boolean(run || evaluationRun), tools, traceEvents, traceRefForOutput),

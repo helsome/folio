@@ -5,7 +5,7 @@ import {
   activeSessionIdAtom,
   messagesAtomFamily,
 } from './sessionAtoms';
-import { applyAgentEventAtom, runViewAtom } from './runAtoms';
+import { applyAgentEventAtom, lastRunSummaryAtom, runViewAtom } from './runAtoms';
 
 function runStarted(sessionId: string): AgentEvent {
   return {
@@ -105,6 +105,11 @@ describe('guard stops read like a stop, not like an error (#17)', () => {
     expect(content).toContain('budget');
     expect(content).toContain('modelCalls 1/1');
     expect(content.startsWith('Error:')).toBe(false);
+    expect(store.get(lastRunSummaryAtom)).toMatchObject({
+      status: 'failed',
+      stopReason: 'budget_exhausted',
+      stopDetail: { key: 'modelCalls', limit: 1, used: 1 },
+    });
   });
 
   it('names the loop for a loop-stopped run', () => {
@@ -124,6 +129,10 @@ describe('guard stops read like a stop, not like an error (#17)', () => {
     expect(content).toContain('loop');
     expect(content).toContain('bash');
     expect(content.startsWith('Error:')).toBe(false);
+    expect(store.get(lastRunSummaryAtom)).toMatchObject({
+      stopReason: 'loop_detected',
+      stopDetail: { signal: 'repeated_tool_call', tool: 'bash', count: 2 },
+    });
   });
 
   it('keeps the plain error for ordinary failures', () => {
@@ -133,5 +142,28 @@ describe('guard stops read like a stop, not like an error (#17)', () => {
     store.set(applyAgentEventAtom, runStopped('visible-session', 'TOOL_ERROR', 'get_quote failed'));
 
     expect(lastAssistantContent(store, 'visible-session')).toBe('Error: get_quote failed');
+    expect(store.get(lastRunSummaryAtom)).toMatchObject({ status: 'failed' });
+    expect(store.get(lastRunSummaryAtom)?.stopReason).toBeUndefined();
+  });
+
+  it('keeps the retry-stop reason without exposing unapproved detail fields', () => {
+    const store = createStore();
+    store.set(activeSessionIdAtom, 'visible-session');
+    store.set(applyAgentEventAtom, runStarted('visible-session'));
+    store.set(
+      applyAgentEventAtom,
+      runStopped(
+        'visible-session',
+        'RETRY_STORM',
+        'Run stopped: retry_storm. {"signal":"retry_storm","retriesInWindow":4,"windowMs":60000,"secret":"omit"}'
+      )
+    );
+
+    expect(store.get(lastRunSummaryAtom)).toMatchObject({
+      stopReason: 'retry_storm',
+      stopDetail: { signal: 'retry_storm' },
+    });
+    expect(store.get(lastRunSummaryAtom)?.stopDetail).not.toHaveProperty('secret');
+    expect(store.get(lastRunSummaryAtom)?.stopDetail).not.toHaveProperty('retriesInWindow');
   });
 });

@@ -97,4 +97,37 @@ describe('StreamEventHistory', () => {
     expect(h.replay('run-0', 0).recoverable).toBe(false);
     expect(h.replay('run-1', 0).recoverable).toBe(true);
   });
+
+  // 契约（StreamReplayResult.atEnd）：field 由「末事件是否为终端事件」决定，
+  // 与 recoverable 无关。调用方据此区分「补发失败但 run 已结束」和
+  // 「补发失败且 run 仍在跑」，后者才需要继续等待/重连。
+  it('缺失段不可恢复时，atEnd 仍按末事件是否为终端事件取值', () => {
+    const h = new StreamEventHistory();
+    fill(h, 'run-1', 99, 102);
+    h.append(make('run-1', 103, 'run_completed'));
+    const result = h.replay('run-1', 5);
+    expect(result.recoverable).toBe(false);
+    expect(result.events).toEqual([]);
+    expect(result.atEnd).toBe(true);
+  });
+
+  it('缺失段不可恢复且末事件非终端 → atEnd=false', () => {
+    const h = new StreamEventHistory();
+    fill(h, 'run-1', 99, 102);
+    const result = h.replay('run-1', 5);
+    expect(result.recoverable).toBe(false);
+    expect(result.atEnd).toBe(false);
+  });
+
+  // 生产触发路径：单 run 缓冲超过 MAX_EVENTS_PER_RUN(2000) 后截断最旧事件，
+  // 端点用旧游标重连即落入「段不连续」分支（长流式回答会产出上千条 delta）。
+  it('缓冲截断后重连：不可恢复，但已结束的 run 仍报 atEnd=true', () => {
+    const h = new StreamEventHistory();
+    fill(h, 'run-1', 1, 2001);
+    h.append(make('run-1', 2002, 'run_completed'));
+    const result = h.replay('run-1', 0);
+    expect(result.recoverable).toBe(false);
+    expect(result.events).toEqual([]);
+    expect(result.atEnd).toBe(true);
+  });
 });
