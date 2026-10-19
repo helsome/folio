@@ -228,15 +228,29 @@ export function createCompanyFinancialsCapability(
         : '';
       return {
         data: report,
-        provenance: { provider: 'longbridge', fetchedAt: (ctx?.now ?? Date.now)(), stale: false },
-        summary: `Financial statements for ${symbol}: ${formatStatementNames(report.statements)}.${conflictSummary}${incomparableSummary}${insufficientSummary}`,
+        provenance: {
+          provider: reconciled?.selected?.provenance.providerId ?? 'longbridge',
+          ...(reconciled?.selected ? {
+            providerId: reconciled.selected.provenance.providerId,
+            providerName: reconciled.selected.provenance.providerName,
+            ...(reconciled.selected.provenance.marketTime !== undefined
+              ? { marketTime: reconciled.selected.provenance.marketTime } : {}),
+            ...(reconciled.selected.provenance.delayed !== undefined
+              ? { delayed: reconciled.selected.provenance.delayed } : {}),
+            ...(reconciled.selected.provenance.failoverTrail
+              ? { failoverTrail: reconciled.selected.provenance.failoverTrail } : {}),
+          } : {}),
+          fetchedAt: (ctx?.now ?? Date.now)(),
+          stale: reconciled?.selected?.provenance.stale ?? false,
+        },
+        summary: `Financial statements for ${symbol}: ${formatStatementNames(report.statements)}.${conflictSummary}${incomparableSummary}${insufficientSummary}${reconciled ? ' Policy selections are recommendations; returned statement data remains from the reported provider.' : ''}`,
         ...(reconciled ? {
           evidence: {
             reconciliation: {
               providers: [...new Set(reconciled.comparisons.flatMap(
                 ({ result }) => result.candidates.map((candidate) => candidate.provider)
               ))],
-              method: 'folio-financial-report/v1; optional sourced balance-sheet FX',
+              method: 'folio-financial-report/v1; policy selections are recommendations only; optional sourced balance-sheet FX',
               comparisons: reconciled.comparisons,
             },
             lineage: [{

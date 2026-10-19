@@ -179,7 +179,7 @@ const SourceDetails: React.FC<{
             {t('agent.sources.reconciliationHint')}
           </p>
           <div className="mt-2 space-y-2">
-            {comparisons.map(({ metric, period, result }, index) => (
+            {comparisons.map(({ metric, period, result, selectionSemantics }, index) => (
               <details key={`${metric}:${period}`} open={index === 0} className="rounded-[8px] border border-border px-2.5 py-2">
                 <summary className="cursor-pointer text-[11.5px] font-medium text-foreground/85">
                   {metric} · {period} · {t(`agent.sources.reconciliationState.${result.state}`)}
@@ -205,7 +205,9 @@ const SourceDetails: React.FC<{
                   )))}
                   <p className="pt-1 text-[11px] text-foreground/60">
                     {result.selected
-                      ? t('agent.sources.selectedReconciliationProvider', { provider: result.selected.provider })
+                      ? selectionSemantics === 'recommendation-only'
+                        ? t('agent.sources.recommendedReconciliationProvider', { provider: result.selected.provider })
+                        : t('agent.sources.selectedReconciliationProvider', { provider: result.selected.provider })
                       : t('agent.sources.noReconciliationSelection')}
                   </p>
                   <p className="text-[10px] text-foreground/55">{result.selectedReason ?? result.reason} · {result.policyVersion}</p>

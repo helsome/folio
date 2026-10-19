@@ -108,6 +108,7 @@ export const agent = {
     insufficientSources: '仅有一个来源，尚未交叉核验',
     noReconciliationSelection: '此项未选定优先数据源。',
     selectedReconciliationProvider: '按已记录的规则选用 {{provider}}；其他数值仍保留供核对。',
+    recommendedReconciliationProvider: '规则建议优先考虑 {{provider}}；当前返回值仍来自结果中标注的数据源。',
     reconciliationState: {
       agreement: '完全一致',
       'within-tolerance': '在容差范围内',

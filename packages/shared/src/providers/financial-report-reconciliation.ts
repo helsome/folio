@@ -11,6 +11,8 @@ import { reconcileFinancialFacts } from '@finagent/core';
 export interface FinancialReportComparison {
   metric: string;
   period: string;
+  /** The provider selected by policy is a recommendation; raw report data is not rewritten. */
+  selectionSemantics: 'recommendation-only';
   result: ReconciliationResult;
 }
 
@@ -71,7 +73,12 @@ export function reconcileFinancialReportResults(
       requireCurrency: candidates[0]?.unit === 'currency',
       ...overrides,
     };
-    return { metric, period, result: reconcileFinancialFacts(candidates, policy) };
+    return {
+      metric,
+      period,
+      selectionSemantics: 'recommendation-only' as const,
+      result: reconcileFinancialFacts(candidates, policy),
+    };
   });
   return { selected: successes[0], comparisons };
 }

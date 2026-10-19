@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'bun:test';
+import { afterEach, describe, expect, it } from 'bun:test';
 import type {
   CapabilityId,
   FinancialDataProvider,
@@ -12,6 +12,13 @@ import { createMarketQuoteCapability } from '../capabilities/manifests/market-qu
 import { ProviderRouter } from './router.ts';
 import { createRouterFetchers } from './router-fetchers.ts';
 import { reconcileFinancialReportResults } from './financial-report-reconciliation.ts';
+import { YahooChartFinancialDataProvider } from './yahoo/adapter.ts';
+
+const originalFetch = globalThis.fetch;
+
+afterEach(() => {
+  globalThis.fetch = originalFetch;
+});
 
 function provider(id: string, capability: CapabilityId, data: unknown): FinancialDataProvider {
   return {
@@ -108,7 +115,41 @@ describe('live router comparison paths', () => {
     );
     const result = await createMarketQuoteCapability(fetchers).execute({ symbol: 'AAPL.US' }, {});
     expect(result.evidence?.reconciliation?.comparisons?.[0].result.state).toBe('incomparable');
-    expect(result.summary).toContain('cannot be directly compared');
+    expect(result.summary).toContain('No comparable second quote was available');
+  });
+
+  it('includes Yahoo delayed quotes as candidates and preserves returned source timestamps', async () => {
+    globalThis.fetch = (async () => new Response(JSON.stringify({
+      chart: {
+        result: [{
+          meta: {
+            currency: 'USD', symbol: 'AAPL', exchangeName: 'NMS',
+            regularMarketPrice: 190.5, regularMarketTime: 1_699_559_040,
+            regularMarketVolume: 48_000_000, regularMarketDayHigh: 191.2,
+            regularMarketDayLow: 188.4, previousClose: 189,
+          },
+          timestamp: [1_699_559_040],
+          indicators: { quote: [{ open: [189.4], high: [191.2], low: [188.4], close: [190.5], volume: [48_000_000] }] },
+        }],
+        error: null,
+      },
+    }), { headers: { 'content-type': 'application/json' } })) as unknown as typeof fetch;
+    const router = new ProviderRouter();
+    router.register(new YahooChartFinancialDataProvider());
+    router.register(provider('current', 'market.quote', quote(191, 1_699_900_000)));
+    router.setRouting({ primary: 'yahoo', fallback: 'current' });
+
+    const result = await createMarketQuoteCapability(createRouterFetchers(router))
+      .execute({ symbol: 'AAPL.US' }, {});
+
+    expect(result.data.lastPrice).toBe(190.5);
+    expect(result.provenance).toMatchObject({
+      provider: 'yahoo', providerId: 'yahoo', providerName: 'Yahoo Finance',
+      delayed: true, marketTime: 1_699_559_040_000,
+    });
+    expect(result.evidence?.reconciliation?.providers).toEqual(['yahoo', 'current']);
+    expect(result.evidence?.reconciliation?.comparisons?.[0].result.state).toBe('incomparable');
+    expect(result.summary).toContain('No comparable second quote was available');
   });
 
   it('compares equal financial statement fields and preserves mismatched currency', async () => {
@@ -190,6 +231,11 @@ describe('live router comparison paths', () => {
     expect(comparison?.selected?.provider).toBe('fallback');
     expect(comparison?.policyVersion).toBe('revenue-priority/1');
     expect(result.summary).toContain('Provider disagreement');
+    expect(result.data.statements.IS?.indicators[0]?.accounts[0]?.values[0]?.value).toBe(100);
+    expect(result.provenance).toMatchObject({ provider: 'primary', providerId: 'primary' });
+    expect(result.evidence?.reconciliation?.comparisons?.[0])
+      .toMatchObject({ selectionSemantics: 'recommendation-only' });
+    expect(result.summary).toContain('Policy selections are recommendations');
   });
 
   it('uses a dated sourced balance-sheet rate and preserves the originals', async () => {

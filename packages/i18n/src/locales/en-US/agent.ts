@@ -108,6 +108,7 @@ export const agent = {
     insufficientSources: 'Only one source; not independently confirmed',
     noReconciliationSelection: 'No provider selected for this comparison.',
     selectedReconciliationProvider: 'Selected {{provider}} under the recorded policy; other values remain visible.',
+    recommendedReconciliationProvider: 'Policy recommends {{provider}}; the returned data remains from its reported provider.',
     reconciliationState: {
       agreement: 'Agreement',
       'within-tolerance': 'Within tolerance',

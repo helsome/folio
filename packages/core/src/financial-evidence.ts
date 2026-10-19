@@ -63,7 +63,13 @@ export interface FinancialEvidenceEnvelope {
   reconciliation?: {
     providers: string[];
     method: string;
-    comparisons?: Array<{ metric: string; period: string; result: ReconciliationResult }>;
+    comparisons?: Array<{
+      metric: string;
+      period: string;
+      /** Clarifies whether a policy selection changed the returned result or is advice only. */
+      selectionSemantics?: 'recommendation-only';
+      result: ReconciliationResult;
+    }>;
   };
   resultSnapshot: unknown;
   resultHash: string;

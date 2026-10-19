@@ -136,11 +136,14 @@ describe('SourceInspector', () => {
           comparisons: [{
             metric: 'BS.TotalAssets',
             period: '2024:FY',
+            selectionSemantics: 'recommendation-only',
             result: {
               state: 'agreement',
               policyVersion: 'folio-financial-report/v1',
               sourceCount: 2,
               reason: 'Candidates agree exactly.',
+              selected: { provider: 'massive', value: 100, currency: 'USD', unit: 'currency', adjustment: 'reported', period: 'af:2024:FY' },
+              selectedReason: 'Selected provider "massive" per policy priority.',
               candidates: [
                 { provider: 'longbridge', value: 100, currency: 'USD', unit: 'currency', adjustment: 'reported', period: 'af:2024:FY' },
                 { provider: 'massive', value: 100, currency: 'USD', unit: 'currency', adjustment: 'reported', period: 'af:2024:FY' },
@@ -157,6 +160,8 @@ describe('SourceInspector', () => {
     expect(comparison?.textContent).toContain('massive');
     expect(comparison?.textContent).toContain('reported');
     expect(comparison?.textContent).toContain('folio-financial-report/v1');
+    expect(comparison?.textContent).toContain('Policy recommends massive');
+    expect(comparison?.textContent).not.toContain('Selected massive under the recorded policy');
   });
 
   it('shows disputed provider values and does not label them verified', async () => {

@@ -42,8 +42,8 @@ export function createMarketQuoteCapability(
         ? await fetchers.getQuoteResult(symbol, ctx?.signal)
         : undefined;
       const quote = reconciled?.selected?.data ?? fetched?.data ?? await fetchers.getQuote(symbol);
-      if (reconciled?.selected) reportProvider?.(reconciled.selected.provenance);
-      else if (fetched) reportProvider?.(fetched.provenance);
+      const source = reconciled?.selected?.provenance ?? fetched?.provenance;
+      if (source) reportProvider?.(source);
       const instrumentId = readInstrumentId(quote) ?? resolveCanonicalInstrumentId(symbol);
       const comparison = reconciled?.comparison;
       const conflict = comparison?.state === 'material-conflict';
@@ -53,19 +53,24 @@ export function createMarketQuoteCapability(
           (candidate) => `${candidate.provider}=${candidate.value} ${candidate.currency ?? ''}`
         ).join(' vs ')}. Treat this price as disputed.`
         : incomparable
-          ? ' Provider quotes have different instrument, currency, or market-time semantics and cannot be directly compared.'
+          ? ' No comparable second quote was available: providers returned different instrument, currency, or market-time semantics.'
           : comparison?.state === 'insufficient-sources'
             ? ' Only one provider supplied this quote; no cross-provider check was possible.'
           : '';
       return {
         data: quote,
         provenance: {
-          provider: 'longbridge',
-          providerName: 'Longbridge',
+          provider: source?.providerId ?? 'longbridge',
+          ...(source ? {
+            providerId: source.providerId,
+            providerName: source.providerName,
+            ...(source.delayed !== undefined ? { delayed: source.delayed } : {}),
+            ...(source.failoverTrail ? { failoverTrail: source.failoverTrail } : {}),
+          } : {}),
           ...(instrumentId ? { instrumentId } : {}),
           fetchedAt: (ctx?.now ?? Date.now)(),
-          marketTime: quote.timestamp * 1000,
-          stale: false,
+          marketTime: source?.marketTime ?? quote.timestamp * 1000,
+          stale: source?.stale ?? false,
         },
         summary: `${formatQuote(quote)}${comparisonSummary}`,
         ...(comparison ? {
