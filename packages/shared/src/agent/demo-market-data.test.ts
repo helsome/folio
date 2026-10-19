@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { MarketDataFetchers } from './market-data-service.ts';
+import type { CapabilityFetchers } from '../capabilities/fetchers.ts';
 import { withDemoDataFallback } from './demo-market-data.ts';
 
 /**
@@ -71,4 +72,15 @@ describe('demo market data kline series', () => {
     const high = await series('AAPL.US', 9_999);
     expect(high.klines).toHaveLength(400);
   });
+});
+
+
+it('keeps the explicit offline kline demo opt-in with honest provenance', async () => {
+  const failing: Pick<CapabilityFetchers, 'getKlineResult'> = {
+    getKlineResult: async () => { throw new Error('Synthetic provider unavailable'); },
+  };
+  const fetchers = withDemoDataFallback(failing);
+  const result = await fetchers.getKlineResult!({ symbol: 'AAPL.US', period: '1d', limit: 5 });
+  expect(result.data).toHaveLength(5);
+  expect(result.provenance).toMatchObject({ providerId: 'demo', providerName: 'Sample data', stale: false });
 });

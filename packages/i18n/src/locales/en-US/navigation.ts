@@ -58,6 +58,7 @@ export const navigation = {
   paletteQuickActionSettingsHint: 'Quick action · Settings',
   aboutAria: 'About Folio',
   aboutTitle: 'About Folio',
+  watchlistQuoteUnavailable: 'Quote unavailable',
   watchlistEmpty: 'No symbols in watchlist',
   watchlistAddSymbols: 'Add symbols above',
   watchlistAddSymbol: 'Add symbol',

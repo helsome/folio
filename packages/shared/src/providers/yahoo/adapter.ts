@@ -201,7 +201,7 @@ export class YahooChartFinancialDataProvider implements FinancialDataProvider {
   ): Promise<ProviderResult<unknown>> {
     switch (capabilityId) {
       case 'market.quote': {
-        const chart = await fetchChart(ticker, '5d', '1d', signal)
+        const chart = await fetchChart(ticker, '1mo', '1d', signal)
         const quote = mapQuote(symbol, chart)
         return { ok: true, data: quote, provenance: provenance(quote.timestamp * 1000) }
       }
@@ -246,8 +246,9 @@ interface ChartSeries {
 
 interface ChartResult {
   meta: Record<string, unknown>
-  timestamp: number[]
+  timestamp: Array<number | null>
   quote: ChartSeries
+  splits: unknown[]
 }
 
 async function fetchChart(
@@ -256,7 +257,7 @@ async function fetchChart(
   interval: '1d' | '1wk',
   signal?: AbortSignal
 ): Promise<ChartResult> {
-  const url = `${CHART_HOST}${encodeURIComponent(ticker)}?range=${encodeURIComponent(range)}&interval=${interval}&includePrePost=false`
+  const url = `${CHART_HOST}${encodeURIComponent(ticker)}?range=${encodeURIComponent(range)}&interval=${interval}&includePrePost=false&events=splits`
   let response: Response
   try {
     response = await fetch(url, {
@@ -303,15 +304,17 @@ function parseChart(body: unknown): ChartResult {
     })
   }
   const meta = isRecord(first.meta) ? first.meta : {}
-  const timestamp = Array.isArray(first.timestamp)
-    ? first.timestamp.filter((value): value is number => typeof value === 'number' && Number.isFinite(value))
-    : []
+  // Preserve null/invalid slots: dropping them shifts every OHLC column.
+  const timestamp = numberSeries(first.timestamp)
   const indicators = isRecord(first.indicators) ? first.indicators : {}
   const quotes = Array.isArray(indicators.quote) ? indicators.quote : []
   const quote = quotes.find(isRecord) ?? {}
   return {
     meta,
     timestamp,
+    splits: isRecord(first.events) && isRecord(first.events.splits)
+      ? Object.values(first.events.splits)
+      : [],
     quote: {
       open: numberSeries(quote.open),
       high: numberSeries(quote.high),
@@ -414,46 +417,88 @@ function lastFinite(series: Array<number | null>): number | undefined {
   return undefined
 }
 
-function previousFinite(series: Array<number | null>, latest: number | undefined): number | undefined {
-  let seenLatest = latest === undefined
-  for (let index = series.length - 1; index >= 0; index -= 1) {
-    const value = series[index]
-    if (typeof value !== 'number') continue
-    if (!seenLatest && value === latest) {
-      seenLatest = true
-      continue
+const PREVIOUS_CLOSE_UNAVAILABLE: ProviderError = {
+  code: 'NOT_FOUND',
+  message: 'Yahoo Finance quote unavailable: previous trading-session close could not be verified.',
+}
+
+function epochSeconds(value: unknown): number | undefined {
+  const time = finite(value)
+  if (time === undefined || time <= 0) return undefined
+  return Math.floor(time > 1e12 ? time / 1000 : time)
+}
+
+/** Calendar day in the exchange timezone, independent of the host's clock. */
+function exchangeDay(time: number, timeZone: string): number {
+  const parts = new Intl.DateTimeFormat('en-US', {
+    timeZone, year: 'numeric', month: '2-digit', day: '2-digit',
+  }).formatToParts(new Date(time * 1000))
+  const part = (type: string) => Number(parts.find((entry) => entry.type === type)?.value)
+  return Date.UTC(part('year'), part('month') - 1, part('day'))
+}
+
+/**
+ * chartPreviousClose is not a verified prior-session baseline for multi-day
+ * ranges. Use the daily bar strictly before that quote's
+ * exchange date. Never skip an absent/null previous bar to an older close.
+ * Without an authoritative holiday calendar we conservatively require the
+ * preceding weekday; a holiday gap is unavailable, not a guessed multi-day move.
+ */
+function previousSessionClose(chart: ChartResult, quoteTime: number): number | undefined {
+  const zone = chart.meta.exchangeTimezoneName
+  if (typeof zone !== 'string' || !zone) return undefined
+  try {
+    const quoteDay = exchangeDay(quoteTime, zone)
+    let expectedDay = quoteDay - 86_400_000
+    while ([0, 6].includes(new Date(expectedDay).getUTCDay())) expectedDay -= 86_400_000
+    const sessions: Array<{ day: number; index: number; time: number }> = []
+    for (const [index, rawTime] of chart.timestamp.entries()) {
+      const time = epochSeconds(rawTime)
+      if (time === undefined) return undefined
+      const day = exchangeDay(time, zone)
+      const previous = sessions.at(-1)
+      if (previous && day < previous.day) return undefined
+      // Yahoo may append a live row for the same session. Keep its final
+      // slot, including nulls, rather than counting it as another trading day.
+      if (previous?.day === day) sessions[sessions.length - 1] = { day, index, time }
+      else sessions.push({ day, index, time })
     }
-    if (seenLatest) return value
+    const current = sessions.findIndex((session) => session.day === quoteDay)
+    if (current < 1 || sessions[current - 1].day !== expectedDay) return undefined
+    const previous = sessions[current - 1]
+    const close = finite(chart.quote.close[previous.index])
+    if (close === undefined || close <= 0) return undefined
+    const previousTime = previous.time
+    // Daily close is normally split-adjusted by Yahoo. At a split boundary
+    // the unofficial payload cannot certify the basis against regular price;
+    // refuse the quote rather than applying the ratio twice or inventing a move.
+    for (const split of chart.splits) {
+      const time = isRecord(split) ? epochSeconds(split.date) : undefined
+      if (time === undefined || (time >= previousTime && time <= quoteTime)) return undefined
+    }
+    return close
+  } catch {
+    return undefined // Invalid/missing timezone or date is an unavailable quote.
   }
-  return undefined
 }
 
 function mapQuote(symbol: string, chart: ChartResult): Quote {
   const meta = chart.meta
-  const closes = chart.quote.close
-  const lastClose = lastFinite(closes)
-  const lastPrice = finite(meta.regularMarketPrice) ?? lastClose
-  if (lastPrice === undefined) {
+  const lastPrice = finite(meta.regularMarketPrice)
+  if (lastPrice === undefined || lastPrice <= 0) {
     throw new ProviderHttpError({ code: 'NOT_FOUND', message: 'No data found for this symbol.' })
   }
-  const prevClose =
-    finite(meta.previousClose) ??
-    finite(meta.chartPreviousClose) ??
-    previousFinite(closes, lastClose) ??
-    lastPrice
+  const timestamp = epochSeconds(meta.regularMarketTime)
+  const prevClose = timestamp === undefined ? undefined : previousSessionClose(chart, timestamp)
+  if (timestamp === undefined || prevClose === undefined) {
+    throw new ProviderHttpError(PREVIOUS_CLOSE_UNAVAILABLE)
+  }
   const change = lastPrice - prevClose
   const changePercent = prevClose === 0 ? 0 : (change / prevClose) * 100
   const open = finite(meta.regularMarketOpen) ?? lastFinite(chart.quote.open) ?? lastPrice
   const high = finite(meta.regularMarketDayHigh) ?? lastFinite(chart.quote.high) ?? lastPrice
   const low = finite(meta.regularMarketDayLow) ?? lastFinite(chart.quote.low) ?? lastPrice
   const volume = finite(meta.regularMarketVolume) ?? lastFinite(chart.quote.volume) ?? 0
-  const rawTime = finite(meta.regularMarketTime)
-  const timestamp =
-    rawTime === undefined
-      ? Math.floor(Date.now() / 1000)
-      : rawTime > 1e12
-        ? Math.floor(rawTime / 1000)
-        : Math.floor(rawTime)
 
   return { symbol, lastPrice, change, changePercent, volume, timestamp, high, low, open, prevClose }
 }

@@ -1,9 +1,14 @@
-import { afterEach, describe, expect, it } from 'bun:test'
+import { afterEach, describe, expect, it, spyOn } from 'bun:test'
 import type { Kline, ProviderResult, Quote, StaticInfo } from '@finagent/core'
 import { DEFAULT_INSTRUMENT_CATALOG } from '@finagent/core'
 import { ProviderRouter } from '../router.ts'
 import { TtlCache } from '../massive/cache.ts'
 import { YahooChartFinancialDataProvider } from './adapter.ts'
+import { createRouterFetchers } from '../router-fetchers.ts'
+import { createMarketQuoteCapability } from '../../capabilities/manifests/market-quote.ts'
+import { createMarketKlineCapability } from '../../capabilities/manifests/market-kline.ts'
+import { createCompanyProfileCapability } from '../../capabilities/manifests/company-profile.ts'
+import { buildFinancialEvidence } from '../../evidence/financial-evidence.ts'
 
 const originalFetch = globalThis.fetch
 
@@ -36,6 +41,7 @@ function chartPayload(overrides: Record<string, unknown> = {}) {
       result: [
         {
           meta: {
+            exchangeTimezoneName: 'America/New_York',
             currency: 'USD',
             symbol: 'AAPL',
             exchangeName: 'NMS',
@@ -118,6 +124,8 @@ describe('YahooChartFinancialDataProvider', () => {
 
     expect(calls[0].url).toContain('https://query1.finance.yahoo.com/v8/finance/chart/AAPL')
     expect(calls[0].url).toContain('interval=1d')
+    expect(calls[0].url).toContain('range=1mo')
+    expect(calls[0].url).toContain('events=splits')
     const headers = calls[0].init?.headers as Record<string, string>
     expect(headers['User-Agent']).toContain('Mozilla/5.0')
     expect(headers.Accept).toBe('application/json')
@@ -402,3 +410,181 @@ describe('YahooChartFinancialDataProvider', () => {
     })
   })
 })
+
+// These are synthetic, session-aligned chart responses, not live Yahoo proof.
+function sessionChart(quoteTime = '2025-10-17T17:00:00Z') {
+  const payload = chartPayload({
+    regularMarketTime: Date.parse(quoteTime) / 1000,
+    regularMarketPrice: 108,
+    // Range baselines must never be mistaken for the previous session close.
+    previousClose: 90,
+    chartPreviousClose: 80,
+  });
+  const chart = payload.chart.result[0];
+  chart.timestamp = ['2025-10-15', '2025-10-16', '2025-10-17'].map(day => Date.parse(`${day}T13:30:00Z`) / 1000);
+  chart.indicators.quote[0] = {
+    open: [99, 101, 106], high: [101, 106, 109], low: [98, 100, 105],
+    close: [100, 105, 108], volume: [1, 2, 3],
+  };
+  return payload;
+}
+
+describe('Yahoo previous trading-session baseline', () => {
+  it.each([
+    ['intraday', '2025-10-17T17:00:00Z', '2025-10-17T17:01:00Z'],
+    ['after hours', '2025-10-17T20:00:00Z', '2025-10-17T23:00:00Z'],
+    ['weekend', '2025-10-17T20:00:00Z', '2025-10-19T12:00:00Z'],
+    ['Monday premarket', '2025-10-17T20:00:00Z', '2025-10-20T12:00:00Z'],
+  ])('anchors %s to regularMarketTime rather than today', async (_label, quoteTime, now) => {
+    const clock = spyOn(Date, 'now').mockReturnValue(Date.parse(now));
+    try {
+      installFetch(() => jsonResponse(sessionChart(quoteTime)));
+      const result = await makeProvider().execute<Quote>('market.quote', { symbol: 'AAPL.US' });
+      expect(result.ok).toBe(true);
+      if (!result.ok) return;
+      expect(result.data.prevClose).toBe(105);
+      expect(result.data.change).toBe(3);
+      expect(result.data.changePercent).toBeCloseTo(100 * 3 / 105);
+      expect(result.data.timestamp).toBe(Date.parse(quoteTime) / 1000);
+    } finally { clock.mockRestore(); }
+  });
+
+  it('retains null current-day slots and uses the immediately preceding close', async () => {
+    const payload = sessionChart();
+    payload.chart.result[0].indicators.quote[0].close = [100, 105, null] as unknown as number[];
+    installFetch(() => jsonResponse(payload));
+    const result = await makeProvider().execute<Quote>('market.quote', { symbol: 'AAPL.US' });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.prevClose).toBe(105);
+  });
+
+  it('keeps equal consecutive closes as distinct sessions', async () => {
+    const payload = sessionChart();
+    payload.chart.result[0].indicators.quote[0].close = [100, 105, 105];
+    installFetch(() => jsonResponse(payload));
+    const result = await makeProvider().execute<Quote>('market.quote', { symbol: 'AAPL.US' });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.prevClose).toBe(105);
+  });
+
+  it('uses exchange dates when UTC date has already advanced', async () => {
+    installFetch(() => jsonResponse(sessionChart('2025-10-18T00:30:00Z')));
+    const result = await makeProvider().execute<Quote>('market.quote', { symbol: 'AAPL.US' });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.prevClose).toBe(105);
+  });
+
+  it.each([
+    'empty bars', 'missing previous bar', 'null previous close', 'missing quote-day bar',
+    'invalid timestamp slot', 'missing timezone', 'invalid timezone', 'missing quote time',
+    'missing regular price', 'split at quote session', 'unverifiable split', 'holiday gap',
+  ])('returns unavailable for %s instead of inventing a daily move', async scenario => {
+    const payload: any = sessionChart();
+    const chart = payload.chart.result[0];
+    if (scenario === 'empty bars') chart.timestamp = [];
+    if (scenario === 'missing previous bar') {
+      chart.timestamp.splice(1, 1);
+      for (const values of Object.values(chart.indicators.quote[0]) as number[][]) values.splice(1, 1);
+    }
+    if (scenario === 'null previous close') chart.indicators.quote[0].close[1] = null;
+    if (scenario === 'missing quote-day bar') chart.timestamp.pop();
+    if (scenario === 'invalid timestamp slot') chart.timestamp[1] = null;
+    if (scenario === 'missing timezone') delete chart.meta.exchangeTimezoneName;
+    if (scenario === 'invalid timezone') chart.meta.exchangeTimezoneName = 'Invalid/Zone';
+    if (scenario === 'missing quote time') delete chart.meta.regularMarketTime;
+    if (scenario === 'missing regular price') delete chart.meta.regularMarketPrice;
+    if (scenario === 'split at quote session') {
+      chart.events = { splits: { split: { date: chart.timestamp[2], numerator: 4, denominator: 1 } } };
+      chart.indicators.quote[0].close[1] = 420;
+    }
+    if (scenario === 'unverifiable split') chart.events = { splits: { split: { numerator: 4, denominator: 1 } } };
+    if (scenario === 'holiday gap') {
+      // Tuesday after a closed Monday: without a calendar, do not call Friday
+      // 'yesterday' or silently report an unverified multi-day change.
+      chart.meta.regularMarketTime = Date.parse('2025-10-21T17:00:00Z') / 1000;
+      chart.timestamp[2] = Date.parse('2025-10-21T13:30:00Z') / 1000;
+    }
+    installFetch(() => jsonResponse(payload));
+    const result = await makeProvider().execute<Quote>('market.quote', { symbol: 'AAPL.US' });
+    expect(result.ok).toBe(false);
+    if (!result.ok) expect(result.error.code).toBe('NOT_FOUND');
+  });
+
+  it('does not apply a historical split ratio again to already adjusted daily closes', async () => {
+    const payload: any = sessionChart();
+    payload.chart.result[0].events = { splits: { earlier: { date: Date.parse('2025-10-14T13:30:00Z') / 1000, numerator: 4, denominator: 1 } } };
+    installFetch(() => jsonResponse(payload));
+    const result = await makeProvider().execute<Quote>('market.quote', { symbol: 'AAPL.US' });
+    expect(result.ok).toBe(true);
+    if (result.ok) expect(result.data.change).toBe(3);
+  });
+});
+
+
+it('deduplicates daily sessions before selecting the previous close', async () => {
+  const payload = sessionChart();
+  const chart = payload.chart.result[0];
+  chart.timestamp = [chart.timestamp[0], chart.timestamp[1], chart.timestamp[1] + 60, chart.timestamp[2], chart.timestamp[2] + 60];
+  chart.indicators.quote[0].close = [100, 104, 105, 107, 108];
+  installFetch(() => jsonResponse(payload));
+  const result = await makeProvider().execute<Quote>('market.quote', { symbol: 'AAPL.US' });
+  expect(result.ok).toBe(true);
+  if (result.ok) expect(result.data.prevClose).toBe(105);
+});
+
+it('does not skip a null final duplicate of the previous session', async () => {
+  const payload: any = sessionChart();
+  const chart = payload.chart.result[0];
+  chart.timestamp.splice(2, 0, chart.timestamp[1] + 60);
+  chart.indicators.quote[0].close = [100, 105, null, 108];
+  installFetch(() => jsonResponse(payload));
+  const result = await makeProvider().execute<Quote>('market.quote', { symbol: 'AAPL.US' });
+  expect(result.ok).toBe(false);
+});
+
+it('preserves actual Yahoo provenance and fallback through all three capability evidence envelopes', async () => {
+  installFetch(() => jsonResponse(chartPayload()));
+  const router = new ProviderRouter();
+  router.register({
+    kind: 'financial-data', id: 'longbridge', name: 'Longbridge',
+    capabilities: () => ['market.quote', 'market.kline', 'company.profile'],
+    markets: () => [{ id: 'US', name: 'United States' }],
+    status: async () => ({ status: 'not-connected', lastCheck: 1 }),
+    execute: async <T>() => ({ ok: false as const, error: { code: 'CONFIG_MISSING', message: 'Synthetic primary unavailable' } }) as ProviderResult<T>,
+  });
+  router.register(makeProvider());
+  router.setRouting({ primary: 'longbridge', fallback: 'yahoo' });
+  const fetchers = createRouterFetchers(router);
+  const cases = [
+    { capability: createMarketQuoteCapability(fetchers), input: { symbol: 'AAPL.US' } },
+    { capability: createMarketKlineCapability(fetchers), input: { symbol: 'AAPL.US', period: '1d' as const, limit: 5 } },
+    { capability: createCompanyProfileCapability(fetchers), input: { symbol: 'AAPL.US' } },
+  ];
+  for (const { capability, input } of cases) {
+    const result = await capability.execute(input);
+    expect(router.lastResultFor('yahoo')).toMatchObject({ providerId: 'yahoo', ok: true, fallbackUsed: true });
+    expect(result.provenance).toMatchObject({ provider: 'yahoo', providerId: 'yahoo', delayed: true, stale: false });
+    expect(result.evidence?.fallback).toMatchObject({ from: 'longbridge', to: 'yahoo' });
+    const [envelope] = buildFinancialEvidence({ sessionId: 'synthetic', runId: 'r', toolCalls: [{
+      id: capability.id, toolName: capability.toolName, args: input,
+      startedAt: 1, status: 'success', result,
+    }] });
+    expect(envelope.provider).toBe('yahoo');
+    expect(envelope.delayed).toBe(true);
+    expect(envelope.fallback).toMatchObject({ from: 'longbridge', to: 'yahoo' });
+    expect(envelope.lineage[0].description).toBe(`Retrieved ${capability.id} from yahoo.`);
+  }
+});
+
+
+it('uses Friday Close for a Monday quote and never dividend-adjusted Adj Close', async () => {
+  const payload: any = sessionChart('2025-10-20T17:00:00Z');
+  const chart = payload.chart.result[0];
+  chart.timestamp = ['2025-10-16', '2025-10-17', '2025-10-20'].map(day => Date.parse(`${day}T13:30:00Z`) / 1000);
+  chart.indicators.quote[0].close = [100, 105, 108];
+  chart.indicators.adjclose = [{ adjclose: [98, 103, 108] }];
+  installFetch(() => jsonResponse(payload));
+  const result = await makeProvider().execute<Quote>('market.quote', { symbol: 'AAPL.US' });
+  expect(result.ok).toBe(true);
+  if (result.ok) { expect(result.data.prevClose).toBe(105); expect(result.data.change).toBe(3); }
+});

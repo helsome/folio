@@ -236,7 +236,17 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({
             </div>
           </>
         ) : (
-          <div className="text-[12px] text-foreground/40">{DASH}</div>
+          <div
+            className="text-[12px] text-foreground/40"
+            title={cache.error ? t('security.header.quoteUnavailable', { error: cache.error }) : undefined}
+          >
+            {DASH}
+            {cache.error && (
+              <div className="text-[10px]" data-testid={`watchlist-error-${symbol}`}>
+                {t('navigation.watchlistQuoteUnavailable')}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

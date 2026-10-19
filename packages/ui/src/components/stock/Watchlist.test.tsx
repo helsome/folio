@@ -62,3 +62,33 @@ it('prices each row in that symbol currency', async () => {
     container.remove();
   }
 });
+
+
+it.each([false, true])('renders failed rows as unavailable without sample prices (allFailed=%s)', async allFailed => {
+  const store = createStore();
+  store.set(watchlistAtom, ['AAPL.US', 'TSLA.US']);
+  const market = {
+    ...fallbackClient.market,
+    getQuote: async (symbol: string) => symbol === 'AAPL.US' && !allFailed
+      ? { ok: true as const, data: { ...QUOTE, symbol, lastPrice: 220, source: { providerId: 'yahoo', providerName: 'Yahoo Finance', delayed: true } } }
+      : { ok: false as const, error: { code: 'OFFLINE', message: 'Synthetic provider failure' } },
+  };
+  const container = document.createElement('div'); document.body.appendChild(container);
+  const root = createRoot(container);
+  try {
+    await act(async () => {
+      root.render(<TestI18n><Provider store={store}><FinagentClientProvider client={{ ...fallbackClient, market }}><Watchlist /></FinagentClientProvider></Provider></TestI18n>);
+      await new Promise(resolve => setTimeout(resolve, 25));
+    });
+    const tesla = container.querySelector('[data-testid="watchlist-row-TSLA.US"]');
+    expect(tesla?.textContent).toContain('Quote unavailable');
+    expect(tesla?.textContent).not.toContain('175.22');
+    expect(tesla?.textContent).not.toContain('-2.10%');
+    expect(tesla?.querySelector('[title]')?.getAttribute('title')).toContain('Synthetic provider failure');
+    expect(container.querySelector('[data-testid="demo-badge"]')).toBeNull();
+    const apple = container.querySelector('[data-testid="watchlist-row-AAPL.US"]');
+    expect(apple?.textContent).toContain(allFailed ? 'Quote unavailable' : '$220.00');
+    if (allFailed) { expect(container.textContent).not.toContain('Yahoo Finance'); expect(container.textContent).not.toContain('Updated'); }
+    else expect(container.textContent).toContain('Yahoo Finance');
+  } finally { await act(async () => root.unmount()); container.remove(); }
+});
