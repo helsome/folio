@@ -19,7 +19,9 @@
 - 报价/前一会话附近的拆股事件若不能认证两者价格口径，保守不可用；早于两者的历史拆股不再次调整。
 - 查阅了 yfinance 项目本身的 [regular_market_previous_close](https://github.com/ranaroussi/yfinance/blob/2081dca0b224512ff768f9c5e6bd9c658a3b8339/yfinance/scrapers/quote.py#L308-L326) 和 [日线重复行处理](https://github.com/ranaroussi/yfinance/blob/2081dca0b224512ff768f9c5e6bd9c658a3b8339/yfinance/utils.py#L687-L711)，作为独立实现参考；这不是 Yahoo 官方 API 合约或本环境 live 成功证明。
 
-## 实际验证
+## 首版 `6111a7e` 实际验证
+
+以下保留首版实测记录；独立审查后的异步拆股修补与新验证见文末。
 
 环境：Linux x64，Bun **1.4.2 (744846f84)**；本轮审查已用 frozen lock 安装依赖，修复无依赖变更。Electron **39.8.9** 官方二进制已校验 SHA256；Xvfb + 构建后 renderer/main + 隔离新 userData。容器测试需使用 `--no-sandbox` 启动参数，未修改应用 webPreferences、凭据或网络安全配置。
 
@@ -76,3 +78,32 @@ git diff --check + PR 工作流相同 high-signal secret patterns（仅变更 pr
 ![After: all providers fail](../screenshots/yahoo-data-integrity/watchlist-all-failed-after.png)
 
 原始审查日志、完整 provenance envelopes、截图和本轮独立脚本均保存在隔离证据目录，未覆盖旧报告。Library 上传此前因网络失败，未获得 library_file_id；本报告与图片随 PR 提供可审查版本。
+
+## 独立审查追补：晚于报价的拆股也可能造成异步口径
+
+审查确认首版 guard 只拒绝 `previousTime <= splitTime <= quoteTime`，漏掉晚于报价时间的同响应拆股。这是**合成反例**，不声称 live Yahoo 已观察到：周五 `regularMarketPrice=400`，周四/周五 Close 已调整为99/100，同响应拆股日期是下周一、比例4:1。旧代码返回成功，产生约 +304.04% 的错误日涨幅。
+
+现在只要同响应拆股时间在前一会话起或更晚，即无法认证报价与历史口径，明确返回 `NOT_FOUND` / quote unavailable；不再用 quoteTime 作为检查上限，不自动乘除拆股比例。早于两者的历史拆股行为保持不变；不新增交易日历或扩大到其他 PR。
+
+新增两个回归：报价后的同日拆股、下周一拆股。两者都使用报价400与历史99/100的异步口径，断言失败及明确的“前收无法验证”错误。
+
+```text
+旧 guard + 新回归：
+bun test packages/shared/src/providers/yahoo/yahoo.test.ts --test-name-pattern 'unavailable when a later split'
+→ 0 pass / 2 fail / 43 filtered out（两个响应原先都错误返回 ok=true）
+
+修补后，重跑上文相同六文件 focused 命令：
+→ 80 pass / 0 fail，493 expectations
+
+bun run test:integration
+→ 2011 pass / 7 skip / 0 fail，8685 expectations，2018 tests / 215 files
+→ 随后 core/i18n/shared/ui/electron typecheck 全部 exit 0
+
+bun run build
+→ renderer / preload / main 全部成功，exit 0；既有 large-chunk warning
+
+git diff --check + changed-production high-signal secret scan
+→ pass
+```
+
+本次没有重跑 UI 截图、本地 agent eval 或真实网络请求：可见状态和传输代码未变；上文截图和 Electron smoke 保留为首版证据。真实行情成功验收仍未完成，先前 DNS/403 限制不因这次合成回归通过而消失。PR 创建继续暂停，等待用户对该外部写操作明确确认。

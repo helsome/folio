@@ -518,6 +518,30 @@ describe('Yahoo previous trading-session baseline', () => {
     expect(result.ok).toBe(true);
     if (result.ok) expect(result.data.change).toBe(3);
   });
+
+  it.each(['2025-10-17T21:00:00Z', '2025-10-20T13:30:00Z'])(
+    'returns unavailable when a later split may have adjusted bars ahead of the quote (%s)',
+    async splitDate => {
+      // Synthetic asynchronous-basis response, not a claim about live Yahoo:
+      // Friday's regular price is still pre-split while daily Close values
+      // already reflect a 4:1 split dated after that quote (including Monday).
+      const payload: any = sessionChart('2025-10-17T20:00:00Z');
+      const chart = payload.chart.result[0];
+      chart.meta.regularMarketPrice = 400;
+      chart.indicators.quote[0].close = [98, 99, 100];
+      chart.events = { splits: { later: {
+        date: Date.parse(splitDate) / 1000, numerator: 4, denominator: 1,
+      } } };
+      installFetch(() => jsonResponse(payload));
+
+      const result = await makeProvider().execute<Quote>('market.quote', { symbol: 'AAPL.US' });
+      expect(result.ok).toBe(false);
+      if (!result.ok) {
+        expect(result.error.code).toBe('NOT_FOUND');
+        expect(result.error.message).toContain('previous trading-session close could not be verified');
+      }
+    }
+  );
 });
 
 

@@ -469,12 +469,13 @@ function previousSessionClose(chart: ChartResult, quoteTime: number): number | u
     const close = finite(chart.quote.close[previous.index])
     if (close === undefined || close <= 0) return undefined
     const previousTime = previous.time
-    // Daily close is normally split-adjusted by Yahoo. At a split boundary
-    // the unofficial payload cannot certify the basis against regular price;
-    // refuse the quote rather than applying the ratio twice or inventing a move.
+    // Daily close can already reflect a split newer than regularMarketTime
+    // while that quote still uses the old basis. Any returned split at or
+    // after the previous session makes the comparison uncertifiable, even
+    // when dated after quoteTime. Refuse rather than multiplying/dividing.
     for (const split of chart.splits) {
       const time = isRecord(split) ? epochSeconds(split.date) : undefined
-      if (time === undefined || (time >= previousTime && time <= quoteTime)) return undefined
+      if (time === undefined || time >= previousTime) return undefined
     }
     return close
   } catch {
