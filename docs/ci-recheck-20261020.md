@@ -73,3 +73,31 @@ read-only default home directory; no permission boundary was changed.
   installation/startup, golden/v5 and release aggregation remain unexecuted.
 - No claim of signed artifact, completed live evaluation or release readiness.
   #350 remains Draft for independent review and native Actions evidence.
+
+## Exact main synchronization: f8b7809
+
+At the parent's request, synchronized exact main
+`f8b7809e3a816bf2111da7eb8e8977c8bb387fa4` (including #362/#342/#343/#347)
+into the same #350 branch. The branch merge was conflict-free and retains the
+previous nightly/release/self-signing repairs. It does not merge #350 into main.
+
+Revalidation on the synchronized tree, same Linux/Bun/Node environment:
+
+- `bun test --isolate`: **2057 pass / 7 skip / 0 fail**, 217 files, 8895 assertions.
+- CI/release plus research-diff/retrieval/compare focused filters:
+  **101 pass / 0 fail**, 9 files, 350 assertions.
+- `bun test --isolate apps/electron/src/main/kernelHost.test.ts packages/shared/src/kernel/stream-event-log.test.ts packages/shared/src/research/runner.test.ts`:
+  **35 pass / 0 fail**, 3 files, 151 assertions.
+- `bun run typecheck`: core/i18n/shared/ui/electron all exit 0.
+- `bun run build`: packages/renderer/preload/main exit 0; existing chunk warning.
+- `bun run i18n:check`: 1507 keys per locale, 0 issues.
+- Fixture eval smoke with baseline folio-agent-v1, temporary store
+  `/tmp/folio-f8b-eval-store` and output `/tmp/folio-f8b-eval-fixture.json`:
+  **15 offline cases completed, GATE: PASS**; not live/judge acceptance.
+- Tracked-source secret scan and diff whitespace check passed.
+
+The parent's logged-out browser independently confirms PR checks Disabled; no
+additional API enable attempt, identity change or notification change was made.
+Native Actions execution, installer/self-signature/live-provider acceptance and
+independent CI-delta review remain outstanding. The PR stays Draft, with no tag,
+release, or main merge performed by this thread.
