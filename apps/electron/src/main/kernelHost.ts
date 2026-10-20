@@ -247,6 +247,13 @@ const OBSERVABILITY_EXPERIMENT_ID = '__observability__';
  */
 const RUN_CANCELLED_CODE = 'RUN_CANCELLED';
 
+/**
+ * Maximum symbols one comparison covers. Matches the Compare workspace picker
+ * (`withComparisonSymbols` in `packages/ui/src/atoms/compareAtoms.ts`), so the
+ * IPC boundary rejects oversized sets instead of rendering an unbounded table.
+ */
+const COMPARE_MAX_SYMBOLS = 4;
+
 interface PendingEvalRun {
   sessionId: string;
   startedAt: number;
@@ -798,9 +805,26 @@ export class AgentKernelHost {
     if (!Array.isArray(request.symbols) || request.symbols.length < 2) {
       throw createCodeError('INVALID_ARGUMENT', 'Compare needs at least two symbols.');
     }
-    const symbols = request.symbols.map((entry) =>
-      requireString(entry, 'symbols[]').toUpperCase()
-    );
+    const symbols: string[] = [];
+    const seenInstruments = new Set<string>();
+    for (const entry of request.symbols) {
+      const symbol = requireString(entry, 'symbols[]').trim().toUpperCase();
+      // Aliases of one canonical instrument (AAPL vs AAPL.US) are the same
+      // listing; keep the first spelling so the table never shows duplicate
+      // columns. Unresolvable symbols dedupe on their exact spelling only.
+      const resolution = this.instrumentResolver.resolve(symbol);
+      const identity =
+        resolution.status === 'resolved' ? resolution.instrument.instrumentId : symbol;
+      if (seenInstruments.has(identity)) continue;
+      seenInstruments.add(identity);
+      symbols.push(symbol);
+    }
+    if (symbols.length < 2) {
+      throw createCodeError('INVALID_ARGUMENT', 'Compare needs at least two distinct symbols.');
+    }
+    if (symbols.length > COMPARE_MAX_SYMBOLS) {
+      throw createCodeError('INVALID_ARGUMENT', 'Compare supports at most four symbols.');
+    }
     return buildComparison(symbols, this.registry, { executor: this.executor });
   }
 

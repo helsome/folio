@@ -67,8 +67,7 @@ export class StreamEventLog {
     const events: StreamEvent[] = [];
     let skipped = 0;
     let duplicates = 0;
-    const runOrder: string[] = [];
-    const seen = new Set<string>();
+    const runOrder = new Set<string>();
     // 每个 run 已接受的最大 sequence：磁盘里的重复行（历史缺陷或并发写回）
     // 在此被幂等丢弃，避免恢复出的重复 seq 破坏 replay 的连续性检查。
     const lastSeqByRun = new Map<string, number>();
@@ -93,20 +92,19 @@ export class StreamEventLog {
         }
         lastSeqByRun.set(event.runId, event.sequence);
         events.push(event);
-        if (!seen.has(event.runId)) {
-          seen.add(event.runId);
-          runOrder.push(event.runId);
-        }
+        // Only accepted events refresh activity, matching StreamEventHistory's LRU order.
+        runOrder.delete(event.runId);
+        runOrder.add(event.runId);
       } catch {
         skipped += 1;
       }
     }
 
-    // 收缩：只保留最近 maxRuns 个 run（按首次出现顺序），并重写文件控制磁盘。
+    // 收缩：只保留最近 maxRuns 个 run（按最近有效事件顺序），并重写文件控制磁盘。
     // 注意：这是 load 唯一的写路径，且只裁剪超限 run；恢复历史本身绝不回写
     // （issue #75 review），因此连续重启不会让文件增长。
-    if (runOrder.length > this.maxRuns) {
-      const keep = new Set(runOrder.slice(-this.maxRuns));
+    if (runOrder.size > this.maxRuns) {
+      const keep = new Set([...runOrder].slice(-this.maxRuns));
       const kept = events.filter((e) => keep.has(e.runId));
       try {
         writeFileSync(this.file, kept.map((e) => `${JSON.stringify(e)}\n`).join(''), 'utf8');
