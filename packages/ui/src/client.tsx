@@ -27,7 +27,10 @@ import type {
   Message,
   NewsItem,
   PortfolioSnapshot,
+  PortfolioLedgerCoverage,
+  PortfolioLedgerImportResult,
   PortfolioRiskReport,
+  PortfolioTwrResult,
   ProviderCoverage,
   ProviderHealth,
   ProviderStatus,
@@ -271,6 +274,14 @@ export interface FinagentClient {
   portfolioRisk?: {
     analyze: () => Promise<ApiResult<PortfolioRiskReport>>;
   };
+  portfolioLedger?: {
+    importEntries: (input: {
+      portfolioId: string;
+      entries: unknown[];
+    }) => Promise<ApiResult<PortfolioLedgerImportResult>>;
+    coverage: (input: { portfolioId: string }) => Promise<ApiResult<PortfolioLedgerCoverage>>;
+    twr: (input: { portfolioId: string; baseCurrency?: string }) => Promise<ApiResult<PortfolioTwrResult>>;
+  };
   llm: {
     getState: () => Promise<ApiResult<LlmRuntimeState>>;
     listModels: () => Promise<ApiResult<LlmModel[]>>;
@@ -386,6 +397,11 @@ export const fallbackClient: FinagentClient = {
   },
   portfolioRisk: {
     analyze: missingClient('portfolioRisk.analyze'),
+  },
+  portfolioLedger: {
+    importEntries: missingClient('portfolioLedger.importEntries'),
+    coverage: missingClient('portfolioLedger.coverage'),
+    twr: missingClient('portfolioLedger.twr'),
   },
   llm: {
     getState: missingClient('llm.getState'),
