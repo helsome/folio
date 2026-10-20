@@ -19,25 +19,39 @@ permissions:
 
 jobs:
   eval-full:
-    runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
+    runs-on: ubuntu-24.04
     timeout-minutes: 180
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
 
       - name: Setup Bun
         uses: oven-sh/setup-bun@v2
         with:
-          bun-version: latest
+          bun-version: '1.4.2'
 
       - name: Install dependencies
         run: bun install --frozen-lockfile
+
+      - name: Install pinned native Longbridge CLI
+        if: github.ref == 'refs/heads/main'
+        run: node scripts/install-longbridge.mjs
+        env:
+          FOLIO_LIVE_EVAL: '1'
 
       # Live eval with the Anthropic judge. Secrets are passed through env
       # only — never echoed, never written to logs. FINAGENT_JUDGE_API_KEY is
       # set from the same secret so either credential convention the CLI
       # checks is satisfied. FINAGENT_ENV_FILE_CONTENT is optional; an absent
-      # secret resolves to an empty string.
+      # secret resolves to an empty string. The live CLI imports supported fields
+      # only; it never sources shell commands or persists this secret to disk.
       #
       # A failure is never swallowed: the step carries the CLI's real exit
       # code through the `| tee` pipeline (`set -o pipefail`, issue #113).
@@ -51,11 +65,18 @@ jobs:
         shell: bash
         run: |
           set -o pipefail
+          mkdir -p artifacts
+          set +e
           bun run eval:full -- --mode live \
             --model "${FINAGENT_EVAL_MODEL:-anthropic/claude-sonnet-4-5}" \
             --judge-provider anthropic \
             --judge-model "${FINAGENT_JUDGE_MODEL:-claude-sonnet-4-5}" \
             --out artifacts/eval-full.json 2>&1 | tee artifacts/eval-full.log
+          STATUSES=("${PIPESTATUS[@]}")
+          set -e
+          echo "exit_code=${STATUSES[0]}" >> "$GITHUB_OUTPUT"
+          if [ "${STATUSES[1]}" -ne 0 ]; then exit "${STATUSES[1]}"; fi
+          exit "${STATUSES[0]}"
         env:
           LANGSMITH_PI_API_KEY: ${{ secrets.LANGSMITH_PI_API_KEY }}
           ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
@@ -70,11 +91,21 @@ jobs:
       # diagnostics, and a failed step fails the job (real signal, no wrapper).
       - name: Summarize eval results
         if: always()
+        env:
+          EVAL_EXIT_CODE: ${{ steps.eval-full.outputs.exit_code }}
         run: |
+          case "$EVAL_EXIT_CODE" in
+            0) VALIDITY='Valid run; inspect quality results' ;;
+            1) VALIDITY='Failed quality gate or usage error' ;;
+            2) VALIDITY='BLOCKED / INVALID: preflight or infrastructure; not a passing benchmark' ;;
+            3) VALIDITY='Cancelled' ;;
+            *) VALIDITY='NOT EXECUTED: setup did not reach the evaluation command' ;;
+          esac
           {
             echo '## Nightly full eval'
             echo ''
             echo "Run status: **${{ steps.eval-full.outcome }}**"
+            echo "Validity: **$VALIDITY** (exit ${EVAL_EXIT_CODE:-not-run})"
             echo '(0 valid · 1 quality regression/usage · 2 invalid or inconclusive execution · 3 cancelled)'
             echo ''
             echo '### Summary table'

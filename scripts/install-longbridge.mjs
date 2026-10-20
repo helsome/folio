@@ -1,12 +1,12 @@
-// Trusted release-only, job-local CLI installation. Never authenticate or persist credentials.
+// Trusted release/nightly, job-local CLI installation. Never authenticate or persist credentials.
 import { chmodSync, mkdirSync, mkdtempSync, appendFileSync, writeFileSync } from 'node:fs';
 import { join } from 'node:path';
 import { tmpdir } from 'node:os';
 import { execFileSync } from 'node:child_process';
 import { sha256 } from './release-lib.mjs';
-import { longbridgeAssetFor } from './release-provider.mjs';
-if (process.env.FOLIO_RELEASE_GATES !== '1' || !process.env.GITHUB_REF?.startsWith('refs/tags/v')) {
-  throw new Error('Longbridge setup is restricted to trusted version-tag release gates');
+import { longbridgeAssetFor, longbridgeSetupAllowed } from './release-provider.mjs';
+if (!longbridgeSetupAllowed(process.env)) {
+  throw new Error('Longbridge setup requires trusted tag release or default-branch schedule/manual live evaluation');
 }
 const asset = longbridgeAssetFor(process.platform, process.arch);
 const work = mkdtempSync(join(process.env.RUNNER_TEMP || tmpdir(), 'folio-cli-'));

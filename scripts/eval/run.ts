@@ -38,6 +38,7 @@ import { createJudgeClient, resolveJudgeConfigStatus } from '../../packages/shar
 import { embeddedDatasets } from '../../packages/shared/src/evaluation/datasets/index.ts';
 import { getLongBridgeStatus } from '../../packages/longbridge-tools/src/status.ts';
 import { selectCases } from './select-cases.ts';
+import { liveEvalEnvironment } from './environment.mjs';
 import { formatPreflight, runLivePreflight, type PreflightResult } from './preflight.ts';
 import { validateGoldCaseDataset } from '../../packages/core/src/evaluation.ts';
 import {
@@ -764,6 +765,20 @@ async function main(): Promise<number> {
   if (options.help) {
     console.log(USAGE);
     return 0;
+  }
+
+  if (options.mode === 'live') {
+    try {
+      const env = liveEvalEnvironment(process.env, options.judgeProvider ?? process.env.FINAGENT_JUDGE_PROVIDER);
+      delete process.env.FINAGENT_ENV_FILE_CONTENT;
+      for (const key of Object.keys(process.env)) {
+        if (!(key in env)) delete process.env[key];
+      }
+      Object.assign(process.env, env);
+    } catch {
+      console.error('Live environment configuration is invalid (contents suppressed); no cases were run.');
+      return EXIT_INVALID;
+    }
   }
 
   const datasetEntry = embeddedDatasets.find((entry) => entry.id === options.dataset);

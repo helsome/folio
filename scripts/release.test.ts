@@ -137,7 +137,8 @@ describe('trusted release prerequisites', () => {
     });
     expect(calls).toEqual([['--version'], ['quote', 'NVDA.US', '--format', 'json']]);
     expect(longbridgeAssetFor('darwin', 'arm64').sha256).toHaveLength(64);
-    expect(() => longbridgeAssetFor('linux', 'x64')).toThrow();
+    expect(longbridgeAssetFor('linux', 'x64').sha256).toHaveLength(64);
+    expect(() => longbridgeAssetFor('linux', 'arm64')).toThrow();
   });
   it('fails closed on unusable quotes and suppresses provider diagnostics', () => {
     expect(() => checkReleaseProvider({}, (_command: string, args: string[]) => args[0] === '--version' ? 'longbridge 0.17.0' : '[]')).toThrow('no usable');

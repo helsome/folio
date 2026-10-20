@@ -6,6 +6,7 @@ export function longbridgeAssetFor(platform, arch) {
   const assets = {
     'darwin-arm64': ['longbridge-terminal-darwin-arm64.tar.gz', '1c1af2ee4a22a76d20c667e8aa1a0083991a874b07b29f10c2cd4132a0647577'],
     'darwin-x64': ['longbridge-terminal-darwin-amd64.tar.gz', '853e0b4f7884877ab52b590b820f586802bd64205109247b23b752a50e1c1058'],
+    'linux-x64': ['longbridge-terminal-linux-musl-amd64.tar.gz', 'b7ea280afd0936baad64e067b66649788696a5a9c626a99ae366920fba039550'],
     'win32-x64': ['longbridge-terminal-windows-amd64.zip', 'fba79490a2bd2e034f34f24dd541864d6187d55c7321f35ca88595e803e7c719'],
   };
   const asset = assets[`${platform}-${arch}`];
@@ -43,4 +44,12 @@ export function checkReleaseProvider(env, execute = execFileSync) {
   if (!rows.some((row) => row?.symbol === 'NVDA.US' && ['last', 'last_done', 'last_price', 'lastPrice'].some((key) => Number(row[key]) > 0))) {
     throw new Error('Release blocked: Longbridge quote probe returned no usable NVDA quote (response suppressed)');
   }
+}
+
+export function longbridgeSetupAllowed(env) {
+  const release = env.FOLIO_RELEASE_GATES === '1' && env.GITHUB_REF?.startsWith('refs/tags/v') &&
+    ['push', 'workflow_dispatch'].includes(env.GITHUB_EVENT_NAME);
+  const nightly = env.FOLIO_LIVE_EVAL === '1' && env.GITHUB_REF === 'refs/heads/main' &&
+    ['schedule', 'workflow_dispatch'].includes(env.GITHUB_EVENT_NAME);
+  return Boolean(release || nightly);
 }
