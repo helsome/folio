@@ -182,6 +182,9 @@ mock.module('@finagent/shared', () => ({
       throw new Error('skip instrument catalog persist in unit tests');
     };
   },
+  YahooChartFinancialDataProvider: class {
+    clearCache = () => undefined;
+  },
   MassiveFinancialDataProvider: class {
     clearCache = () => undefined;
   },

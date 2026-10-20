@@ -1,5 +1,6 @@
 import {
   summarizeInstrument,
+  type MarketSource,
   type AccountAssets,
   type CalcIndex,
   type CashFlowRecord,
@@ -60,16 +61,18 @@ export class ProviderFetchError extends Error {
  * Fetcher surface produced by `createRouterFetchers`. Structurally the
  * post-migration `CapabilityFetchers` contract (portfolio methods carry the
  * neutral `@finagent/core` account shapes). Raw methods erase routing for
- * data-only consumers; `getQuoteResult` is the explicit provenance-aware
- * companion used by the traceable quote capability.
+ * data-only consumers; matching `*Result` companions retain provenance for
+ * traceable capabilities.
  */
 export interface RouterCapabilityFetchers {
   getQuote: (symbol: string) => Promise<Quote>;
   getQuoteResult: (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<Quote>>;
   getKline: (options: GetKlineOptions) => Promise<Kline[]>;
+  getKlineResult: (options: GetKlineOptions, signal?: AbortSignal) => Promise<CapabilityFetchResult<Kline[]>>;
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
   getMarketStatus: () => Promise<MarketStatus[]>;
   getStaticInfo: (symbol: string) => Promise<StaticInfo>;
+  getStaticInfoResult: (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<StaticInfo>>;
   getCalcIndex: (symbol: string) => Promise<CalcIndex>;
   getNews: (symbol: string) => Promise<NewsItem[]>;
   getPortfolio: () => Promise<PortfolioSnapshot>;
@@ -96,6 +99,12 @@ export interface RouterCapabilityFetchers {
   getCashFlow: (options?: GetCashFlowOptions) => Promise<CashFlowRecord[]>;
 }
 
+const SOURCE_CAPABILITIES = new Set([
+  'market.quote',
+  'market.kline',
+  'portfolio.summary',
+]);
+
 async function fetchResult<T>(
   router: FinancialProviderRouter,
   capabilityId: string,
@@ -104,7 +113,10 @@ async function fetchResult<T>(
 ): Promise<CapabilityFetchResult<T>> {
   const result: ProviderResult<T> = await router.execute<T>(capabilityId, input, signal);
   if (result.ok) {
-    return { data: result.data, provenance: cloneProvenance(result.provenance) };
+    const data = SOURCE_CAPABILITIES.has(capabilityId)
+      ? stampMarketSource(result.data, result.provenance)
+      : result.data;
+    return { data, provenance: cloneProvenance(result.provenance) };
   }
   throw new ProviderFetchError(result.error);
 }
@@ -115,6 +127,28 @@ async function fetch<T>(
   input: unknown
 ): Promise<T> {
   return (await fetchResult<T>(router, capabilityId, input)).data;
+}
+
+function marketSourceOf(provenance: ProviderProvenance): MarketSource {
+  return {
+    providerId: provenance.providerId,
+    providerName: provenance.providerName,
+    ...(provenance.delayed === true ? { delayed: true } : {}),
+  };
+}
+
+/** Attach the answering provider so UI freshness lines are not hard-coded. */
+function stampMarketSource<T>(data: T, provenance: ProviderProvenance): T {
+  const source = marketSourceOf(provenance);
+  if (Array.isArray(data)) {
+    return data.map((item) =>
+      typeof item === 'object' && item !== null ? { ...item, source } : item
+    ) as T;
+  }
+  if (typeof data === 'object' && data !== null) {
+    return { ...data, source };
+  }
+  return data;
 }
 
 function cloneProvenance(provenance: ProviderProvenance): ProviderProvenance {
@@ -170,10 +204,14 @@ export function createRouterFetchers(
       fetchResult(router, 'market.quote', bindSymbolInput(symbol, {}, resolve), signal),
     getKline: (options) =>
       fetch(router, 'market.kline', bindSymbolInput(options.symbol, { ...options }, resolve)),
+    getKlineResult: (options, signal) =>
+      fetchResult(router, 'market.kline', bindSymbolInput(options.symbol, { ...options }, resolve), signal),
     getIntraday: (symbol) => fetch(router, 'market.intraday', bindSymbolInput(symbol, {}, resolve)),
     getMarketStatus: () => fetch(router, 'market.status', {}),
     getStaticInfo: (symbol) =>
       fetch(router, 'company.profile', bindSymbolInput(symbol, {}, resolve)),
+    getStaticInfoResult: (symbol, signal) =>
+      fetchResult(router, 'company.profile', bindSymbolInput(symbol, {}, resolve), signal),
     getCalcIndex: (symbol) =>
       fetch(router, 'company.valuation', bindSymbolInput(symbol, {}, resolve)),
     getNews: (symbol) => fetch(router, 'research.news', bindSymbolInput(symbol, {}, resolve)),

@@ -791,7 +791,10 @@ describe('createRouterFetchers', () => {
 
     const fetchers = createRouterFetchers(router);
     const result = await fetchers.getQuote('AAPL.US');
-    expect(result).toEqual(quote);
+    expect(result).toEqual({
+      ...quote,
+      source: { providerId: 'primary', providerName: 'Primary' },
+    });
   });
 
   it('throws a normalized ProviderFetchError on failure', async () => {

@@ -6,6 +6,7 @@ import {
   watchlistAtom,
   quoteCacheAtomFamily,
   watchlistLatestTimestampAtom,
+  watchlistMarketSourceAtom,
   watchlistQuotesAreDemoAtom,
   fetchQuoteAtom,
   addToWatchlistAtom,
@@ -36,6 +37,7 @@ export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = tru
   const setActiveView = useSetAtom(activeViewAtom);
   const activeSymbol = useAtomValue(activeSymbolAtom);
   const latestTimestamp = useAtomValue(watchlistLatestTimestampAtom);
+  const marketSource = useAtomValue(watchlistMarketSourceAtom);
   const quotesAreDemo = useAtomValue(watchlistQuotesAreDemoAtom);
 
   const [newSymbol, setNewSymbol] = React.useState('');
@@ -106,7 +108,8 @@ export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = tru
             <span className="flex min-w-0 items-center gap-2">
               {quotesAreDemo && <DemoBadge />}
               <DataFreshness
-                providerName="Longbridge"
+                providerName={marketSource.providerName}
+                delayed={marketSource.delayed}
                 updatedAtMs={
                   latestTimestamp ? latestTimestamp * 1000 : undefined
                 }
@@ -233,7 +236,17 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({
             </div>
           </>
         ) : (
-          <div className="text-[12px] text-foreground/40">{DASH}</div>
+          <div
+            className="text-[12px] text-foreground/40"
+            title={cache.error ? t('security.header.quoteUnavailable', { error: cache.error }) : undefined}
+          >
+            {DASH}
+            {cache.error && (
+              <div className="text-[10px]" data-testid={`watchlist-error-${symbol}`}>
+                {t('navigation.watchlistQuoteUnavailable')}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

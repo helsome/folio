@@ -16,7 +16,8 @@
     "./diagnostics": "./src/diagnostics/index.ts",
     "./retrieval": "./src/retrieval/index.ts",
     "./providers/longbridge": "./src/providers/longbridge/index.ts",
-    "./providers/massive": "./src/providers/massive/index.ts"
+    "./providers/massive": "./src/providers/massive/index.ts",
+    "./providers/yahoo": "./src/providers/yahoo/index.ts"
   },
   "dependencies": {
     "@finagent/core": "workspace:*",

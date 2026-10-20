@@ -20,6 +20,7 @@ export {
 } from './instrument.ts';
 export { healthAll } from './health.ts';
 export { MassiveFinancialDataProvider } from './massive/index.ts';
+export { YahooChartFinancialDataProvider } from './yahoo/index.ts';
 export { TtlCache } from './massive/cache.ts';
 export {
   // typed failure model
