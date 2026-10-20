@@ -1,4 +1,5 @@
 import type {
+  CapabilityProvenance,
   CapabilityRegistry,
   Comparison,
   ComparisonCell,
@@ -95,6 +96,11 @@ export async function buildComparison(
   const perSymbol: Record<string, Record<string, unknown>> = Object.fromEntries(
     symbols.map((symbol) => [symbol, {}])
   );
+  // Same shape as `perSymbol`, holding the provenance of each successful
+  // capability result so cells can name the actual source (#332).
+  const perSymbolProvenance: Record<string, Record<string, CapabilityProvenance>> = Object.fromEntries(
+    symbols.map((symbol) => [symbol, {}])
+  );
   const errors: Record<string, string> = {};
 
   for (let i = 0; i < specs.length; i += 1) {
@@ -108,12 +114,15 @@ export async function buildComparison(
       continue;
     }
     perSymbol[symbol][outcome.record.capabilityId] = outcome.result.data;
+    if (outcome.result.provenance) {
+      perSymbolProvenance[symbol][outcome.record.capabilityId] = outcome.result.provenance;
+    }
   }
 
   const sources = collectSources(perSymbol);
   return {
     symbols,
-    rows: buildRows(symbols, perSymbol),
+    rows: buildRows(symbols, perSymbol, perSymbolProvenance),
     generatedAt: now(),
     errors,
     ...(sources.names.length > 0 ? { sources: sources.names, delayed: sources.delayed } : {}),
@@ -150,7 +159,8 @@ function readMarketSource(data: unknown): { name: string; delayed: boolean } | u
 
 function buildRows(
   symbols: string[],
-  perSymbol: Record<string, Record<string, unknown>>
+  perSymbol: Record<string, Record<string, unknown>>,
+  perSymbolProvenance: Record<string, Record<string, CapabilityProvenance>>
 ): ComparisonRow[] {
   const rows: ComparisonRow[] = [];
 
@@ -170,6 +180,7 @@ function buildRows(
 
   for (const symbol of symbols) {
     const data = perSymbol[symbol] ?? {};
+    const provenance = perSymbolProvenance[symbol] ?? {};
     const quote = isRecord(data['market.quote']) ? data['market.quote'] : undefined;
     const valuation = isRecord(data['company.valuation']) ? data['company.valuation'] : undefined;
     const financials = extractFinancials(data['company.financials']);
@@ -181,19 +192,28 @@ function buildRows(
     const return3m = periodReturn(klines, RETURN_WINDOWS['3M']);
     const return1y = periodReturn(klines, RETURN_WINDOWS['1Y']);
 
-    quoteRow.cells[symbol] = priceCell(toFiniteNumber(quote?.lastPrice));
-    marketCapRow.cells[symbol] = marketCapCell(toFiniteNumber(valuation?.totalMarketValue));
-    peRow.cells[symbol] = ratioCell(toFiniteNumber(valuation?.pe));
-    pbRow.cells[symbol] = ratioCell(toFiniteNumber(valuation?.pb));
-    revenueRow.cells[symbol] = percentCell(financials.revenueGrowth);
-    marginRow.cells[symbol] = percentCell(financials.grossMargin);
-    roeRow.cells[symbol] = percentCell(financials.roe);
-    dividendRow.cells[symbol] = percentCell(dividendYield);
-    return1mRow.cells[symbol] = percentCell(return1m);
-    return3mRow.cells[symbol] = percentCell(return3m);
-    return1yRow.cells[symbol] = percentCell(return1y);
-    ratingRow.cells[symbol] = labelCell(rating);
-    momentumRow.cells[symbol] = momentumCell(return1m, return3m);
+    const quoteProv = provenance['market.quote'];
+    const valuationProv = provenance['company.valuation'];
+    const financialsProv = provenance['company.financials'];
+    const dividendsProv = provenance['company.dividends'];
+    const ratingsProv = provenance['company.ratings'];
+    // The kline provenance names the source of the bar series; the latest
+    // bar's own timestamp is the honest `as_of` for return cells.
+    const klineProv = withMarketTime(provenance['market.kline'], klines);
+
+    quoteRow.cells[symbol] = priceCell(toFiniteNumber(quote?.lastPrice), quoteProv);
+    marketCapRow.cells[symbol] = marketCapCell(toFiniteNumber(valuation?.totalMarketValue), valuationProv);
+    peRow.cells[symbol] = ratioCell(toFiniteNumber(valuation?.pe), valuationProv);
+    pbRow.cells[symbol] = ratioCell(toFiniteNumber(valuation?.pb), valuationProv);
+    revenueRow.cells[symbol] = percentCell(financials.revenueGrowth, financialsProv);
+    marginRow.cells[symbol] = percentCell(financials.grossMargin, financialsProv);
+    roeRow.cells[symbol] = percentCell(financials.roe, financialsProv);
+    dividendRow.cells[symbol] = percentCell(dividendYield, dividendsProv);
+    return1mRow.cells[symbol] = percentCell(return1m, klineProv);
+    return3mRow.cells[symbol] = percentCell(return3m, klineProv);
+    return1yRow.cells[symbol] = percentCell(return1y, klineProv);
+    ratingRow.cells[symbol] = labelCell(rating, ratingsProv);
+    momentumRow.cells[symbol] = momentumCell(return1m, return3m, klineProv);
   }
 
   rows.push(
@@ -292,34 +312,53 @@ function momentum(oneMonth: number | undefined, threeMonth: number | undefined):
   return Math.abs(oneMonth) >= 5 ? 'Strong' : 'Weak';
 }
 
-function priceCell(value: number | undefined): ComparisonCell {
-  if (value === undefined) return { missing: true, display: DASH };
-  return { value, missing: false, display: `$${value.toFixed(2)}` };
+/**
+ * Attach the latest bar's own timestamp as `marketTime` when the kline
+ * capability provenance does not carry one. Missing bars → provenance
+ * unchanged; never stamped with the current time.
+ */
+function withMarketTime(
+  provenance: CapabilityProvenance | undefined,
+  klines: Array<{ timestamp: number; close: number }>
+): CapabilityProvenance | undefined {
+  if (!provenance || klines.length === 0) return provenance;
+  if (provenance.marketTime !== undefined) return provenance;
+  const latest = [...klines].sort((a, b) => a.timestamp - b.timestamp)[klines.length - 1];
+  return latest ? { ...provenance, marketTime: latest.timestamp * 1000 } : provenance;
 }
 
-function ratioCell(value: number | undefined): ComparisonCell {
+function priceCell(value: number | undefined, provenance?: CapabilityProvenance): ComparisonCell {
   if (value === undefined) return { missing: true, display: DASH };
-  return { value, missing: false, display: value.toFixed(2) };
+  return { value, missing: false, display: `$${value.toFixed(2)}`, ...(provenance ? { provenance } : {}) };
 }
 
-function percentCell(value: number | undefined): ComparisonCell {
+function ratioCell(value: number | undefined, provenance?: CapabilityProvenance): ComparisonCell {
   if (value === undefined) return { missing: true, display: DASH };
-  return { value, missing: false, display: `${value.toFixed(1)}%` };
+  return { value, missing: false, display: value.toFixed(2), ...(provenance ? { provenance } : {}) };
 }
 
-function marketCapCell(value: number | undefined): ComparisonCell {
+function percentCell(value: number | undefined, provenance?: CapabilityProvenance): ComparisonCell {
   if (value === undefined) return { missing: true, display: DASH };
-  return { value, missing: false, display: formatMarketCap(value) };
+  return { value, missing: false, display: `${value.toFixed(1)}%`, ...(provenance ? { provenance } : {}) };
 }
 
-function labelCell(value: string | undefined): ComparisonCell {
+function marketCapCell(value: number | undefined, provenance?: CapabilityProvenance): ComparisonCell {
   if (value === undefined) return { missing: true, display: DASH };
-  return { value, missing: false, display: value };
+  return { value, missing: false, display: formatMarketCap(value), ...(provenance ? { provenance } : {}) };
 }
 
-function momentumCell(oneMonth: number | undefined, threeMonth: number | undefined): ComparisonCell {
+function labelCell(value: string | undefined, provenance?: CapabilityProvenance): ComparisonCell {
+  if (value === undefined) return { missing: true, display: DASH };
+  return { value, missing: false, display: value, ...(provenance ? { provenance } : {}) };
+}
+
+function momentumCell(
+  oneMonth: number | undefined,
+  threeMonth: number | undefined,
+  provenance?: CapabilityProvenance
+): ComparisonCell {
   const value = momentum(oneMonth, threeMonth);
-  return labelCell(value);
+  return labelCell(value, provenance);
 }
 
 function formatMarketCap(value: number): string {

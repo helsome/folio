@@ -1,6 +1,6 @@
 import { Type } from '@sinclair/typebox';
 import { describe, expect, it } from 'bun:test';
-import type { Comparison, FinanceCapability } from '@finagent/core';
+import type { CapabilityProvenance, Comparison, FinanceCapability } from '@finagent/core';
 import { defineCapability } from '../capabilities/define.ts';
 import { createCapabilityRegistry } from '../capabilities/registry.ts';
 import { buildComparison } from './service.ts';
@@ -10,7 +10,8 @@ type Bars = Array<{ timestamp: number; close: number }>;
 function makeCap(
   id: string,
   toolName: string,
-  execute: (symbol: string) => unknown
+  execute: (symbol: string) => unknown,
+  provenance?: CapabilityProvenance
 ): FinanceCapability {
   return defineCapability({
     id,
@@ -25,7 +26,7 @@ function makeCap(
       const symbol = (input as { symbol: string }).symbol;
       return {
         data: execute(symbol),
-        provenance: { provider: 'test', fetchedAt: 1, stale: false },
+        provenance: provenance ?? { provider: 'test', fetchedAt: 1, stale: false },
         summary: `${id} ok`,
       };
     },
@@ -182,5 +183,126 @@ describe('buildComparison', () => {
 
     expect(cell(comparison, '1M Return', 'AAPL.US')?.missing).toBe(true);
     expect(cell(comparison, '1Y Return', 'AAPL.US')?.missing).toBe(true);
+  });
+});
+
+describe('buildComparison cell provenance (#332)', () => {
+  it('attaches the producing capability provenance to each derived cell', async () => {
+    const quoteProvenance: CapabilityProvenance = {
+      provider: 'massive',
+      providerId: 'massive',
+      providerName: 'Massive',
+      fetchedAt: 5_000,
+      marketTime: 4_000,
+      delayed: true,
+      stale: false,
+      failoverTrail: [
+        { providerId: 'longbridge', code: 'TIMEOUT', kind: 'timeout', attempts: 1, at: 4_900 },
+      ],
+    };
+    const valuationProvenance: CapabilityProvenance = {
+      provider: 'longbridge',
+      providerName: 'Longbridge',
+      fetchedAt: 6_000,
+      stale: false,
+    };
+    const registry = createCapabilityRegistry([
+      makeCap('market.quote', 'get_quote', () => FULL_DATA['market.quote'], quoteProvenance),
+      makeCap('company.valuation', 'get_valuation', () => FULL_DATA['company.valuation'], valuationProvenance),
+    ]);
+
+    const comparison = await buildComparison(['AAPL.US'], registry, { now: () => 1 });
+
+    const price = cell(comparison, 'Price', 'AAPL.US');
+    expect(price?.value).toBe(100.5);
+    expect(price?.provenance).toMatchObject({
+      provider: 'massive',
+      providerName: 'Massive',
+      fetchedAt: 5_000,
+      delayed: true,
+    });
+    expect(price?.provenance?.failoverTrail?.[0]).toMatchObject({ providerId: 'longbridge', code: 'TIMEOUT' });
+
+    const pe = cell(comparison, 'PE', 'AAPL.US');
+    expect(pe?.provenance).toMatchObject({ provider: 'longbridge', fetchedAt: 6_000 });
+    // Every valuation-derived row keeps the same source record.
+    expect(cell(comparison, 'Market Cap', 'AAPL.US')?.provenance).toBe(pe?.provenance);
+    expect(cell(comparison, 'PB', 'AAPL.US')?.provenance).toBe(pe?.provenance);
+  });
+
+  it('keeps table-level sources (from stamped payloads) alongside per-cell provenance (#353+#332)', async () => {
+    const stampedQuote = {
+      ...FULL_DATA['market.quote'],
+      source: { providerId: 'massive', providerName: 'Massive', delayed: true },
+    };
+    const registry = createCapabilityRegistry([
+      makeCap('market.quote', 'get_quote', () => stampedQuote, {
+        provider: 'massive',
+        providerId: 'massive',
+        providerName: 'Massive',
+        fetchedAt: 5_000,
+        delayed: true,
+        stale: false,
+      }),
+    ]);
+
+    const comparison = await buildComparison(['AAPL.US'], registry, { now: () => 1 });
+
+    // Table-level summary (#353) survives.
+    expect(comparison.sources).toEqual(['Massive']);
+    expect(comparison.delayed).toBe(true);
+    // Per-metric provenance (#332) rides on the same cell.
+    const price = cell(comparison, 'Price', 'AAPL.US');
+    expect(price?.provenance).toMatchObject({ provider: 'massive', fetchedAt: 5_000, delayed: true });
+  });
+
+  it('stamps kline-derived cells with the bar series source and the latest bar as as_of', async () => {
+    const klineProvenance: CapabilityProvenance = {
+      provider: 'longbridge',
+      providerName: 'Longbridge',
+      fetchedAt: 7_000,
+      stale: false,
+    };
+    const registry = createCapabilityRegistry([
+      makeCap('market.kline', 'get_kline', () => FULL_DATA['market.kline'], klineProvenance),
+    ]);
+
+    const comparison = await buildComparison(['AAPL.US'], registry, { now: () => 1 });
+
+    const bars = FULL_DATA['market.kline'] as Bars;
+    const return1m = cell(comparison, '1M Return', 'AAPL.US');
+    expect(return1m?.provenance).toMatchObject({ provider: 'longbridge', fetchedAt: 7_000 });
+    expect(return1m?.provenance?.marketTime).toBe(bars[bars.length - 1].timestamp * 1000);
+    expect(cell(comparison, 'Momentum', 'AAPL.US')?.provenance?.fetchedAt).toBe(7_000);
+  });
+
+  it('keeps cells provenance-free when the producing run carries none', async () => {
+    const rawQuote: FinanceCapability = {
+      id: 'market.quote',
+      name: 'Quote',
+      description: 'raw test capability',
+      category: 'market',
+      riskLevel: 'read',
+      auth: 'public',
+      toolName: 'get_quote',
+      inputSchema: Type.Object({ symbol: Type.String() }),
+      async execute(input) {
+        const symbol = (input as { symbol: string }).symbol;
+        if (symbol === 'BROKEN.US') throw new Error('quote down');
+        return {
+          data: FULL_DATA['market.quote'],
+          provenance: undefined as unknown as CapabilityProvenance,
+          summary: 'raw quote',
+        };
+      },
+    };
+    const registry = createCapabilityRegistry([rawQuote]);
+
+    const comparison = await buildComparison(['AAPL.US', 'BROKEN.US'], registry, { now: () => 1 });
+
+    expect(cell(comparison, 'Price', 'AAPL.US')?.value).toBe(100.5);
+    expect(cell(comparison, 'Price', 'AAPL.US')?.provenance).toBeUndefined();
+    // A missing cell never grows a fabricated source either.
+    expect(cell(comparison, 'Price', 'BROKEN.US')).toEqual({ missing: true, display: '—' });
   });
 });

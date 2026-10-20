@@ -20,6 +20,7 @@ import { Button } from '../primitives/Button';
 import { DataFreshness } from '../primitives/DataFreshness';
 import { DemoBadge } from '../primitives/DemoBadge';
 import { currencyForSymbol, formatMoney } from '../../lib/money';
+import { describeProvenance } from '../../lib/provenance';
 
 const SYMBOL_REGEX = /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/;
 const DASH = '\u2014';
@@ -223,7 +224,7 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({
         </div>
       </div>
 
-      <div className="shrink-0 text-right tabular-nums">
+      <div className="shrink-0 text-right tabular-nums" title={quote ? describeProvenance(quote.provenance, t) : undefined}>
         {loading ? (
           <div className="h-3.5 w-14 animate-pulse rounded bg-foreground/10" />
         ) : quote ? (

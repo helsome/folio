@@ -60,6 +60,7 @@ export const watchlistLatestTimestampAtom = atom<number | undefined>((get) => {
   return latest;
 });
 
+
 // Add symbol to watchlist
 export const addToWatchlistAtom = atom(
   null,
