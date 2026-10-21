@@ -6,6 +6,7 @@ import {
   watchlistAtom,
   quoteCacheAtomFamily,
   watchlistLatestTimestampAtom,
+  watchlistMarketSourceAtom,
   watchlistQuotesAreDemoAtom,
   fetchQuoteAtom,
   addToWatchlistAtom,
@@ -18,11 +19,11 @@ import { Input } from '../primitives/Input';
 import { Button } from '../primitives/Button';
 import { DataFreshness } from '../primitives/DataFreshness';
 import { DemoBadge } from '../primitives/DemoBadge';
+import { currencyForSymbol, formatMoney } from '../../lib/money';
 
 const SYMBOL_REGEX = /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/;
 const DASH = '\u2014';
 
-const formatPrice = (value: number): string => `$${value.toFixed(2)}`;
 const formatPercent = (value: number): string =>
   `${value >= 0 ? '+' : ''}${value.toFixed(2)}%`;
 
@@ -36,6 +37,7 @@ export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = tru
   const setActiveView = useSetAtom(activeViewAtom);
   const activeSymbol = useAtomValue(activeSymbolAtom);
   const latestTimestamp = useAtomValue(watchlistLatestTimestampAtom);
+  const marketSource = useAtomValue(watchlistMarketSourceAtom);
   const quotesAreDemo = useAtomValue(watchlistQuotesAreDemoAtom);
 
   const [newSymbol, setNewSymbol] = React.useState('');
@@ -106,7 +108,8 @@ export const Watchlist: React.FC<{ showHeader?: boolean }> = ({ showHeader = tru
             <span className="flex min-w-0 items-center gap-2">
               {quotesAreDemo && <DemoBadge />}
               <DataFreshness
-                providerName="Longbridge"
+                providerName={marketSource.providerName}
+                delayed={marketSource.delayed}
                 updatedAtMs={
                   latestTimestamp ? latestTimestamp * 1000 : undefined
                 }
@@ -226,14 +229,24 @@ const WatchlistRow: React.FC<WatchlistRowProps> = ({
         ) : quote ? (
           <>
             <div className="text-[12px] font-semibold text-foreground">
-              {formatPrice(quote.lastPrice)}
+              {formatMoney(quote.lastPrice, currencyForSymbol(symbol))}
             </div>
             <div className="text-[11px]" style={{ color: changeColor }}>
               {formatPercent(quote.changePercent)}
             </div>
           </>
         ) : (
-          <div className="text-[12px] text-foreground/40">{DASH}</div>
+          <div
+            className="text-[12px] text-foreground/40"
+            title={cache.error ? t('security.header.quoteUnavailable', { error: cache.error }) : undefined}
+          >
+            {DASH}
+            {cache.error && (
+              <div className="text-[10px]" data-testid={`watchlist-error-${symbol}`}>
+                {t('navigation.watchlistQuoteUnavailable')}
+              </div>
+            )}
+          </div>
         )}
       </div>
 

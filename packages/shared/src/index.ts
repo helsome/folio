@@ -158,3 +158,4 @@ export * from './pulse/index.ts';
 export * from './export/index.ts';
 export * from './evidence/index.ts';
 export * from './evaluation/index.ts';
+export * from './retrieval/index.ts';

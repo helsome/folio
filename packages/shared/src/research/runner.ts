@@ -24,6 +24,10 @@ import {
   planForStrategy,
   type PlannedCapability,
 } from './planner.ts';
+import {
+  rankRetrievalSources,
+  type RetrievalSourceInput,
+} from '../retrieval/index.ts';
 
 const CONCURRENCY = 4;
 const TIMEOUT_MS = 20000;
@@ -183,25 +187,31 @@ export class ResearchRunner {
     });
 
     const runs = buildRuns(plan, outcomes);
-    const dataBundle = buildDataBundle(outcomes);
+    const dataBundle = buildDataBundle(outcomes, symbol, this.now());
 
     let synthesis: ResearchSynthesis;
     try {
       if (cp) await checkpoint(() => { cp.phase = 'synthesizing'; });
-      if (!cp?.synthesis) await request.beforeSynthesis?.();
+      if (!cp?.synthesis && request.beforeSynthesis) {
+        await withCancellation(signal, () => request.beforeSynthesis!());
+      }
       if (!cp?.synthesis) await charge('modelCalls');
-      synthesis = cp?.synthesis ?? await this.synthesizer.synthesize(
+      synthesis = cp?.synthesis ?? await withCancellation(signal, () => this.synthesizer.synthesize(
         { symbol, plannedCapabilities: plannedIds, runs, dataBundle,
           ...(cp ? { recovery: {
             runId, attempt: cp.retry.synthesisAttempts,
-            onAgentRun: (agentRunId: string, sessionId: string) => checkpoint(() => {
-              cp.events.push({ runId, parentRunId: runId, spanId: randomUUID(), type: 'synthesis',
-                at: this.now(), agentRunId, sessionId });
-            }),
+            onAgentRun: (agentRunId: string, sessionId: string) => {
+              if (signal?.aborted) return Promise.resolve();
+              return checkpoint(() => {
+                if (signal?.aborted) throw createCodeError('RESEARCH_CANCELLED', 'Research cancelled.');
+                cp.events.push({ runId, parentRunId: runId, spanId: randomUUID(), type: 'synthesis',
+                  at: this.now(), agentRunId, sessionId });
+              });
+            },
           } } : {}),
         },
         signal
-      );
+      ));
       // A section key identifies one report dimension; never append duplicates.
       synthesis = { ...synthesis, sections: [...new Map(synthesis.sections.map((section) => [section.key, section])).values()] };
       if (signal?.aborted) throw createCodeError('RESEARCH_CANCELLED', 'Research cancelled.');
@@ -212,7 +222,8 @@ export class ResearchRunner {
         const summary = await emit('cancelled', {
           finishedAt: this.now(),
           cancelled: true,
-          failedCapabilities: plannedIds,
+          completedCapabilities: successIds,
+          failedCapabilities: failedIds,
         });
         return { summary };
       }
@@ -253,6 +264,28 @@ export class ResearchRunner {
   }
 }
 
+/** Settle the caller on cancellation even if the model/preflight ignores its signal. */
+async function withCancellation<T>(signal: AbortSignal | undefined, work: () => Promise<T>): Promise<T> {
+  if (!signal) return work();
+  const cancelled = () => createCodeError('RESEARCH_CANCELLED', 'Research cancelled.');
+  if (signal.aborted) throw cancelled();
+  let onAbort!: () => void;
+  const aborted = new Promise<never>((_, reject) => {
+    onAbort = () => reject(cancelled());
+    signal.addEventListener('abort', onAbort, { once: true });
+  });
+  try {
+    // Register the listener before invoking work: it can abort synchronously.
+    // Promise.race also observes any rejection from work that arrives after cancel.
+    return await Promise.race([aborted, Promise.resolve().then(() => {
+      if (signal.aborted) throw cancelled();
+      return work();
+    })]);
+  } finally {
+    signal.removeEventListener('abort', onAbort);
+  }
+}
+
 function buildRuns(plan: PlannedCapability[], outcomes: RunOutcome[]) {
   const byCapability = new Map(outcomes.map((o) => [o.record.capabilityId, o]));
   return plan.map((p) => {
@@ -270,29 +303,108 @@ function buildRuns(plan: PlannedCapability[], outcomes: RunOutcome[]) {
   });
 }
 
-function buildDataBundle(outcomes: RunOutcome[]): string {
+function buildDataBundle(
+  outcomes: RunOutcome[],
+  query: string,
+  now: number
+): string {
   const bundle: Record<string, unknown> = {};
   for (const outcome of outcomes) {
     if (outcome.record.status === 'success' && outcome.result) {
-      const data = truncateData(outcome.record.capabilityId, outcome.result.data);
-      // Security: external-text capabilities (news) are labeled untrusted so
-      // the synthesizer treats their prose as attributed claims, never
-      // instructions. Text was already sanitized at the capability boundary.
-      bundle[outcome.record.capabilityId] = outcome.record.capabilityId === 'research.news'
-        ? { trust: 'untrusted', provider: outcome.result.provenance?.provider ?? 'unknown', items: data }
-        : data;
+      if (outcome.record.capabilityId === 'research.news') {
+        const provider = outcome.result.provenance?.provider ?? 'unknown';
+        let items = truncateData(
+          outcome.record.capabilityId,
+          outcome.result.data
+        );
+        if (Array.isArray(outcome.result.data)) {
+          const sources = toRetrievalSources(outcome.result.data, provider);
+          const ranking = rankRetrievalSources(sources, {
+            query,
+            now,
+            topK: 10,
+            maxPerDomain: 2,
+          });
+          items = ranking.selected.map((item) => ({
+            ...item.source,
+            canonicalUrl: item.canonicalUrl,
+            sourceClass: item.sourceClass,
+            clusterId: item.clusterId,
+            qualityScore: item.qualityScore,
+          }));
+          bundle['research.news:ranking'] = {
+            policyVersion: ranking.policyVersion,
+            independentSourceCount: ranking.independentSourceCount,
+            clusters: ranking.clusters,
+            decisions: [...ranking.selected, ...ranking.dropped].map((item) => ({
+              sourceId: item.source.id,
+              originalRank: item.originalRank,
+              clusterId: item.clusterId,
+              selected: item.selected,
+              reason: item.decisionReason,
+            })),
+          };
+        }
+        // Security: every external news payload remains explicitly untrusted,
+        // including malformed provider responses that cannot be ranked.
+        bundle[outcome.record.capabilityId] = {
+          trust: 'untrusted',
+          provider,
+          items,
+        };
+        continue;
+      }
+      const data = truncateData(
+        outcome.record.capabilityId,
+        outcome.result.data
+      );
+      bundle[outcome.record.capabilityId] = data;
     }
   }
   return JSON.stringify(bundle);
+}
+
+function toRetrievalSources(
+  data: unknown[],
+  provider: string
+): RetrievalSourceInput[] {
+  const sources: RetrievalSourceInput[] = [];
+  for (let index = 0; index < data.length; index += 1) {
+    const item = data[index];
+    if (item === null || typeof item !== 'object') continue;
+    const record = item as Record<string, unknown>;
+    if (typeof record.title !== 'string' || typeof record.url !== 'string') {
+      continue;
+    }
+    const rawTimestamp =
+      typeof record.timestamp === 'number' ? record.timestamp : undefined;
+    const publishedAt =
+      rawTimestamp === undefined
+        ? undefined
+        : rawTimestamp < 10_000_000_000
+          ? rawTimestamp * 1000
+          : rawTimestamp;
+    sources.push({
+      id:
+        typeof record.id === 'string' && record.id.length > 0
+          ? record.id
+          : provider + ':' + index,
+      title: record.title,
+      url: record.url,
+      excerpt:
+        typeof record.summary === 'string' ? record.summary : undefined,
+      publishedAt,
+      provider,
+      available: true,
+    });
+  }
+  return sources;
 }
 
 function truncateData(capabilityId: string, data: unknown): unknown {
   if (!Array.isArray(data)) return data;
   if (capabilityId === 'market.kline' || capabilityId === 'market.intraday') {
     return data.slice(-60);
-  }
-  if (capabilityId === 'research.news') {
-    return data.slice(0, 10);
   }
   return data;
 }

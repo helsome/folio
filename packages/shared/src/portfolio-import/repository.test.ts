@@ -21,6 +21,87 @@ const INPUT = {
 }
 
 describe('ManualPortfolioRepository', () => {
+  it('retains every simultaneous confirmed import across repository instances', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'folio-manual-portfolios-'))
+    const repositories = [
+      new ManualPortfolioRepository(new JsonFileStore(dir)),
+      new ManualPortfolioRepository(new JsonFileStore(dir)),
+    ]
+    const created = await Promise.all(Array.from({ length: 20 }, (_, index) =>
+      repositories[index % 2].create({ ...INPUT, name: `Portfolio ${index}` })
+    ))
+    const persisted = await new ManualPortfolioRepository(new JsonFileStore(dir)).list()
+    expect(persisted).toHaveLength(20)
+    expect(new Set(persisted.map((portfolio) => portfolio.id)).size).toBe(20)
+    expect(new Set(created.map((portfolio) => portfolio.id))).toEqual(
+      new Set(persisted.map((portfolio) => portfolio.id))
+    )
+  })
+
+  it('retains simultaneous edits to different portfolios', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'folio-manual-portfolios-'))
+    const first = new ManualPortfolioRepository(new JsonFileStore(dir))
+    const second = new ManualPortfolioRepository(new JsonFileStore(dir))
+    const a = await first.create({ ...INPUT, name: 'A' })
+    const b = await first.create({ ...INPUT, name: 'B' })
+    await Promise.all([
+      first.update(a.id, { ...INPUT, name: 'A updated' }),
+      second.update(b.id, { ...INPUT, name: 'B updated' }),
+    ])
+    const persisted = await first.list()
+    expect(persisted.find((portfolio) => portfolio.id === a.id)?.name).toBe('A updated')
+    expect(persisted.find((portfolio) => portfolio.id === b.id)?.name).toBe('B updated')
+  })
+
+  it('does not resurrect a deleted portfolio during a simultaneous edit', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'folio-manual-portfolios-'))
+    const first = new ManualPortfolioRepository(new JsonFileStore(dir))
+    const second = new ManualPortfolioRepository(new JsonFileStore(dir))
+    const a = await first.create({ ...INPUT, name: 'A' })
+    const b = await first.create({ ...INPUT, name: 'B' })
+    await Promise.all([
+      first.delete(a.id),
+      second.update(b.id, { ...INPUT, name: 'B updated' }),
+    ])
+    expect((await first.list()).map((portfolio) => [portfolio.id, portfolio.name])).toEqual([
+      [b.id, 'B updated'],
+    ])
+  })
+
+  it('continues processing a queued create after an update rejects', async () => {
+    const store = tempStore()
+    const first = new ManualPortfolioRepository(store)
+    const second = new ManualPortfolioRepository(store)
+    const failed = first.update('missing', INPUT).catch((error: unknown) => error)
+    const created = second.create(INPUT)
+    const error = await failed as Error
+    expect(error.message).toContain('not found')
+    expect((await created).name).toBe('My Portfolio')
+    expect(await first.list()).toHaveLength(1)
+  })
+
+  it('continues processing a queued create after a file write fails', async () => {
+    class FailOnceStore extends JsonFileStore {
+      private failNextWrite = true
+      override async write(file: string, data: unknown): Promise<void> {
+        if (this.failNextWrite) {
+          this.failNextWrite = false
+          throw new Error('simulated write failure')
+        }
+        return super.write(file, data)
+      }
+    }
+    const dir = mkdtempSync(join(tmpdir(), 'folio-manual-portfolios-'))
+    const first = new ManualPortfolioRepository(new FailOnceStore(dir))
+    const second = new ManualPortfolioRepository(new JsonFileStore(dir))
+    const failed = first.create(INPUT).catch((error: unknown) => error)
+    const created = second.create({ ...INPUT, name: 'After failure' })
+    const error = await failed as Error
+    expect(error.message).toBe('simulated write failure')
+    expect((await created).name).toBe('After failure')
+    expect((await second.list()).map((portfolio) => portfolio.name)).toEqual(['After failure'])
+  })
+
   it('persists TSV quantities and costs without splitting thousands separators', async () => {
     const store = tempStore()
     const draft = createDraft('csv', parseCsv('Symbol\tQuantity\tCost\tCurrency\nAAPL.US\t1,000\t1,234.50\tUSD'))

@@ -12,12 +12,15 @@ export const portfolio = {
   noHoldingsToDisplay: 'No holdings to display',
   other: 'Other',
   riskSummary: 'Risk summary',
+  riskPartialPortfolio: 'Excluded from analysis ({{count}}; base-currency value unavailable): {{symbols}}. Remaining weights use the portfolio total; full risk may be higher.',
+  riskPartialSubset: 'Excluded from analysis ({{count}}; base-currency value unavailable): {{symbols}}. Percentages describe available positions only; portfolio-wide concentration is unavailable.',
   concentration: 'Concentration',
   topPosition: 'Top position',
   topFive: 'Top five',
   herfindahl: 'Herfindahl',
   allocation: 'Allocation',
   noPositions: 'No positions.',
+  noComparablePositions: 'No holdings with a comparable base-currency value.',
   upcomingEarnings: 'Upcoming earnings',
   account: 'Account',
   allAccounts: 'All accounts',
@@ -40,6 +43,18 @@ export const portfolio = {
     providerError: 'Portfolio unavailable',
     parseError: "Couldn't read portfolio data",
     timeout: 'Portfolio timed out',
+  },
+  /** Long-form detail under a `failure` heading: heading = label, this = sentence. */
+  failureDetail: {
+    notConnected:
+      'LongBridge is not connected. Install or configure the CLI and try again.',
+    noPermission:
+      'This LongBridge account does not grant portfolio access. Reconnect or check permissions.',
+    empty: 'No portfolio data yet.',
+    partial: 'Account totals loaded, but holdings could not be read.',
+    providerError: 'LongBridge could not return portfolio data.',
+    parseError: 'Portfolio data could not be read in the expected format.',
+    timeout: 'LongBridge took too long to respond.',
   },
   import: {
     title: 'Import Portfolio',
@@ -79,5 +94,10 @@ export const portfolio = {
     high: 'High',
     review: 'Review',
     needsReview: 'Needs review',
+  },
+  severity: {
+    high: 'High',
+    medium: 'Medium',
+    low: 'Low',
   },
 } satisfies NamespaceResource;

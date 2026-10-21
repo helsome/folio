@@ -83,31 +83,114 @@ export function pickShareSections(report: ResearchReport): ResearchSection[] {
   return [...chosen, ...rest].slice(0, 3)
 }
 
-/** Split text into lines of at most `maxChars` (word-boundary aware). */
-export function wrapText(text: string, maxChars: number): string[] {
+/**
+ * Code points rendered twice as wide as a Latin glyph by the card's font stack:
+ * CJK ideographs and punctuation, kana, hangul and fullwidth forms.
+ */
+const FULL_WIDTH_RE =
+  /[\u1100-\u115f\u2e80-\u303e\u3041-\u33ff\u3400-\u4dbf\u4e00-\u9fff\ua000-\ua4cf\uac00-\ud7a3\uf900-\ufaff\ufe10-\ufe19\ufe30-\ufe6f\uff00-\uff60\uffe0-\uffe6]/
+
+function isFullWidth(char: string): boolean {
+  return FULL_WIDTH_RE.test(char)
+}
+
+/** Width of `value` in card columns; a full-width glyph occupies two columns. */
+function displayWidth(value: string): number {
+  let width = 0
+  for (const char of value) width += isFullWidth(char) ? 2 : 1
+  return width
+}
+
+/** The smallest run the card never splits, plus the whitespace that precedes it. */
+interface WrapAtom {
+  text: string
+  lead: string
+}
+
+/**
+ * Split text into wrap atoms. Break opportunities exist after whitespace and
+ * between CJK glyphs, which is where everyday CJK line breaking allows a break;
+ * a run of Latin characters stays one atom, so it never breaks mid-word.
+ */
+function atomize(text: string): WrapAtom[] {
+  const atoms: WrapAtom[] = []
+  let lead = ''
+  let buffer = ''
+  const flush = () => {
+    if (!buffer) return
+    atoms.push({ text: buffer, lead })
+    buffer = ''
+    lead = ''
+  }
+  for (const char of text) {
+    if (/\s/.test(char)) {
+      flush()
+      lead += char
+    } else if (isFullWidth(char)) {
+      flush()
+      atoms.push({ text: char, lead })
+      lead = ''
+    } else {
+      buffer += char
+    }
+  }
+  flush()
+  return atoms
+}
+
+/**
+ * Split text into lines of at most `maxColumns` display columns.
+ *
+ * A full-width glyph counts as two columns and CJK text breaks between
+ * ideographs, so a whitespace-free Chinese sentence no longer reaches the card
+ * as one over-wide line. Whitespace between atoms is preserved verbatim. A
+ * Latin run never breaks, so a single over-long word still gets its own line.
+ */
+export function wrapText(text: string, maxColumns: number): string[] {
   const lines: string[] = []
   let current = ''
-  for (const word of text.split(/\s+/).filter(Boolean)) {
-    const candidate = current ? `${current} ${word}` : word
-    if (candidate.length <= maxChars || !current) {
-      current = candidate
-    } else {
+  for (const atom of atomize(text)) {
+    const joined = current ? current + atom.lead + atom.text : atom.text
+    if (current && displayWidth(joined) > maxColumns) {
       lines.push(current)
-      current = word
+      current = atom.text
+    } else {
+      current = joined
     }
   }
   if (current) lines.push(current)
   return lines
 }
 
+/** `text` clipped so its display width does not exceed `maxColumns`. */
+function clampToColumns(text: string, maxColumns: number): string {
+  let width = 0
+  let end = 0
+  for (const char of text) {
+    const next = width + (isFullWidth(char) ? 2 : 1)
+    if (next > maxColumns) break
+    width = next
+    end += char.length
+  }
+  return text.slice(0, end)
+}
+
+/** Column budget of the risk block: two card lines of `RISK_LINE_COLUMNS`. */
+const RISK_LINE_COLUMNS = 56
+const RISK_MAX_COLUMNS = RISK_LINE_COLUMNS * 2
+const ELLIPSIS = '…'
+
 /** The first risk bullet, trimmed to at most two card lines. */
 function keyRiskLines(report: ResearchReport): string[] {
   const risk = report.risks[0]
   if (!risk) return []
-  const MAX_CHARS = 112
-  const truncated =
-    risk.length > MAX_CHARS ? `${risk.slice(0, MAX_CHARS).replace(/\s+\S*$/, '')}…` : risk
-  return wrapText(truncated, 56)
+  let body = risk
+  if (displayWidth(body) > RISK_MAX_COLUMNS) {
+    // Reserve the ellipsis so the trimmed text still fits the two-line budget.
+    const clipped = clampToColumns(body, RISK_MAX_COLUMNS - displayWidth(ELLIPSIS))
+    body = clipped.replace(/\s+\S*$/, '') + ELLIPSIS
+  }
+  return wrapText(body, RISK_LINE_COLUMNS)
 }
 
 export function reportToShareCard(report: ResearchReport): ShareCard {

@@ -155,6 +155,13 @@ describe('dailyVolatility / appendBlocksToAnswer', () => {
     expect(dailyVolatility([])).toBeNull();
   });
 
+  it('computes the same volatility when bars arrive out of order', () => {
+    const ordered = klineSeries();
+    const unordered = [ordered[3], ordered[0], ordered[4], ordered[1], ordered[2]];
+
+    expect(dailyVolatility(unordered)).toBeCloseTo(dailyVolatility(ordered)!);
+  });
+
   it('appends fences after the answer text with a blank line', () => {
     const blocks = buildQuoteAnswerBlocks(quote, klineSeries(), ['get_quote-1']);
     const answer = appendBlocksToAnswer('Summary text.', blocks);

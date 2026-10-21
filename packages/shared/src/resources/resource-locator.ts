@@ -1,4 +1,4 @@
-import { dirname, join, resolve } from 'node:path';
+import { basename, dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 /**
@@ -14,8 +14,8 @@ import { fileURLToPath } from 'node:url';
  * Shared code must not import Electron, so "packaged" is detected by a flag
  * the packaged main process sets (`FINAGENT_PACKAGED=1`, set only when
  * `app.isPackaged` is true) combined with `process.resourcesPath` actually
- * pointing at a directory whose name is `Resources`. In dev, Electron's own
- * `process.resourcesPath` also ends in `Resources`, so the env flag is the
+ * pointing at a directory named `Resources` (macOS) or `resources` (Windows /
+ * Linux). In dev, Electron also has a resources directory, so the env flag is the
  * discriminator; both conditions are required to avoid false positives.
  */
 
@@ -39,7 +39,7 @@ export function isPackaged(): boolean {
     process.env.FINAGENT_PACKAGED === '1' &&
     typeof resourcesPath === 'string' &&
     resourcesPath.length > 0 &&
-    resourcesPath.endsWith('Resources')
+    basename(resourcesPath).toLowerCase() === 'resources'
   );
 }
 

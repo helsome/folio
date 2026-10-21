@@ -116,7 +116,9 @@ export class StreamEventHistory {
       (tail[0].sequence === lastSequence + 1 &&
         tail.every((e, i) => i === 0 || e.sequence === tail[i - 1].sequence + 1));
     if (!contiguous) {
-      return { recoverable: false, events: [], atEnd: false };
+      // 不可恢复 ≠ 未结束：atEnd 只描述末事件是否为终端事件（见接口注释），
+      // 与另两个分支保持一致，调用方才分得清「流丢了但已结束」和「流丢了还在跑」。
+      return { recoverable: false, events: [], atEnd: TERMINAL_TYPES.has(last.type) };
     }
 
     return {

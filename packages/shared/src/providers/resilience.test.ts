@@ -27,6 +27,7 @@ import {
   TypedProviderCache,
 } from './resilience.ts';
 import { ProviderRouter } from './router.ts';
+import { createRouterFetchers } from './router-fetchers.ts';
 
 function success<T>(providerId: string, data: T, fetchedAt = 1000): ProviderResult<T> {
   return {
@@ -151,6 +152,53 @@ describe('backoffDelayMs', () => {
 });
 
 describe('runWithRetry', () => {
+  for (const code of ['TIMEOUT', 'RATE_LIMITED']) {
+    it(`does not retry ${code} when the budget expires during backoff`, async () => {
+      const clock = fakeClock();
+      const deadline = clock.now() + 100;
+      const lastFailure = failure(code);
+      let calls = 0;
+      const result = await runWithRetry(async () => {
+        calls += 1;
+        return calls === 1 ? lastFailure : success('p', 'unexpected retry');
+      }, {
+        maxAttempts: 3,
+        baseDelayMs: 200,
+        jitter: false,
+        sleep: async (ms) => { clock.advance(ms); },
+        budget: { isExhausted: () => clock.now() >= deadline },
+      });
+
+      expect(calls).toBe(1);
+      expect(result.attempts).toBe(1);
+      expect(result.result).toBe(lastFailure);
+      expect(result.stoppedByBudget).toBe(true);
+    });
+  }
+
+  it('retains the latest error and attempt count when a later backoff spends the budget', async () => {
+    const clock = fakeClock();
+    const deadline = clock.now() + 250;
+    const outcomes = [failure('TIMEOUT', 'first'), failure('RATE_LIMITED', 'second')];
+    let calls = 0;
+    const result = await runWithRetry(async () => {
+      calls += 1;
+      return outcomes[calls - 1] ?? success('p', 'unexpected retry');
+    }, {
+      maxAttempts: 4,
+      baseDelayMs: 100,
+      factor: 2,
+      jitter: false,
+      sleep: async (ms) => { clock.advance(ms); },
+      budget: { isExhausted: () => clock.now() >= deadline },
+    });
+
+    expect(calls).toBe(2);
+    expect(result.attempts).toBe(2);
+    expect(result.result).toBe(outcomes[1]);
+    expect(result.stoppedByBudget).toBe(true);
+  });
+
   it('retries a 429 until success and reports attempts', async () => {
     const outcomes = [failure('RATE_LIMITED'), failure('RATE_LIMITED'), success('p', 'ok')];
     const result = await runWithRetry(async () => outcomes.shift()!, {
@@ -298,6 +346,58 @@ describe('TypedProviderCache', () => {
 });
 
 // ── Router integration: retry / timeout / breaker / failover / cache ──────
+
+describe('calendar query cache isolation', () => {
+  const query = {
+    eventType: 'financial' as const,
+    symbols: ['AAPL.US'],
+    start: '2026-09-01',
+    end: '2026-09-30',
+    count: 10,
+  };
+
+  for (const [field, value] of [
+    ['eventType', 'dividend'],
+    ['symbols', ['MSFT.US']],
+    ['start', '2026-09-10'],
+    ['end', '2026-10-31'],
+    ['count', 20],
+  ] as const) {
+    it(`does not reuse fresh or stale calendar results when ${field} changes`, () => {
+      const clock = fakeClock();
+      const cache = new TypedProviderCache({ now: clock.now, ttls: { fundamental: 1000 } });
+      const events = [{ id: 'apple-earnings' }];
+      cache.set('research.events', 'primary', query, events, {
+        providerId: 'primary', providerName: 'Primary', fetchedAt: clock.now(), stale: false,
+      });
+
+      expect(cache.get('research.events', 'primary', { ...query, [field]: value }).kind).toBe('miss');
+      clock.advance(1001);
+      expect(cache.get('research.events', 'primary', query).kind).toBe('stale');
+      expect(cache.get('research.events', 'primary', { ...query, [field]: value }).kind).toBe('miss');
+    });
+  }
+
+  it('returns each requested calendar through router fetchers and reuses equivalent queries', async () => {
+    const clock = fakeClock();
+    const router = new ProviderRouter({ now: clock.now, cache: {} });
+    const apple = [{ id: 'apple-earnings', type: 'financial', symbol: 'AAPL.US', date: 1790294400 }];
+    const microsoft = [{ id: 'microsoft-earnings', type: 'financial', symbol: 'MSFT.US', date: 1790380800 }];
+    const primary = new ScriptedProvider('primary', 'Primary', ['research.events'], (n) =>
+      success('primary', n === 1 ? apple : microsoft)
+    );
+    router.register(primary);
+    router.setRouting({ primary: 'primary' });
+    const fetchers = createRouterFetchers(router);
+
+    expect(await fetchers.getCalendarEvents(query)).toEqual(apple);
+    expect(await fetchers.getCalendarEvents({ ...query, symbols: ['MSFT.US'] })).toEqual(microsoft);
+    expect(await fetchers.getCalendarEvents({
+      count: 10, end: '2026-09-30', start: '2026-09-01', symbols: ['AAPL.US'], eventType: 'financial',
+    })).toEqual(apple);
+    expect(primary.calls).toBe(2);
+  });
+});
 
 describe('ProviderRouter resilience integration (#25)', () => {
   it('retries a 429 on the primary and never touches the fallback', async () => {
@@ -491,6 +591,106 @@ describe('ProviderRouter resilience integration (#25)', () => {
     expect(primary.calls).toBe(2);
   });
 
+  for (const [cacheState, elapsedMs] of [['fresh', 500], ['stale', 2000]] as const) {
+    it(`rejects a disabled provider's ${cacheState} cache`, async () => {
+      const clock = fakeClock();
+      let enabled = true;
+      const router = new ProviderRouter({
+        now: clock.now,
+        cache: { ttls: { quote: 1000 } },
+        isEnabled: async () => enabled,
+      });
+      const primary = new ScriptedProvider('primary', 'Primary', ['market.quote'], () =>
+        success('primary', { px: 100 })
+      );
+      router.register(primary);
+      router.setRouting({ primary: 'primary' });
+      const input = { symbol: 'AAPL.US' };
+      expect((await router.execute('market.quote', input)).ok).toBe(true);
+
+      enabled = false;
+      clock.advance(elapsedMs);
+      const result = await router.execute('market.quote', input);
+
+      expect(result).toMatchObject({ ok: false, error: { code: 'UNSUPPORTED_CAPABILITY' } });
+      expect(primary.calls).toBe(1);
+    });
+
+    it(`routes to a live fallback instead of a disabled provider's ${cacheState} cache`, async () => {
+      const clock = fakeClock();
+      let primaryEnabled = true;
+      const router = new ProviderRouter({
+        now: clock.now,
+        cache: { ttls: { quote: 1000 } },
+        isEnabled: async (id) => id !== 'primary' || primaryEnabled,
+      });
+      const primary = new ScriptedProvider('primary', 'Primary', ['market.quote'], () =>
+        success('primary', { px: 100 })
+      );
+      const fallback = new ScriptedProvider('fallback', 'Fallback', ['market.quote'], () =>
+        success('fallback', { px: 200 })
+      );
+      router.register(primary);
+      router.register(fallback);
+      router.setRouting({ primary: 'primary', fallback: 'fallback' });
+      const input = { symbol: 'AAPL.US' };
+      expect((await router.execute('market.quote', input)).ok).toBe(true);
+
+      primaryEnabled = false;
+      clock.advance(elapsedMs);
+      const result = await router.execute('market.quote', input);
+
+      expect(result).toMatchObject({
+        ok: true,
+        data: { px: 200 },
+        provenance: { providerId: 'fallback', stale: false },
+      });
+      expect(primary.calls).toBe(1);
+      expect(fallback.calls).toBe(1);
+    });
+
+    it(`skips a disabled primary's ${cacheState} cache in favor of an enabled fallback's cache`, async () => {
+      const clock = fakeClock();
+      const disabled = new Set<string>();
+      let live = true;
+      const router = new ProviderRouter({
+        now: clock.now,
+        cache: { ttls: { quote: 1000 } },
+        isEnabled: async (id) => !disabled.has(id),
+      });
+      const primary = new ScriptedProvider('primary', 'Primary', ['market.quote'], () =>
+        live ? success('primary', { px: 100 }) : failure('SERVICE_UNAVAILABLE')
+      );
+      const fallback = new ScriptedProvider('fallback', 'Fallback', ['market.quote'], () =>
+        live ? success('fallback', { px: 200 }) : failure('SERVICE_UNAVAILABLE')
+      );
+      router.register(primary);
+      router.register(fallback);
+      router.setRouting({ primary: 'primary', fallback: 'fallback' });
+      const input = { symbol: 'AAPL.US' };
+      expect((await router.execute('market.quote', input)).ok).toBe(true);
+      disabled.add('primary');
+      expect((await router.execute('market.quote', input)).ok).toBe(true);
+
+      live = false;
+      clock.advance(elapsedMs);
+      const result = await router.execute('market.quote', input);
+
+      expect(result).toMatchObject({
+        ok: true,
+        data: { px: 200 },
+        provenance: { providerId: 'fallback', stale: cacheState === 'stale' },
+      });
+      expect(primary.calls).toBe(1);
+      expect(fallback.calls).toBe(cacheState === 'stale' ? 2 : 1);
+      if (result.ok && cacheState === 'stale') {
+        expect(result.provenance.failoverTrail).toEqual([
+          expect.objectContaining({ providerId: 'fallback', code: 'SERVICE_UNAVAILABLE' }),
+        ]);
+      }
+    });
+  }
+
   it('downgrades to stale ONLY after every live provider fails, flagged stale with origin kept', async () => {
     const clock = fakeClock();
     const router = new ProviderRouter({
@@ -568,6 +768,31 @@ describe('ProviderRouter resilience integration (#25)', () => {
 
     await router.execute('market.quote', {});
     expect(primary.calls).toBe(1); // budget stopped further same-provider retries
+  });
+
+  it('stops same-provider retries when the injected budget expires during backoff', async () => {
+    const clock = fakeClock();
+    const deadline = clock.now() + 100;
+    const router = new ProviderRouter({
+      retry: {
+        maxAttempts: 3,
+        baseDelayMs: 200,
+        jitter: false,
+        sleep: async (ms) => { clock.advance(ms); },
+        budget: { isExhausted: () => clock.now() >= deadline },
+      },
+    });
+    const primary = new ScriptedProvider('primary', 'Primary', ['market.quote'], () => failure('TIMEOUT'));
+    const fallback = new ScriptedProvider('fallback', 'Fallback', ['market.quote'], () => success('fallback', { v: 'f' }));
+    router.register(primary);
+    router.register(fallback);
+    router.setRouting({ primary: 'primary', fallback: 'fallback' });
+
+    const result = await router.execute('market.quote', {});
+    expect(primary.calls).toBe(1);
+    // The budget hook bounds same-provider retries, not the routing policy.
+    expect(fallback.calls).toBe(1);
+    expect(result.ok && result.provenance.providerId).toBe('fallback');
   });
 
   it('keeps original default behavior with no resilience options (single attempt)', async () => {

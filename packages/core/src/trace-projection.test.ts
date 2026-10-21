@@ -58,6 +58,24 @@ describe('projectTrace (V9.1)', () => {
     expect(ws?.value).toBe('');
   });
 
+  it('preserves a cancelled run status in the timeline', () => {
+    const trace = projectTrace(
+      inputWith({
+        run: {
+          ...baseRun,
+          status: 'cancelled',
+          completedAt: 15000,
+          answer: undefined,
+        },
+      })
+    );
+    const runStep = trace.steps.find((step) => step.kind === 'run');
+
+    expect(trace.status).toBe('cancelled');
+    expect(runStep?.status).toBe('cancelled');
+    expect(runStep?.detail).toBe('cancelled');
+  });
+
   it('marks evaluation-case context as evaluation-input, not recorded', () => {
     const caseDef: EvaluationCase = {
       id: 'case-1',
@@ -223,5 +241,50 @@ describe('projectTrace (V9.1)', () => {
     expect(trace.tools[0].status).toBe('running');
     const toolStep = trace.steps.find((s) => s.kind === 'tool' && s.tool?.id === 'live-run');
     expect(toolStep?.status).toBe('running');
+  });
+
+  it('projects the benchmark case prompt as the trace input, never the answer', () => {
+    const caseDef: EvaluationCase = {
+      id: 'case-1',
+      name: 'NVDA research',
+      category: 'tool-selection',
+      difficulty: 'golden',
+      input: { prompt: 'Research NVDA' },
+      expected: {},
+      tags: [],
+      source: 'hand-authored',
+    };
+    const evalRun: EvaluationRun = {
+      id: 'eval-run-1',
+      experimentId: 'exp-1',
+      caseId: 'case-1',
+      datasetId: 'ds-1',
+      status: 'completed',
+      startedAt: 1000,
+      completedAt: 9000,
+      answer: 'NVDA looks fine',
+      toolCalls: [],
+      failureModes: [],
+    };
+    const trace = projectTrace({ evaluationRun: evalRun, evaluationCase: caseDef });
+    expect(trace.input).toBe('Research NVDA');
+    expect(trace.input).not.toBe(evalRun.answer);
+  });
+
+  it('leaves the trace input empty when no authoritative prompt was recorded', () => {
+    const evalRun: EvaluationRun = {
+      id: 'eval-run-2',
+      experimentId: 'exp-1',
+      caseId: 'case-2',
+      datasetId: 'ds-1',
+      status: 'completed',
+      startedAt: 1000,
+      completedAt: 9000,
+      answer: 'NVDA looks fine',
+      toolCalls: [],
+      failureModes: [],
+    };
+    const trace = projectTrace({ evaluationRun: evalRun });
+    expect(trace.input).toBe('');
   });
 });

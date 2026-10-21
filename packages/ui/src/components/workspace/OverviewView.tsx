@@ -10,12 +10,17 @@ import type {
   PortfolioSnapshot,
 } from '@finagent/core';
 import { activeSymbolAtom } from '../../atoms';
-import { formatMoney, formatPercent, formatQuantity, formatSignedMoney } from '../../lib/money';
+import {
+  currencyForSymbol,
+  formatMoney,
+  formatPercent,
+  formatQuantity,
+  formatSignedMoney,
+} from '../../lib/money';
 import { useFinagentClient } from '../../client';
 
 const DASH = '\u2014';
 
-const fmtPrice = (value: number): string => `$${value.toFixed(2)}`;
 const fmtNumber = (value: number): string => value.toLocaleString();
 const fmtPercent = (value: number): string => `${value.toFixed(2)}%`;
 const fmtSigned = (value: number): string =>
@@ -120,6 +125,11 @@ export const OverviewView: React.FC = () => {
   }, [client, symbol]);
 
   if (!symbol) return null;
+
+  // Quote-derived cells follow the instrument's currency (the Position block
+  // below already formats with `holding.currency`); never a hardcoded `$`.
+  const currency = staticInfo?.currency ?? currencyForSymbol(symbol);
+  const fmtPrice = (value: number): string => formatMoney(value, currency);
 
   const holding: Holding | undefined = portfolio?.holdings.find(
     (h) => h.symbol === symbol

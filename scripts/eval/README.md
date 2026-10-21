@@ -58,6 +58,8 @@ bun run eval:full                 # entire dataset, fixture mode
 bun run eval:smoke -- --mode live --model anthropic/claude-sonnet-4-5
 bun run eval:full  -- --baseline <id>
 bun run eval:smoke -- --save-baseline release-candidate --out ./eval.json
+bun run eval:smoke -- --case fv1-market-001 --case fv1-market-002
+bun run eval:smoke -- --tag provider-failure --max-cases 3
 ```
 
 Flags:
@@ -73,6 +75,8 @@ Flags:
 | `--judge-model <id>` | Judge model, separate from the agent under test |
 | `--judge-api-key <key>` | Judge API key |
 | `--max-cases <n>` | Run only the first n cases (deterministic) |
+| `--case <id>` | Run only the named case id; repeatable |
+| `--tag <tag>` | Run only cases carrying the tag; repeatable, a case matches any tag |
 | `--timeout-ms <n>` | Per-run wall-clock budget (default 120000) |
 | `--baseline <id>` | Gate the run against a stored baseline |
 | `--save-baseline <name>` | Store the run's aggregates as a new baseline |

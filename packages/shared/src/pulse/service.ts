@@ -1,5 +1,6 @@
 import type {
   CapabilityRegistry,
+  Holding,
   MarketStatus,
   MarketTemperature,
   PortfolioSnapshot,
@@ -303,6 +304,31 @@ export function computePersonalImpact(
   return { scope: 'watchlist', items }
 }
 
+/**
+ * Market value of `holding` that is safe to divide by a base-currency total.
+ *
+ * `marketValueBase` is the vendor-converted base-currency value and is always
+ * safe. `marketValue` is denominated in `holding.currency` (see core
+ * `Holding`), so it may only stand in when the two currencies are known to
+ * match — otherwise dividing it by `PortfolioSnapshot.totalAssets` would scale
+ * the exposure by the FX rate. This mirrors `evaluatePositionWeight` in the
+ * alerts evaluator.
+ */
+function baseCurrencyValue(holding: Holding, baseCurrency?: string): number | undefined {
+  const converted = toFiniteNumber(holding.marketValueBase)
+  if (converted !== undefined) return converted
+  const raw = toFiniteNumber(holding.marketValue)
+  if (raw === undefined) return undefined
+  // `sameCurrency` must be false when either side is unknown — an unconverted
+  // `marketValue` divided by a base-currency total is only meaningful when both
+  // currencies are known to be the same one (mirrors evaluatePositionWeight).
+  const holdingCurrency = holding.currency?.trim().toUpperCase()
+  const base = baseCurrency?.trim().toUpperCase()
+  const sameCurrency = Boolean(holdingCurrency && base && holdingCurrency === base)
+  if (!sameCurrency) return undefined
+  return raw
+}
+
 /** Holding market value as a share of portfolio total assets (%), when computable. */
 export function portfolioExposurePercent(
   symbol: string,
@@ -314,7 +340,7 @@ export function portfolioExposurePercent(
   const target = normalizeSymbol(symbol)
   for (const holding of portfolio.holdings) {
     if (normalizeSymbol(holding.symbol) !== target) continue
-    const weight = holding.marketValueBase ?? holding.marketValue
+    const weight = baseCurrencyValue(holding, portfolio.baseCurrency)
     if (weight === undefined || !Number.isFinite(weight)) return undefined
     return round2((weight / total) * 100)
   }

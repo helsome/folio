@@ -1,4 +1,5 @@
 import type { ResearchOpinion, ResearchOutcome } from '@finagent/core'
+import { resolve } from 'node:path'
 import type { JsonFileStore } from '../storage/json-file-store.ts'
 import { HORIZON_MS } from './engine.ts'
 
@@ -13,6 +14,10 @@ import { HORIZON_MS } from './engine.ts'
  */
 
 const FILE = 'outcomes.json'
+
+// One queue per file, shared by repository/store instances in this process.
+// Atomic rename alone cannot protect a read-modify-write from stale snapshots.
+const writeLocks = new Map<string, Promise<void>>()
 
 interface OutcomesFile {
   opinions: ResearchOpinion[]
@@ -34,13 +39,26 @@ export class OutcomeRepository {
     await this.store.write(FILE, file)
   }
 
+  private async update(change: (file: OutcomesFile) => OutcomesFile): Promise<void> {
+    const target = resolve(this.store.resolve(FILE))
+    const previous = writeLocks.get(target) ?? Promise.resolve()
+    const current = previous.catch(() => undefined).then(async () => {
+      await this.write(change(await this.read()))
+    })
+    writeLocks.set(target, current)
+    try {
+      await current
+    } finally {
+      if (writeLocks.get(target) === current) writeLocks.delete(target)
+    }
+  }
+
   /** Upsert an opinion (deterministic id → re-persisting a report is idempotent). */
   async saveOpinion(opinion: ResearchOpinion): Promise<void> {
-    const file = await this.read()
-    await this.write({
+    await this.update((file) => ({
       ...file,
       opinions: [opinion, ...file.opinions.filter((o) => o.id !== opinion.id)],
-    })
+    }))
   }
 
   async getOpinion(opinionId: string): Promise<ResearchOpinion | undefined> {
@@ -57,11 +75,10 @@ export class OutcomeRepository {
 
   /** Upsert an outcome — one per opinion. */
   async saveOutcome(outcome: ResearchOutcome): Promise<void> {
-    const file = await this.read()
-    await this.write({
+    await this.update((file) => ({
       ...file,
       outcomes: [outcome, ...file.outcomes.filter((o) => o.opinionId !== outcome.opinionId)],
-    })
+    }))
   }
 
   async getOutcomeByOpinionId(opinionId: string): Promise<ResearchOutcome | undefined> {

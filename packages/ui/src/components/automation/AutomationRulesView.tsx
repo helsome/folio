@@ -91,7 +91,7 @@ export const AutomationRulesView: React.FC = () => {
               aria-label={t('automation.status.active')}
               className="h-8 appearance-none rounded-[7px] border border-input bg-surface py-1 pl-8 pr-7 text-[12px] text-foreground focus:border-accent focus:outline-none focus:ring-2 focus:ring-ring"
             >
-              <option value="all">All</option>
+              <option value="all">{t('common.all')}</option>
               <option value="active">{t('automation.status.active')}</option>
               <option value="paused">{t('automation.status.paused')}</option>
             </select>

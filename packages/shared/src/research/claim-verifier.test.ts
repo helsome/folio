@@ -1,11 +1,15 @@
 import { describe, expect, it } from 'bun:test';
+import type { EvidenceRef, ResearchReport } from '@finagent/core';
 import type { JudgeClient } from '../evaluation/judge-client.ts';
+import { buildReportEvidenceBundle } from '../evidence/contract.ts';
 import {
   CLAIM_VERIFIER_VERSION,
   createClaimVerifier,
+  verifyReportClaims,
   type ClaimVerificationInput,
+  type ClaimVerificationResult,
+  type ClaimVerifier,
 } from './claim-verifier.ts';
-
 function input(
   claimText: string,
   evidence: ClaimVerificationInput['evidence'],
@@ -23,6 +27,42 @@ function judgeReturning(reply: string): JudgeClient & { calls: Array<{ system: s
       calls.push({ system, user });
       return reply;
     },
+  };
+}
+
+function evidenceRef(claim: string, summary?: string, overrides: Partial<EvidenceRef> = {}): EvidenceRef {
+  return {
+    capabilityId: 'sec.filing',
+    runId: 'filing-run',
+    claim,
+    fetchedAt: 1_700_000_000_000,
+    summary,
+    instrumentId: 'NVDA.US',
+    ...overrides,
+  };
+}
+
+function reportWithEvidence(sections: EvidenceRef[][]): ResearchReport {
+  return {
+    id: 'report-123',
+    symbol: 'NVDA.US',
+    generatedAt: 1_700_000_000_000,
+    summary: 'Fixture report',
+    stance: 'neutral',
+    confidence: 0.5,
+    sections: sections.map((evidence, index) => ({
+      key: `section-${index}`,
+      title: `Section ${index}`,
+      verdict: 'neutral',
+      summary: 'Fixture section',
+      evidence,
+    })),
+    bullCase: [],
+    bearCase: [],
+    catalysts: [],
+    risks: [],
+    capabilityRuns: [],
+    runStatus: 'completed',
   };
 }
 
@@ -142,5 +182,140 @@ describe('claim verifier', () => {
     expect(judge.calls[0].system).toContain('Do not use background knowledge');
     expect(result.evidenceIds).toEqual(['source-evidence']);
     expect(result.evidenceIds).not.toContain('Explanation only.');
+  });
+
+  it('aggregates canonical report bundle claims with a mock judge (fixture)', async () => {
+    const judge = judgeReturning('{"status":"supported","reason":"Confirmed by filing excerpt."}');
+    const verifier = createClaimVerifier(judge);
+    const report = reportWithEvidence([
+      [
+        evidenceRef('Revenue rose 10%', 'SEC 10-Q filing notes 10% revenue increase'),
+        evidenceRef('Gross margin expanded', 'Margin up 150bps', { runId: 'margin-run' }),
+      ],
+      [evidenceRef('Revenue rose 10%', 'Same claim in conclusion', { runId: 'conclusion-run' })],
+    ]);
+    const bundle = buildReportEvidenceBundle(report);
+    const summary = await verifyReportClaims(report, verifier);
+
+    expect(summary.reportId).toBe('report-123');
+    expect(summary.totalClaims).toBe(2);
+    expect(summary.supported).toBe(2);
+    expect(summary.contradicted).toBe(0);
+    expect(summary.insufficientEvidence).toBe(0);
+    expect(summary.results).toHaveLength(2);
+    expect(judge.calls).toHaveLength(2);
+    for (const result of summary.results) {
+      const claim = bundle.claims.find((candidate) => candidate.claimId === result.claimId);
+      expect(claim).toBeDefined();
+      expect(result.evidenceIds).toEqual(claim!.evidenceIds);
+      for (const id of result.evidenceIds) {
+        const item = bundle.evidence.find((candidate) => candidate.evidenceId === id);
+        expect(item).toBeDefined();
+        expect(bundle.sources.some((source) => source.sourceId === item!.sourceId)).toBe(true);
+      }
+    }
+  });
+
+  it('preserves canonical claim and evidence identities when unrelated sections are inserted or reordered', async () => {
+    const judge = judgeReturning('{"status":"supported","reason":"Confirmed."}');
+    const verifier = createClaimVerifier(judge);
+    const cashFlow = evidenceRef('Free cash flow increased', 'FCF up 20% YoY', { runId: 'fcf-run' });
+    const margin = evidenceRef('Gross margin expanded', 'Margin up 150bps', { runId: 'margin-run' });
+    const unrelated = evidenceRef('Unrelated intro fact', 'Company founded in 2010', { runId: 'intro-run' });
+    const baseReport = reportWithEvidence([[cashFlow], [margin]]);
+    const prependedReport = reportWithEvidence([[unrelated], [margin], [cashFlow]]);
+    const baseBundle = buildReportEvidenceBundle(baseReport);
+    const prependedBundle = buildReportEvidenceBundle(prependedReport);
+    const baseSummary = await verifyReportClaims(baseReport, verifier);
+    const prependedSummary = await verifyReportClaims(prependedReport, verifier);
+    for (const statement of [cashFlow.claim, margin.claim]) {
+      const original = baseBundle.claims.find((claim) => claim.statement === statement)!;
+      const reordered = prependedBundle.claims.find((claim) => claim.statement === statement)!;
+      expect(reordered.claimId).toBe(original.claimId);
+      expect(reordered.evidenceIds).toEqual(original.evidenceIds);
+      expect(baseSummary.results.find((result) => result.claimId === original.claimId)?.evidenceIds).toEqual(original.evidenceIds);
+      expect(prependedSummary.results.find((result) => result.claimId === original.claimId)?.evidenceIds).toEqual(original.evidenceIds);
+      for (const id of original.evidenceIds) {
+        const originalItem = baseBundle.evidence.find((item) => item.evidenceId === id)!;
+        const reorderedItem = prependedBundle.evidence.find((item) => item.evidenceId === id)!;
+        expect(reorderedItem).toEqual(originalItem);
+        expect(prependedBundle.sources.find((source) => source.sourceId === reorderedItem.sourceId)).toEqual(
+          baseBundle.sources.find((source) => source.sourceId === originalItem.sourceId)
+        );
+      }
+    }
+  });
+
+  it('fails closed when a projected claim has no factual excerpt (fixture)', async () => {
+    const judge = judgeReturning('{"status":"supported","reason":"Invented."}');
+    const report = reportWithEvidence([[evidenceRef('Revenue rose 10%')]]);
+    const summary = await verifyReportClaims(report, createClaimVerifier(judge));
+    expect(summary.results[0]?.status).toBe('insufficient_evidence');
+    expect(summary.results[0]?.evidenceIds).toEqual([]);
+    expect(judge.calls).toHaveLength(0);
+  });
+
+  it('does not return evidence identities invented by a verifier (fixture)', async () => {
+    const report = reportWithEvidence([[evidenceRef('Revenue rose 10%', 'Filing reports a 10% rise')]]);
+    const verifier: ClaimVerifier = {
+      async verify({ claimId }) {
+        return {
+          claimId,
+          status: 'supported',
+          evidenceIds: ['ev_missing'],
+          reason: 'Unsupported identity',
+          verifierVersion: CLAIM_VERIFIER_VERSION,
+        };
+      },
+    };
+    const summary = await verifyReportClaims(report, verifier);
+    expect(summary.results[0]?.status).toBe('insufficient_evidence');
+    expect(summary.results[0]?.evidenceIds).toEqual([]);
+  });
+
+  it('fails closed when a verifier returns an unknown status (fixture)', async () => {
+    const report = reportWithEvidence([[evidenceRef('Revenue rose 10%', 'Filing reports a 10% rise')]]);
+    const bundle = buildReportEvidenceBundle(report);
+    const verifier: ClaimVerifier = {
+      async verify({ claimId }) {
+        return {
+          claimId,
+          status: 'unknown' as ClaimVerificationResult['status'],
+          evidenceIds: bundle.claims[0]!.evidenceIds,
+          reason: 'Unexpected status',
+          verifierVersion: CLAIM_VERIFIER_VERSION,
+        };
+      },
+    };
+    const summary = await verifyReportClaims(report, verifier);
+    expect(summary.results[0]?.status).toBe('insufficient_evidence');
+    expect(summary.results[0]?.evidenceIds).toEqual([]);
+    expect(summary.insufficientEvidence).toBe(1);
+  });
+
+  it('rejects positive verdicts without a valid evidence id list (fixture)', async () => {
+    const report = reportWithEvidence([[evidenceRef('Revenue rose 10%', 'Filing reports a 10% rise')]]);
+    const invalidResults: Array<{ status: 'supported' | 'contradicted'; evidenceIds: unknown }> = [
+      { status: 'supported', evidenceIds: [] },
+      { status: 'contradicted', evidenceIds: [] },
+      { status: 'supported', evidenceIds: undefined },
+      { status: 'supported', evidenceIds: 'ev_not_an_array' },
+    ];
+    for (const { status, evidenceIds } of invalidResults) {
+      const verifier: ClaimVerifier = {
+        async verify({ claimId }) {
+          return {
+            claimId,
+            status,
+            evidenceIds: evidenceIds as string[],
+            reason: 'Verdict without a resolvable evidence reference',
+            verifierVersion: CLAIM_VERIFIER_VERSION,
+          };
+        },
+      };
+      const summary = await verifyReportClaims(report, verifier);
+      expect(summary.results[0]?.status).toBe('insufficient_evidence');
+      expect(summary.results[0]?.evidenceIds).toEqual([]);
+    }
   });
 });

@@ -181,7 +181,6 @@ export const ThesisPanel: React.FC = () => {
         <div>
           <p className="folio-eyebrow">{t('thesis.thesis')}</p>
           <h2 className="folio-thesis-title">{symbol}</h2>
-          <p className="folio-thesis-subtitle">{t('thesis.noReportFor', { symbol })}</p>
         </div>
         {report && (
           <Button

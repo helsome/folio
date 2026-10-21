@@ -60,6 +60,13 @@ function readOptions(input: unknown): unknown {
   return input.options;
 }
 
+/** Optional reporting-currency filter carried by `portfolio.assets` inputs. */
+function readCurrency(input: unknown): string | undefined {
+  if (!isRecord(input)) return undefined;
+  const currency = input.currency;
+  return typeof currency === 'string' && currency.length > 0 ? currency : undefined;
+}
+
 /**
  * Opt-in resilience configuration (#25). Every field is optional; when the
  * whole object (or a field) is omitted, the router behaves exactly like the
@@ -226,7 +233,7 @@ export class ProviderRouter implements FinancialProviderRouter {
     // 1) Fresh cache short-circuit, consulted in routing order so the primary's
     //    fresh value always wins over the fallback's.
     if (this.cache) {
-      const cached = this.readFresh<T>(candidates, capabilityId, input);
+      const cached = await this.readFresh<T>(candidates, capabilityId, input);
       if (cached) return cached;
     }
 
@@ -296,7 +303,7 @@ export class ProviderRouter implements FinancialProviderRouter {
     // 3) Every live candidate failed: serve a STALE cache entry only as an
     //    explicit downgrade, never disguised as a live value (#25 AC).
     if (this.cache) {
-      const stale = this.readStale<T>(candidates, capabilityId, input, trail);
+      const stale = await this.readStale<T>(candidates, capabilityId, input, trail);
       if (stale) return stale;
     }
 
@@ -350,31 +357,34 @@ export class ProviderRouter implements FinancialProviderRouter {
     return { ...error, failoverTrail: trail.map((step) => ({ ...step })) };
   }
 
-  private readFresh<T>(
+  private async readFresh<T>(
     candidates: string[],
     capabilityId: CapabilityId,
     input: unknown
-  ): ProviderResult<T> | undefined {
+  ): Promise<ProviderResult<T> | undefined> {
     if (!this.cache) return undefined;
     for (const id of candidates) {
       const lookup = this.cache.get<T>(capabilityId, id, input);
       if (lookup.kind === 'fresh') {
+        // Cached responses must obey the same enablement gate as live requests.
+        if (this.isEnabled && !(await this.isEnabled(id))) continue;
         return { ok: true, data: lookup.record.data, provenance: { ...lookup.record.provenance } };
       }
     }
     return undefined;
   }
 
-  private readStale<T>(
+  private async readStale<T>(
     candidates: string[],
     capabilityId: CapabilityId,
     input: unknown,
     trail: ProviderFailoverStep[]
-  ): ProviderResult<T> | undefined {
+  ): Promise<ProviderResult<T> | undefined> {
     if (!this.cache) return undefined;
     for (const id of candidates) {
       const lookup = this.cache.get<T>(capabilityId, id, input);
       if (lookup.kind === 'stale') {
+        if (this.isEnabled && !(await this.isEnabled(id))) continue;
         // Explicit downgrade: keep the ACTUAL origin provider, force stale,
         // and attach the live-failure trail. A consumer can always tell this
         // is cached history, never a fresh quote.
@@ -400,6 +410,15 @@ export class ProviderRouter implements FinancialProviderRouter {
     input: unknown,
     externalSignal?: AbortSignal
   ): Promise<ProviderResult<T>> {
+    // A signal that is already aborted never fires the listener registered
+    // below, so the cancellation would be silently dropped. This is reachable
+    // even though `execute` checks `signal.aborted` up front: the caller can
+    // cancel while async routing resolution or the enablement gate is pending.
+    // The external-abort contract of this method must hold either way.
+    if (externalSignal?.aborted) {
+      return { ok: false, error: ABORTED };
+    }
+
     if (!this.timeoutMs) {
       return this.invoke<T>(provider, capabilityId, input, externalSignal);
     }
@@ -462,8 +481,10 @@ export class ProviderRouter implements FinancialProviderRouter {
         providerId: provider.id,
         capabilities: provider.capabilities(),
         markets: provider.markets(),
-        dataAccess: provider.id === 'massive' ? 'end-of-day' : 'live',
-        credentialRequirement: provider.id === 'massive' ? 'api-key' : 'device-login',
+        dataAccess:
+          provider.id === 'massive' ? 'end-of-day' : provider.id === 'yahoo' ? 'delayed' : 'live',
+        credentialRequirement:
+          provider.id === 'massive' ? 'api-key' : provider.id === 'yahoo' ? 'none' : 'device-login',
         quota: provider.id === 'massive' ? { limit: 5, window: 'minute' } : undefined,
       };
     }
@@ -502,7 +523,7 @@ export class ProviderRouter implements FinancialProviderRouter {
       case 'portfolio.positions':
         return provider.getPositions(accountId, signal);
       case 'portfolio.assets':
-        return provider.getAssets(accountId, signal);
+        return provider.getAssets(accountId, signal, readCurrency(input));
       case 'portfolio.cashFlow':
         return provider.getCashFlow(accountId, readOptions(input), signal);
       default:

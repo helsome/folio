@@ -1,6 +1,6 @@
 import type { Holding, Kline, PortfolioAccount, PortfolioSnapshot, Quote } from '@finagent/core';
 import type { MarketDataFetchers } from './market-data-service.ts';
-import type { CapabilityFetchResult } from '../capabilities/fetchers.ts';
+import type { CapabilityFetchers, CapabilityFetchResult } from '../capabilities/fetchers.ts';
 
 type QuoteResultFetcher = (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<Quote>>;
 
@@ -82,7 +82,9 @@ function demoKlinesFor(symbol: string, limit?: number): Kline[] {
   const daySeconds = 86_400;
   const todayUtc = Math.floor(new Date().setUTCHours(0, 0, 0, 0) / 1000);
   for (let index = count - 1; index >= 0; index -= 1) {
-    const step = count - 1 - index;
+    // Bars are appended oldest → newest, so the exponent must equal the bar's
+    // distance from today (`index`), not the distance from the first bar.
+    const step = index;
     const drift = (seeded(symbol, index + 3) - 0.5) * 0.02;
     const close = round2(quote.lastPrice / Math.pow(1 + drift, step));
     const open = round2(close * (1 + (seeded(symbol, index + 61) - 0.5) * 0.008));
@@ -139,7 +141,7 @@ function demoPortfolioSnapshot(): PortfolioSnapshot {
  * demo dataset answers instead. Only the surfaces typed blocks demo are
  * wrapped; everything else keeps failing honestly.
  */
-export function withDemoDataFallback<F extends Partial<MarketDataFetchers> & { getQuoteResult?: QuoteResultFetcher }>(
+export function withDemoDataFallback<F extends Partial<MarketDataFetchers> & Pick<CapabilityFetchers, 'getKlineResult'> & { getQuoteResult?: QuoteResultFetcher }>(
   fetchers: F
 ): F {
   const quoteResult = fetchers.getQuoteResult;
@@ -167,6 +169,23 @@ export function withDemoDataFallback<F extends Partial<MarketDataFetchers> & { g
         },
       }
       : {}),
+    ...(fetchers.getKlineResult ? {
+      getKlineResult: async (options, signal) => {
+        try {
+          return await fetchers.getKlineResult!(options, signal);
+        } catch {
+          const data = demoKlinesFor(options.symbol, options.limit ?? 30);
+          return {
+            data,
+            provenance: {
+              providerId: 'demo', providerName: 'Sample data', fetchedAt: Date.now(),
+              marketTime: data.at(-1)?.timestamp === undefined ? undefined : data.at(-1)!.timestamp * 1000,
+              stale: false,
+            },
+          };
+        }
+      },
+    } : {}),
     getKline: async (options) => {
       const real = fetchers.getKline;
       if (real) {

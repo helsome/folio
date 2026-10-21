@@ -66,6 +66,7 @@ export const SourceInspector: React.FC<{
                           key={source.id}
                           type="button"
                           data-source-id={source.id}
+                          aria-current={active ? 'true' : undefined}
                           onClick={() => setSelectedId(source.id)}
                           className={`flex w-full items-center gap-2 border-b border-border px-3 py-2 text-left last:border-b-0 transition-smooth ${
                             active ? 'bg-accent/10' : 'hover:bg-foreground/4'
@@ -170,6 +171,9 @@ const SourceDetails: React.FC<{
 
       <button
         type="button"
+        data-testid="source-snapshot-toggle"
+        aria-expanded={snapshotOpen}
+        aria-controls="source-snapshot"
         onClick={() => setSnapshotOpen((open) => !open)}
         className="flex items-center gap-1.5 self-start rounded-[8px] px-2 py-1 text-[11.5px] text-foreground/56 transition-smooth hover:bg-foreground/6 hover:text-foreground"
       >
@@ -177,7 +181,7 @@ const SourceDetails: React.FC<{
         {t('agent.sources.snapshot')}
       </button>
       {snapshotOpen && (
-        <pre className="max-h-48 overflow-auto rounded-[10px] border mac-list-row bg-foreground/[0.03] p-3 font-mono text-[10.5px] leading-relaxed text-foreground/70">
+        <pre id="source-snapshot" className="max-h-48 overflow-auto rounded-[10px] border mac-list-row bg-foreground/[0.03] p-3 font-mono text-[10.5px] leading-relaxed text-foreground/70">
           {JSON.stringify({ query: envelope.query, resultSnapshot: envelope.resultSnapshot }, null, 2)}
         </pre>
       )}

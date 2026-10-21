@@ -18,6 +18,7 @@ import {
   type LastRunSummary,
   type NavSection,
 } from '../../atoms';
+import type { GuardStopReason } from '../../atoms/runAtoms';
 import { useFinagentClient } from '../../client';
 import { MessageList } from '../chat/MessageList';
 import { AnswerContent } from '../chat/AnswerContent';
@@ -391,17 +392,24 @@ const RunFooter: React.FC<{
       ? Math.max(0, Math.round((lastRun.completedAt - lastRun.startedAt) / 100) / 10)
       : undefined;
   const failed = lastRun.status === 'failed';
-  const summary = failed
-    ? t('trace.footer.failed', { tools: lastRun.toolCount })
-    : t('trace.footer.completed', { seconds: durationSec ?? 0, steps: lastRun.toolCount });
+  const stopReason = isGuardStopReason(lastRun.stopReason) ? lastRun.stopReason : undefined;
+  const summary = stopReason
+    ? t('trace.footer.stopped', {
+        reason: t(`trace.footer.stopReasons.${stopReason}`),
+        detail: formatStopDetail(lastRun.stopDetail),
+        tools: lastRun.toolCount,
+      })
+    : failed
+      ? t('trace.footer.failed', { tools: lastRun.toolCount })
+      : t('trace.footer.completed', { seconds: durationSec ?? 0, steps: lastRun.toolCount });
   return (
     <div
       data-testid="run-footer"
       className={`flex items-center justify-between gap-2 rounded-[10px] border px-3 py-2 ${
-        failed ? 'border-destructive/24 bg-destructive/5' : 'border-border bg-surface-muted'
+        stopReason || failed ? 'border-destructive/24 bg-destructive/5' : 'border-border bg-surface-muted'
       }`}
     >
-      <span className={`text-[11px] ${failed ? 'text-negative' : 'text-foreground/60'}`}>{summary}</span>
+      <span className={`text-[11px] ${stopReason || failed ? 'text-negative' : 'text-foreground/60'}`}>{summary}</span>
       <button
         type="button"
         onClick={onOpenTrace}
@@ -414,6 +422,22 @@ const RunFooter: React.FC<{
     </div>
   );
 };
+
+const GUARD_STOP_REASONS = new Set<GuardStopReason>(['budget_exhausted', 'loop_detected', 'retry_storm']);
+
+function isGuardStopReason(reason: LastRunSummary['stopReason']): reason is GuardStopReason {
+  return reason !== undefined && GUARD_STOP_REASONS.has(reason);
+}
+
+function formatStopDetail(detail: LastRunSummary['stopDetail']): string {
+  if (detail?.key && detail.used !== undefined && detail.limit !== undefined) {
+    return ` · ${detail.key} ${detail.used}/${detail.limit}`;
+  }
+  if (detail?.tool && detail.count !== undefined) {
+    return ` · ${detail.tool} ×${detail.count}`;
+  }
+  return '';
+}
 /**
  * Contextual starter prompts (V9 §25). The empty-state suggestions follow the
  * current section instead of the same three prompts everywhere.

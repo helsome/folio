@@ -2,7 +2,6 @@ import { atom } from 'jotai';
 import { atomFamily } from 'jotai/utils';
 import type { Quote } from '@finagent/core';
 import type { FinagentClient } from '../client';
-import { demoQuote, hasDemoQuote } from '../demo/demoData';
 
 const CACHE_TTL = 30 * 1000; // 30 seconds
 
@@ -29,12 +28,32 @@ export const quoteCacheAtomFamily = atomFamily((symbol: string) =>
 // Watchlist atoms
 export const watchlistAtom = atom<string[]>(['AAPL.US', 'TSLA.US', 'NVDA.US']);
 
+/** Provider names actually stamped on watchlist quotes, for the §34 freshness line. */
+export const watchlistMarketSourceAtom = atom<{ providerName?: string; delayed: boolean }>((get) => {
+  const watchlist = get(watchlistAtom);
+  const names: string[] = [];
+  let delayed = false;
+  for (const symbol of watchlist) {
+    const cache = get(quoteCacheAtomFamily(symbol));
+    if (cache.error || cache.isDemo) continue;
+    const source = cache.data?.source;
+    if (!source?.providerName) continue;
+    if (!names.includes(source.providerName)) names.push(source.providerName);
+    if (source.delayed) delayed = true;
+  }
+  return {
+    providerName: names.length > 0 ? names.join(', ') : undefined,
+    delayed,
+  };
+});
+
 /** Newest quote timestamp (epoch seconds) across the watchlist, for the §34 freshness line. */
 export const watchlistLatestTimestampAtom = atom<number | undefined>((get) => {
   const watchlist = get(watchlistAtom);
   let latest: number | undefined;
   for (const symbol of watchlist) {
     const cache = get(quoteCacheAtomFamily(symbol));
+    if (cache.error || cache.isDemo) continue;
     const ts = cache.data?.timestamp;
     if (ts && (!latest || ts > latest)) latest = ts;
   }
@@ -90,18 +109,15 @@ export const fetchQuoteAtom = atom(
       return quote;
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Failed to fetch quote';
-      // No live provider available: fall back to built-in sample data when we
-      // have it, so the UI shows a populated (clearly badged) default instead
-      // of an empty state. Unknown symbols keep the honest error path.
-      const demo = hasDemoQuote(symbol) ? demoQuote(symbol) : null;
-      set(quoteCacheAtomFamily(symbol), (cache) => ({
-        ...cache,
-        data: demo,
-        isDemo: demo != null,
-        timestamp: demo != null ? Date.now() : cache.timestamp,
+      // A failed market-data request is unavailable, never an implicit demo.
+      // Clear prior values too, so a failed refresh cannot look current.
+      set(quoteCacheAtomFamily(symbol), {
+        data: null,
+        isDemo: false,
+        timestamp: 0,
         loading: false,
         error: errorMessage,
-      }));
+      });
       return null;
     }
   }

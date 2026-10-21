@@ -178,7 +178,6 @@ export class LangSmithEvaluationBackend implements EvaluationBackend {
   async findTraces(query: TraceQuery): Promise<TraceMatch[]> {
     const filters: Record<string, unknown> = {};
     if (query.startedAfter !== undefined) filters.start_time = new Date(query.startedAfter).toISOString();
-    if (query.startedBefore !== undefined) filters.end_time = new Date(query.startedBefore).toISOString();
     try {
       const body = { filters, limit: query.limit ?? 50, order: '-start_time' };
       const data = await this.requestJson<{ runs?: LangSmithRunResource[] }>('/runs/query', body);
@@ -191,6 +190,13 @@ export class LangSmithEvaluationBackend implements EvaluationBackend {
         if (!query.threadId && query.sessionId && this.sessionOf(metadata) !== query.sessionId) continue;
         const startTime = run.start_time ? Date.parse(run.start_time) : NaN;
         if (Number.isNaN(startTime)) continue;
+        // TraceQuery bounds the run's *start* time, so the window is enforced
+        // here. Delegating the upper bound to the request was wrong twice over:
+        // `end_time` is a different field, and the response loop never
+        // re-checked it, so out-of-window runs came straight back. Every
+        // sibling backend (local, langfuse) filters on `startTime` the same way.
+        if (query.startedAfter !== undefined && startTime < query.startedAfter) continue;
+        if (query.startedBefore !== undefined && startTime > query.startedBefore) continue;
         matches.push({ traceId: run.id, startTime, metadata });
       }
       return matches.slice(-(query.limit ?? 50));

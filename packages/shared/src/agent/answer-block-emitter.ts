@@ -197,7 +197,8 @@ export function buildRiskComparisonBlock(
 
 /** Annualized-agnostic daily-return standard deviation over closes. */
 export function dailyVolatility(klines: Kline[] | undefined): number | null {
-  const closes = (klines ?? [])
+  const closes = [...(klines ?? [])]
+    .sort((a, b) => a.timestamp - b.timestamp)
     .map((kline) => kline.close)
     .filter((value) => Number.isFinite(value) && value > 0);
   if (closes.length < 3) return null;

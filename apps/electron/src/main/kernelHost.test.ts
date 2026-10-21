@@ -5,7 +5,11 @@ import type { AgentEvent, AutomationRule, AutomationRun } from '@finagent/core';
 let lastKernelOptions: Record<string, unknown> | null = null;
 let lastMarketData: FakeMarketDataService | null = null;
 let lastAutomationContext: unknown = null;
+/** Symbols the last compareBuild call forwarded to buildComparison. */
+let lastCompareSymbols: unknown = null;
 let forwardedEvents: unknown[] = [];
+/** Evaluation runs handed to EvaluationStore.addRun (observability path). */
+const savedEvalRuns: Array<Record<string, unknown>> = [];
 const routerFetchers = { getQuote: async () => ({ symbol: 'AAPL.US' }) };
 const scheduledRule: AutomationRule = {
   id: 'scheduled-rule',
@@ -34,6 +38,15 @@ let runAutomationMock: () => Promise<AutomationRun> = async () => {
   automationExecutions += 1;
   return automationRun();
 };
+
+/** Poll until `predicate` holds; the settle path is fire-and-forget (`void`). */
+async function waitFor(predicate: () => boolean, timeoutMs = 1000): Promise<void> {
+  const deadline = Date.now() + timeoutMs;
+  while (!predicate()) {
+    if (Date.now() > deadline) throw new Error('waitFor timed out');
+    await new Promise((resolve) => setTimeout(resolve, 5));
+  }
+}
 
 class FakeMarketDataService {
   quoteSymbols: string[] = [];
@@ -81,6 +94,7 @@ const fakeSessions = {
   deleteSession: async () => undefined,
   listMessages: async (sessionId: string) => [{ id: 'm1', role: 'user', content: sessionId, timestamp: 1 }],
   listRuns: async () => [],
+  getSession: async () => undefined,
 };
 
 const fakeRuns = {
@@ -184,7 +198,10 @@ mock.module('@finagent/shared', () => ({
     analyze = async () => undefined;
   },
   defaultPortfolioRiskSynthesizer: async () => '',
-  buildComparison: async () => undefined,
+  buildComparison: async (symbols: string[]) => {
+    lastCompareSymbols = symbols;
+    return undefined;
+  },
   computeSkillReadiness: () => undefined,
   parseSynthesisJson: (text: string) => JSON.parse(text),
   parseImpactJson: (text: string) => JSON.parse(text),
@@ -196,6 +213,9 @@ mock.module('@finagent/shared', () => ({
     load = async () => {
       throw new Error('skip instrument catalog persist in unit tests');
     };
+  },
+  YahooChartFinancialDataProvider: class {
+    clearCache = () => undefined;
   },
   MassiveFinancialDataProvider: class {
     clearCache = () => undefined;
@@ -315,7 +335,9 @@ mock.module('@finagent/shared', () => ({
     });
     saveSettings = async (settings: unknown) => settings;
     getSettings = async () => ({});
-    addRun = async () => undefined;
+    addRun = async (run: Record<string, unknown>) => {
+      savedEvalRuns.push(run);
+    };
     listExperiments = async () => [];
     getExperiment = async () => undefined;
     listRuns = async () => [];
@@ -378,6 +400,7 @@ beforeEach(() => {
   lastKernelOptions = null;
   lastMarketData = null;
   lastAutomationContext = null;
+  lastCompareSymbols = null;
   forwardedEvents = [];
   scheduledRules = [];
   recordedAutomationRuns = [];
@@ -387,6 +410,7 @@ beforeEach(() => {
     automationExecutions += 1;
     return automationRun();
   };
+  savedEvalRuns.length = 0;
 });
 
 afterEach(() => {
@@ -471,6 +495,73 @@ describe('AgentKernelHost', () => {
     host.dispose();
   });
 
+  it('dedupes compare symbols that resolve to the same canonical instrument', async () => {
+    const host = new AgentKernelHost();
+
+    await host.compareBuild({ symbols: ['AAPL.US', 'AAPL', 'MSFT.US'] });
+    expect(lastCompareSymbols).toEqual(['AAPL.US', 'MSFT.US']);
+
+    await host.compareBuild({ symbols: ['nvda.us', ' aapl '] });
+    expect(lastCompareSymbols).toEqual(['NVDA.US', 'AAPL']);
+    host.dispose();
+  });
+
+  it('rejects a compare request that collapses below two distinct symbols', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(host.compareBuild({ symbols: ['AAPL.US', 'AAPL.US'] })).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+    });
+    await expect(host.compareBuild({ symbols: ['TSLA', 'TSLA.US'] })).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+    });
+    host.dispose();
+  });
+
+  it('rejects more than four compare symbols', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(
+      host.compareBuild({ symbols: ['AAPL.US', 'MSFT.US', 'NVDA.US', 'BABA.US', '9988.HK'] })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    host.dispose();
+  });
+
+  it('rejects malformed automation rules before they reach persistence', async () => {
+    const host = new AgentKernelHost();
+    const valid: AutomationRule = {
+      id: 'daily-review',
+      type: 'watchlist-daily-review',
+      enabled: true,
+      hour: 16.5,
+      days: [1, 2, 3, 4, 5],
+      symbols: ['AAPL.US'],
+      strategyId: 'comprehensive',
+      notify: 'material-only',
+      createdAt: 1_700_000_000_000,
+    };
+    const invalidRules: unknown[] = [
+      { ...valid, id: '   ' },
+      { ...valid, type: 'monthly-review' },
+      { ...valid, enabled: 'yes' },
+      { ...valid, notify: 'sometimes' },
+      { ...valid, createdAt: Number.NaN },
+      { ...valid, hour: 24 },
+      { ...valid, days: [1, 7] },
+      { ...valid, days: [1, 1] },
+      { ...valid, symbols: [''] },
+      { ...valid, strategyId: 'unknown-strategy' },
+    ];
+
+    for (const rule of invalidRules) {
+      await expect(host.automationSaveRule({ rule })).rejects.toMatchObject({
+        code: 'AUTOMATION_RULE_INVALID',
+      });
+    }
+    await expect(host.automationSaveRule({ rule: valid })).resolves.toBeUndefined();
+    host.dispose();
+  });
+
   it('forwards kernel agent events to the attached window', async () => {
     let subscriber: ((event: AgentEvent) => void) | null = null;
     fakeRuns.subscribe = (listener) => {
@@ -546,6 +637,57 @@ describe('AgentKernelHost', () => {
     host.dispose();
   });
 
+  it('leaves the LongBridge action empty while the CLI is available', async () => {
+    const host = new AgentKernelHost();
+
+    const result = await host.getLongBridgeStatus();
+
+    expect(result.status).toBe('available');
+    expect(result.action).toBeUndefined();
+    host.dispose();
+  });
+
+  it('maps a LongBridge timeout to a retry action, not an install prompt', async () => {
+    const host = new AgentKernelHost();
+    const marketData = lastMarketData as unknown as {
+      getLongBridgeStatus: () => Promise<Record<string, unknown>>;
+    };
+    marketData.getLongBridgeStatus = async () => ({
+      installed: true,
+      authed: true,
+      available: false,
+      status: 'timeout',
+      error: { code: 'LONGBRIDGE_TIMEOUT', message: 'LongBridge CLI timed out.' },
+    });
+
+    const result = await host.getLongBridgeStatus();
+
+    expect(typeof result.action).toBe('string');
+    expect(result.action).toContain('timed out');
+    expect(result.action).not.toContain('Install the LongBridge CLI');
+    host.dispose();
+  });
+
+  it('maps an unrecognised LongBridge failure to its own action', async () => {
+    const host = new AgentKernelHost();
+    const marketData = lastMarketData as unknown as {
+      getLongBridgeStatus: () => Promise<Record<string, unknown>>;
+    };
+    marketData.getLongBridgeStatus = async () => ({
+      installed: true,
+      authed: false,
+      available: false,
+      status: 'unknown',
+      error: { code: 'LONGBRIDGE_UNKNOWN', message: 'Unexpected failure.' },
+    });
+
+    const result = await host.getLongBridgeStatus();
+
+    expect(typeof result.action).toBe('string');
+    expect(result.action).not.toContain('Install the LongBridge CLI');
+    host.dispose();
+  });
+
   it('wraps market data errors into IPC results', async () => {
     const host = new AgentKernelHost();
     const { toIpcResult } = await import('./kernelHost.ts');
@@ -610,6 +752,86 @@ describe('AgentKernelHost', () => {
     await host['tickAutomations']();
 
     expect(automationExecutions).toBe(1);
+    host.dispose();
+  });
+
+  it('records a user-cancelled run as cancelled, not failed', async () => {
+    const originalSubscribe = fakeRuns.subscribe;
+    let subscriber: ((event: AgentEvent) => void) | null = null;
+    fakeRuns.subscribe = (listener) => {
+      subscriber = listener;
+      return () => undefined;
+    };
+    const host = new AgentKernelHost();
+    const emit = subscriber as ((event: AgentEvent) => void) | null;
+
+    emit?.({
+      id: 'e1',
+      sessionId: 's1',
+      runId: 'r1',
+      type: 'run_started',
+      timestamp: 10,
+      sequence: 1,
+      payload: {
+        run: { id: 'r1', sessionId: 's1', status: 'running', input: 'x', startedAt: 10 },
+        userMessage: { id: 'm1', role: 'user', content: 'x', timestamp: 10 },
+      },
+    });
+    // A user cancel settles the run as run_failed/RUN_CANCELLED (RunManager
+    // normalizes it to `cancelled` on the stream channel).
+    emit?.({
+      id: 'e2',
+      sessionId: 's1',
+      runId: 'r1',
+      type: 'run_failed',
+      timestamp: 20,
+      sequence: 2,
+      payload: { error: { code: 'RUN_CANCELLED', message: 'Run cancelled by user.' } },
+    });
+
+    await waitFor(() => savedEvalRuns.length === 1);
+    expect(savedEvalRuns[0]).toMatchObject({ id: 'r1', status: 'cancelled' });
+
+    fakeRuns.subscribe = originalSubscribe;
+    host.dispose();
+  });
+
+  it('keeps a genuine runtime failure recorded as failed', async () => {
+    const originalSubscribe = fakeRuns.subscribe;
+    let subscriber: ((event: AgentEvent) => void) | null = null;
+    fakeRuns.subscribe = (listener) => {
+      subscriber = listener;
+      return () => undefined;
+    };
+    const host = new AgentKernelHost();
+    const emit = subscriber as ((event: AgentEvent) => void) | null;
+
+    emit?.({
+      id: 'e1',
+      sessionId: 's1',
+      runId: 'r2',
+      type: 'run_started',
+      timestamp: 10,
+      sequence: 1,
+      payload: {
+        run: { id: 'r2', sessionId: 's1', status: 'running', input: 'x', startedAt: 10 },
+        userMessage: { id: 'm1', role: 'user', content: 'x', timestamp: 10 },
+      },
+    });
+    emit?.({
+      id: 'e2',
+      sessionId: 's1',
+      runId: 'r2',
+      type: 'run_failed',
+      timestamp: 20,
+      sequence: 2,
+      payload: { error: { code: 'PROVIDER_ERROR', message: 'Upstream failed.' } },
+    });
+
+    await waitFor(() => savedEvalRuns.length === 1);
+    expect(savedEvalRuns[0]).toMatchObject({ id: 'r2', status: 'failed' });
+
+    fakeRuns.subscribe = originalSubscribe;
     host.dispose();
   });
 });

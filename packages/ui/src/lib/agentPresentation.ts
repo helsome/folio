@@ -22,7 +22,7 @@ const TOOL_LABEL_KEY: Readonly<Record<string, string>> = {
   get_news: 'agent.tool.names.getNews',
   get_kline: 'agent.tool.names.getKline',
   get_earnings: 'agent.tool.names.getEarnings',
-  get_profile: 'agent.tool.names.getProfile',
+  get_company_profile: 'agent.tool.names.getProfile',
   analyze: 'agent.tool.names.analyze',
 };
 

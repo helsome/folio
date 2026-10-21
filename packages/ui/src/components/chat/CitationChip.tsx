@@ -32,6 +32,8 @@ export const CitationChip: React.FC<{ sourceId: string }> = ({ sourceId }) => {
       type="button"
       data-citation-id={sourceId}
       data-citation-resolved="true"
+      aria-label={t('agent.citation.openSource', { id: sourceId })}
+      aria-haspopup="dialog"
       title={t('agent.citation.open')}
       onClick={(event) => {
         event.stopPropagation();

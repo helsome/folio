@@ -20,6 +20,7 @@ export const DEFAULT_INSTRUMENT_CATALOG: readonly CanonicalInstrument[] = [
     providerAliases: [
       { providerId: 'longbridge', symbol: 'AAPL.US' },
       { providerId: 'massive', symbol: 'AAPL' },
+      { providerId: 'yahoo', symbol: 'AAPL' },
     ],
     externalIds: [{ type: 'isin', value: 'US0378331005' }],
   },
@@ -37,6 +38,7 @@ export const DEFAULT_INSTRUMENT_CATALOG: readonly CanonicalInstrument[] = [
     providerAliases: [
       { providerId: 'longbridge', symbol: 'TSLA.US' },
       { providerId: 'massive', symbol: 'TSLA' },
+      { providerId: 'yahoo', symbol: 'TSLA' },
     ],
     externalIds: [{ type: 'isin', value: 'US88160R1014' }],
   },
@@ -54,6 +56,7 @@ export const DEFAULT_INSTRUMENT_CATALOG: readonly CanonicalInstrument[] = [
     providerAliases: [
       { providerId: 'longbridge', symbol: 'NVDA.US' },
       { providerId: 'massive', symbol: 'NVDA' },
+      { providerId: 'yahoo', symbol: 'NVDA' },
     ],
     externalIds: [{ type: 'isin', value: 'US67066G1040' }],
   },
@@ -85,6 +88,7 @@ export const DEFAULT_INSTRUMENT_CATALOG: readonly CanonicalInstrument[] = [
     providerAliases: [
       { providerId: 'longbridge', symbol: 'BABA.US' },
       { providerId: 'massive', symbol: 'BABA' },
+      { providerId: 'yahoo', symbol: 'BABA' },
     ],
     externalIds: [{ type: 'isin', value: 'US01609W1027' }],
   },

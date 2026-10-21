@@ -13,6 +13,7 @@ export interface FinancialEvidenceValue {
   unit?: string;
   currency?: string;
   period?: string;
+  /** Epoch milliseconds — payload-native seconds are normalized at the evidence boundary. */
   asOf?: number;
 }
 
