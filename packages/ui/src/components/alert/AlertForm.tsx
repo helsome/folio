@@ -11,6 +11,10 @@ interface AlertFormProps {
   symbol?: string;
   onSubmit: (draft: AlertRuleDraft) => void;
   onCancel: () => void;
+  /** A create is in flight — submit is blocked so it cannot fire twice. */
+  pending?: boolean;
+  /** Persist failure surfaced by the caller; the draft stays intact for a retry. */
+  error?: string | null;
 }
 
 const SYMBOL_REGEX = /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/;
@@ -19,6 +23,8 @@ export const AlertForm: React.FC<AlertFormProps> = ({
   symbol: initialSymbol = '',
   onSubmit,
   onCancel,
+  pending = false,
+  error = null,
 }) => {
   const { t } = useTranslation();
   const [symbol, setSymbol] = useState(initialSymbol.toUpperCase());
@@ -88,6 +94,7 @@ export const AlertForm: React.FC<AlertFormProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (pending) return;
     if (!validate()) return;
 
     const draft: AlertRuleDraft = { type };
@@ -211,12 +218,22 @@ export const AlertForm: React.FC<AlertFormProps> = ({
         />
       )}
 
+      {error && (
+        <div
+          role="alert"
+          data-testid="alert-form-error"
+          className="rounded-[8px] border border-destructive/26 bg-destructive/6 px-3 py-2 text-[12px] text-destructive"
+        >
+          {error}
+        </div>
+      )}
+
       <div className="flex flex-col-reverse gap-2 border-t border-border pt-4 sm:flex-row">
         <Button type="button" variant="outline" onClick={onCancel} className="sm:min-w-24">
           {t('common.cancel')}
         </Button>
-        <Button type="submit" className="flex-1">
-          {t('alerts.form.create')}
+        <Button type="submit" className="flex-1" disabled={pending}>
+          {pending ? t('alerts.form.saving') : t('alerts.form.create')}
         </Button>
       </div>
     </form>

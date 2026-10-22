@@ -1,10 +1,10 @@
-import React, { useEffect, useState } from 'react'
+import React, { useCallback, useEffect, useState } from 'react'
 import { ArrowUpRight, BriefcaseBusiness, CalendarDays, GitCompareArrows, Search } from 'lucide-react'
 import type { LucideIcon } from 'lucide-react'
 import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next';
 import { useAtomValue, useSetAtom } from 'jotai'
-import type { AlertTriggerEvent, ApiResult, CalendarEvent, InvestmentThesis, ResearchReport } from '@finagent/core'
+import type { AlertTriggerEvent, InvestmentThesis, ResearchReport } from '@finagent/core'
 import {
   activeSymbolAtom,
   alertStateAtom,
@@ -19,12 +19,12 @@ import {
 import { researchOriginAtom } from '../../atoms/discoverAtoms'
 import { watchlistMoversAtom, mapUpcomingEvents, thesesNeedingReview } from '../../atoms/todayAtoms'
 import { watchlistQuotesAreDemoAtom } from '../../atoms/quoteAtoms'
-import { demoCalendarEvents } from '../../demo/demoData'
 import { DemoBadge } from '../primitives/DemoBadge'
 import { analyzePortfolioRiskAtom } from '../../atoms/portfolioRiskAtoms'
 import { loadSymbolReports } from '../../atoms/researchAtoms'
 import { loadTheses } from '../../client/thesis'
-import { useFinagentClient, type FinagentClient } from '../../client'
+import { useFinagentClient } from '../../client'
+import { loadCalendarEvents, type CalendarEventsResult } from '../../client/calendar'
 import { formatMoney, formatPercent } from '../../lib/money'
 import { portfolioFailureDetail } from '../../lib/portfolioFailure'
 import { PortfolioCard } from '../portfolio/PortfolioCard'
@@ -50,25 +50,11 @@ function formatWhen(timestamp: number, t: TFunction): string {
 }
 
 /**
- * Defensive calendar-event loader. `FinagentClient.market` has no calendar
- * method yet (see "needed channel" in the completion report); this degrades to
- * `[]` so the Upcoming Events section renders its honest empty state.
+ * Upcoming events keep the same three outcomes the Events page renders (#330):
+ * a genuine empty result, a channel that is not wired, and a failed request.
+ * Only the first one is an answer about the user's calendar, so the dashboard
+ * never papers over the other two with sample data.
  */
-interface CalendarCapableMarket {
-  getCalendarEvents?: (input: { eventType?: string; symbols?: string[] }) => Promise<ApiResult<CalendarEvent[]>>
-}
-
-async function loadUpcomingEvents(client: FinagentClient, symbols: string[]): Promise<CalendarEvent[]> {
-  const market = client.market as unknown as CalendarCapableMarket
-  const fetch = market?.getCalendarEvents
-  if (typeof fetch !== 'function') return []
-  try {
-    const result = await fetch({ eventType: 'financial', symbols })
-    return result.ok ? result.data : []
-  } catch {
-    return []
-  }
-}
 
 export const TodayView: React.FC = () => {
   const { t } = useTranslation()
@@ -93,12 +79,18 @@ export const TodayView: React.FC = () => {
   const [reportsLoading, setReportsLoading] = useState(true)
   const [theses, setTheses] = useState<InvestmentThesis[]>([])
   const [thesesLoading, setThesesLoading] = useState(true)
-  const [upcomingEvents, setUpcomingEvents] = useState<CalendarEvent[]>([])
+  const [eventsResult, setEventsResult] = useState<CalendarEventsResult | null>(null)
   const [eventsLoading, setEventsLoading] = useState(true)
-  const [eventsAreDemo, setEventsAreDemo] = useState(false)
   const [automationOpen, setAutomationOpen] = useState(false)
   const [searchQuery, setSearchQuery] = useState('')
   const quotesAreDemo = useAtomValue(watchlistQuotesAreDemoAtom)
+
+  const reloadEvents = useCallback(async () => {
+    setEventsLoading(true)
+    const next = await loadCalendarEvents(client, { eventType: 'financial', symbols: watchlist })
+    setEventsResult(next)
+    setEventsLoading(false)
+  }, [client, watchlist])
 
   useEffect(() => {
     let cancelled = false
@@ -113,27 +105,18 @@ export const TodayView: React.FC = () => {
       if (cancelled) return
       setQuotesLoading(false)
 
-      const [nextReports, nextTheses, nextEvents] = await Promise.all([
-        loadSymbolReports(),
-        loadTheses(),
-        loadUpcomingEvents(client, watchlist),
-      ])
+      const [nextReports, nextTheses] = await Promise.all([loadSymbolReports(), loadTheses()])
       if (cancelled) return
       setReports(nextReports)
       setReportsLoading(false)
       setTheses(nextTheses)
       setThesesLoading(false)
-      // No calendar channel / no data: fall back to badged sample events so
-      // the dashboard shows a populated default instead of an empty state.
-      const eventsAreSample = nextEvents.length === 0
-      setEventsAreDemo(eventsAreSample)
-      setUpcomingEvents(eventsAreSample ? demoCalendarEvents(t) : nextEvents)
-      setEventsLoading(false)
+      await reloadEvents()
     })()
     return () => {
       cancelled = true
     }
-  }, [client, watchlist, fetchPortfolio, loadAlerts, fetchQuote])
+  }, [client, watchlist, fetchPortfolio, loadAlerts, fetchQuote, reloadEvents])
 
   const handleResearchStock = (): void => {
     if (activeSymbol == null && watchlist.length > 0) setActiveSymbol(watchlist[0])
@@ -230,17 +213,28 @@ export const TodayView: React.FC = () => {
     )
   })()
 
-  const upcomingItems = mapUpcomingEvents(upcomingEvents, Date.now() / 1000, EVENT_ROWS)
+  const upcomingItems =
+    eventsResult?.status === 'ok'
+      ? mapUpcomingEvents(eventsResult.events, Date.now() / 1000, EVENT_ROWS)
+      : []
 
   const upcomingContent = (() => {
-    if (eventsLoading && upcomingItems.length === 0) return <SectionState kind="loading" />
-    if (upcomingItems.length === 0) {
+    if (eventsLoading && eventsResult == null) return <SectionState kind="loading" />
+    if (eventsResult?.status === 'unavailable') {
+      return <SectionState kind="empty" message={t('today.eventsNoChannel')} />
+    }
+    if (eventsResult?.status === 'error') {
       return (
-        <SectionState
-          kind="empty"
-          message={t('today.eventsUnavailable')}
-        />
+        <div className="space-y-2" data-testid="today-events-error">
+          <SectionState kind="error" message={t('today.eventsLoadError')} />
+          <Button size="sm" variant="outline" onClick={() => void reloadEvents()}>
+            {t('common.retry')}
+          </Button>
+        </div>
       )
+    }
+    if (upcomingItems.length === 0) {
+      return <SectionState kind="empty" message={t('today.noUpcomingEvents')} />
     }
     return (
       <ul className="divide-y divide-border">
@@ -344,7 +338,7 @@ export const TodayView: React.FC = () => {
           </section>
 
           <section className="folio-stitch-card" data-testid="today-upcoming-events">
-            <div className="folio-stitch-card-heading"><h2>{t('today.upcomingEvents')}</h2><span className="flex items-center gap-2">{eventsAreDemo && <DemoBadge />}<CalendarDays className="h-4 w-4 text-foreground/48" /></span></div>
+            <div className="folio-stitch-card-heading"><h2>{t('today.upcomingEvents')}</h2><span className="flex items-center gap-2"><CalendarDays className="h-4 w-4 text-foreground/48" /></span></div>
             {upcomingContent}
             <button type="button" onClick={() => setNavSection('events')} className="folio-stitch-secondary-button mt-5 w-full">{t('events.title')}</button>
           </section>

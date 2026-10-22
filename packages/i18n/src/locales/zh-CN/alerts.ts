@@ -16,6 +16,9 @@ export const alerts = {
   removeAlert: '移除提醒',
   createAlert: '创建提醒',
   editAlert: '编辑提醒',
+  persistFailedCreate: '提醒保存失败，尚未生效。草稿已保留，请重试。',
+  persistFailedToggle: '提醒状态保存失败，已恢复原状态。',
+  persistFailedRemove: '提醒删除失败，已恢复到列表中。',
   status: {
     active: '生效中',
     triggered: '已触发',
@@ -51,6 +54,7 @@ export const alerts = {
     maxWeight: '最大权重（%）',
     drawdownThreshold: '回撤阈值（%）',
     create: '创建提醒',
+    saving: '保存中…',
     symbolRequired: '请输入代码',
     symbolInvalid: '格式无效。请使用：AAPL.US、0700.HK',
     targetPricePositive: '请输入正的目标价',

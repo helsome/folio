@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { CalendarEvent } from '@finagent/core'
+import type { ApiResult, CalendarEvent } from '@finagent/core'
 import { getDefaultStore } from 'jotai'
 import { activeSymbolAtom, navSectionAtom } from '../../atoms'
 import { fallbackClient, FinagentClientProvider, type FinagentClient } from '../../client'
@@ -56,37 +56,34 @@ async function render(client: FinagentClient) {
   return { container, root }
 }
 
+async function unmount(container: HTMLElement, root: ReturnType<typeof createRoot>) {
+  await act(async () => root.unmount())
+  container.remove()
+}
+
+type CalendarFetch = (input: { eventType?: string; symbols?: string[] }) => Promise<ApiResult<CalendarEvent[]>>
+
+function clientWith(getCalendarEvents: CalendarFetch): FinagentClient {
+  return {
+    ...fallbackClient,
+    market: {
+      ...fallbackClient.market,
+      getCalendarEvents,
+    } as unknown as FinagentClient['market'],
+  }
+}
+
 describe('EventsView', () => {
-  it('falls back to badged sample events when calendar capability is unavailable', async () => {
-    const { container, root } = await render(fallbackClient)
-    await flushAsync()
-
-    expect(container.querySelector('[data-testid="events-view"]')).not.toBeNull()
-    // Sample-data fallback: badge is rendered and demo events populate the list.
-    expect(container.querySelector('[data-testid="demo-badge"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="events-list"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="events-list"]')?.textContent).toContain('AAPL.US')
-
-    await act(async () => root.unmount())
-    container.remove()
-  })
-
   it('renders real calendar data without the sample badge', async () => {
     store.set(navSectionAtom, 'events')
     store.set(activeSymbolAtom, null)
-    const client: FinagentClient = {
-      ...fallbackClient,
-      market: {
-        ...fallbackClient.market,
-        getCalendarEvents: async () => ({ ok: true, data: [EVENT] }),
-      } as FinagentClient['market'],
-    }
-    const { container, root } = await render(client)
+    const { container, root } = await render(clientWith(async () => ({ ok: true, data: [EVENT] })))
     await flushAsync()
 
     expect(container.querySelector('[data-testid="demo-badge"]')).toBeNull()
     expect(container.querySelector('[data-testid="events-list"]')?.textContent).toContain('AAPL.US')
     expect(container.textContent).toContain('Apple earnings')
+    expect(container.querySelector('[data-testid="events-empty"]')).toBeNull()
 
     const researchButton = container.querySelector<HTMLButtonElement>('button[aria-label="Open research for AAPL.US"]')
     expect(researchButton).not.toBeNull()
@@ -94,28 +91,95 @@ describe('EventsView', () => {
     expect(store.get(activeSymbolAtom)).toBe('AAPL.US')
     expect(store.get(navSectionAtom)).toBe('research')
 
-    await act(async () => root.unmount())
-    container.remove()
+    await unmount(container, root)
   })
 
-  it('falls back to badged sample events instead of inventing unlabeled data when the provider errors', async () => {
-    const client: FinagentClient = {
-      ...fallbackClient,
-      market: {
-        ...fallbackClient.market,
-        getCalendarEvents: async () => ({ ok: false, error: { code: 'OFFLINE', message: 'Calendar offline' } }),
-      } as FinagentClient['market'],
-    }
+  /**
+   * #330: a successful empty response is an answer about the user's calendar —
+   * it must not be replaced by invented events.
+   */
+  it('shows an honest empty state for a successful empty result', async () => {
+    const { container, root } = await render(clientWith(async () => ({ ok: true, data: [] })))
+    await flushAsync()
+
+    expect(container.querySelector('[data-testid="events-empty"]')?.textContent).toContain(
+      'No events in the selected range.'
+    )
+    expect(container.querySelector('[data-testid="events-list"]')).toBeNull()
+    expect(container.querySelector('[data-testid="demo-badge"]')).toBeNull()
+
+    await unmount(container, root)
+  })
+
+  it('renders sample events only after the explicit sample toggle', async () => {
+    const { container, root } = await render(clientWith(async () => ({ ok: true, data: [] })))
+    await flushAsync()
+
+    const toggle = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('View sample events')
+    )
+    expect(toggle).not.toBeNull()
+    await act(async () => toggle?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await flushAsync()
+
+    expect(container.querySelector('[data-testid="demo-badge"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="events-sample-note"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="events-list"]')?.textContent).toContain('AAPL.US')
+    // Sample rows carry no research hand-off: they are not real event context.
+    expect(container.querySelector('button[aria-label="Open research for AAPL.US"]')).toBeNull()
+
+    await unmount(container, root)
+  })
+
+  it('surfaces a provider error with a retry entry instead of sample events', async () => {
+    let calls = 0
+    const client = clientWith(async () => {
+      calls += 1
+      return { ok: false, error: { code: 'OFFLINE', message: 'Calendar offline' } }
+    })
     const { container, root } = await render(client)
     await flushAsync()
 
-    // The error text is not surfaced as page state; the clearly-badged sample
-    // list is rendered instead so the surface is never blank.
-    expect(container.textContent).not.toContain('Calendar offline')
-    expect(container.querySelector('[data-testid="demo-badge"]')).not.toBeNull()
-    expect(container.querySelector('[data-testid="events-list"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="events-error"]')?.textContent).toContain(
+      'Upcoming events are unavailable'
+    )
+    expect(container.querySelector('[data-testid="events-list"]')).toBeNull()
+    expect(container.querySelector('[data-testid="demo-badge"]')).toBeNull()
 
-    await act(async () => root.unmount())
-    container.remove()
+    const retry = Array.from(container.querySelectorAll('button')).find((button) =>
+      button.textContent?.includes('Retry')
+    )
+    expect(retry).not.toBeNull()
+    await act(async () => retry?.dispatchEvent(new MouseEvent('click', { bubbles: true })))
+    await flushAsync()
+    expect(calls).toBe(2)
+
+    await unmount(container, root)
+  })
+
+  it('surfaces a thrown exception as an error, not as sample events', async () => {
+    const client = clientWith(async () => {
+      throw new Error('ipc closed')
+    })
+    const { container, root } = await render(client)
+    await flushAsync()
+
+    expect(container.querySelector('[data-testid="events-error"]')).not.toBeNull()
+    expect(container.querySelector('[data-testid="events-list"]')).toBeNull()
+
+    await unmount(container, root)
+  })
+
+  it('explains the missing channel instead of inventing events', async () => {
+    const { container, root } = await render(fallbackClient)
+    await flushAsync()
+
+    expect(container.querySelector('[data-testid="events-unavailable"]')?.textContent).toContain(
+      'No market calendar is connected yet'
+    )
+    expect(container.querySelector('[data-testid="events-list"]')).toBeNull()
+    expect(container.querySelector('[data-testid="demo-badge"]')).toBeNull()
+
+    await unmount(container, root)
   })
 })

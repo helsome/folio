@@ -148,3 +148,70 @@ describe('defensive client loader', () => {
     expect(await saveAlertRules(client, [makeRule('r1', 'price_above')])).toBe(false);
   });
 });
+
+/**
+ * #328: every mutation must report whether the change was *persisted*. An
+ * optimistic update that never reaches `saveRules` would let the UI claim a
+ * reminder is armed while a restart loses it.
+ */
+describe('alert atoms persist failures', () => {
+  function makeFailingClient(rules: AlertRule[] = []): FinagentClient {
+    return {
+      alerts: {
+        loadRules: async () => ({ ok: true as const, data: rules }),
+        listEvents: async () => ({ ok: true as const, data: [] }),
+        saveRules: async () => ({ ok: false as const, error: { code: 'STORE_WRITE_FAILED', message: 'disk full' } }),
+      },
+    } as unknown as FinagentClient;
+  }
+
+  it('does not keep an unpersisted rule and reports the failure', async () => {
+    const store = createStore();
+    const client = makeFailingClient();
+
+    const saved = await store.set(addAlertAtom, { client, rule: makeRule('r1', 'price_above') });
+
+    expect(saved).toBe(false);
+    expect(store.get(alertStateAtom).rules).toEqual([]);
+  });
+
+  it('restores the previous enabled state when pausing fails', async () => {
+    const store = createStore();
+    const client = makeFailingClient([makeRule('r1', 'price_above')]);
+    await store.set(loadAlertsAtom, client);
+
+    const saved = await store.set(toggleAlertAtom, { client, ruleId: 'r1' });
+
+    expect(saved).toBe(false);
+    expect(store.get(alertStateAtom).rules[0].enabled).toBe(true);
+  });
+
+  it('restores a rule whose deletion failed', async () => {
+    const store = createStore();
+    const client = makeFailingClient([makeRule('r1', 'price_above')]);
+    await store.set(loadAlertsAtom, client);
+
+    const saved = await store.set(removeAlertAtom, { client, ruleId: 'r1' });
+
+    expect(saved).toBe(false);
+    expect(store.get(alertStateAtom).rules.map((r) => r.id)).toEqual(['r1']);
+  });
+
+  it('treats a throwing saveRules as a failure too', async () => {
+    const store = createStore();
+    const client = {
+      alerts: {
+        loadRules: async () => ({ ok: true as const, data: [] }),
+        listEvents: async () => ({ ok: true as const, data: [] }),
+        saveRules: async () => {
+          throw new Error('ipc closed');
+        },
+      },
+    } as unknown as FinagentClient;
+
+    const saved = await store.set(addAlertAtom, { client, rule: makeRule('r1', 'price_above') });
+
+    expect(saved).toBe(false);
+    expect(store.get(alertStateAtom).rules).toEqual([]);
+  });
+});

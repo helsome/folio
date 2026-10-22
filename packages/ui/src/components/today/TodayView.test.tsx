@@ -1,7 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
-import type { PortfolioSnapshot, Quote } from '@finagent/core'
+import type { ApiResult, CalendarEvent, PortfolioSnapshot, Quote } from '@finagent/core'
 import { formatCurrency } from '@finagent/i18n'
 import { fallbackClient, FinagentClientProvider, type FinagentClient } from '../../client'
 import { installHappyDom } from '../../test/setupHappyDom'
@@ -68,6 +68,16 @@ function clientWithPortfolio(): FinagentClient {
       listEvents: async () => ({ ok: true, data: [] }),
       onTriggered: () => () => undefined,
     },
+  }
+}
+
+type CalendarFetch = (input: { eventType?: string; symbols?: string[] }) => Promise<ApiResult<CalendarEvent[]>>
+
+function clientWithCalendar(getCalendarEvents: CalendarFetch): FinagentClient {
+  const base = clientWithPortfolio()
+  return {
+    ...base,
+    market: { ...base.market, getCalendarEvents } as unknown as FinagentClient['market'],
   }
 }
 
@@ -148,5 +158,77 @@ describe('TodayView', () => {
       root.unmount()
     })
     container.remove()
+  })
+
+  /**
+   * #330: the dashboard must not turn "no events", "not connected" and "failed"
+   * into the same row of invented sample events.
+   */
+  describe('upcoming events states', () => {
+    async function renderToday(client: FinagentClient) {
+      const container = document.createElement('div')
+      document.body.appendChild(container)
+      const root = createRoot(container)
+      await act(async () => {
+        root.render(
+          <I18nextProvider i18n={makeTestI18n('en-US')}>
+            <FinagentClientProvider client={client}>
+              <TodayView />
+            </FinagentClientProvider>
+          </I18nextProvider>
+        )
+      })
+      await flushAsync()
+      return { container, root }
+    }
+
+    async function cleanup(container: HTMLElement, root: ReturnType<typeof createRoot>) {
+      await act(async () => {
+        root.unmount()
+      })
+      container.remove()
+    }
+
+    function eventsCard(container: HTMLElement): HTMLElement {
+      const card = container.querySelector<HTMLElement>('[data-testid="today-upcoming-events"]')
+      expect(card).not.toBeNull()
+      return card as HTMLElement
+    }
+
+    it('shows a real empty state without sample events', async () => {
+      const { container, root } = await renderToday(clientWithCalendar(async () => ({ ok: true, data: [] })))
+      const card = eventsCard(container)
+
+      expect(card.textContent).toContain('No upcoming events in the selected range.')
+      expect(card.querySelector('[data-testid="demo-badge"]')).toBeNull()
+      expect(card.textContent).not.toContain('AAPL.US')
+
+      await cleanup(container, root)
+    })
+
+    it('shows an error with a retry entry when the provider fails', async () => {
+      const { container, root } = await renderToday(
+        clientWithCalendar(async () => ({ ok: false, error: { code: 'OFFLINE', message: 'Calendar offline' } }))
+      )
+      const card = eventsCard(container)
+
+      expect(card.querySelector('[data-testid="today-events-error"]')?.textContent).toContain(
+        'Upcoming events could not be loaded.'
+      )
+      expect(card.querySelector('[data-testid="demo-badge"]')).toBeNull()
+
+      await cleanup(container, root)
+    })
+
+    it('explains the missing calendar channel', async () => {
+      const { container, root } = await renderToday(clientWithPortfolio())
+      const card = eventsCard(container)
+
+      expect(card.textContent).toContain('Upcoming events need a market-data connection')
+      expect(card.querySelector('[data-testid="demo-badge"]')).toBeNull()
+      expect(card.textContent).not.toContain('AAPL.US')
+
+      await cleanup(container, root)
+    })
   })
 })

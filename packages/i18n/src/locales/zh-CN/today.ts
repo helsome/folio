@@ -37,7 +37,9 @@ export const today = {
   // alerts
   noTriggeredAlerts: '暂无已触发的提醒。',
   // events
-  eventsUnavailable: '即将发生的事件暂不可用（日历通道尚未接通）。',
+  eventsNoChannel: '即将发生的事件需要行情数据连接，连接提供商后即可加载。',
+  eventsLoadError: '无法加载即将发生的事件。',
+  noUpcomingEvents: '所选时间范围内暂无即将发生的事件。',
   // research
   noResearchReports: '暂无研究报告。',
   // theses

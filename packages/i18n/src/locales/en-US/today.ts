@@ -34,7 +34,9 @@ export const today = {
   // alerts
   noTriggeredAlerts: 'No triggered alerts.',
   // events
-  eventsUnavailable: 'Upcoming events are not available yet (calendar channel not wired).',
+  eventsNoChannel: 'Upcoming events need a market-data connection. Connect a provider to load them.',
+  eventsLoadError: 'Upcoming events could not be loaded.',
+  noUpcomingEvents: 'No upcoming events in the selected range.',
   // research
   noResearchReports: 'No research reports yet.',
   // theses

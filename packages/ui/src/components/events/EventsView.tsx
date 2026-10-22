@@ -2,18 +2,14 @@ import React, { useCallback, useEffect, useState } from 'react';
 import { ArrowUpRight, CalendarDays, RefreshCw, Sparkles } from 'lucide-react';
 import { useSetAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
-import type { ApiResult, CalendarEvent } from '@finagent/core';
 import { activeSymbolAtom, navSectionAtom } from '../../atoms';
 import { useFinagentClient } from '../../client';
+import { loadCalendarEvents, type CalendarEventsResult } from '../../client/calendar';
 import { mapUpcomingEvents, type UpcomingEventItem } from '../../atoms/todayAtoms';
 import { demoCalendarEvents } from '../../demo/demoData';
 import { Button } from '../primitives/Button';
 import { DemoBadge } from '../primitives/DemoBadge';
 import { SectionState } from '../today/TodaySection';
-
-interface CalendarCapableMarket {
-  getCalendarEvents?: (input: { eventType?: string; symbols?: string[] }) => Promise<ApiResult<CalendarEvent[]>>;
-}
 
 function formatEventDate(event: UpcomingEventItem): string {
   if (event.localDate) return event.localDate;
@@ -25,45 +21,30 @@ function formatEventDate(event: UpcomingEventItem): string {
   }).format(event.date * 1000);
 }
 
-/** Stitch Events & Catalysts surface, backed only by the optional calendar channel. */
+/**
+ * Stitch Events & Catalysts surface, backed only by the optional calendar
+ * channel.
+ *
+ * A successful empty response, a missing channel and a provider failure are
+ * three different answers (#330): only the first one describes the user's
+ * calendar. Sample events are therefore opt-in — never a silent substitute for
+ * a real result.
+ */
 export const EventsView: React.FC = () => {
   const { t } = useTranslation();
   const client = useFinagentClient();
   const setActiveSymbol = useSetAtom(activeSymbolAtom);
   const setNavSection = useSetAtom(navSectionAtom);
-  const [events, setEvents] = useState<UpcomingEventItem[]>([]);
+  const [result, setResult] = useState<CalendarEventsResult | null>(null);
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [isDemo, setIsDemo] = useState(false);
+  const [showSample, setShowSample] = useState(false);
 
   const refresh = useCallback(async () => {
     setLoading(true);
-    setError(null);
-    const calendar = client.market as unknown as CalendarCapableMarket;
-    if (typeof calendar.getCalendarEvents !== 'function') {
-      // Channel not wired: badged sample events instead of a blank page.
-      setIsDemo(true);
-      setEvents(mapUpcomingEvents(demoCalendarEvents(t)));
-      setLoading(false);
-      return;
-    }
-    try {
-      const result = await calendar.getCalendarEvents({ eventType: 'financial' });
-      if (!result.ok || result.data.length === 0) {
-        // Provider error or genuinely empty calendar: badged sample events.
-        setIsDemo(true);
-        setEvents(mapUpcomingEvents(demoCalendarEvents(t)));
-      } else {
-        setIsDemo(false);
-        setEvents(mapUpcomingEvents(result.data));
-      }
-    } catch {
-      setIsDemo(true);
-      setEvents(mapUpcomingEvents(demoCalendarEvents(t)));
-    } finally {
-      setLoading(false);
-    }
-  }, [client, t]);
+    const next = await loadCalendarEvents(client, { eventType: 'financial' });
+    setResult(next);
+    setLoading(false);
+  }, [client]);
 
   useEffect(() => {
     void refresh();
@@ -75,7 +56,24 @@ export const EventsView: React.FC = () => {
     setNavSection('research');
   };
 
-  const state = loading ? 'loading' : error ? 'error' : events.length === 0 ? 'empty' : null;
+  const realEvents = result?.status === 'ok' ? mapUpcomingEvents(result.events) : [];
+  const sampleEvents = showSample ? mapUpcomingEvents(demoCalendarEvents(t)) : [];
+  const isDemo = realEvents.length === 0 && sampleEvents.length > 0;
+  const events = isDemo ? sampleEvents : realEvents;
+
+  const status = (() => {
+    if (loading) return 'loading';
+    if (!result) return 'loading';
+    if (result.status === 'unavailable') return 'unavailable';
+    if (result.status === 'error') return 'error';
+    return realEvents.length === 0 ? 'empty' : 'ready';
+  })();
+
+  const sampleButton = (
+    <Button variant="outline" size="sm" onClick={() => setShowSample((previous) => !previous)}>
+      {showSample ? t('events.hideSample') : t('events.showSample')}
+    </Button>
+  );
 
   return (
     <main className="folio-page folio-events-view flex h-full min-h-0 flex-col overflow-y-auto bg-background" data-testid="events-view">
@@ -104,9 +102,36 @@ export const EventsView: React.FC = () => {
             </span>
           </div>
 
-          {state === 'loading' && <SectionState kind="loading" message={t('events.loading')} />}
-          {state === 'error' && <SectionState kind="error" message={error ?? t('events.loadError')} />}
-          {state === 'empty' && <SectionState kind="empty" message={t('events.empty')} />}
+          {status === 'loading' && <SectionState kind="loading" message={t('events.loading')} />}
+
+          {status === 'error' && (
+            <div className="space-y-2" data-testid="events-error">
+              <SectionState kind="error" message={t('events.loadError')} />
+              <Button variant="outline" size="sm" onClick={() => void refresh()}>
+                <RefreshCw className="mr-1.5 h-3.5 w-3.5" />
+                {t('common.retry')}
+              </Button>
+            </div>
+          )}
+
+          {status === 'unavailable' && (
+            <div className="space-y-2" data-testid="events-unavailable">
+              <SectionState kind="empty" message={t('events.unavailable')} />
+              {!showSample && sampleButton}
+            </div>
+          )}
+
+          {status === 'empty' && !showSample && (
+            <div className="space-y-2" data-testid="events-empty">
+              <SectionState kind="empty" message={t('events.empty')} />
+              {sampleButton}
+            </div>
+          )}
+          {isDemo && (
+            <p className="mb-2 text-[11px] text-foreground/45" data-testid="events-sample-note">
+              {t('events.sampleNote')}
+            </p>
+          )}
 
           {events.length > 0 && (
             <div className="folio-events-list" data-testid="events-list">
@@ -122,7 +147,7 @@ export const EventsView: React.FC = () => {
                     <p>{event.content || t('events.noDescription')}</p>
                   </div>
                   <div className="flex items-center gap-2">
-                    {event.symbol && (
+                    {event.symbol && !isDemo && (
                       <button type="button" className="folio-icon-action" aria-label={t('events.openResearch', { symbol: event.symbol })} onClick={() => openResearch(event.symbol)}>
                         <ArrowUpRight className="h-4 w-4" />
                       </button>
@@ -132,6 +157,8 @@ export const EventsView: React.FC = () => {
               ))}
             </div>
           )}
+
+          {isDemo && <div className="mt-3">{sampleButton}</div>}
         </section>
 
         <aside className="folio-events-rail folio-page-section h-fit">
