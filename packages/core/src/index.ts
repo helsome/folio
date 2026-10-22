@@ -386,6 +386,7 @@ export interface AgentRequest {
   content: string;
   context?: Record<string, unknown>;
   createdAt?: number;
+  signal?: AbortSignal;
 }
 
 export interface AgentSessionSnapshot {
