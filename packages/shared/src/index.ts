@@ -142,6 +142,7 @@ export * from './thesis/index.ts';
 export * from './compare/index.ts';
 export * from './alerts/index.ts';
 export * from './portfolio-risk/index.ts';
+export * from './heatmap/index.ts';
 export * from './resources/index.ts';
 export { isRecord, toFiniteNumber } from './guards.ts';
 export * from './providers/index.ts';
