@@ -17,7 +17,7 @@ import {
   watchlistAtom,
 } from '../../atoms'
 import { researchOriginAtom } from '../../atoms/discoverAtoms'
-import { watchlistMoversAtom, mapUpcomingEvents, thesesNeedingReview } from '../../atoms/todayAtoms'
+import { watchlistMoversAtom, watchlistHeatmapItemsAtom, mapUpcomingEvents, thesesNeedingReview } from '../../atoms/todayAtoms'
 import { watchlistQuotesAreDemoAtom } from '../../atoms/quoteAtoms'
 import { demoCalendarEvents } from '../../demo/demoData'
 import { DemoBadge } from '../primitives/DemoBadge'
@@ -34,6 +34,7 @@ import { SectionState, TodaySection } from './TodaySection'
 import { DailyBriefSection } from './DailyBriefSection'
 import { AutomationRulesView } from '../automation/AutomationRulesView'
 import { MarketPulse } from '../pulse/MarketPulse'
+import { WatchlistHeatmap } from './WatchlistHeatmap'
 
 const MOVER_ROWS = 5
 const EVENT_ROWS = 10
@@ -75,6 +76,7 @@ export const TodayView: React.FC = () => {
   const client = useFinagentClient()
   const watchlist = useAtomValue(watchlistAtom)
   const movers = useAtomValue(watchlistMoversAtom)
+  const heatmapItems = useAtomValue(watchlistHeatmapItemsAtom)
   const portfolioView = useAtomValue(portfolioViewAtom)
   const portfolioCache = useAtomValue(portfolioCacheAtom)
   const alertState = useAtomValue(alertStateAtom)
@@ -97,6 +99,7 @@ export const TodayView: React.FC = () => {
   const [eventsLoading, setEventsLoading] = useState(true)
   const [eventsAreDemo, setEventsAreDemo] = useState(false)
   const [automationOpen, setAutomationOpen] = useState(false)
+  const [watchlistDisplay, setWatchlistDisplay] = useState<'list' | 'heatmap'>('list')
   const [searchQuery, setSearchQuery] = useState('')
   const quotesAreDemo = useAtomValue(watchlistQuotesAreDemoAtom)
 
@@ -147,6 +150,12 @@ export const TodayView: React.FC = () => {
 
   const handleCompare = (): void => {
     setNavSection('compare')
+  }
+
+  const handleHeatmapResearch = (symbol: string): void => {
+    setActiveSymbol(symbol)
+    setResearchOrigin({ from: 'today', label: t('today.continueLabel') })
+    setNavSection('research')
   }
 
   const handleSearchKeyDown = (event: React.KeyboardEvent<HTMLInputElement>): void => {
@@ -201,6 +210,10 @@ export const TodayView: React.FC = () => {
       </ul>
     )
   })()
+
+  const watchlistActivityContent = watchlistDisplay === 'heatmap'
+    ? <WatchlistHeatmap items={heatmapItems} onSelect={handleHeatmapResearch} />
+    : moversContent
 
   const triggeredAlerts = alertState.events
     .filter((event) => event != null)
@@ -350,8 +363,18 @@ export const TodayView: React.FC = () => {
           </section>
 
           <section className="folio-stitch-card lg:col-span-3" data-testid="today-watchlist-activity">
-            <div className="folio-stitch-card-heading"><h2>{t('today.watchlistMovers')}</h2><span className="flex items-center gap-2">{quotesAreDemo && <DemoBadge />}<button type="button" onClick={() => setNavSection('watchlist')} className="folio-stitch-text-button">{t('navigation.watchlist')}</button></span></div>
-            {moversContent}
+            <div className="folio-stitch-card-heading flex-wrap">
+              <h2>{watchlistDisplay === 'heatmap' ? t('today.watchlistHeatmap') : t('today.watchlistMovers')}</h2>
+              <span className="flex items-center gap-2">
+                {quotesAreDemo && <DemoBadge />}
+                <div className="flex rounded-md border border-border p-0.5" role="group" aria-label={t('today.watchlistView')}>
+                  <button type="button" aria-pressed={watchlistDisplay === 'list'} onClick={() => setWatchlistDisplay('list')} className="rounded px-2 py-1 text-[10px] aria-pressed:bg-accent/10 aria-pressed:text-accent">{t('today.watchlistListView')}</button>
+                  <button type="button" data-testid="today-watchlist-heatmap-toggle" aria-pressed={watchlistDisplay === 'heatmap'} onClick={() => setWatchlistDisplay('heatmap')} className="rounded px-2 py-1 text-[10px] aria-pressed:bg-accent/10 aria-pressed:text-accent">{t('today.watchlistHeatmap')}</button>
+                </div>
+                <button type="button" onClick={() => setNavSection('watchlist')} className="folio-stitch-text-button">{t('navigation.watchlist')}</button>
+              </span>
+            </div>
+            {watchlistActivityContent}
           </section>
         </div>
 
