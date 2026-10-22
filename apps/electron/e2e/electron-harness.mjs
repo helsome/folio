@@ -34,10 +34,13 @@ export async function reserveCdpPort() {
 }
 
 export function resolveElectronBinary(appRoot, repoRoot) {
+  // 不做任何平台路径假设：`require('electron')` 会读取 electron 包自带的
+  // path.txt 得到真实二进制（win32 是 dist 下的 exe，darwin 是 bundle 内的
+  // 可执行文件）。需要覆盖时用 ELECTRON_BINARY。
   const candidates = [
     process.env.ELECTRON_BINARY,
     tryResolve(join(appRoot, 'node_modules/electron')),
-    join(repoRoot, 'node_modules/.bun/electron@39.8.9/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'),
+    tryResolve(join(repoRoot, 'node_modules/electron')),
   ].filter(Boolean);
 
   const binary = candidates.find((candidate) => {

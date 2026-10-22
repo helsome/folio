@@ -11,9 +11,10 @@
 
 import { execSync, spawn } from 'node:child_process';
 import { seedLocale } from './seed-locale.mjs';
-import { existsSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveElectronBinary } from './electron-harness.mjs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -23,10 +24,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, '..');
 const repoRoot = join(here, '../../..');
 const electronMain = join(appRoot, 'src/main/index.ts');
-const electronBinary = join(
-  repoRoot,
-  'node_modules/.bun/electron@39.8.9/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'
-);
+const electronBinary = resolveElectronBinary(appRoot, repoRoot);
 
 const CDP_PORT = 9333;
 const CDP_URL = `http://127.0.0.1:${CDP_PORT}`;
@@ -82,10 +80,6 @@ async function waitForCdp(timeoutMs) {
 }
 
 async function main() {
-  if (!existsSync(electronBinary)) {
-    console.error(`Electron binary not found: ${electronBinary}`);
-    process.exit(1);
-  }
   // Stale instances from interrupted runs hold the CDP port and would be the
   // ones we connect to — kill them first, then spawn fresh.
   try {
@@ -98,8 +92,8 @@ async function main() {
 
   // Deterministic golden path: always start from a fresh userData dir.
   const userDataDir = join(appRoot, 'e2e/.user-data');
-  execSync(`rm -rf "${userDataDir}"`);
-  execSync(`mkdir -p "${userDataDir}"`);
+  rmSync(userDataDir, { recursive: true, force: true });
+  mkdirSync(userDataDir, { recursive: true });
   seedLocale(userDataDir, 'en-US');
   const electronProcess = spawn(
     electronBinary,

@@ -13,9 +13,10 @@
 
 import { execSync, spawn } from 'node:child_process';
 import { seedLocale } from './seed-locale.mjs';
-import { existsSync } from 'node:fs';
+import { mkdirSync, rmSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { resolveElectronBinary } from './electron-harness.mjs';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
@@ -25,10 +26,7 @@ const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, '..');
 const repoRoot = join(here, '../../..');
 const electronMain = join(appRoot, 'src/main/index.ts');
-const electronBinary = join(
-  repoRoot,
-  'node_modules/.bun/electron@39.8.9/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'
-);
+const electronBinary = resolveElectronBinary(appRoot, repoRoot);
 
 const CDP_PORT = 9337;
 const CDP_URL = `http://127.0.0.1:${CDP_PORT}`;
@@ -181,10 +179,6 @@ async function probe(page, name, scope, trigger, opts = {}) {
 }
 
 async function main() {
-  if (!existsSync(electronBinary)) {
-    console.error(`Electron binary not found: ${electronBinary}`);
-    process.exit(1);
-  }
   // Stale instances from interrupted runs hold the CDP port — kill first.
   try {
     execSync("pkill -f 'remote-debugging-port=9337' || true", { stdio: 'ignore' });
@@ -196,8 +190,8 @@ async function main() {
 
   // Isolated userData so this audit never touches the golden-path or dev state.
   const userDataDir = join(appRoot, 'e2e/.user-data-interactions');
-  execSync(`rm -rf "${userDataDir}"`);
-  execSync(`mkdir -p "${userDataDir}"`);
+  rmSync(userDataDir, { recursive: true, force: true });
+  mkdirSync(userDataDir, { recursive: true });
   seedLocale(userDataDir, 'en-US');
   const electronProcess = spawn(
     electronBinary,
