@@ -79,6 +79,22 @@ describe('toFiniteNumber', () => {
     expect(toFiniteNumber(' 1,234.56 ')).toBe(1234.56)
   })
 
+  it('reads HK$, US$, yuan, and ISO currency glued onto the number', () => {
+    expect(toFiniteNumber('HK$1,234.50')).toBe(1234.5)
+    expect(toFiniteNumber('hk$180.5')).toBe(180.5)
+    expect(toFiniteNumber('US$180.50')).toBe(180.5)
+    expect(toFiniteNumber('¥180.5')).toBe(180.5)
+    expect(toFiniteNumber('￥1,600')).toBe(1600)
+    expect(toFiniteNumber('CN¥180')).toBe(180)
+    expect(toFiniteNumber('RMB 180.5')).toBe(180.5)
+    expect(toFiniteNumber('180.50 USD')).toBe(180.5)
+    expect(toFiniteNumber('320 HKD')).toBe(320)
+    expect(toFiniteNumber('-HK$12.5')).toBe(-12.5)
+    expect(toFiniteNumber('-$0.00')).toBe(0)
+    expect(toFiniteNumber('USD')).toBeUndefined()
+    expect(toFiniteNumber('HK$')).toBeUndefined()
+  })
+
   it('returns undefined for null, empty, and junk', () => {
     expect(toFiniteNumber(null)).toBeUndefined()
     expect(toFiniteNumber(undefined)).toBeUndefined()
@@ -132,6 +148,13 @@ describe('parseCsv', () => {
     expect(mapped).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, issues: [] })
   })
 
+  it('parses currency-prefixed cost cells from a brokerage CSV', () => {
+    const rows = parseCsv('Symbol,Quantity,Cost,Currency\nAAPL.US,"1,000","US$180.50",USD\n0700.HK,500,HK$320,HKD\n600519.SH,10,¥1600,CNY')
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, currency: 'USD', confidence: 1, issues: [] })
+    expect(rows[1]).toMatchObject({ symbol: '0700.HK', quantity: 500, costPrice: 320, currency: 'HKD' })
+    expect(rows[2]).toMatchObject({ symbol: '600519.SH', quantity: 10, costPrice: 1600, currency: 'CNY' })
+  })
+
   it('flags formatting-only quantities and costs without inventing zeros', () => {
     const rows = parseCsv('Symbol,Quantity,Cost\nAAPL.US,100,$\nMSFT.US,",",180.5\n0700.HK,500,320')
     expect(rows).toHaveLength(3)
@@ -170,6 +193,24 @@ describe('parseCsv', () => {
   it('detects alias variants (qty / shares / price / code)', () => {
     const rows = parseCsv('Code,Shares,Price\nAAPL.US,100,180.5')
     expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 100, costPrice: 180.5 })
+  })
+
+  it('keeps Price as a cost fallback only when no specific cost column exists', () => {
+    const rows = parseCsv('Symbol,Price,Shares\nAAPL.US,180.5,100')
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 100, costPrice: 180.5, confidence: 1, issues: [] })
+  })
+
+  it('uses the specific cost column when an earlier Price column is also present', () => {
+    const rows = parseCsv('Symbol,Price,Cost,Qty\nAAPL.US,190.25,180.5,100\n0700.HK,330,320,500')
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 100, costPrice: 180.5, confidence: 1, issues: [] })
+    expect(rows[1]).toMatchObject({ symbol: '0700.HK', quantity: 500, costPrice: 320 })
+  })
+
+  it('prefers Avg Cost and 成本 over a generic price column', () => {
+    const english = parseCsv('Ticker,Price,Avg Cost,Shares\nAAPL.US,190.25,180.5,100')
+    expect(english[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 100, costPrice: 180.5 })
+    const chinese = parseCsv('代码,价格,成本,数量\n600519.SH,1700,1600,10')
+    expect(chinese[0]).toMatchObject({ symbol: '600519.SH', quantity: 10, costPrice: 1600, confidence: 1, issues: [] })
   })
 
   it('supports an explicit headerMapping override', () => {
