@@ -2,15 +2,17 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
 import type { Quote } from '@finagent/core';
-import { i18nSetCurrentLocale } from '@finagent/i18n';
+import { i18nCurrentLocale, i18nSetCurrentLocale } from '@finagent/i18n';
 import { installHappyDom } from '../../../test/setupHappyDom';
 import { I18nextProvider, makeTestI18n } from '../../../test/i18nTest';
 import { currencyForSymbol } from '../../../lib/money';
 import { QuoteCard } from './QuoteCard';
 
 let restoreDom: (() => void) | undefined;
+let previousLocale: ReturnType<typeof i18nCurrentLocale>;
 
 beforeAll(() => {
+  previousLocale = i18nCurrentLocale();
   restoreDom = installHappyDom().restore;
   // @finagent/i18n formatters read a module-level active locale. Pin it so the
   // money output is deterministic regardless of test-run order in one process.
@@ -18,6 +20,7 @@ beforeAll(() => {
 });
 
 afterAll(() => {
+  i18nSetCurrentLocale(previousLocale);
   restoreDom?.();
 });
 
