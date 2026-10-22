@@ -7,6 +7,7 @@ import type {
 } from '@finagent/core';
 import { CapabilityExecutor, type RunAllSpec } from '../capabilities/executor.ts';
 import { isRecord, toFiniteNumber } from '../guards.ts';
+import { buildRebasedPriceSeries } from './rebase.ts';
 
 const DASH = '\u2014';
 
@@ -131,41 +132,27 @@ function buildPriceHistory(
   symbols: string[],
   perSymbol: Record<string, Record<string, unknown>>
 ): ComparisonPriceHistory {
-  const bySymbol = new Map<string, Map<number, number>>();
-  for (const symbol of symbols) {
-    const bars = extractKlines(perSymbol[symbol]?.['market.kline']);
-    const closes = new Map<number, number>();
-    for (const bar of bars) {
-      if (bar.close > 0) closes.set(bar.timestamp, bar.close);
-    }
-    bySymbol.set(symbol, closes);
-  }
+  const rebased = buildRebasedPriceSeries(symbols.map((symbol) => ({
+    symbol,
+    bars: extractKlines(perSymbol[symbol]?.['market.kline'])
+      .filter((bar) => bar.close > 0)
+      .map(({ timestamp, close }) => ({ timestamp, close })),
+  })));
 
-  if (symbols.length === 0 || [...bySymbol.values()].some((bars) => bars.size === 0)) {
+  if (!rebased.comparable) {
     return { commonStartTimestamp: null, series: Object.fromEntries(symbols.map((symbol) => [symbol, []])) };
   }
 
-  const firstSymbolBars = bySymbol.get(symbols[0]!)!;
-  const commonStartTimestamp = [...firstSymbolBars.keys()]
-    .filter((timestamp) => symbols.every((symbol) => bySymbol.get(symbol)?.has(timestamp)))
-    .sort((a, b) => a - b)[0] ?? null;
-  if (commonStartTimestamp === null) {
-    return { commonStartTimestamp: null, series: Object.fromEntries(symbols.map((symbol) => [symbol, []])) };
-  }
-
-  const timestamps = [...new Set(
-    [...bySymbol.values()].flatMap((bars) => [...bars.keys()].filter((timestamp) => timestamp >= commonStartTimestamp))
-  )].sort((a, b) => a - b);
-  const series = Object.fromEntries(symbols.map((symbol) => {
-    const closes = bySymbol.get(symbol)!;
-    const base = closes.get(commonStartTimestamp)!;
-    return [symbol, timestamps.map((timestamp) => {
-      const close = closes.get(timestamp);
-      return { timestamp, value: close === undefined ? null : (close / base) * 100 };
-    })];
-  }));
-
-  return { commonStartTimestamp, series };
+  return {
+    commonStartTimestamp: rebased.baseTimestamp,
+    series: Object.fromEntries(symbols.map((symbol) => [
+      symbol,
+      rebased.points.map(({ timestamp, values }) => ({
+        timestamp,
+        value: values[symbol] ?? null,
+      })),
+    ])),
+  };
 }
 
 function collectSources(perSymbol: Record<string, Record<string, unknown>>): {
