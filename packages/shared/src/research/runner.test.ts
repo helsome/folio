@@ -121,8 +121,8 @@ describe('ResearchRunner', () => {
         },
         {
           id: 'wire-copy',
-          title: 'NVIDIA announces quarterly results',
-          summary: 'NVIDIA reported quarterly revenue and guidance.',
+          title: 'NVIDIA management provides guidance',
+          summary: 'Management expects accelerating demand next quarter.',
           url: 'https://copy.test/nvidia-results',
           timestamp: 1_700_000_000,
           symbols: ['NVDA.US'],
@@ -132,6 +132,14 @@ describe('ResearchRunner', () => {
           title: 'NVIDIA quarterly report',
           summary: 'Official filing for NVIDIA quarterly results.',
           url: 'https://sec.gov/Archives/edgar/data/1/report',
+          timestamp: 1_700_000_000,
+          symbols: ['NVDA.US'],
+        },
+        {
+          id: 'wire-bridge',
+          title: 'Quarterly revenue bulletin',
+          summary: 'Management expects accelerating demand next quarter.',
+          url: 'https://reuters.com/technology/nvidia-results#top',
           timestamp: 1_700_000_000,
           symbols: ['NVDA.US'],
         },
@@ -177,14 +185,20 @@ describe('ResearchRunner', () => {
     };
     expect(newsBundle.trust).toBe('untrusted');
     expect(newsBundle.provider).toBe('test');
-    expect(selected).toHaveLength(2);
-    expect(selected[0].id).toBe('filing');
+    expect(selected.map((item) => item.id)).toEqual(['filing', 'wire']);
     expect(selected[0].sourceClass).toBe('regulator');
     expect(metadata.policyVersion).toBe('folio-retrieval-v1');
     expect(metadata.independentSourceCount).toBe(2);
     expect(metadata.decisions).toContainEqual({
       sourceId: 'wire-copy',
       originalRank: 1,
+      clusterId: expect.any(String),
+      selected: false,
+      reason: 'duplicate_of:wire',
+    });
+    expect(metadata.decisions).toContainEqual({
+      sourceId: 'wire-bridge',
+      originalRank: 3,
       clusterId: expect.any(String),
       selected: false,
       reason: 'duplicate_of:wire',

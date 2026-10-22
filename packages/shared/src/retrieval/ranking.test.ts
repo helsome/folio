@@ -72,6 +72,67 @@ describe('rankRetrievalSources', () => {
     );
   });
 
+  it.each([
+    [0, 1, 2],
+    [0, 2, 1],
+    [1, 0, 2],
+    [1, 2, 0],
+    [2, 0, 1],
+    [2, 1, 0],
+  ])('merges bridged sources for input order %i, %i, %i', (first, second, third) => {
+    const sources = [
+      source('original', 'https://original.test/report', 'Issuer bulletin', 'Opening paragraph.'),
+      source('filing', 'https://sec.gov/report', 'Regulatory filing', 'Quarterly revenue increased.'),
+      source('bridge', 'https://original.test/report?utm_source=feed', 'Report mirror', 'Quarterly revenue increased.'),
+    ];
+    const input = [first, second, third].map((index) => sources[index]);
+    const result = rankRetrievalSources(input, {
+      now: NOW,
+      nearDuplicateThreshold: 1,
+    });
+
+    expect(result.independentSourceCount).toBe(1);
+    expect(result.clusters).toHaveLength(1);
+    expect([...result.clusters[0].memberIds].sort()).toEqual(['bridge', 'filing', 'original']);
+    expect(result.clusters[0].duplicateRelations.map((item) => item.relation).sort()).toEqual([
+      'same_content',
+      'same_url',
+    ]);
+    expect(result.selected.map((item) => item.source.id)).toEqual(['filing']);
+    expect(result.dropped).toHaveLength(2);
+    for (const item of result.dropped) {
+      expect(item.decisionReason).toBe('duplicate_of:filing');
+      expect(item.clusterId).toBe(result.selected[0].clusterId);
+      expect(input[item.originalRank].id).toBe(item.source.id);
+    }
+  });
+
+  it('preserves existing members and relations when merging populated groups', () => {
+    const result = rankRetrievalSources(
+      [
+        source('a', 'https://a.test/report', 'Issuer bulletin', 'Opening paragraph.'),
+        source('a-copy', 'https://a.test/report?utm_source=feed', 'First mirror'),
+        source('b', 'https://b.test/report', 'Revenue update', 'Quarterly revenue increased.'),
+        source('b-copy', 'https://b.test/report#top', 'Second mirror'),
+        source('bridge', 'https://a.test/report', 'Report mirror', 'Quarterly revenue increased.'),
+        source('other', 'https://other.test/notice', 'Unrelated policy notice'),
+      ],
+      { now: NOW, nearDuplicateThreshold: 1 }
+    );
+
+    expect(result.independentSourceCount).toBe(2);
+    expect(result.selected.map((item) => item.source.id)).toEqual(['a', 'other']);
+    const merged = result.clusters.find((cluster) => cluster.representativeId === 'a')!;
+    expect(merged.memberIds).toEqual(['a', 'a-copy', 'b', 'b-copy', 'bridge']);
+    expect(merged.duplicateRelations).toHaveLength(4);
+    expect(merged.duplicateRelations).toEqual(expect.arrayContaining([
+      { sourceId: 'a-copy', relation: 'same_url' },
+      { sourceId: 'b-copy', relation: 'same_url' },
+      { sourceId: 'bridge', relation: 'same_url' },
+      { sourceId: 'bridge', relation: 'same_content' },
+    ]));
+  });
+
   it('clusters near-duplicate syndicated excerpts', () => {
     const result = rankRetrievalSources(
       [
