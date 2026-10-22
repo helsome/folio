@@ -5,6 +5,8 @@ import type { AgentEvent, AutomationRule } from '@finagent/core';
 let lastKernelOptions: Record<string, unknown> | null = null;
 let lastMarketData: FakeMarketDataService | null = null;
 let lastAutomationContext: unknown = null;
+/** Symbols the last compareBuild call forwarded to buildComparison. */
+let lastCompareSymbols: unknown = null;
 let forwardedEvents: unknown[] = [];
 /** Evaluation runs handed to EvaluationStore.addRun (observability path). */
 const savedEvalRuns: Array<Record<string, unknown>> = [];
@@ -169,7 +171,10 @@ mock.module('@finagent/shared', () => ({
     analyze = async () => undefined;
   },
   defaultPortfolioRiskSynthesizer: async () => '',
-  buildComparison: async () => undefined,
+  buildComparison: async (symbols: string[]) => {
+    lastCompareSymbols = symbols;
+    return undefined;
+  },
   computeSkillReadiness: () => undefined,
   parseSynthesisJson: (text: string) => JSON.parse(text),
   parseImpactJson: (text: string) => JSON.parse(text),
@@ -368,6 +373,7 @@ beforeEach(() => {
   lastKernelOptions = null;
   lastMarketData = null;
   lastAutomationContext = null;
+  lastCompareSymbols = null;
   forwardedEvents = [];
   savedEvalRuns.length = 0;
 });
@@ -451,6 +457,38 @@ describe('AgentKernelHost', () => {
     await expect(host.startRun({ sessionId: '', content: 'x' })).rejects.toMatchObject({
       code: 'INVALID_ARGUMENT',
     });
+    host.dispose();
+  });
+
+  it('dedupes compare symbols that resolve to the same canonical instrument', async () => {
+    const host = new AgentKernelHost();
+
+    await host.compareBuild({ symbols: ['AAPL.US', 'AAPL', 'MSFT.US'] });
+    expect(lastCompareSymbols).toEqual(['AAPL.US', 'MSFT.US']);
+
+    await host.compareBuild({ symbols: ['nvda.us', ' aapl '] });
+    expect(lastCompareSymbols).toEqual(['NVDA.US', 'AAPL']);
+    host.dispose();
+  });
+
+  it('rejects a compare request that collapses below two distinct symbols', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(host.compareBuild({ symbols: ['AAPL.US', 'AAPL.US'] })).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+    });
+    await expect(host.compareBuild({ symbols: ['TSLA', 'TSLA.US'] })).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+    });
+    host.dispose();
+  });
+
+  it('rejects more than four compare symbols', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(
+      host.compareBuild({ symbols: ['AAPL.US', 'MSFT.US', 'NVDA.US', 'BABA.US', '9988.HK'] })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
     host.dispose();
   });
 

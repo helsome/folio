@@ -82,6 +82,56 @@ describe('StreamEventLog', () => {
     expect(again.events).toEqual(result.events);
   });
 
+  it('retains a recently active older run through compaction and restart replay', () => {
+    const log = new StreamEventLog(dir, { maxRuns: 2 });
+    const activeStart = make('active', 1, 'run_started');
+    const activeEnd = make('active', 2, 'run_completed');
+    const newest = make('newest', 1, 'run_started');
+    log.append(activeStart);
+    log.append(make('idle', 1, 'run_started'));
+    log.append(activeEnd);
+    log.append(newest);
+
+    const loaded = log.load();
+    expect(loaded.events).toEqual([activeStart, activeEnd, newest]);
+    expect(loaded.skipped).toBe(0);
+    expect(loaded.duplicates).toBe(0);
+    const file = join(dir, 'stream-events.jsonl');
+    const compacted = readFileSync(file, 'utf8');
+    expect(compacted.trim().split('\n')).toHaveLength(3);
+
+    const restarted = new StreamEventLog(dir, { maxRuns: 2 });
+    const restored = restarted.load();
+    expect(restored.events).toEqual(loaded.events);
+    const history = new StreamEventHistory({ log: restarted, persisted: restored.events });
+    expect(history.replay('active', 0)).toEqual({
+      recoverable: true, events: [activeStart, activeEnd], atEnd: true,
+    });
+    expect(history.replay('active', 1)).toEqual({
+      recoverable: true, events: [activeEnd], atEnd: true,
+    });
+    expect(history.replay('idle', 0).recoverable).toBe(false);
+    expect(readFileSync(file, 'utf8')).toBe(compacted);
+  });
+
+  it('does not refresh retention for duplicate or regressing sequences', () => {
+    const log = new StreamEventLog(dir, { maxRuns: 2 });
+    log.append(make('idle', 1, 'run_started'));
+    log.append(make('idle', 2, 'run_completed'));
+    const active = make('active', 1, 'run_started');
+    log.append(active);
+    log.append(make('idle', 2, 'run_completed'));
+    log.append(make('idle', 1, 'run_started'));
+    const newest = make('newest', 1, 'run_started');
+    log.append(newest);
+
+    const loaded = log.load();
+    expect(loaded.events).toEqual([active, newest]);
+    expect(loaded.duplicates).toBe(2);
+    expect(loaded.skipped).toBe(0);
+    expect(new StreamEventLog(dir, { maxRuns: 2 }).load().events).toEqual(loaded.events);
+  });
+
   it('连续 3 次重启：只恢复不写回，文件行数不增长且 replay 保持连续', () => {
     const log = new StreamEventLog(dir);
     log.append(make('run-1', 1, 'run_started'));
