@@ -286,10 +286,13 @@ export function compareToBaseline(
     const delta = baselineValue !== null && currentValue !== null ? currentValue - baselineValue : null;
     const maxDelta = baseline?.thresholds?.[aggregate.metric] ?? definition?.defaultMaxDelta ?? 0.05;
     const critical = definition?.critical ?? false;
-    const passed =
-      delta === null || baselineValue === null || currentValue === null
-        ? true
-        : delta >= -maxDelta;
+    // Regression direction comes from the metric's own definition: a
+    // higher-is-better metric regresses when it drops, a lower-is-better one
+    // (latency, tool_error_rate) when it rises. Reading `delta` directly would
+    // report a slower/error-ier run as `ok` and an improvement as a regression.
+    const directionalDelta =
+      delta === null ? null : definition?.higherIsBetter === false ? -delta : delta;
+    const passed = directionalDelta === null ? true : directionalDelta >= -maxDelta;
     return {
       metric: aggregate.metric,
       baseline: baselineValue,
