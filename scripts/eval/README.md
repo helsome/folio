@@ -129,3 +129,21 @@ errors, no valid case); `3` = cancelled.
 | `LANGSMITH_PI_PROJECT` / `LANGSMITH_PI_ENDPOINT` | LangSmith project / endpoint overrides |
 | `ANTHROPIC_API_KEY` / `FINAGENT_PROVIDER_OVERRIDES` | Live agent provider credentials |
 | `FINAGENT_PI_VERSION` | Recorded as `metadata.piVersion` |
+
+### Nightly environment and readiness
+
+The trusted `main` schedule/manual workflow pins Bun 1.4.2 and installs Longbridge
+0.17.0 Linux x64 from a SHA256-pinned upstream asset. Live mode imports only the
+supported provider/judge/Longbridge/tracing fields from the already-referenced
+`FINAGENT_ENV_FILE_CONTENT`; it never sources shell code or writes credentials.
+Nonempty direct environment values take priority. Empty Actions secret values can
+be filled by this existing dotenv secret. For an Anthropic judge, its existing
+`ANTHROPIC_API_KEY` may supply the judge alias when no separate judge key is set.
+No credential is generated, and missing values still fail the real preflight.
+
+The raw dotenv secret and Apple signing variables are not propagated to the Pi
+child process. Command/path variables from the dotenv body are not imported.
+Nightly now records the CLI exit code even through `tee`: 2 means blocked/invalid
+preflight or infrastructure, not a passing benchmark; setup failures show not run.
+The job still fails, preserving its quality/validity gates and existing schedule.
+Offline fixture acceptance must never be presented as live provider acceptance.

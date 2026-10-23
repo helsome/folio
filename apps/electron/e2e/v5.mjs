@@ -1,10 +1,13 @@
+import { seedLocale } from './seed-locale.mjs';
+import { tmpdir } from 'node:os';
+import { developmentBinary, packagedBinary as findPackagedBinary, ensurePortFree, spawnApp, stopApp, completeOnboarding } from './platform.mjs';
 // V5 golden-path additions (spec §88, §93): Discover → candidates, Portfolio
 // Import paste flow, automation rules/brief, outcome evaluation — all against
 // the hidden Electron app with real IPC + real Longbridge data where available.
 //
 //   FINAGENT_AGENT_PROVIDER=local node e2e/v5.mjs
 
-import { execSync, spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -16,11 +19,9 @@ const { chromium } = require('playwright-core');
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, '..');
 const repoRoot = join(here, '../../..');
-const electronMain = join(appRoot, 'src/main/index.ts');
-const electronBinary = join(
-  repoRoot,
-  'node_modules/.bun/electron@39.8.9/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'
-);
+const electronMain = join(appRoot, 'src/main/index.js');
+const installed = Boolean(process.env.FOLIO_PACKAGED_BINARY);
+const electronBinary = installed ? findPackagedBinary(repoRoot) : developmentBinary();
 const CDP_PORT = 9349;
 
 let failures = 0;
@@ -62,23 +63,19 @@ async function main() {
     console.error(`Electron binary not found: ${electronBinary}`);
     process.exit(1);
   }
-  try {
-    execSync(`pkill -f 'remote-debugging-port=${CDP_PORT}' || true`, { stdio: 'ignore' });
-  } catch {
-    // Nothing to clean.
-  }
-  execSync('bun run build:preload', { cwd: appRoot, stdio: 'pipe' });
-  execSync('bunx vite build', { cwd: appRoot, stdio: 'pipe' });
+  await ensurePortFree(CDP_PORT);
+  if (!installed) execSync('bun run build', { cwd: appRoot, stdio: 'pipe' });
 
-  const userDataDir = join(appRoot, 'e2e/.user-data-v5');
+  const userDataDir = join(tmpdir(), `folio-v5-${process.pid}`);
   rmSync(userDataDir, { recursive: true, force: true });
   mkdirSync(userDataDir, { recursive: true });
+  seedLocale(userDataDir);
 
-  const electronProcess = spawn(
+  const electronProcess = spawnApp(
     electronBinary,
-    [electronMain, `--remote-debugging-port=${CDP_PORT}`, '--no-sandbox'],
+    [...(installed ? [] : [electronMain]), `--remote-debugging-port=${CDP_PORT}`],
     {
-      cwd: repoRoot,
+      cwd: installed ? tmpdir() : repoRoot,
       stdio: 'ignore',
       env: {
         ...process.env,
@@ -98,6 +95,7 @@ async function main() {
     const context = browser.contexts()[0];
     const page = await waitForPage(context, 30_000);
     await page.waitForLoadState('domcontentloaded');
+    await completeOnboarding(page);
 
     // V1. Discover renders and a screening task produces candidates or an
     // honest failure (rate limits are real on the free CLI).
@@ -182,7 +180,7 @@ async function main() {
     if (process.env.FINAGENT_E2E_KEEP_OPEN === '1') {
       console.log(`KEEP_OPEN CDP port ${CDP_PORT}`);
     } else {
-      electronProcess.kill();
+      await stopApp(electronProcess);
     }
   }
 

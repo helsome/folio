@@ -1,3 +1,6 @@
+import { tmpdir } from 'node:os';
+import { seedLocale } from './seed-locale.mjs';
+import { packagedBinary as findPackagedBinary, ensurePortFree, spawnApp, stopApp } from './platform.mjs';
 // Fresh-install release E2E (spec §63, §70): clean userData, no repo, no .env —
 // a simulated new user's first launch of the PACKAGED app.
 //
@@ -13,9 +16,8 @@
 // The Longbridge CLI is hidden from PATH so the app sees a brand-new user
 // (no provider connected → wizard gate opens).
 
-import { execSync, spawn } from 'node:child_process';
-import { existsSync, rmSync, mkdirSync } from 'node:fs';
-import { dirname, join } from 'node:path';
+import { existsSync, rmSync, mkdirSync, mkdtempSync } from 'node:fs';
+import { dirname, join, delimiter } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
 
@@ -25,25 +27,22 @@ const { chromium } = require('playwright-core');
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, '..');
 const repoRoot = join(here, '../../..');
-const packagedBinary = join(
-  repoRoot,
-  'dist/electron/mac-arm64/Folio.app/Contents/MacOS/Folio'
-);
+const packagedBinary = findPackagedBinary(repoRoot);
 const CDP_PORT = 9347;
-const userDataDir = join(appRoot, 'e2e/.user-data-fresh');
+const userDataDir = mkdtempSync(join(tmpdir(), 'folio-fresh-'));
 
 // FINAGENT_E2E_KEEP_OPEN=1 — debugging only, NEVER in automated runs: leave
 // the app running when the harness finishes and print where it is, instead of
 // killing it. Automated runs/CI rely on the harness cleaning up its port.
 const KEEP_OPEN = process.env.FINAGENT_E2E_KEEP_OPEN === '1';
-function shutdown(appProcess) {
+async function shutdown(appProcess) {
   if (KEEP_OPEN) {
     console.log(
       `KEEP_OPEN CDP port ${CDP_PORT} — app left running; clean up yourself: pkill -f 'remote-debugging-port=${CDP_PORT}'`
     );
     return
   }
-  appProcess.kill()
+  await stopApp(appProcess)
 }
 
 let failures = 0;
@@ -58,15 +57,13 @@ function fail(name, error) {
 
 // Strip the Longbridge CLI from PATH (a fresh user has no CLI).
 function freshUserEnv() {
-  const lbDir = execSync('dirname "$(which longbridge 2>/dev/null)" 2>/dev/null || echo /nonexistent', {
-    shell: '/bin/bash',
-  })
-    .toString()
-    .trim();
-  const pathEntries = (process.env.PATH ?? '').split(':').filter((entry) => entry !== lbDir);
+  // No developer CLIs are inherited by the installed app. OS utilities remain available.
+  const cleanPath = process.platform === 'win32'
+    ? [process.env.SystemRoot, join(process.env.SystemRoot || 'C:\Windows', 'System32')].filter(Boolean).join(delimiter)
+    : '/usr/bin:/bin';
   return {
     ...process.env,
-    PATH: pathEntries.join(':'),
+    PATH: cleanPath,
     FINAGENT_AGENT_PROVIDER: 'local',
     FINAGENT_E2E: '1',
     FINAGENT_E2E_HIDDEN: '1',
@@ -75,8 +72,8 @@ function freshUserEnv() {
 }
 
 function launch() {
-  return spawn(packagedBinary, [`--remote-debugging-port=${CDP_PORT}`, '--no-sandbox'], {
-    cwd: repoRoot,
+  return spawnApp(packagedBinary, [`--remote-debugging-port=${CDP_PORT}`], {
+    cwd: tmpdir(),
     stdio: 'ignore',
     env: freshUserEnv(),
   });
@@ -112,13 +109,10 @@ async function main() {
     console.error('Run `bun run package` first.');
     process.exit(1);
   }
-  try {
-    execSync("pkill -f 'remote-debugging-port=9347' || true", { stdio: 'ignore' });
-  } catch {
-    // Nothing to clean.
-  }
+  await ensurePortFree(CDP_PORT);
   rmSync(userDataDir, { recursive: true, force: true });
   mkdirSync(userDataDir, { recursive: true });
+  seedLocale(userDataDir);
 
   let child = launch();
   try {
@@ -182,10 +176,11 @@ async function main() {
   } catch (error) {
     fail('harness setup', error);
   } finally {
-    shutdown(child)
+    await shutdown(child)
   }
 
   // F5. Relaunch: onboarding must NOT reappear.
+  await ensurePortFree(CDP_PORT);
   child = launch();
   try {
     await waitForCdp(90_000);
@@ -205,7 +200,7 @@ async function main() {
   } catch (error) {
     fail('F5: relaunch preserves completion (no wizard)', error);
   } finally {
-    shutdown(child)
+    await shutdown(child)
   }
 
   if (failures > 0) {

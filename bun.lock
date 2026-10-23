@@ -16,7 +16,7 @@
     },
     "apps/electron": {
       "name": "@finagent/electron",
-      "version": "0.4.0-beta.1",
+      "version": "0.4.0-beta.3",
       "dependencies": {
         "@finagent/core": "workspace:*",
         "@finagent/i18n": "workspace:*",

@@ -1,3 +1,4 @@
+import { packagedBinary as findPackagedBinary, ensurePortFree, spawnApp, stopApp } from './platform.mjs';
 // Folio packaged-app smoke test — launches the electron-builder output from
 // OUTSIDE the source repo and asserts the packaged app is self-contained:
 // window renders, skills load from process.resourcesPath, agent tools are
@@ -7,8 +8,7 @@
 //
 // Prerequisite: `bun run package` must have produced dist/electron/mac*/Folio.app.
 
-import { execSync, spawn } from 'node:child_process';
-import { existsSync, mkdtempSync, readdirSync, statSync } from 'node:fs';
+import { mkdtempSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -29,14 +29,14 @@ const CDP_URL = `http://127.0.0.1:${CDP_PORT}`;
 // the app running when the harness finishes and print where it is, instead of
 // killing it. Automated runs/CI rely on the harness cleaning up its port.
 const KEEP_OPEN = process.env.FINAGENT_E2E_KEEP_OPEN === '1';
-function shutdown(appProcess) {
+async function shutdown(appProcess) {
   if (KEEP_OPEN) {
     console.log(
       `KEEP_OPEN CDP port ${CDP_PORT} — app left running; clean up yourself: pkill -f 'remote-debugging-port=${CDP_PORT}'`
     );
     return
   }
-  appProcess.kill()
+  await stopApp(appProcess)
 }
 
 let failures = 0;
@@ -51,19 +51,7 @@ function fail(name, error) {
   console.error(String(error?.stack ?? error).slice(0, 2000));
 }
 
-function findAppBinary() {
-  if (!existsSync(distDir)) {
-    throw new Error(`No dist output at ${distDir}. Run \`bun run package\` first.`);
-  }
-  for (const entry of readdirSync(distDir)) {
-    if (!entry.startsWith('mac')) continue;
-    const candidate = join(distDir, entry, 'Folio.app', 'Contents', 'MacOS', 'Folio');
-    if (existsSync(candidate) && statSync(candidate).isFile()) {
-      return candidate;
-    }
-  }
-  throw new Error(`No Folio.app binary found under ${distDir}/mac*.`);
-}
+function findAppBinary() { return findPackagedBinary(repoRoot); }
 
 async function waitForPage(context, timeoutMs) {
   const deadline = Date.now() + timeoutMs;
@@ -96,15 +84,10 @@ function evaluateIpC(page, expr) {
 async function main() {
   const appBinary = findAppBinary();
   console.log(`Launching ${appBinary}`);
-  // Stale instances from interrupted runs hold the CDP port — kill first.
-  try {
-    execSync("pkill -f 'remote-debugging-port=9334' || true", { stdio: 'ignore' });
-  } catch {
-    // Nothing to clean.
-  }
+  await ensurePortFree(CDP_PORT);
   const userDataDir = mkdtempSync(join(tmpdir(), 'folio-smoke-'));
 
-  const appProcess = spawn(appBinary, [`--remote-debugging-port=${CDP_PORT}`, '--no-sandbox'], {
+  const appProcess = spawnApp(appBinary, [`--remote-debugging-port=${CDP_PORT}`], {
     cwd: tmpdir(),
     stdio: 'ignore',
     env: {
@@ -210,7 +193,7 @@ async function main() {
     fail('harness setup', error);
   } finally {
     await browser?.close().catch(() => undefined);
-    shutdown(appProcess)
+    await shutdown(appProcess)
   }
 
   if (failures > 0) {

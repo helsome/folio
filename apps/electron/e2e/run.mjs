@@ -1,3 +1,5 @@
+import { tmpdir } from 'node:os';
+import { developmentBinary, packagedBinary as findPackagedBinary, ensurePortFree, spawnApp, stopApp, completeOnboarding } from './platform.mjs';
 // Folio E2E golden-path smoke — plain Node runner (playwright-core's CDP
 // WebSocket handshake is unreliable under Bun; Node drives it reliably).
 //
@@ -9,9 +11,9 @@
 //   C. rapid symbol switching settles on the last symbol
 //   D. agent run streams an answer using the workspace symbol
 
-import { execSync, spawn } from 'node:child_process';
+import { execSync } from 'node:child_process';
 import { seedLocale } from './seed-locale.mjs';
-import { existsSync } from 'node:fs';
+import { existsSync, rmSync, mkdirSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { createRequire } from 'node:module';
@@ -22,11 +24,9 @@ const { chromium } = require('playwright-core');
 const here = dirname(fileURLToPath(import.meta.url));
 const appRoot = join(here, '..');
 const repoRoot = join(here, '../../..');
-const electronMain = join(appRoot, 'src/main/index.ts');
-const electronBinary = join(
-  repoRoot,
-  'node_modules/.bun/electron@39.8.9/node_modules/electron/dist/Electron.app/Contents/MacOS/Electron'
-);
+const electronMain = join(appRoot, 'src/main/index.js');
+const installed = Boolean(process.env.FOLIO_PACKAGED_BINARY);
+const electronBinary = installed ? findPackagedBinary(repoRoot) : developmentBinary();
 
 const CDP_PORT = 9333;
 const CDP_URL = `http://127.0.0.1:${CDP_PORT}`;
@@ -35,14 +35,14 @@ const CDP_URL = `http://127.0.0.1:${CDP_PORT}`;
 // the app running when the harness finishes and print where it is, instead of
 // killing it. Automated runs/CI rely on the harness cleaning up its port.
 const KEEP_OPEN = process.env.FINAGENT_E2E_KEEP_OPEN === '1';
-function shutdown(appProcess) {
+async function shutdown(appProcess) {
   if (KEEP_OPEN) {
     console.log(
       `KEEP_OPEN CDP port ${CDP_PORT} — app left running; clean up yourself: pkill -f 'remote-debugging-port=${CDP_PORT}'`
     );
     return
   }
-  appProcess.kill()
+  await stopApp(appProcess)
 }
 
 let failures = 0;
@@ -86,26 +86,20 @@ async function main() {
     console.error(`Electron binary not found: ${electronBinary}`);
     process.exit(1);
   }
-  // Stale instances from interrupted runs hold the CDP port and would be the
-  // ones we connect to — kill them first, then spawn fresh.
-  try {
-    execSync(`pkill -f 'remote-debugging-port=${CDP_PORT}' || true`, { stdio: 'ignore' });
-  } catch {
-    // Nothing to clean.
-  }
-  execSync('bun run build:preload', { cwd: appRoot, stdio: 'pipe' });
-  execSync('bunx vite build', { cwd: appRoot, stdio: 'pipe' });
+  // Refuse stale CDP listeners so only this build can satisfy assertions.
+  await ensurePortFree(CDP_PORT);
+  if (!installed) execSync('bun run build', { cwd: appRoot, stdio: 'pipe' });
 
   // Deterministic golden path: always start from a fresh userData dir.
-  const userDataDir = join(appRoot, 'e2e/.user-data');
-  execSync(`rm -rf "${userDataDir}"`);
-  execSync(`mkdir -p "${userDataDir}"`);
+  const userDataDir = join(tmpdir(), `folio-golden-${process.pid}`);
+  rmSync(userDataDir, { recursive: true, force: true });
+  mkdirSync(userDataDir, { recursive: true });
   seedLocale(userDataDir, 'en-US');
-  const electronProcess = spawn(
+  const electronProcess = spawnApp(
     electronBinary,
-    [electronMain, `--remote-debugging-port=${CDP_PORT}`, '--no-sandbox'],
+    [...(installed ? [] : [electronMain]), `--remote-debugging-port=${CDP_PORT}`],
     {
-      cwd: repoRoot,
+      cwd: installed ? tmpdir() : repoRoot,
       stdio: 'ignore',
       env: {
         ...process.env,
@@ -113,7 +107,7 @@ async function main() {
         FINAGENT_FORCE_PROD_LOAD: '1',
         FINAGENT_E2E: '1',
         FINAGENT_E2E_HIDDEN: '1',
-        FINAGENT_USER_DATA_DIR: join(appRoot, 'e2e/.user-data'),
+        FINAGENT_USER_DATA_DIR: join(tmpdir(), `folio-golden-${process.pid}`),
       },
     }
   );
@@ -125,6 +119,7 @@ async function main() {
     const context = browser.contexts()[0];
     const page = await waitForPage(context, 30_000);
     await page.waitForLoadState('domcontentloaded');
+    await completeOnboarding(page);
 
     const apiKeys = await page
       .evaluate(() => Object.keys(window.electronAPI ?? {}))
@@ -356,7 +351,7 @@ async function main() {
     fail('harness setup', error);
   } finally {
     await browser?.close().catch(() => undefined);
-    shutdown(electronProcess)
+    await shutdown(electronProcess)
   }
 
   if (failures > 0) {

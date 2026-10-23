@@ -146,6 +146,13 @@ Simulate a real new user — no git repo, no `.env`, no terminal:
 
 ## Signing policy
 
-- No Apple credentials → unsigned `internal` build, labeled NOT RELEASEABLE
-- `beta`/`stable` channels REQUIRE signing + notarization configured in CI
-  (secrets-gated); the pipeline must not emit a "release" without them.
+For the user-authorized internal preview, macOS uses verified ad-hoc signatures and
+Windows uses a verified ephemeral self-signed installer certificate. These establish
+code integrity, not publisher trust; macOS is not Apple-notarized. After all unchanged
+installation/startup/real product gates pass, they may be distributed as explicitly
+labeled internal GitHub **prereleases**, never a trusted stable release. No private
+keys are persisted/exported and no certificate is installed into a trust store.
+
+Optional formal Apple signing/notarization using existing secrets remains available
+via explicit manual release input. See [desktop-release.md](desktop-release.md) for
+verification, native targets, trust limitations and operational requirements.

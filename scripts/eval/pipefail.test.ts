@@ -40,3 +40,29 @@ withPipefail('pipeline exit codes', () => {
     expect(result.stdout).toContain('exit=1');
   });
 });
+
+// Execute the real workflow run block, replacing only the CLI with a fixture process.
+// This verifies that exit 2 (invalid preflight) survives tee and is recorded for summary.
+withPipefail('nightly invalid-run propagation', () => {
+  it('keeps preflight exit 2 and records it without reporting a passing benchmark', async () => {
+    const { mkdtempSync, writeFileSync, readFileSync, chmodSync, rmSync } = await import('node:fs');
+    const { tmpdir } = await import('node:os');
+    const { delimiter } = await import('node:path');
+    const dir = mkdtempSync(join(tmpdir(), 'folio-nightly-exit-'));
+    try {
+      const workflow = readFileSync(join(import.meta.dir, '../../.github/workflows/eval-nightly.yml'), 'utf8');
+      const block = workflow.split('      - name: Run full live eval')[1].split('        run: |\n')[1].split('        env:')[0];
+      const script = block.split('\n').map((line) => line.startsWith('          ') ? line.slice(10) : line).join('\n');
+      const binary = join(dir, 'bun');
+      writeFileSync(binary, '#!/bin/sh\nprintf "%s\\n" "PREFLIGHT: NOT READY; no cases were run"\nexit 2\n');
+      chmodSync(binary, 0o755);
+      const output = join(dir, 'step-output.txt');
+      const result = spawnSync(bash as string, ['-c', script], {
+        cwd: dir, encoding: 'utf8', env: { ...process.env, PATH: dir + delimiter + process.env.PATH, GITHUB_OUTPUT: output },
+      });
+      expect(result.status).toBe(2);
+      expect(readFileSync(output, 'utf8')).toContain('exit_code=2');
+      expect(readFileSync(join(dir, 'artifacts/eval-full.log'), 'utf8')).toContain('no cases were run');
+    } finally { rmSync(dir, { recursive: true, force: true }); }
+  });
+});
