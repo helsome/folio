@@ -16,6 +16,8 @@ Complete reference for all LongBridge CLI commands used by Finance Agent.
 | Indices | `.US` | `.VIX.US`, `.SPX.US` | Start with `.` |
 | Crypto | `.HAS` | `BTCUSD.HAS` | LongBridge crypto suffix |
 
+The code before the suffix is 1–6 letters or digits. Shanghai and Shenzhen listings use 6-digit codes (`600519.SH`); a 5-character limit rejects them. Codes longer than 6 characters (`6005191.SH`, `TOOLONG.US`) are not valid Folio symbols.
+
 ---
 
 ## Market Data Commands
