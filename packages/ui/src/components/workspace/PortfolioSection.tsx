@@ -100,9 +100,62 @@ export const PortfolioSection: React.FC = () => {
     </div>
   );
 
+  const freshnessProvider = isManualAccountId(selectedAccount)
+    ? t('portfolio.manualPortfolio')
+    : cache.isDemo
+      ? undefined
+      : cache.data?.source?.providerName;
+  const accounts = cache.data?.accounts ?? [];
+  // Import and manual accounts do not depend on the broker request succeeding.
+  const controls = (
+    <>
+      <div className="flex items-center justify-between">
+        <div>
+          <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">{t('portfolio.title')}</h2>
+          {freshnessProvider ? (
+            <div className="mt-1 text-[11px] text-foreground/44">{freshnessProvider}</div>
+          ) : null}
+        </div>
+        <Button variant="default" size="sm" onClick={() => setImportOpen(true)}>
+          {t('portfolio.importButton')}
+        </Button>
+      </div>
+      {(accounts.length > 1 || manualState.portfolios.length > 0) && (
+        <label className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[var(--mac-border)] bg-white px-3 py-2 text-[12px] text-foreground/54">
+          {t('portfolio.account')}
+          <select
+            value={selectedAccount ?? ''}
+            onChange={(e) => setSelectedAccount(e.target.value === '' ? null : e.target.value)}
+            className="rounded-[8px] border border-[var(--mac-border)] bg-white px-2 py-1 text-[12px] text-foreground outline-none focus:border-[var(--mac-blue)]"
+          >
+            <option value="">{t('portfolio.allAccounts')}</option>
+            {accounts.map((account) => (
+              <option key={account.id} value={account.id}>
+                {account.name} ({account.currency ?? '—'})
+              </option>
+            ))}
+            {manualState.portfolios.map((portfolio) => (
+              <option key={portfolio.id} value={manualAccountId(portfolio.id)}>
+                {portfolio.name} ({t('portfolio.manual')})
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <ImportDialog
+        open={importOpen}
+        onClose={() => setImportOpen(false)}
+        onImported={() => {
+          void refreshManualPortfolios().catch(() => {})
+        }}
+      />
+    </>
+  );
+
   if (cache.loading && !view) {
     return (
       <div className="space-y-3 bg-[#f7f8fa] p-4">
+        {controls}
         <div className="h-24 animate-pulse rounded-[14px] border border-[var(--mac-border)] bg-white" />
         <div className="h-32 animate-pulse rounded-[14px] border border-[var(--mac-border)] bg-white" />
         {riskSection}
@@ -113,6 +166,7 @@ export const PortfolioSection: React.FC = () => {
   if (!view && cache.failure) {
     return (
       <div className="space-y-3 bg-[#f7f8fa] p-4">
+        {controls}
         <div className="rounded-[14px] border border-[var(--mac-border)] bg-white p-4 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
           <div className="text-[13px] font-semibold text-foreground">
             {t(FAILURE_HEADINGS[cache.failure.kind])}
@@ -127,6 +181,7 @@ export const PortfolioSection: React.FC = () => {
   if (!view) {
     return (
       <div className="space-y-3 bg-[#f7f8fa] p-4">
+        {controls}
         <div className="text-[13px] text-foreground/44">{t('portfolio.noPortfolioData')}</div>
         {riskSection}
       </div>
@@ -148,50 +203,10 @@ export const PortfolioSection: React.FC = () => {
   };
 
   const isPartial = cache.failure?.kind === 'partial';
-  const showAccountSelector =
-    view.accounts.length > 1 || manualState.portfolios.length > 0;
-  const freshnessProvider = isManualAccountId(selectedAccount)
-    ? t('portfolio.manualPortfolio')
-    : cache.isDemo
-      ? undefined
-      : cache.data?.source?.providerName;
 
   return (
     <div className="folio-portfolio-view space-y-4 overflow-y-auto bg-[#f7f8fa] p-4" data-testid="portfolio-view">
-      <div className="flex items-center justify-between">
-        <div>
-          <h2 className="text-[18px] font-semibold tracking-[-0.03em] text-foreground">{t('portfolio.title')}</h2>
-          {freshnessProvider ? (
-            <div className="mt-1 text-[11px] text-foreground/44">{freshnessProvider}</div>
-          ) : null}
-        </div>
-        <Button variant="default" size="sm" onClick={() => setImportOpen(true)}>
-          {t('portfolio.importButton')}
-        </Button>
-      </div>
-
-      {showAccountSelector && (
-        <label className="flex flex-wrap items-center gap-2 rounded-[12px] border border-[var(--mac-border)] bg-white px-3 py-2 text-[12px] text-foreground/54">
-          {t('portfolio.account')}
-          <select
-            value={selectedAccount ?? ''}
-            onChange={(e) => setSelectedAccount(e.target.value === '' ? null : e.target.value)}
-            className="rounded-[8px] border border-[var(--mac-border)] bg-white px-2 py-1 text-[12px] text-foreground outline-none focus:border-[var(--mac-blue)]"
-          >
-            <option value="">{t('portfolio.allAccounts')}</option>
-            {view.accounts.map((account) => (
-              <option key={account.id} value={account.id}>
-                {account.name} ({account.currency ?? '—'})
-              </option>
-            ))}
-            {manualState.portfolios.map((portfolio) => (
-              <option key={portfolio.id} value={manualAccountId(portfolio.id)}>
-                {portfolio.name} ({t('portfolio.manual')})
-              </option>
-            ))}
-          </select>
-        </label>
-      )}
+      {controls}
 
       {isPartial && (
         <div className="rounded-[10px] border border-[var(--mac-yellow)]/20 bg-[var(--mac-yellow)]/12 px-3 py-2 text-[12px] text-foreground/80">
@@ -229,13 +244,6 @@ export const PortfolioSection: React.FC = () => {
 
       {riskSection}
 
-      <ImportDialog
-        open={importOpen}
-        onClose={() => setImportOpen(false)}
-        onImported={() => {
-          void refreshManualPortfolios().catch(() => {})
-        }}
-      />
     </div>
   );
 };

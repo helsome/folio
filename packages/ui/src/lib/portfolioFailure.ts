@@ -8,6 +8,9 @@ import type { PortfolioFailure, PortfolioFailureKind, PortfolioSnapshot } from '
  */
 
 const CODE_KINDS: Record<string, PortfolioFailureKind> = {
+  AUTH_EXPIRED: 'no-account-permission',
+  TIMEOUT: 'timeout',
+  PARSE_FAILURE: 'parse-error',
   LONGBRIDGE_NOT_INSTALLED: 'not-connected',
   LONGBRIDGE_NOT_AUTHED: 'no-account-permission',
   LONGBRIDGE_TIMEOUT: 'timeout',

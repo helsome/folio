@@ -99,7 +99,7 @@ export function toProviderError(error: unknown): ProviderError {
       case 'INVALID_SYMBOL':
         return { code: 'PROVIDER_ERROR', message: 'A valid symbol is required.' };
       case 'LONGBRIDGE_NOT_INSTALLED':
-        return { code: 'PROVIDER_ERROR', message: 'Longbridge CLI is not installed.' };
+        return { code: 'LONGBRIDGE_NOT_INSTALLED', message: 'Longbridge CLI is not installed.' };
       default:
         return { code: 'PROVIDER_ERROR', message: 'Longbridge request failed.' };
     }

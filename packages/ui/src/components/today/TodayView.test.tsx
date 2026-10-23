@@ -1,12 +1,14 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
+import { Provider, createStore } from 'jotai'
 import type { PortfolioSnapshot, Quote } from '@finagent/core'
 import { formatCurrency } from '@finagent/i18n'
 import { fallbackClient, FinagentClientProvider, type FinagentClient } from '../../client'
 import { installHappyDom } from '../../test/setupHappyDom'
 import { makeTestI18n, I18nextProvider } from '../../test/i18nTest'
 import { TodayView } from './TodayView'
+import { portfolioCacheAtom } from '../../atoms/portfolioAtoms'
 
 let restoreDom: (() => void) | undefined
 
@@ -80,6 +82,36 @@ async function flushAsync(rounds = 5): Promise<void> {
 }
 
 describe('TodayView', () => {
+  it.each(['en-US', 'zh-CN'] as const)('shows a portfolio fetch failure in %s without sample holdings', async (locale) => {
+    const store = createStore()
+    const client = clientWithPortfolio()
+    client.market.getPortfolio = async () => ({
+      ok: false, error: { code: 'LONGBRIDGE_TIMEOUT', message: 'raw timeout detail' },
+    })
+    const i18n = makeTestI18n(locale)
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => {
+        root.render(
+          <I18nextProvider i18n={i18n}>
+            <Provider store={store}>
+              <FinagentClientProvider client={client}><TodayView /></FinagentClientProvider>
+            </Provider>
+          </I18nextProvider>
+        )
+      })
+      await flushAsync()
+      expect(container.textContent).toContain(i18n.t('portfolio.failureDetail.timeout'))
+      expect(container.textContent).not.toContain('raw timeout detail')
+      expect(store.get(portfolioCacheAtom)).toMatchObject({ data: null, isDemo: false, failure: { kind: 'timeout' } })
+    } finally {
+      await act(async () => { root.unmount() })
+      container.remove()
+    }
+  })
+
   it('renders portfolio + movers data without NaN/undefined', async () => {
     const container = document.createElement('div')
     document.body.appendChild(container)
