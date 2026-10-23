@@ -40,6 +40,37 @@ describe('reportToMarkdown', () => {
     expect(md).toContain('- Valuation: P/E at the 95th percentile. — company.valuation (run run_v1)')
   })
 
+  it('carries the claim id on each evidence line so exported text stays traceable', () => {
+    const md = reportToMarkdown(reportFixture())
+    // The fixture predates claim linking; the id is derived from section + position.
+    expect(md).toContain('· claim claim:growth:0')
+    expect(md).toContain('· claim claim:valuation:0')
+  })
+
+  it('names unbacked claims instead of letting them read as verified', () => {
+    const report = reportFixture({
+      claims: [
+        {
+          id: 'claim:fundamentals:0',
+          sectionKey: 'fundamentals',
+          text: 'Balance sheet carries net cash.',
+          evidenceRefs: [],
+        },
+      ],
+    })
+    const md = reportToMarkdown(report)
+    expect(md).toContain('### Unbacked Claims')
+    expect(md).toContain('- claim:fundamentals:0: Balance sheet carries net cash. — no evidence')
+  })
+
+  it('appends the machine-readable claim ↔ evidence index only when asked', () => {
+    const md = reportToMarkdown(reportFixture(), { includeClaimEvidenceIndex: true })
+    expect(md).toContain('### Claim-Evidence Index')
+    expect(md).toContain('"claim:growth:0"')
+    expect(md).toContain('"evidence:run_g1:company.financials"')
+    expect(reportToMarkdown(reportFixture())).not.toContain('### Claim-Evidence Index')
+  })
+
   it('omits the evidence list when includeEvidence is false', () => {
     const md = reportToMarkdown(reportFixture(), { includeEvidence: false })
     expect(md).not.toContain('## Evidence')
