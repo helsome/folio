@@ -67,7 +67,11 @@ export class JsonFileStore {
     const tmp = `${target}.${randomUUID()}.tmp`;
     let ownsTemp = false;
     try {
-      const contents = `${JSON.stringify(data, null, 2)}\n`;
+      const serialized = JSON.stringify(data, null, 2);
+      if (serialized === undefined) {
+        throw new TypeError('Value cannot be represented as JSON');
+      }
+      const contents = `${serialized}\n`;
       await mkdir(dirname(target), { recursive: true });
       const handle = await open(tmp, 'wx', 0o600);
       ownsTemp = true;
