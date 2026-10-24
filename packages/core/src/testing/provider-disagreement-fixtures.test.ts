@@ -41,7 +41,8 @@ describe('provider disagreement fixtures', () => {
       expect(result.sourceCount).toBe(fixture.candidates.length);
       expect(result.policyVersion).toBe(fixture.policy.version);
 
-      if (result.state === 'incomparable' || result.state === 'insufficient-sources') {
+      if (result.state === 'incomparable' || result.state === 'insufficient-sources'
+        || (result.state === 'material-conflict' && !fixture.policy.providerPriority?.length)) {
         expect(result.selected).toBeUndefined();
         return;
       }
@@ -67,14 +68,13 @@ describe('provider disagreement fixtures', () => {
     expect(result.reason).toContain('never averaged');
   });
 
-  it('falls back to the first candidate when no priority is configured', () => {
+  it('leaves a material conflict unresolved when no priority is configured', () => {
     const fixture = fixtureNamed('no provider priority configured');
     const result = reconcileFinancialFacts(fixture.candidates, fixture.policy);
 
     expect(result.state).toBe('material-conflict');
-    expect(result.selected?.provider).toBe('longbridge');
-    expect(result.selected?.value).toBe(100);
-    expect(result.selectedReason).toBe('No provider priority configured; first candidate retained.');
+    expect(result.selected).toBeUndefined();
+    expect(result.selectedReason).toBeUndefined();
     expect(result.candidates).toHaveLength(2);
   });
 });
