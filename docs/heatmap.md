@@ -62,27 +62,27 @@ Demo portfolio cache data is shown as unavailable for this feature.
 ## Reproducible verification
 
 Environment: Windows 11 Pro 10.0.26300, Intel i5-12600KF, Bun 1.4.2
-(`744846f84`), Node 24.13.0, Edge 155.0.4283.45. Run from the repository root
+(`744846f84`), Node 24.13.0, Edge 156.0.4314.42. Run from the repository root
 unless a directory change is shown.
 
 ```sh
 bun install --frozen-lockfile --ignore-scripts
 # exit 0; lockfile accepted
 
-bun test --isolate packages/core/src/heatmap.test.ts packages/shared/src/heatmap/service.test.ts packages/shared/src/agent/market-data-service.test.ts packages/shared/src/agent/agent.test.ts packages/shared/src/providers/massive/massive.test.ts packages/ui/src/components/heatmap/HeatmapPanel.test.tsx apps/electron/src/main/kernelHost.test.ts
-# 95 pass / 0 fail, 318 assertions
+bun test --isolate packages/core/src/heatmap.test.ts packages/shared/src/heatmap/service.test.ts packages/shared/src/agent/market-data-service.test.ts packages/shared/src/agent/agent.test.ts packages/shared/src/providers/massive/massive.test.ts packages/shared/src/providers/yahoo/yahoo.test.ts packages/ui/src/components/heatmap/HeatmapPanel.test.tsx apps/electron/src/main/kernelHost.test.ts
+# 146 pass / 0 fail, 494 assertions
 
 bun run typecheck
 # core / i18n / shared / ui / electron: exit 0
 
 bun run i18n:check
-# en-US and zh-CN: 1539 keys, 0 issues
+# en-US and zh-CN: 1541 keys, 0 issues
 
 cd apps/electron
 bun x vite build
 # 2471 modules transformed; exit 0 (existing large-chunk advisory)
 bun run build:main
-# 700 modules bundled; exit 0
+# 703 modules bundled; exit 0
 cd ../..
 bun build apps/electron/src/preload/index.ts --outfile apps/electron/src/preload/index.cjs --target node --format cjs --external electron
 # exit 0
@@ -100,7 +100,7 @@ Expanded workspace regression:
 
 ```sh
 bun test --isolate packages/core packages/i18n packages/shared packages/ui apps/electron
-# 1855 pass / 1 fail across 201 files at the expanded-suite checkpoint
+# 1959 pass / 1 fail across 203 files
 # The one failure is pi-rpc-restart.test.ts: real child-process JSONL pipes
 # times out at 5000ms on this Windows host.
 ```
@@ -108,9 +108,9 @@ bun test --isolate packages/core packages/i18n packages/shared packages/ui apps/
 The failing test was separately run on both this branch and the clean upstream
 baseline `ec0b8d2791f343495533a7425e6d3ecab97977b2`:
 `bun test --isolate packages/shared/src/agent/pi-rpc-restart.test.ts`
-produced 9 pass / 1 fail on both. The final selection regression is included in
-the 95-pass focused result above. Live provider credentials and live model calls
-were not exercised.
+produced 9 pass / 1 fail on both. That test file is unchanged between this
+baseline and current main `9afa4604e71a008391622b13a5415c87a9721e90`.
+Live provider credentials and live model calls were not exercised.
 
 ### Browser interaction and screenshots
 
@@ -149,13 +149,13 @@ Generated screenshots and JSON reports go to `apps/electron/e2e/artifacts/heatma
 
 The focused tests generate 100 fixture instruments and use the production
 service/cache/scheduler plus the renderer's actual D3 layout function. One
-recorded run loaded the cold fixture in 43.3ms and the warm fixture in 0.8ms:
+recorded run loaded the cold fixture in 41.6ms and the warm fixture in 4.4ms:
 100 quote fetches, 100 profile fetches and one status fetch in total, with four
 concurrent quote operations maximum and no additional warm-cache calls. Each
 fake quote intentionally waits 1ms. The 100-rectangle D3 layout took 0.9ms.
 
 The browser harness's `?count=100` mode renders 100 synthetic identities through
 the real React component; one warm Vite navigation-to-100-tiles measurement was
-196ms. These are reproducible fixture measurements, not live-provider latency
+221ms. These are reproducible fixture measurements, not live-provider latency
 or a production performance guarantee. The harness writes measured durations
 to `report.json` on every run.
