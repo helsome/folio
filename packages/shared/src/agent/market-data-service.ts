@@ -68,7 +68,8 @@ export interface MarketDataFetchers {
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
   getPortfolio: () => Promise<PortfolioSnapshot>;
   getLongBridgeStatus: () => Promise<LongBridgeStatus>;
-  getStaticInfo: (symbol: string, signal?: AbortSignal) => Promise<StaticInfo>;
+  getStaticInfo: (symbol: string) => Promise<StaticInfo>;
+  getStaticInfoResult?: (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<StaticInfo>>;
   getCalcIndex: (symbol: string) => Promise<CalcIndex>;
   getMarketStatus: (signal?: AbortSignal) => Promise<MarketStatus[]>;
   getNews: (symbol: string) => Promise<NewsItem[]>;
@@ -183,7 +184,10 @@ export class MarketDataService {
   }
 
   getStaticInfo(symbol: string, signal?: AbortSignal) {
-    return this.shared(`static:${symbol}`, this.referenceTTL, (abort) => this.fetchers.getStaticInfo(symbol, abort), signal);
+    const fetcher = this.fetchers.getStaticInfoResult
+      ? (abort: AbortSignal) => this.fetchers.getStaticInfoResult!(symbol, abort).then((result) => result.data)
+      : () => this.fetchers.getStaticInfo(symbol);
+    return this.shared(`static:${symbol}`, this.referenceTTL, fetcher, signal);
   }
 
   getCalcIndex(symbol: string) {

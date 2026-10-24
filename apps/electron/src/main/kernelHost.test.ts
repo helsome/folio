@@ -1,7 +1,6 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { join } from 'node:path';
-import type { AgentEvent, AutomationRule, ProviderProvenance, Quote } from '@finagent/core';
-import { HeatmapService, parseHeatmapSource } from '../../../../packages/shared/src/heatmap/service.ts';
+import type { AgentEvent, AutomationRule } from '@finagent/core';
 
 let lastKernelOptions: Record<string, unknown> | null = null;
 let lastMarketData: FakeMarketDataService | null = null;
@@ -33,7 +32,10 @@ class FakeMarketDataService {
     return [{ input }];
   }
 
-  async getQuoteResult(symbol: string, _signal?: AbortSignal): Promise<{ data: Quote; provenance: ProviderProvenance }> {
+  async getQuoteResult(symbol: string, _signal?: AbortSignal): Promise<{
+    data: import('@finagent/core').Quote;
+    provenance: import('@finagent/core').ProviderProvenance;
+  }> {
     return {
       data: { symbol, lastPrice: 101, change: 1, changePercent: 1, timestamp: Date.now() / 1000, prevClose: 100, high: 101, low: 100, open: 100, volume: 10 },
       provenance: { providerId: 'fixture', providerName: 'Fixture', instrumentId: 'XNAS:AAPL', fetchedAt: Date.now(), marketTime: Date.now(), stale: false },
@@ -92,6 +94,8 @@ const fakeRuns = {
   cancelRun: async () => undefined,
   replayStream: (_runId: string, _lastSequence: number) => ({ recoverable: false, events: [], atEnd: true }),
 };
+
+const { HeatmapService, parseHeatmapSource } = await import('../../../../packages/shared/src/heatmap/service.ts');
 
 class FakeAgentKernel {
   sessions = fakeSessions;
