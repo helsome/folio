@@ -8,6 +8,7 @@ export type { SupportedLocale, LocalePreference } from './locale.ts';
 
 // Stream Event Protocol v1 (issue #27, docs/adr/0001-stream-event-protocol.md)
 export * from './stream-events.ts';
+export * from './heatmap.ts';
 
 export interface Quote {
   symbol: string;
@@ -82,6 +83,13 @@ export interface StaticInfo {
   /** Folio canonical instrument id when profile data was resolved through the catalog. */
   instrumentId?: string;
   name: string;
+  /** Provider-reported industry. Group by classification and code/name together. */
+  industry?: {
+    name: string;
+    classification: 'SIC';
+    /** Four-digit SIC code, preserved as text including leading zeros. */
+    code?: string;
+  };
   exchange?: string;
   currency?: string;
   lotSize?: number;

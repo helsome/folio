@@ -159,3 +159,4 @@ export * from './export/index.ts';
 export * from './evidence/index.ts';
 export * from './evaluation/index.ts';
 export * from './retrieval/index.ts';
+export { HeatmapService, parseHeatmapSource } from './heatmap/service.ts';

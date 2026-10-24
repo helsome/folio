@@ -4,6 +4,23 @@ import type { portfolio as enPortfolio } from '../en-US/portfolio.ts';
 /** Portfolio slice (spec §31) — Simplified Chinese (glossary-aligned). */
 export const portfolio = {
   title: '投资组合',
+  heatmap: {
+    title: '自选 / 持仓热力图', legend: '当日涨跌幅', size: '色块面积', equal: '等面积', weighted: '按市值',
+    map: '热力图', table: '表格', refresh: '刷新热力图', loading: '正在加载行情…', empty: '此快照中没有标的。',
+    unknown: '未知', current: '最新', stale: '延迟', unknownIndustry: '未知行业', instrument: '标的',
+    industry: '行业', change: '今日', weight: '权重', source: '来源', status: '交易时段 / 时间',
+    market: '市场', currency: '币种', asOf: '行情时间', delayed: '延迟行情',
+    excluded: '未映射面积：{{symbols}}', unresolved: '未匹配到规范标的',
+    exclusions: {
+      short: '空头持仓：保留在表格中，不参与仅多头面积或权重计算。',
+      currency: '缺少基币估值，暂不支持组合面积加权。',
+      'missing-value': '缺少市值，暂不支持组合面积加权。',
+      zero: '零敞口，仅在表格中展示。',
+    },
+    baseCurrency: '面积按 {{currency}} 计的仅多头市值映射。',
+    snapshotMismatch: '刷新期间自选或持仓发生变化，请重新加载视图。',
+    openResearch: '打开公司研究', unavailable: '热力图数据不可用。',
+  },
   totalValue: '总资产',
   cash: '现金',
   today: '今日',

@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
 import type { PortfolioFailureKind } from '@finagent/core';
@@ -25,6 +25,8 @@ import { ImportDialog } from '../portfolio/ImportDialog';
 import { Button } from '../primitives/Button';
 import { i18nCurrentLocale } from '@finagent/i18n';
 import { portfolioFailureDetail } from '../../lib/portfolioFailure';
+import { HeatmapPanel } from '../heatmap/HeatmapPanel';
+import { portfolioHeatmapSource } from '../heatmap/heatmapSource';
 
 const FAILURE_HEADINGS: Record<PortfolioFailureKind, string> = {
   'not-connected': 'portfolio.failure.notConnected',
@@ -60,6 +62,9 @@ export const PortfolioSection: React.FC = () => {
   const setActiveSymbol = useSetAtom(activeSymbolAtom);
   const setNavSection = useSetAtom(navSectionAtom);
   const setResearchOrigin = useSetAtom(researchOriginAtom);
+  const heatmapSource = useMemo(() => view && (!cache.isDemo || isManualAccountId(selectedAccount))
+    ? portfolioHeatmapSource(view, selectedAccount)
+    : null, [view, selectedAccount, cache.isDemo]);
   const riskCache = useAtomValue(portfolioRiskCacheAtom);
   const analyzeRisk = useSetAtom(analyzePortfolioRiskAtom);
   const manualState = useAtomValue(manualPortfoliosAtom);
@@ -198,6 +203,19 @@ export const PortfolioSection: React.FC = () => {
           {cache.failure === null ? null : portfolioFailureDetail(t, cache.failure)}
         </div>
       )}
+
+      {cache.isDemo && !isManualAccountId(selectedAccount) && <p className="text-[12px] text-foreground/54">{t('portfolio.heatmap.unavailable')}</p>}
+      {heatmapSource && <HeatmapPanel
+        source={heatmapSource}
+        onSelect={(tile) => {
+          setSelectedPosition(tile.workspaceSymbol);
+          setActiveSymbol(tile.workspaceSymbol);
+        }}
+        onResearch={(tile) => {
+          setResearchOrigin({ from: 'portfolio', label: tile.workspaceSymbol });
+          setNavSection('research');
+        }}
+      />}
 
       <PortfolioCard view={view} isDemo={cache.isDemo} />
       <AssetPieChart view={view} />

@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import type { FinancialReport, Kline, ProviderResult, Quote, StaticInfo } from '@finagent/core'
-import { DEFAULT_INSTRUMENT_CATALOG } from '@finagent/core'
+import { DEFAULT_INSTRUMENT_CATALOG, InstrumentResolver } from '@finagent/core'
+import { MarketDataService } from '../../agent/market-data-service.ts'
+import { HeatmapService, parseHeatmapSource } from '../../heatmap/service.ts'
+import { ProviderRouter } from '../router.ts'
+import { createRouterFetchers } from '../router-fetchers.ts'
 import { MassiveFinancialDataProvider } from './adapter.ts'
 import { TtlCache } from './cache.ts'
 
@@ -223,6 +227,7 @@ describe('MassiveFinancialDataProvider', () => {
           locale: 'us',
           primary_exchange: 'XNAS',
           currency_name: 'usd',
+          sic_code: '3571',
           sic_description: 'Electronic Computers',
           homepage_url: 'https://www.apple.com',
         },
@@ -238,7 +243,103 @@ describe('MassiveFinancialDataProvider', () => {
       name: 'Apple Inc.',
       exchange: 'XNAS',
       currency: 'usd',
+      industry: { name: 'Electronic Computers', classification: 'SIC', code: '3571' },
     })
+  })
+
+  it.each([
+    ['absent fields', {}],
+    ['code without a description', { sic_code: '3571' }],
+    ['blank description', { sic_description: '   ', sic_code: '3571' }],
+    ['null description', { sic_description: null, sic_code: '3571' }],
+    ['non-string description', { sic_description: 42, sic_code: '3571' }],
+  ] satisfies Array<[string, Record<string, unknown>]>)('keeps industry unknown for %s', async (_label, fields) => {
+    installFetch(() => jsonResponse({ results: { name: 'Apple Inc.', ...fields } }))
+    const result = await makeProvider('key').execute<StaticInfo>('company.profile', { symbol: 'AAPL.US' })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.industry).toBeUndefined()
+  })
+
+  it('trims industry labels and preserves leading zeros in SIC codes', async () => {
+    installFetch(() => jsonResponse({ results: {
+      sic_description: '  Wheat  ', sic_code: ' 0111 ',
+    } }))
+    const result = await makeProvider('key').execute<StaticInfo>('company.profile', { symbol: 'TEST.US' })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.industry).toEqual({ name: 'Wheat', classification: 'SIC', code: '0111' })
+  })
+
+  it.each([undefined, null, 3571, '', '357', '35x1'])('omits an unavailable or malformed SIC code (%s)', async (code) => {
+    installFetch(() => jsonResponse({ results: {
+      sic_description: 'Electronic Computers', sic_code: code,
+    } }))
+    const result = await makeProvider('key').execute<StaticInfo>('company.profile', { symbol: 'AAPL.US' })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.industry).toEqual({ name: 'Electronic Computers', classification: 'SIC' })
+  })
+
+  it('carries industry through canonical routing and the shared reference cache without extra requests', async () => {
+    const calls = installFetch(() => jsonResponse({ results: {
+      name: 'Apple Inc.', sic_description: 'Electronic Computers', sic_code: '3571',
+    } }))
+    const router = new ProviderRouter()
+    router.register(makeProvider('key'))
+    router.setRouting({ primary: 'massive' })
+    const resolver = new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG)
+    const service = new MarketDataService({ fetchers: createRouterFetchers(router, {
+      resolve: (query) => resolver.resolve(query),
+    }) })
+
+    const [first, concurrent] = await Promise.all([
+      service.getStaticInfo('AAPL.US'), service.getStaticInfo('AAPL.US'),
+    ])
+    const cached = await service.getStaticInfo('AAPL.US')
+
+    expect(first.instrumentId).toBe('XNAS:AAPL')
+    expect(first.industry).toEqual({ name: 'Electronic Computers', classification: 'SIC', code: '3571' })
+    expect(concurrent).toEqual(first)
+    expect(cached).toEqual(first)
+    expect(calls).toHaveLength(1)
+    expect(new URL(calls[0].url).pathname).toBe('/v3/reference/tickers/AAPL')
+  })
+
+  it('loads heatmap through the real router/cache while keeping portfolio valuations out of HTTP', async () => {
+    const calls = installFetch((url) => jsonResponse(url.includes('/v3/reference/')
+      ? { results: { name: 'Apple Inc.', sic_description: 'Electronic Computers', sic_code: '3571' } }
+      : snapshotPayload()))
+    const router = new ProviderRouter()
+    router.register(makeProvider('fixture-key'))
+    router.setRouting({ primary: 'massive' })
+    const resolver = new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG)
+    const resolve = (query: string) => resolver.resolve(query)
+    const market = new MarketDataService({ fetchers: createRouterFetchers(router, { resolve }) })
+    await market.getQuote('AAPL.US')
+    await market.getStaticInfo('AAPL.US')
+    const result = await new HeatmapService({ marketData: market, resolve }).load(parseHeatmapSource({
+      schemaVersion: 1, kind: 'portfolio', id: 'local-account', revision: 'v1', capturedAt: Date.now(),
+      baseCurrency: 'USD', valuationCurrency: 'USD',
+      entries: [{ symbol: 'AAPL.US', holding: { quantity: 17, marketValueBase: 2047, currency: 'USD' } }],
+    }))
+    expect(result.tiles[0]?.instrument.instrumentId).toBe('XNAS:AAPL')
+    expect(result.tiles[0]?.industry?.code).toBe('3571')
+    expect(result.tiles[0]?.valueBase).toBe(2047)
+    expect(result.tiles[0]?.weight).toBe(1)
+    expect(result.tiles[0]?.state).toBe('stale')
+    expect(result.tiles[0]?.provenance?.providerId).toBe('massive')
+    expect(calls).toHaveLength(2)
+    for (const call of calls) {
+      expect([...new URL(call.url).searchParams.keys()]).toEqual(['apiKey'])
+      expect(call.init?.body).toBeUndefined()
+      expect(call.url).not.toContain('2047')
+      expect(call.url).not.toContain('local-account')
+    }
+    expect('entries' in result.source).toBe(false)
   })
 
   it('loads three current financial statement endpoints and preserves period and filing dates', async () => {

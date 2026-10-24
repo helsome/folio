@@ -94,6 +94,8 @@ import {
   JsonFileStore,
   LocalResearchSynthesizer,
   MarketDataService,
+  HeatmapService,
+  parseHeatmapSource,
   MassiveFinancialDataProvider,
   YahooChartFinancialDataProvider,
   parseImpactJson,
@@ -273,6 +275,7 @@ interface PendingEvalRun {
  */
 export class AgentKernelHost {
   private readonly marketData: MarketDataService;
+  private readonly heatmapRequests = new Map<string, AbortController>();
   private readonly kernel: AgentKernel;
   private readonly credentials: CredentialStore;
   private readonly skillHub: SkillHub;
@@ -615,6 +618,29 @@ export class AgentKernelHost {
 
   getQuote(symbol: unknown) {
     return this.marketData.getQuote(requireString(symbol, 'symbol').toUpperCase());
+  }
+
+  async getHeatmap(input: unknown, owner: number) {
+    const request = requireObject(input);
+    const requestId = requireString(request.requestId, 'requestId');
+    if (requestId.length > 128) throw new Error('Invalid heatmap request id.');
+    const source = parseHeatmapSource(request.source);
+    const key = `${owner}:${requestId}`;
+    this.heatmapRequests.get(key)?.abort();
+    const controller = new AbortController();
+    this.heatmapRequests.set(key, controller);
+    try {
+      return await new HeatmapService({
+        marketData: this.marketData,
+        resolve: (query) => this.instrumentResolver.resolve(query),
+      }).load(source, controller.signal);
+    } finally {
+      if (this.heatmapRequests.get(key) === controller) this.heatmapRequests.delete(key);
+    }
+  }
+
+  cancelHeatmap(requestId: unknown, owner: number) {
+    this.heatmapRequests.get(`${owner}:${requireString(requestId, 'requestId')}`)?.abort();
   }
 
   getKline(input: unknown) {
@@ -2649,6 +2675,8 @@ export class AgentKernelHost {
   }
 
   async dispose() {
+    for (const controller of this.heatmapRequests.values()) controller.abort();
+    this.heatmapRequests.clear();
     this.alertEngine.stop();
     this.unsubscribe?.();
     this.unsubscribe = null;

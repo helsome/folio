@@ -48,6 +48,8 @@ function createElectronClient(): FinagentClient {
       getTools: () => ipcResult(window.electronAPI.agent.getTools()),
     },
     market: {
+      getHeatmap: (input) => ipcResult(window.electronAPI.market.getHeatmap(input)),
+      cancelHeatmap: (requestId) => ipcResult(window.electronAPI.market.cancelHeatmap(requestId)),
       getQuote: (symbol) => ipcResult(window.electronAPI.market.getQuote(symbol)),
       getKline: (request) => ipcResult(window.electronAPI.market.getKline(request)),
       getPortfolio: () => ipcResult(window.electronAPI.market.getPortfolio()),

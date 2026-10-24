@@ -146,6 +146,13 @@ ipcMain.handle('market:getQuote', async (_event, symbol: unknown) =>
   toIpcResult(() => agentKernelHost.getQuote(symbol))
 );
 
+ipcMain.handle('market:getHeatmap', async (event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.getHeatmap(input, event.sender.id))
+);
+ipcMain.handle('market:cancelHeatmap', async (event, requestId: unknown) =>
+  toIpcResult(() => agentKernelHost.cancelHeatmap(requestId, event.sender.id))
+);
+
 ipcMain.handle('market:getKline', async (_event, request: unknown) =>
   toIpcResult(() => agentKernelHost.getKline(request))
 );
