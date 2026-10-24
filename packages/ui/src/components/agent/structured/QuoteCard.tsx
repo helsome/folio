@@ -2,6 +2,7 @@ import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Quote } from '@finagent/core';
 import { MetricGrid } from './MetricGrid';
+import { currencyForSymbol, formatMoney } from '../../../lib/money';
 
 const fmtNum = (n: number | null | undefined, digits = 2): string =>
   n == null || Number.isNaN(n) ? '—' : n.toFixed(digits);
@@ -29,6 +30,7 @@ interface QuoteCardProps {
 export const QuoteCard: React.FC<QuoteCardProps> = ({ quote }) => {
   const { t } = useTranslation();
   const symbol = quote.symbol || '—';
+  const currency = currencyForSymbol(symbol);
   const change = quote.change ?? 0;
   const changePercent = quote.changePercent ?? 0;
   const isPositive = change >= 0;
@@ -42,8 +44,8 @@ export const QuoteCard: React.FC<QuoteCardProps> = ({ quote }) => {
           <div className="mt-0.5 truncate text-[15px] font-semibold text-foreground">{symbol}</div>
         </div>
         <div className="text-right">
-          <div className="text-[20px] font-semibold tracking-tight text-foreground">
-            ${fmtNum(quote.lastPrice)}
+          <div data-testid="quote-card-price" className="text-[20px] font-semibold tracking-tight text-foreground">
+            {formatMoney(quote.lastPrice, currency)}
           </div>
           <div className={`text-[12px] font-semibold ${tone}`}>
             {signed(change)} ({signed(changePercent)}%)

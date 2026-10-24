@@ -1,4 +1,5 @@
 import { mkdtemp, rm } from 'node:fs/promises'
+import { readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
@@ -42,6 +43,33 @@ function run(id: string, ruleId: string, ranAt: number): AutomationRun {
   }
 }
 
+// Freeze a real on-disk snapshot before the first mutation writes it back.
+// Synchronous snapshot reads make overlapping operations deterministic: an
+// unprotected second mutation sees the stale file before the first is released.
+class PausedSnapshotStore extends JsonFileStore {
+  private paused = false
+  private signalRead!: () => void
+  private releaseRead!: () => void
+  readonly snapshotReady = new Promise<void>((resolve) => { this.signalRead = resolve })
+  private readonly released = new Promise<void>((resolve) => { this.releaseRead = resolve })
+
+  constructor(root: string, private readonly pauseFirstRead = false) {
+    super(root)
+  }
+
+  resume(): void { this.releaseRead() }
+
+  async read<T>(file: string, _fallback: T): Promise<T> {
+    const snapshot = JSON.parse(readFileSync(this.resolve(file), 'utf8')) as T
+    if (this.pauseFirstRead && !this.paused) {
+      this.paused = true
+      this.signalRead()
+      await this.released
+    }
+    return snapshot
+  }
+}
+
 describe('AutomationRuleRepository', () => {
   it('round-trips rules across repository instances (restart)', async () => {
     await new AutomationRuleRepository(store).save(rule('r1', { strategyId: 'value' }))
@@ -81,6 +109,66 @@ describe('AutomationRuleRepository', () => {
 })
 
 describe('AutomationRunRepository', () => {
+  for (const firstOperation of ['record', 'claim'] as const) {
+    it(`preserves runs and claims across instances when ${firstOperation} reads first`, async () => {
+      await store.write('automation-runs.json', { runs: [] })
+      const pausedStore = new PausedSnapshotStore(dir, true)
+      const first = new AutomationRunRepository(pausedStore)
+      const second = new AutomationRunRepository(new PausedSnapshotStore(join(dir, '.')))
+      const occurrence = 'Mon Jan 01 2024'
+      const firstMutation = firstOperation === 'record'
+        ? first.record(run('run-a', 'r1', 1))
+        : first.claimScheduledOccurrence('r2', occurrence)
+      await pausedStore.snapshotReady
+      const secondMutation = firstOperation === 'record'
+        ? second.claimScheduledOccurrence('r2', occurrence)
+        : second.record(run('run-a', 'r1', 1))
+      pausedStore.resume()
+      await Promise.all([firstMutation, secondMutation])
+
+      const fresh = new AutomationRunRepository(new JsonFileStore(dir))
+      expect(await fresh.list()).toEqual([run('run-a', 'r1', 1)])
+      expect(await fresh.claimScheduledOccurrence('r2', occurrence)).toBe(false)
+    })
+  }
+
+  it('allows only one concurrent claim for the same occurrence across instances', async () => {
+    await store.write('automation-runs.json', { runs: [] })
+    const pausedStore = new PausedSnapshotStore(dir, true)
+    const first = new AutomationRunRepository(pausedStore)
+    const second = new AutomationRunRepository(new PausedSnapshotStore(dir))
+    const firstClaim = first.claimScheduledOccurrence('r1', 'Mon Jan 01 2024')
+    await pausedStore.snapshotReady
+    const secondClaim = second.claimScheduledOccurrence('r1', 'Mon Jan 01 2024')
+    pausedStore.resume()
+    expect(await Promise.all([firstClaim, secondClaim])).toEqual([true, false])
+    const fresh = new AutomationRunRepository(new JsonFileStore(dir))
+    expect(await fresh.claimScheduledOccurrence('r1', 'Mon Jan 01 2024')).toBe(false)
+  })
+
+  it('does not block a queued record after a claim write fails', async () => {
+    class FailOnceStore extends JsonFileStore {
+      private failed = false
+      async write(file: string, data: unknown): Promise<void> {
+        if (!this.failed) {
+          this.failed = true
+          throw new Error('simulated write failure')
+        }
+        await super.write(file, data)
+      }
+    }
+    const repo = new AutomationRunRepository(new FailOnceStore(dir))
+    const results = await Promise.allSettled([
+      repo.claimScheduledOccurrence('r1', 'Mon Jan 01 2024'),
+      repo.record(run('run-a', 'r1', 1)),
+    ])
+    expect(results[0].status).toBe('rejected')
+    expect(results[1].status).toBe('fulfilled')
+    const fresh = new AutomationRunRepository(new JsonFileStore(dir))
+    expect(await fresh.list()).toEqual([run('run-a', 'r1', 1)])
+    expect(await fresh.claimScheduledOccurrence('r1', 'Mon Jan 01 2024')).toBe(true)
+  })
+
   it('records runs and lists them newest-first across restarts', async () => {
     const repo = new AutomationRunRepository(store)
     await repo.record(run('run-old', 'r1', 1_700_000_000_000))
@@ -99,6 +187,18 @@ describe('AutomationRunRepository', () => {
     expect((await repo.listByRule('r1')).map((r) => r.id)).toEqual(['run-1'])
     expect((await repo.listByRule('r2')).map((r) => r.id)).toEqual(['run-2'])
     expect(await repo.listByRule('r3')).toEqual([])
+  })
+
+  it('claims scheduled occurrences across repository instances', async () => {
+    const repo = new AutomationRunRepository(store)
+    expect(await repo.claimScheduledOccurrence('r1', 'Mon Jan 01 2024')).toBe(true)
+    await repo.record(run('run-1', 'r1', 1_704_067_200_000))
+    expect(await repo.claimScheduledOccurrence('r1', 'Mon Jan 01 2024')).toBe(false)
+
+    const fresh = new AutomationRunRepository(new JsonFileStore(dir))
+    expect(await fresh.claimScheduledOccurrence('r1', 'Mon Jan 01 2024')).toBe(false)
+    expect(await fresh.claimScheduledOccurrence('r1', 'Tue Jan 02 2024')).toBe(true)
+    expect(await fresh.claimScheduledOccurrence('r2', 'Mon Jan 01 2024')).toBe(true)
   })
 
   it('persists the no-material outcome and captured portfolio scope across restarts', async () => {

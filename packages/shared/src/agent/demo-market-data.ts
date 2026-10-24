@@ -1,6 +1,6 @@
 import type { Holding, Kline, PortfolioAccount, PortfolioSnapshot, Quote } from '@finagent/core';
 import type { MarketDataFetchers } from './market-data-service.ts';
-import type { CapabilityFetchResult } from '../capabilities/fetchers.ts';
+import type { CapabilityFetchers, CapabilityFetchResult } from '../capabilities/fetchers.ts';
 
 type QuoteResultFetcher = (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<Quote>>;
 
@@ -141,7 +141,7 @@ function demoPortfolioSnapshot(): PortfolioSnapshot {
  * demo dataset answers instead. Only the surfaces typed blocks demo are
  * wrapped; everything else keeps failing honestly.
  */
-export function withDemoDataFallback<F extends Partial<MarketDataFetchers> & { getQuoteResult?: QuoteResultFetcher }>(
+export function withDemoDataFallback<F extends Partial<MarketDataFetchers> & Pick<CapabilityFetchers, 'getKlineResult'> & { getQuoteResult?: QuoteResultFetcher }>(
   fetchers: F
 ): F {
   const quoteResult = fetchers.getQuoteResult;
@@ -169,6 +169,23 @@ export function withDemoDataFallback<F extends Partial<MarketDataFetchers> & { g
         },
       }
       : {}),
+    ...(fetchers.getKlineResult ? {
+      getKlineResult: async (options, signal) => {
+        try {
+          return await fetchers.getKlineResult!(options, signal);
+        } catch {
+          const data = demoKlinesFor(options.symbol, options.limit ?? 30);
+          return {
+            data,
+            provenance: {
+              providerId: 'demo', providerName: 'Sample data', fetchedAt: Date.now(),
+              marketTime: data.at(-1)?.timestamp === undefined ? undefined : data.at(-1)!.timestamp * 1000,
+              stale: false,
+            },
+          };
+        }
+      },
+    } : {}),
     getKline: async (options) => {
       const real = fetchers.getKline;
       if (real) {

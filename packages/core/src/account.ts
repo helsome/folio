@@ -1,3 +1,5 @@
+import type { MarketSource } from './market-data.ts';
+
 /**
  * Provider-neutral brokerage account domain (V4).
  *
@@ -69,6 +71,8 @@ export interface PortfolioSnapshot {
   fetchedAt: number;
   /** Epoch ms of the vendor's own snapshot time, when known. */
   marketTime?: number;
+  /** Broker provider that produced this snapshot, when the router fetcher stamped it. */
+  source?: MarketSource;
 }
 
 /** Cash-flow / ledger record (deposits, withdrawals, dividends, settlements). */

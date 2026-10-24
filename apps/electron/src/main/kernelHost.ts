@@ -97,6 +97,7 @@ import {
   HeatmapService,
   parseHeatmapSource,
   MassiveFinancialDataProvider,
+  YahooChartFinancialDataProvider,
   parseImpactJson,
   parseSynthesisJson,
   PortfolioRiskService,
@@ -248,6 +249,13 @@ const OBSERVABILITY_EXPERIMENT_ID = '__observability__';
  */
 const RUN_CANCELLED_CODE = 'RUN_CANCELLED';
 
+/**
+ * Maximum symbols one comparison covers. Matches the Compare workspace picker
+ * (`withComparisonSymbols` in `packages/ui/src/atoms/compareAtoms.ts`), so the
+ * IPC boundary rejects oversized sets instead of rendering an unbounded table.
+ */
+const COMPARE_MAX_SYMBOLS = 4;
+
 interface PendingEvalRun {
   sessionId: string;
   startedAt: number;
@@ -285,7 +293,7 @@ export class AgentKernelHost {
   private readonly automationRules: AutomationRuleRepository;
   private readonly automationRuns: AutomationRunRepository;
   private automationTimer: ReturnType<typeof setInterval> | null = null;
-  private readonly lastAutomationRunByRule = new Map<string, string>();
+  private readonly claimedAutomationOccurrenceByRule = new Map<string, string>();
   private readonly thesisRepository: ThesisRepository;
   private readonly thesisService: ThesisService;
   private readonly alertRepository: AlertRuleRepository;
@@ -335,8 +343,11 @@ export class AgentKernelHost {
 
     // V4 provider platform: the capability registry is built on top of the
     // provider router, which owns the Longbridge (primary) and Massive
-    // (fallback) adapters. Business layers see only the neutral capability
-    // surface — vendor specifics stay inside the adapters.
+    // (fallback) adapters. Yahoo Finance is always registered as a no-key US
+    // backup: the router tries it after the configured chain fails, and
+    // Connections can promote it to primary or fallback. Business layers see
+    // only the neutral capability surface — vendor specifics stay inside the
+    // adapters.
     this.connectionStore = new ConnectionStore(new JsonFileStore(userData));
     this.providerRouter = new ProviderRouter({
       resolveRouting: () => this.connectionStore.getRouting(DEFAULT_PROVIDER_ROUTING),
@@ -352,6 +363,7 @@ export class AgentKernelHost {
     this.providerRouter.register(longbridgeData);
     this.providerRouter.register(longbridgeBroker);
     this.providerRouter.register(massive);
+    this.providerRouter.register(new YahooChartFinancialDataProvider());
     this.providerRouter.setRouting(DEFAULT_PROVIDER_ROUTING);
 
     // Keep renderer IPC and agent tools on the same provider gateway.  The
@@ -819,9 +831,26 @@ export class AgentKernelHost {
     if (!Array.isArray(request.symbols) || request.symbols.length < 2) {
       throw createCodeError('INVALID_ARGUMENT', 'Compare needs at least two symbols.');
     }
-    const symbols = request.symbols.map((entry) =>
-      requireString(entry, 'symbols[]').toUpperCase()
-    );
+    const symbols: string[] = [];
+    const seenInstruments = new Set<string>();
+    for (const entry of request.symbols) {
+      const symbol = requireString(entry, 'symbols[]').trim().toUpperCase();
+      // Aliases of one canonical instrument (AAPL vs AAPL.US) are the same
+      // listing; keep the first spelling so the table never shows duplicate
+      // columns. Unresolvable symbols dedupe on their exact spelling only.
+      const resolution = this.instrumentResolver.resolve(symbol);
+      const identity =
+        resolution.status === 'resolved' ? resolution.instrument.instrumentId : symbol;
+      if (seenInstruments.has(identity)) continue;
+      seenInstruments.add(identity);
+      symbols.push(symbol);
+    }
+    if (symbols.length < 2) {
+      throw createCodeError('INVALID_ARGUMENT', 'Compare needs at least two distinct symbols.');
+    }
+    if (symbols.length > COMPARE_MAX_SYMBOLS) {
+      throw createCodeError('INVALID_ARGUMENT', 'Compare supports at most four symbols.');
+    }
     return buildComparison(symbols, this.registry, { executor: this.executor });
   }
 
@@ -1801,7 +1830,9 @@ export class AgentKernelHost {
       configured:
         provider.id === 'massive'
           ? Boolean(await this.credentials.getCredential(MASSIVE_CREDENTIAL_ID))
-          : health?.status === 'connected',
+          : provider.id === 'yahoo'
+            ? config?.enabled !== false
+            : health?.status === 'connected',
       hasAccount,
       accountLabel,
       error: state?.error ?? null,
@@ -1825,6 +1856,22 @@ export class AgentKernelHost {
   async connectProvider(input: unknown): Promise<{ status: 'connecting' | 'connected'; verificationUrl?: string }> {
     const request = requireObject(input);
     const providerId = requireString(request.providerId, 'providerId');
+    if (providerId === 'yahoo') {
+      const existing = await this.connectionStore.getConfig(providerId);
+      await this.connectionStore.setConfig(providerId, {
+        enabled: true,
+        endpoint: existing?.endpoint,
+        region: existing?.region,
+      });
+      const now = Date.now();
+      await this.connectionStore.update({
+        providerId,
+        status: 'connected',
+        lastCheck: now,
+        connectedAt: now,
+      });
+      return { status: 'connected' };
+    }
     if (providerId !== 'longbridge') {
       throw createCodeError('CONFIG_UNSUPPORTED', 'Connect is only supported for the Longbridge CLI.');
     }
@@ -1907,6 +1954,15 @@ export class AgentKernelHost {
       await longbridgeLogout({ exec: executeLongBridgeCli });
     } else if (providerId === 'massive') {
       await this.credentials.removeCredential(MASSIVE_CREDENTIAL_ID);
+    } else if (providerId === 'yahoo') {
+      const existing = await this.connectionStore.getConfig(providerId);
+      await this.connectionStore.setConfig(providerId, {
+        enabled: false,
+        endpoint: existing?.endpoint,
+        region: existing?.region,
+      });
+      const yahoo = this.providerRouter.get('yahoo');
+      if (yahoo instanceof YahooChartFinancialDataProvider) yahoo.clearCache();
     }
     await this.connectionStore.update({ providerId, status: 'not-connected', lastCheck: Date.now() });
     return this.entryFor(provider);
@@ -1996,10 +2052,21 @@ export class AgentKernelHost {
       await this.connectionStore.setRouting(next);
       this.providerRouter.setRouting(next);
     }
-    await this.connectionStore.update({ providerId, status: 'not-connected', lastCheck: Date.now() });
+    const yahooReady = providerId === 'yahoo' && enabled !== false;
+    const now = Date.now();
+    await this.connectionStore.update({
+      providerId,
+      status: yahooReady ? 'connected' : 'not-connected',
+      lastCheck: now,
+      ...(yahooReady ? { connectedAt: now } : {}),
+    });
     const massive = this.providerRouter.get('massive');
     if (massive instanceof MassiveFinancialDataProvider) {
       massive.clearCache();
+    }
+    const yahoo = this.providerRouter.get('yahoo');
+    if (yahoo instanceof YahooChartFinancialDataProvider) {
+      yahoo.clearCache();
     }
     return this.entryFor(provider);
   }
@@ -2393,13 +2460,14 @@ export class AgentKernelHost {
       const now = Date.now();
       const todayKey = new Date(now).toDateString();
       for (const rule of runDue(rules, now)) {
-        if (this.lastAutomationRunByRule.get(rule.id) === todayKey) continue;
+        if (this.claimedAutomationOccurrenceByRule.get(rule.id) === todayKey) continue;
+        this.claimedAutomationOccurrenceByRule.set(rule.id, todayKey);
         try {
+          if (!(await this.automationRuns.claimScheduledOccurrence(rule.id, todayKey))) continue;
           const run = await this.executeAutomation(rule);
           await this.automationRuns.record(run);
-          this.lastAutomationRunByRule.set(rule.id, todayKey);
         } catch {
-          // A failing rule never blocks the other rules.
+          // The occurrence remains claimed; retry on its next scheduled date.
         }
       }
     } catch {

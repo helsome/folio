@@ -1,7 +1,7 @@
 import React from 'react';
 
 /**
- * Data-source freshness line (spec §34): "Longbridge · Updated 13:45:12".
+ * Data-source freshness line (spec §34): "Yahoo Finance · Updated 13:45:12".
  * Renders nothing until a timestamp is available — never fabricates one.
  */
 export const DataFreshness: React.FC<{

@@ -1,6 +1,7 @@
 import { type ReactNode, useEffect, useRef, useState } from 'react';
 import { useAtomValue } from 'jotai';
 import { useTranslation } from 'react-i18next';
+import type { MarketSource } from '@finagent/core';
 import { activeSymbolAtom } from '../../atoms';
 import { useFinagentClient } from '../../client';
 import { Button } from '../primitives/Button';
@@ -20,6 +21,7 @@ export function ChartView() {
 
   const [period, setPeriod] = useState<Period>('1d');
   const [bars, setBars] = useState<FinancialBar[]>([]);
+  const [source, setSource] = useState<MarketSource | undefined>();
   const [status, setStatus] = useState<ChartStatus>('loading');
   const [error, setError] = useState<string | null>(null);
   const [retryToken, setRetryToken] = useState(0);
@@ -34,6 +36,7 @@ export function ChartView() {
 
     if (!symbol) {
       setBars([]);
+      setSource(undefined);
       setStatus('ready');
       setError(null);
       return;
@@ -41,6 +44,7 @@ export function ChartView() {
 
     setStatus('loading');
     setError(null);
+    setSource(undefined);
 
     client.market
       .getKline({ symbol, period, limit: 300 })
@@ -51,6 +55,7 @@ export function ChartView() {
           setError(result.error.message);
           return;
         }
+        setSource(result.data.find((bar) => bar.source)?.source);
         setBars(normalizeKlines(result.data));
         setStatus('ready');
       })
@@ -127,7 +132,8 @@ export function ChartView() {
         ))}
         <div className="ml-auto">
           <DataFreshness
-            providerName="Longbridge"
+            providerName={source?.providerName}
+            delayed={source?.delayed === true}
             updatedAtMs={
               bars.length > 0 ? bars[bars.length - 1]!.timestamp * 1000 : undefined
             }

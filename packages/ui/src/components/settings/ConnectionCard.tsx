@@ -325,6 +325,12 @@ export const ConnectionCard: React.FC<{
         </div>
       )}
 
+      {entry.coverage?.credentialRequirement === 'none' && entry.coverage.dataAccess === 'delayed' && (
+        <p className="mt-3 text-[10px] leading-relaxed text-foreground/42" data-testid={`free-data-note-${entry.providerId}`}>
+          {t('connections.freeDelayedNote')}
+        </p>
+      )}
+
       {entry.recentResult && (
         <div className="mt-2 text-[10px] text-foreground/48">
           {t('connections.recentRuntime')}: {entry.recentResult.capabilityId} ·{' '}

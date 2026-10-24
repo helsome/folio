@@ -61,6 +61,7 @@ export const navigation = {
   paletteQuickActionSettingsHint: '快捷操作 · 设置',
   aboutAria: '关于 Folio',
   aboutTitle: '关于 Folio',
+  watchlistQuoteUnavailable: '行情暂不可用',
   watchlistEmpty: '自选中暂无标的',
   watchlistAddSymbols: '在上方添加标的',
   watchlistAddSymbol: '添加标的',

@@ -1,4 +1,5 @@
 import type { AutomationRule, AutomationRun } from '@finagent/core'
+import { resolve } from 'node:path'
 import type { JsonFileStore } from '../storage/json-file-store.ts'
 
 /**
@@ -7,7 +8,7 @@ import type { JsonFileStore } from '../storage/json-file-store.ts'
  * research-diff / outcome repository pattern:
  *
  *   automations.json     — AutomationRule[] (five fixed rules; no cron UI)
- *   automation-runs.json — { runs: AutomationRun[] } newest first
+ *   automation-runs.json — completed runs plus claimed scheduled occurrences
  *
  * The repository is deliberately thin: seeding the five default rules is the
  * kernel host's job (first run), the UI only toggles `enabled` / runs a rule,
@@ -19,6 +20,8 @@ const RUNS_FILE = 'automation-runs.json'
 
 interface RunsFile {
   runs: AutomationRun[]
+  /** Scheduled occurrences claimed before execution, grouped by rule id. */
+  scheduledOccurrences?: Record<string, string[]>
 }
 
 export class AutomationRuleRepository {
@@ -73,6 +76,9 @@ export class AutomationRuleRepository {
 }
 
 export class AutomationRunRepository {
+  // Share the entire read-modify-write queue across instances for each file.
+  // JsonFileStore's atomic rename cannot prevent stale snapshot overwrites.
+  private static readonly mutations = new Map<string, Promise<void>>()
   private readonly store: JsonFileStore
 
   constructor(store: JsonFileStore) {
@@ -83,12 +89,52 @@ export class AutomationRunRepository {
     return this.store.read<RunsFile>(RUNS_FILE, { runs: [] })
   }
 
+  private async mutate<T>(operation: () => Promise<T>): Promise<T> {
+    const path = resolve(this.store.resolve(RUNS_FILE))
+    const key = process.platform === 'win32' ? path.toLowerCase() : path
+    const previous = AutomationRunRepository.mutations.get(key) ?? Promise.resolve()
+    const result = previous.then(operation)
+    // Preserve this caller's error without poisoning subsequent mutations.
+    const settled = result.then(() => undefined, () => undefined)
+    AutomationRunRepository.mutations.set(key, settled)
+    try {
+      return await result
+    } finally {
+      if (AutomationRunRepository.mutations.get(key) === settled) {
+        AutomationRunRepository.mutations.delete(key)
+      }
+    }
+  }
+
   /** Append a run (upsert by id); the list stays sorted newest-first. */
   async record(run: AutomationRun): Promise<void> {
-    const file = await this.read()
-    const next = [run, ...file.runs.filter((existing) => existing.id !== run.id)]
-    next.sort((a, b) => b.ranAt - a.ranAt || a.id.localeCompare(b.id))
-    await this.store.write(RUNS_FILE, { runs: next })
+    await this.mutate(async () => {
+      const file = await this.read()
+      const next = [run, ...file.runs.filter((existing) => existing.id !== run.id)]
+      next.sort((a, b) => b.ranAt - a.ranAt || a.id.localeCompare(b.id))
+      await this.store.write(RUNS_FILE, { ...file, runs: next })
+    })
+  }
+
+  /**
+   * Persistently claim one scheduled occurrence. A claim is made before the
+   * rule starts, so another scheduler tick (or a restarted host) cannot run
+   * the same occurrence again.
+   */
+  async claimScheduledOccurrence(ruleId: string, occurrence: string): Promise<boolean> {
+    return this.mutate(async () => {
+      const file = await this.read()
+      const occurrences = file.scheduledOccurrences?.[ruleId] ?? []
+      if (occurrences.includes(occurrence)) return false
+      await this.store.write(RUNS_FILE, {
+        ...file,
+        scheduledOccurrences: {
+          ...file.scheduledOccurrences,
+          [ruleId]: [...occurrences, occurrence],
+        },
+      })
+      return true
+    })
   }
 
   async list(): Promise<AutomationRun[]> {

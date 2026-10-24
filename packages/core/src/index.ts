@@ -2,6 +2,7 @@
 
 import type { SupportedLocale } from './locale.ts';
 import type { FinancialEvidenceEnvelope } from './financial-evidence.ts';
+import type { MarketSource } from './market-data.ts';
 
 export type { SupportedLocale, LocalePreference } from './locale.ts';
 
@@ -22,6 +23,8 @@ export interface Quote {
   low: number;
   open: number;
   prevClose: number;
+  /** Provider that produced this quote, when the router fetcher stamped it. */
+  source?: MarketSource;
 }
 
 export interface Position {
@@ -49,6 +52,8 @@ export interface Kline {
   low: number;
   close: number;
   volume: number;
+  /** Provider that produced this bar, when the router fetcher stamped it. */
+  source?: MarketSource;
 }
 
 export interface IntradayData {
