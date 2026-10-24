@@ -56,3 +56,32 @@ export interface PortfolioRiskReport {
     error?: string;
   }>;
 }
+
+
+/** Display state for a heatmap tile; unknown data must remain visible as unknown. */
+export type HeatmapTileStatus = 'ready' | 'stale' | 'unknown';
+
+/** Provider-neutral input for the watchlist/portfolio heatmap model. */
+export interface HeatmapTileInput {
+  /** Stable canonical identity when available; symbol is the fallback identity. */
+  instrumentId?: string;
+  symbol: string;
+  name?: string;
+  industry?: string;
+  changePercent?: number;
+  /** Base-currency value. Raw marketValue is accepted only when already comparable. */
+  marketValue?: number;
+  dataStatus?: HeatmapTileStatus;
+}
+
+/** Deterministic tile model consumed by a future heatmap renderer. */
+export interface HeatmapTile {
+  key: string;
+  symbol: string;
+  name: string;
+  group: string;
+  /** Watchlist tiles are equal weight; portfolio tiles use comparable values. */
+  weight?: number;
+  changePercent?: number;
+  status: HeatmapTileStatus;
+}

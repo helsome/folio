@@ -46,6 +46,49 @@ export type PortfolioRiskSynthesizer = (
   signal?: AbortSignal
 ) => Promise<string>;
 
+/**
+ * Build a deterministic, renderer-agnostic heatmap model from one snapshot.
+ *
+ * The function deliberately keeps unknown industry/change/value data explicit:
+ * callers must not turn missing provider data into a fake zero or neutral tile.
+ */
+export function buildHeatmapTiles(
+  items: import('@finagent/core').HeatmapTileInput[],
+  mode: 'watchlist' | 'portfolio'
+): import('@finagent/core').HeatmapTile[] {
+  const unique = new Map<string, import('@finagent/core').HeatmapTileInput>();
+  for (const item of items) {
+    const symbol = item.symbol.trim().toUpperCase();
+    if (!symbol) continue;
+    const key = (item.instrumentId?.trim() || symbol).toUpperCase();
+    if (!unique.has(key)) unique.set(key, { ...item, symbol });
+  }
+
+  const values = [...unique.values()].map((item) => ({
+    item,
+    value: typeof item.marketValue === 'number' && Number.isFinite(item.marketValue) && item.marketValue > 0
+      ? item.marketValue
+      : undefined,
+  }));
+  const total = mode === 'portfolio'
+    ? values.reduce((sum, entry) => sum + (entry.value ?? 0), 0)
+    : 0;
+
+  return values
+    .map(({ item, value }) => ({
+      key: (item.instrumentId?.trim() || item.symbol).toUpperCase(),
+      symbol: item.symbol,
+      name: item.name?.trim() || item.symbol,
+      group: item.industry?.trim() || 'Unknown',
+      weight: mode === 'watchlist' ? 1 : total > 0 && value !== undefined ? value / total : undefined,
+      changePercent: typeof item.changePercent === 'number' && Number.isFinite(item.changePercent)
+        ? item.changePercent
+        : undefined,
+      status: item.dataStatus ?? (typeof item.changePercent === 'number' && Number.isFinite(item.changePercent) ? 'ready' : 'unknown'),
+    }))
+    .sort((a, b) => a.group.localeCompare(b.group, 'en-US') || (b.weight ?? -1) - (a.weight ?? -1) || a.symbol.localeCompare(b.symbol));
+}
+
 export interface PortfolioRiskServiceOptions {
   registry: CapabilityRegistry;
   executor: CapabilityExecutor;

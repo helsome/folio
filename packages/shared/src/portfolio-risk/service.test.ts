@@ -17,6 +17,7 @@ import { createCapabilityRegistry } from '../capabilities/registry.ts';
 import { CapabilityExecutor } from '../capabilities/executor.ts';
 import {
   PortfolioRiskService,
+  buildHeatmapTiles,
   type PortfolioRiskSynthesisInput,
   type PortfolioRiskSynthesizer,
 } from './service.ts';
@@ -520,5 +521,57 @@ describe('PortfolioRiskService synthesizer + failure isolation', () => {
         (r) => r.capabilityId === 'portfolio.summary' && r.status === 'unavailable'
       )
     ).toBe(true);
+  });
+});
+
+describe('buildHeatmapTiles', () => {
+  it('deduplicates canonical instruments, groups unknown industries, and keeps missing change explicit', () => {
+    const tiles = buildHeatmapTiles([
+      { instrumentId: 'NASDAQ:AAPL', symbol: 'aapl.us', name: 'Apple', industry: 'Technology', marketValue: 60, changePercent: 2.5 },
+      { instrumentId: 'NASDAQ:AAPL', symbol: 'AAPL.US', name: 'Duplicate', industry: 'Technology', marketValue: 99, changePercent: 8 },
+      { symbol: '0700.HK', name: 'Tencent', marketValue: 40 },
+    ], 'portfolio');
+
+    expect(tiles).toEqual([
+      {
+        key: 'NASDAQ:AAPL',
+        symbol: 'AAPL.US',
+        name: 'Apple',
+        group: 'Technology',
+        weight: 0.6,
+        changePercent: 2.5,
+        status: 'ready',
+      },
+      {
+        key: '0700.HK',
+        symbol: '0700.HK',
+        name: 'Tencent',
+        group: 'Unknown',
+        weight: 0.4,
+        changePercent: undefined,
+        status: 'unknown',
+      },
+    ]);
+  });
+
+  it('uses equal watchlist weights and preserves stale status', () => {
+    const tiles = buildHeatmapTiles([
+      { symbol: 'MSFT.US', industry: 'Technology', changePercent: -1, dataStatus: 'stale' },
+      { symbol: 'TSLA.US', industry: 'Automotive', changePercent: 3 },
+    ], 'watchlist');
+
+    expect(tiles.map((tile) => [tile.symbol, tile.group, tile.weight, tile.status])).toEqual([
+      ['TSLA.US', 'Automotive', 1, 'ready'],
+      ['MSFT.US', 'Technology', 1, 'stale'],
+    ]);
+  });
+
+  it('does not fabricate portfolio weights when values are unavailable', () => {
+    const tiles = buildHeatmapTiles([
+      { symbol: 'AAPL.US', industry: 'Technology' },
+      { symbol: 'MSFT.US', industry: 'Technology', marketValue: 0 },
+    ], 'portfolio');
+
+    expect(tiles.every((tile) => tile.weight === undefined)).toBe(true);
   });
 });

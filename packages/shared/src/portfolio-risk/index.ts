@@ -1,5 +1,6 @@
 export {
   PortfolioRiskService,
+  buildHeatmapTiles,
   defaultPortfolioRiskSynthesizer,
   type PortfolioRiskSynthesizer,
   type PortfolioRiskSynthesisInput,
