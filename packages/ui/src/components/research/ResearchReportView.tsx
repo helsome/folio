@@ -39,7 +39,7 @@ export const ResearchReportView: React.FC<{
     let alive = true;
     setDiffState({ loading: true, diff: null });
     setPreviousReport(null);
-    void loadResearchDiff(report.symbol).then((diff) => {
+    void loadResearchDiff(report.symbol, report.id).then((diff) => {
       if (!alive) return;
       setDiffState({ loading: false, diff: diff ?? null });
       if (diff) {

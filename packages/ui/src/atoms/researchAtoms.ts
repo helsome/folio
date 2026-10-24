@@ -19,6 +19,9 @@ export const researchReportAtom = atom<ResearchReport | null>(null);
 /** Reports available for the active symbol (hydrated from `research:listReports`). */
 export const symbolReportsAtom = atom<ResearchReport[]>([]);
 
+/** Report id explicitly selected by navigation (Today/history). */
+export const selectedResearchReportIdAtom = atom<string | null>(null);
+
 /** Loading flag for a running refresh. */
 export const researchLoadingAtom = atom<boolean>(false);
 

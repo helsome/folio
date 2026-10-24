@@ -83,6 +83,7 @@ export const TodayView: React.FC = () => {
   const setActiveSymbol = useSetAtom(activeSymbolAtom)
   const setNavSection = useSetAtom(navSectionAtom)
   const setResearchOrigin = useSetAtom(researchOriginAtom)
+  const setSelectedReportId = useSetAtom(selectedResearchReportIdAtom)
   const fetchPortfolio = useSetAtom(fetchPortfolioAtom)
   const fetchQuote = useSetAtom(fetchQuoteAtom)
   const loadAlerts = useSetAtom(loadAlertsAtom)
@@ -283,6 +284,7 @@ export const TodayView: React.FC = () => {
             <button
               type="button"
               onClick={() => {
+                setSelectedReportId(report.id)
                 setActiveSymbol(report.symbol)
                 setResearchOrigin({ from: 'today', label: t('today.continueLabel') })
                 setNavSection('research')

@@ -8,6 +8,7 @@ import { pendingResearchStrategyAtom, researchOriginAtom } from '../../atoms/dis
 import {
   researchRunsAtom,
   researchReportAtom,
+  selectedResearchReportIdAtom,
   researchLoadingAtom,
   startResearch,
   cancelResearch,
@@ -45,6 +46,7 @@ export const ResearchPanel: React.FC = () => {
   const [runs, setRuns] = useAtom(researchRunsAtom);
   const [reports, setReports] = useState<ResearchReport[]>([]);
   const [report, setReport] = useAtom(researchReportAtom);
+  const [selectedReportId, setSelectedReportId] = useAtom(selectedResearchReportIdAtom);
   const [loading, setLoading] = useAtom(researchLoadingAtom);
   const [error, setError] = useState<string | null>(null);
   const [strategyId, setStrategyId] = useState<StrategyId>(DEFAULT_STRATEGY_ID);
@@ -87,18 +89,33 @@ export const ResearchPanel: React.FC = () => {
     if (!symbol) {
       setReports([]);
       setReport(null);
+      setSelectedReportId(null);
       setThesisSaved(false);
       return;
     }
     setThesisSaved(false);
     void loadSymbolReports(symbol).then(setReports);
+
+    if (selectedReportId) {
+      void loadResearchReport(selectedReportId).then((loaded) => {
+        if (loaded?.symbol === symbol) {
+          setReport(loaded);
+        } else {
+          setSelectedReportId(null);
+          setReport(null);
+        }
+      });
+      return;
+    }
+
     const latest = runs.find((run) => run.symbol === symbol && run.reportId);
-    if (latest?.reportId && !report) {
+    if (latest?.reportId && (!report || report.symbol !== symbol)) {
+      setSelectedReportId(latest.reportId);
       void loadResearchReport(latest.reportId).then((loaded) => {
-        if (loaded) setReport(loaded);
+        if (loaded?.symbol === symbol) setReport(loaded);
       });
     }
-  }, [symbol, setReport, setReports, runs, report]);
+  }, [symbol, setReport, setReports, setSelectedReportId, runs, report, selectedReportId]);
 
   // Poll the newest active run for this symbol while it is non-terminal.
   const activeRun = runs.find(
@@ -117,6 +134,7 @@ export const ResearchPanel: React.FC = () => {
       if (updated.status in TERMINAL_RUN_STATUSES && updated.reportId) {
         const loaded = await loadResearchReport(updated.reportId);
         if (alive && loaded) {
+          setSelectedReportId(updated.reportId);
           setReport(loaded);
           void loadSymbolReports(updated.symbol).then(setReports);
         }
@@ -174,7 +192,7 @@ export const ResearchPanel: React.FC = () => {
   /** V9: research complete → one-click save as investment thesis. */
   const handleSaveThesis = async () => {
     if (!symbol) return;
-    const created = await saveThesisFromReport(symbol);
+    const created = await saveThesisFromReport({ symbol, reportId: report?.id });
     if (created) {
       setThesisSaved(true);
     } else {
@@ -362,12 +380,13 @@ export const ResearchPanel: React.FC = () => {
           </ContentReveal>
         )}
 
-        {symbol && !activeRun && !report && (
+        {symbol && !activeRun && (
           <RunHistory
             runs={symbolRuns}
             onSelect={async (reportId) => {
+              setSelectedReportId(reportId);
               const loaded = await loadResearchReport(reportId);
-              if (loaded) setReport(loaded);
+              if (loaded?.symbol === symbol) setReport(loaded);
             }}
           />
         )}
