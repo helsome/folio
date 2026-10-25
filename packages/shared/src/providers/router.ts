@@ -332,6 +332,7 @@ export class ProviderRouter implements FinancialProviderRouter {
       if (!order.includes(provider.id) && supports(provider, capabilityId)) order.push(provider.id);
     }
     const results: ProviderResult<T>[] = [];
+    const trail: ProviderFailoverStep[] = [];
     for (const id of order) {
       const provider = this.get(id);
       if (!provider || !supports(provider, capabilityId)) continue;
@@ -340,7 +341,21 @@ export class ProviderRouter implements FinancialProviderRouter {
         () => this.invokeWithTimeout<T>(provider, capabilityId, input, signal),
         this.retryOptions
       );
-      results.push(outcome.result);
+      if (outcome.result.ok) {
+        results.push({
+          ...outcome.result,
+          provenance: this.attachTrail(outcome.result.provenance, trail),
+        });
+      } else {
+        results.push(outcome.result);
+        trail.push({
+          providerId: id,
+          code: outcome.result.error.code,
+          kind: classifyFailure(outcome.result.error.code),
+          attempts: outcome.attempts,
+          at: this.now(),
+        });
+      }
     }
     return results;
   }

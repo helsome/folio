@@ -87,6 +87,7 @@ import {
   createFullRegistry,
   createLocalThesisEvaluator,
   createRouterFetchers,
+  fetchEcbConversion,
   ConnectionStore,
   InstrumentCatalogStore,
   defaultPortfolioRiskSynthesizer,
@@ -369,6 +370,7 @@ export class AgentKernelHost {
     this.instrumentResolver = new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG);
     const routerFetchers = createRouterFetchers(this.providerRouter, {
       resolve: (query, options) => this.instrumentResolver.resolve(query, options),
+      currencyConversion: fetchEcbConversion,
     });
     void this.hydrateInstrumentCatalog(userData);
     // FINAGENT_DEMO_DATA=1: offline demo mode. When every real provider is

@@ -12,6 +12,7 @@ import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
 import { defaultCapabilityFetchers } from '../fetchers.ts';
+import { reconcileQuoteResults } from '../../providers/quote-reconciliation.ts';
 
 const DEFAULT_INSTRUMENT_RESOLVER = new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG);
 
@@ -35,23 +36,57 @@ export function createMarketQuoteCapability(
     }),
     async execute(input, ctx, reportProvider) {
       const symbol = normalizeSymbol(input.symbol);
-      const fetched = fetchers.getQuoteResult
+      const candidates = await fetchers.getQuoteCandidates?.(symbol, ctx?.signal);
+      const reconciled = candidates ? reconcileQuoteResults(candidates) : undefined;
+      const fetched = !reconciled?.selected && fetchers.getQuoteResult
         ? await fetchers.getQuoteResult(symbol, ctx?.signal)
         : undefined;
-      const quote = fetched?.data ?? await fetchers.getQuote(symbol);
-      if (fetched) reportProvider?.(fetched.provenance);
+      const quote = reconciled?.selected?.data ?? fetched?.data ?? await fetchers.getQuote(symbol);
+      const source = reconciled?.selected?.provenance ?? fetched?.provenance;
+      if (source) reportProvider?.(source);
       const instrumentId = readInstrumentId(quote) ?? resolveCanonicalInstrumentId(symbol);
+      const comparison = reconciled?.comparison;
+      const conflict = comparison?.state === 'material-conflict';
+      const incomparable = comparison?.state === 'incomparable';
+      const comparisonSummary = conflict
+        ? ` Provider price conflict: ${comparison.candidates.map(
+          (candidate) => `${candidate.provider}=${candidate.value} ${candidate.currency ?? ''}`
+        ).join(' vs ')}. Treat this price as disputed.`
+        : incomparable
+          ? ' No comparable second quote was available: providers returned different instrument, currency, or market-time semantics.'
+          : comparison?.state === 'insufficient-sources'
+            ? ' Only one provider supplied this quote; no cross-provider check was possible.'
+          : '';
       return {
         data: quote,
         provenance: {
-          provider: 'longbridge',
-          providerName: 'Longbridge',
+          provider: source?.providerId ?? 'longbridge',
+          ...(source ? {
+            providerId: source.providerId,
+            providerName: source.providerName,
+            ...(source.delayed !== undefined ? { delayed: source.delayed } : {}),
+            ...(source.failoverTrail ? { failoverTrail: source.failoverTrail } : {}),
+          } : {}),
           ...(instrumentId ? { instrumentId } : {}),
           fetchedAt: (ctx?.now ?? Date.now)(),
-          marketTime: quote.timestamp * 1000,
-          stale: false,
+          marketTime: source?.marketTime ?? quote.timestamp * 1000,
+          stale: source?.stale ?? false,
         },
-        summary: formatQuote(quote),
+        summary: `${formatQuote(quote)}${comparisonSummary}`,
+        ...(comparison ? {
+          evidence: {
+            reconciliation: {
+              providers: comparison.candidates.map((candidate) => candidate.provider),
+              method: 'folio-quote/v1',
+              comparisons: [{ metric: 'lastPrice', period: 'market.quote', result: comparison }],
+            },
+            lineage: [{
+              kind: 'reconciliation' as const,
+              description: `Compared ${comparison.sourceCount ?? 0} provider quotes: ${comparison.state}.`,
+              version: 'folio-quote/v1',
+            }],
+          },
+        } : {}),
       };
     },
   });
