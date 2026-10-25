@@ -12,16 +12,21 @@
  * Real components only, no fixtures:
  *  - real `AgentKernel` + `ResearchService` (the production research path);
  *  - real DeepSeek HTTP streaming — the configured model is the model asked for;
- *  - real retrieval over the public internet, injected through the capability
- *    fetcher seam (`createFullRegistry(fetchers)`) so the capability bodies
- *    (validation, sanitisation, summaries, provenance) run unchanged;
+ *  - real retrieval over the public internet through the SHIPPED provider
+ *    platform: the `YahooChartFinancialDataProvider` registered on the real
+ *    `ProviderRouter`, its fetchers handed to `createFullRegistry` — the same
+ *    wiring `AgentKernelHost` uses. Capability bodies (validation,
+ *    sanitisation, summaries, provenance) run unchanged, and every result
+ *    carries the provider that actually answered plus its `delayed` flag;
  *  - a second process for the restart read-back, so nothing is served from the
  *    first process's memory.
  *
- * The retrieval sources are Yahoo Finance's public chart API (quote / kline /
- * profile) and the NYT Business RSS feed (news). They stand in for the
- * Longbridge CLI, which is not installed on this machine; the report records
- * that substitution explicitly and never claims Longbridge was used.
+ * Retrieval scope is exactly what the shipped Yahoo adapter supports: US
+ * delayed quotes, daily candles, and a thin company profile. It is a no-key,
+ * unofficial chart endpoint (personal use, may rate-limit). Everything else —
+ * broker positions, financials, news, options, intraday — has no provider on
+ * this machine and fails loudly through the router instead of being faked with
+ * zeros or empty lists. See `docs/yahoo-finance.md`.
  *
  * Usage (from the repository root, with DEEPSEEK_API_KEY in the environment):
  *   bun apps/electron/e2e/run-manifest-acceptance.ts
@@ -32,24 +37,17 @@ import { once } from 'node:events';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import { openSync, closeSync } from 'node:fs';
 import { resolve, join } from 'node:path';
-import { randomUUID, createHash } from 'node:crypto';
-import type {
-  AgentRuntime,
-  AgentEvent,
-  AgentRunInput,
-  Kline,
-  NewsItem,
-  Quote,
-  RunManifestContext,
-  StaticInfo,
-} from '@finagent/core';
+import { randomUUID } from 'node:crypto';
+import type { AgentRuntime, AgentEvent, AgentRunInput, RunManifestContext } from '@finagent/core';
 import { AgentKernel } from '../../../packages/shared/src/kernel/agent-kernel';
 import { ResearchService } from '../../../packages/shared/src/research/service';
 import { ResearchReportRepository } from '../../../packages/shared/src/research/repository';
 import { JsonFileStore } from '../../../packages/shared/src/storage/json-file-store';
 import { createFullRegistry } from '../../../packages/shared/src/capabilities';
-import type { CapabilityFetchers } from '../../../packages/shared/src/capabilities/fetchers';
 import { parseSynthesisJson } from '../../../packages/shared/src/research/agent-synth';
+import { ProviderRouter, createRouterFetchers } from '../../../packages/shared/src/providers';
+import { YahooChartFinancialDataProvider } from '../../../packages/shared/src/providers/yahoo';
+import { YAHOO_PROVIDER_ID } from '../../../packages/shared/src/providers/yahoo/adapter';
 import {
   diffRunManifests,
   exportRunManifest,
@@ -61,8 +59,6 @@ import {
 // ---------------------------------------------------------------------------
 
 const SYMBOL = process.env.FINAGENT_MANIFEST_SYMBOL ?? 'NVDA.US';
-/** Yahoo's ticker for the same instrument (folio's `.US` suffix is not Yahoo's). */
-const YAHOO_TICKER = SYMBOL.split('.')[0];
 const STRATEGY = 'comprehensive';
 const MAX_TOKENS = 8_000;
 
@@ -117,188 +113,45 @@ function launch(args: string[]) {
 }
 
 // ---------------------------------------------------------------------------
-// Real retrieval: Yahoo Finance chart API + NYT Business RSS
+// Real retrieval: the shipped Yahoo provider behind the real provider router
 // ---------------------------------------------------------------------------
 
-const YAHOO_HEADERS = { 'User-Agent': 'Mozilla/5.0 (compatible; folio-acceptance/1.0)' };
-
-interface YahooChart {
-  meta: {
-    currency?: string;
-    symbol?: string;
-    fullExchangeName?: string;
-    longName?: string;
-    shortName?: string;
-    regularMarketPrice?: number;
-    regularMarketChangePercent?: number;
-    chartPreviousClose?: number;
-    regularMarketDayHigh?: number;
-    regularMarketDayLow?: number;
-    regularMarketVolume?: number;
-    regularMarketTime?: number;
-  };
-  timestamp?: number[];
-  indicators: { quote: Array<{ open?: number[]; high?: number[]; low?: number[]; close?: number[]; volume?: number[] }> };
+/**
+ * Build the same retrieval stack `AgentKernelHost` builds: register the real
+ * `YahooChartFinancialDataProvider` on a real `ProviderRouter`, point the
+ * routing at it, and let `createRouterFetchers` produce the capability
+ * fetchers. No hand-rolled HTTP, no hand-written mapping: quote / kline /
+ * profile go through the router and the capability bodies, so the provider id,
+ * the timestamp and the `delayed` flag in every result are the ones that
+ * actually answered.
+ *
+ * Yahoo is the only market-data provider on this machine (the Longbridge CLI is
+ * not installed, there is no Massive key), so it is the whole chain. Its
+ * adapter covers US delayed quotes, daily candles and a thin company profile;
+ * every other capability raises `UNSUPPORTED_CAPABILITY` from the router and
+ * is reported as unavailable by the research run — never as zero or "no data".
+ */
+function buildRetrieval() {
+  const router = new ProviderRouter();
+  router.register(new YahooChartFinancialDataProvider());
+  router.setRouting({ primary: YAHOO_PROVIDER_ID });
+  return { router, fetchers: createRouterFetchers(router) };
 }
 
-async function yahooChart(range: string, interval: string): Promise<YahooChart> {
-  const url = `https://query1.finance.yahoo.com/v8/finance/chart/${YAHOO_TICKER}?range=${range}&interval=${interval}`;
-  const response = await fetch(url, { headers: YAHOO_HEADERS, signal: AbortSignal.timeout(30_000) });
-  assert.ok(response.ok, `Yahoo chart returned HTTP ${response.status}`);
-  const body = (await response.json()) as { chart?: { result?: YahooChart[] } };
-  const result = body.chart?.result?.[0];
-  assert.ok(result?.meta, 'Yahoo chart response carried no result meta');
-  return result;
-}
-
-function decodeXml(value: string): string {
-  return value
-    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-    .replace(/&lt;/g, '<')
-    .replace(/&gt;/g, '>')
-    .replace(/&quot;/g, '"')
-    .replace(/&#0?39;|&apos;/g, "'")
-    .replace(/&amp;/g, '&')
-    .trim();
-}
-
-interface RssItem {
-  title: string;
-  link: string;
-  description: string;
-  pubDate: string;
-}
-
-function parseRss(xml: string): RssItem[] {
-  const items: RssItem[] = [];
-  const blocks = xml.match(/<item>[\s\S]*?<\/item>/g) ?? [];
-  for (const block of blocks) {
-    const pick = (tag: string): string => {
-      const match = new RegExp(`<${tag}[^>]*>([\\s\\S]*?)</${tag}>`).exec(block);
-      return match ? decodeXml(match[1]) : '';
-    };
-    const title = pick('title');
-    const link = pick('link');
-    if (!title || !link) continue;
-    items.push({ title, link, description: pick('description'), pubDate: pick('pubDate') });
-  }
-  return items;
-}
-
-const NYT_BUSINESS_RSS = 'https://rss.nytimes.com/services/xml/rss/nyt/Business.xml';
-
-/** A fetcher with no real source here: it fails loudly rather than returning fake data. */
-const notWired = (name: string) =>
-  async (): Promise<never> => {
-    throw new Error(`live-acceptance: ${name} has no real source wired on this machine`);
-  };
-
-function realFetchers(): CapabilityFetchers {
+/** Routing as the manifest should record it: what the run actually used. */
+function retrievalManifest(routing: { primary?: string; fallback?: string }) {
   return {
-    // Real quote from Yahoo's public chart API (epoch seconds, like Longbridge).
-    async getQuote(symbol: string): Promise<Quote> {
-      const chart = await yahooChart('5d', '1d');
-      const meta = chart.meta;
-      const last = meta.regularMarketPrice;
-      const prev = meta.chartPreviousClose;
-      assert.ok(typeof last === 'number', 'Yahoo chart had no regularMarketPrice');
-      const series = chart.indicators.quote[0];
-      const open = series.open?.filter((v): v is number => typeof v === 'number') ?? [];
-      return {
-        symbol,
-        lastPrice: last,
-        change: typeof prev === 'number' ? last - prev : 0,
-        changePercent: meta.regularMarketChangePercent ?? 0,
-        volume: meta.regularMarketVolume ?? 0,
-        timestamp: meta.regularMarketTime ?? Math.floor(Date.now() / 1000),
-        high: meta.regularMarketDayHigh ?? last,
-        low: meta.regularMarketDayLow ?? last,
-        open: open.length > 0 ? open[open.length - 1] : last,
-        prevClose: typeof prev === 'number' ? prev : last,
-      };
+    providerId: routing.primary,
+    routing: {
+      primary: routing.primary,
+      ...(routing.fallback ? { fallback: routing.fallback } : {}),
     },
-
-    // Real daily candles from the same public endpoint.
-    async getKline(): Promise<Kline[]> {
-      const chart = await yahooChart('3mo', '1d');
-      const stamps = chart.timestamp ?? [];
-      const series = chart.indicators.quote[0];
-      const out: Kline[] = [];
-      for (let i = 0; i < stamps.length; i += 1) {
-        const open = series.open?.[i];
-        const high = series.high?.[i];
-        const low = series.low?.[i];
-        const close = series.close?.[i];
-        if ([open, high, low, close].some((v) => typeof v !== 'number')) continue;
-        out.push({
-          symbol: SYMBOL,
-          timestamp: stamps[i],
-          open: open as number,
-          high: high as number,
-          low: low as number,
-          close: close as number,
-          volume: series.volume?.[i] ?? 0,
-        });
-      }
-      assert.ok(out.length > 0, 'Yahoo chart returned no usable candles');
-      return out;
-    },
-
-    // Real company profile from the chart endpoint's instrument metadata.
-    async getStaticInfo(symbol: string): Promise<StaticInfo> {
-      const chart = await yahooChart('5d', '1d');
-      const meta = chart.meta;
-      return {
-        symbol,
-        name: meta.longName ?? meta.shortName ?? YAHOO_TICKER,
-        exchange: meta.fullExchangeName,
-        currency: meta.currency,
-      };
-    },
-
-    // Real news headlines over HTTP. Market-wide business news: a symbol-scoped
-    // feed needs the Longbridge CLI, which is not installed here.
-    async getNews(): Promise<NewsItem[]> {
-      const response = await fetch(NYT_BUSINESS_RSS, {
-        headers: YAHOO_HEADERS,
-        signal: AbortSignal.timeout(30_000),
-      });
-      assert.ok(response.ok, `NYT RSS returned HTTP ${response.status}`);
-      const items = parseRss(await response.text());
-      assert.ok(items.length > 0, 'NYT RSS returned no items');
-      return items.slice(0, 20).map((item) => {
-        const parsed = Date.parse(item.pubDate);
-        return {
-          id: createHash('sha1').update(item.link).digest('hex').slice(0, 16),
-          title: item.title,
-          summary: item.description,
-          url: item.link,
-          // NewsItem.timestamp is epoch SECONDS across the codebase.
-          timestamp: Number.isFinite(parsed) ? Math.floor(parsed / 1000) : Math.floor(Date.now() / 1000),
-          symbols: [],
-        };
-      });
-    },
-
-    // Not wired to a real source in this acceptance run.
-    getIntraday: notWired('getIntraday'),
-    getMarketStatus: notWired('getMarketStatus'),
-    getCalcIndex: notWired('getCalcIndex'),
-    getPortfolio: notWired('getPortfolio'),
-    getDepth: notWired('getDepth'),
-    getTrades: notWired('getTrades'),
-    getCapitalFlow: notWired('getCapitalFlow'),
-    getMarketTemperature: notWired('getMarketTemperature'),
-    getFinancialReport: notWired('getFinancialReport'),
-    getInstitutionRating: notWired('getInstitutionRating'),
-    getDividends: notWired('getDividends'),
-    getEpsForecasts: notWired('getEpsForecasts'),
-    getCalendarEvents: notWired('getCalendarEvents'),
-    getAccountPositions: notWired('getAccountPositions'),
-    getAssets: notWired('getAssets'),
-    getCashFlow: notWired('getCashFlow'),
+    configured: true,
+    endpoint: 'https://query1.finance.yahoo.com/v8/finance/chart/',
   };
 }
+
+
 
 /** The prompt-composition fingerprint, recorded identically for both runs. */
 const PROMPT_HASH = hashManifestInput(
@@ -317,7 +170,9 @@ interface WorkerOptions {
 }
 
 function buildStack(options: WorkerOptions) {
-  const registry = createFullRegistry(realFetchers());
+  const { router, fetchers } = buildRetrieval();
+  const routing = router.getRouting();
+  const registry = createFullRegistry(fetchers);
   const repository = new ResearchReportRepository(new JsonFileStore(join(output, 'store')));
 
   const abort = new AbortController();
@@ -443,12 +298,9 @@ function buildStack(options: WorkerOptions) {
       },
       prompt: { hash: PROMPT_HASH, version: PROMPT_VERSION, source: PROMPT_SOURCE },
       tools,
-      search: {
-        providerId: 'public-http',
-        routing: { primary: 'public-http' },
-        configured: true,
-        endpoint: 'https://query1.finance.yahoo.com',
-      },
+      // Recorded from the live router, not hard-coded: the manifest must name
+      // the provider that actually serves retrieval for this run.
+      search: retrievalManifest(routing),
       featureFlags: { runtimeProvider: 'pi', demoData: false, langfuseTracing: false },
       locale: 'en-US',
     }),
@@ -485,7 +337,7 @@ function buildStack(options: WorkerOptions) {
     },
   });
 
-  return { service, kernel };
+  return { service, kernel, fetchers };
 }
 
 // ---------------------------------------------------------------------------
@@ -494,7 +346,7 @@ function buildStack(options: WorkerOptions) {
 
 async function runWorker(options: WorkerOptions): Promise<void> {
   assert.ok(process.env.DEEPSEEK_API_KEY, 'Set DEEPSEEK_API_KEY. No fixture fallback.');
-  const { service, kernel } = buildStack(options);
+  const { service, kernel, fetchers } = buildStack(options);
 
   const queued = await service.start(SYMBOL, STRATEGY);
   const done = await until(async () => {
@@ -508,6 +360,24 @@ async function runWorker(options: WorkerOptions): Promise<void> {
   const manifest = (await service.getRun(queued.id))?.manifest;
   assert.ok(manifest, 'The production research run produced no manifest');
 
+  // Who actually answered, straight off the same fetcher chain the run used.
+  // Recorded so the report can show a real provider + timestamp + delayed flag
+  // instead of asserting "Yahoo" from the wiring alone. A failure is recorded
+  // as a failure — never papered over with a zero.
+  const marketSource = await fetchers
+    .getQuote(SYMBOL)
+    .then((quote) => {
+      const source = (quote as { source?: Record<string, unknown> }).source;
+      return {
+        ok: true as const,
+        symbol: quote.symbol,
+        lastPrice: quote.lastPrice,
+        timestamp: quote.timestamp,
+        ...source,
+      };
+    })
+    .catch((error: unknown) => ({ ok: false as const, error: String(error) }));
+
   await save(`${options.label}.json`, {
     label: options.label,
     requestedModel: options.model,
@@ -516,6 +386,7 @@ async function runWorker(options: WorkerOptions): Promise<void> {
     status: done.status,
     completedCapabilities: done.completedCapabilities,
     failedCapabilities: done.failedCapabilities,
+    marketSource,
     manifest,
   });
   await kernel.dispose();
@@ -646,16 +517,41 @@ async function main(): Promise<void> {
     'A credential must never appear in a manifest'
   );
 
+  // --- Assertion: the manifest names the provider that actually served ------
+  assert.equal(
+    manifestA.search?.providerId,
+    YAHOO_PROVIDER_ID,
+    'The manifest must record the retrieval provider the run actually used'
+  );
+  assert.equal(manifestA.search?.routing?.primary, YAHOO_PROVIDER_ID);
+  assert.equal(
+    recordA.marketSource.ok,
+    true,
+    'The retrieval probe must return real data — a configured connection is not proof of a successful fetch'
+  );
+  assert.equal(
+    recordA.marketSource.providerId,
+    YAHOO_PROVIDER_ID,
+    'The quote must carry the answering provider'
+  );
+  assert.equal(recordA.marketSource.delayed, true, 'This provider serves delayed US quotes and must say so');
+  assert.ok(recordA.marketSource.timestamp > 0, 'The quote must carry the provider timestamp');
+
   const verification = {
     kind: 'live',
-    transport: 'real DeepSeek HTTP streaming; real public HTTP retrieval',
-    retrievalSources: {
-      quote: 'https://query1.finance.yahoo.com/v8/finance/chart/<ticker>',
-      kline: 'https://query1.finance.yahoo.com/v8/finance/chart/<ticker>',
-      profile: 'https://query1.finance.yahoo.com/v8/finance/chart/<ticker>',
-      news: NYT_BUSINESS_RSS,
-      substitutedFor: 'Longbridge CLI (not installed on this machine)',
+    transport: 'real DeepSeek HTTP streaming; real provider-router retrieval',
+    retrieval: {
+      wiring: 'YahooChartFinancialDataProvider → ProviderRouter → createRouterFetchers → createFullRegistry',
+      provider: YAHOO_PROVIDER_ID,
+      routing: manifestA.search?.routing,
+      endpoint: manifestA.search?.endpoint,
+      supported: ['market.quote', 'market.kline', 'company.profile'],
+      unsupported:
+        'every other capability raises UNSUPPORTED_CAPABILITY from the router and is reported unavailable — never zero, never an empty event list',
+      caveat: 'no-key unofficial chart host, personal use, may rate-limit',
     },
+    // What actually answered, per run: provider id, timestamp, delayed flag.
+    marketSource: { runA: recordA.marketSource, runB: recordB.marketSource },
     symbol: SYMBOL,
     strategy: STRATEGY,
     runs: [
