@@ -554,7 +554,8 @@ export class AgentKernelHost {
   }
 
   async listRuns(sessionId: unknown): Promise<Run[]> {
-    return this.kernel.sessions.listRuns(requireString(sessionId, 'sessionId'));
+    const runs = await this.kernel.sessions.listRuns(requireString(sessionId, 'sessionId'));
+    return runs.map((run) => this.redactRunRecordManifest(run));
   }
 
   async startRun(input: unknown): Promise<Run> {
@@ -736,6 +737,24 @@ export class AgentKernelHost {
   }
 
   // -- Run manifests (#21) ---------------------------------------------------
+
+  /**
+   * Clone a run/summary record with its embedded `manifest` redacted.
+   *
+   * `listRuns` / `researchListRuns` / `researchGetRun` are the *ordinary* read
+   * paths the renderer uses for run history, and every record they return
+   * carries the same `manifest` field as the dedicated `get*Manifest` IPC.
+   * Capture already strips credentials, but a manifest persisted before that
+   * guarantee — or written by a caller that bypassed `captureRunManifest` —
+   * must not be able to hand a key to the renderer through these routes
+   * either, so they go through the same redaction as the dedicated getters.
+   *
+   * Only `manifest` is cloned; the rest of the record keeps its identity.
+   */
+  private redactRunRecordManifest<T extends { manifest?: RunManifest }>(record: T): T {
+    if (!record.manifest) return record;
+    return { ...record, manifest: redactManifestSecrets(record.manifest) };
+  }
 
   /**
    * Immutable run-config snapshot for a copilot run, or undefined if absent.
@@ -936,12 +955,14 @@ export class AgentKernelHost {
   }
 
   async researchListRuns(): Promise<ResearchRunSummary[]> {
-    return this.researchService.listRuns();
+    const runs = await this.researchService.listRuns();
+    return runs.map((run) => this.redactRunRecordManifest(run));
   }
 
   async researchGetRun(input: unknown): Promise<ResearchRunSummary | undefined> {
     const request = requireObject(input);
-    return this.researchService.getRun(requireString(request.runId, 'runId'));
+    const run = await this.researchService.getRun(requireString(request.runId, 'runId'));
+    return run ? this.redactRunRecordManifest(run) : undefined;
   }
 
   async researchListReports(input: unknown): Promise<ResearchReport[]> {

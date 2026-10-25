@@ -920,4 +920,62 @@ describe('AgentKernelHost run manifest IPC (#21)', () => {
     expect(diff.fields.map((field) => field.path)).toContain('model');
     host.dispose();
   });
+
+  // The dedicated getters above are not the only way a manifest reaches the
+  // renderer: run history is read through listRuns / researchListRuns /
+  // researchGetRun, and each record carries the same `manifest` field. These
+  // three routes used to hand the raw record through, so a dirty manifest
+  // bypassed redaction entirely by going through them instead.
+  it('redacts manifests returned by the ordinary copilot run-history read path', async () => {
+    storedRuns = [storedRun('r1', dirtyManifest('r1')), storedRun('r2', undefined)];
+    const host = new AgentKernelHost();
+
+    const runs = await host.listRuns('s1');
+
+    expect(runs.map((run) => run.id)).toEqual(['r1', 'r2']);
+    expect((runs[0].manifest?.modelParams as Record<string, unknown>).apiKey).toBe('[redacted]');
+    expect(runs[0].manifest?.modelParams?.maxTokens).toBe(4096);
+    // A run with no manifest must not gain one, and the rest of the record is
+    // passed through untouched.
+    expect(runs[1].manifest).toBeUndefined();
+    expect(runs[1].input).toBe('hi');
+    // Redaction is applied to the copy handed over IPC, not written back into
+    // the store: the persisted record must keep the value it was created with.
+    expect(
+      (storedRuns[0].manifest as { modelParams: Record<string, unknown> }).modelParams.apiKey
+    ).toBe('sk-live');
+    host.dispose();
+  });
+
+  it('redacts manifests returned by the ordinary Deep Research run-history read path', async () => {
+    const host = new AgentKernelHost();
+    const research = (
+      host as unknown as { researchService: { listRuns: () => Promise<unknown[]> } }
+    ).researchService;
+    research.listRuns = async () => [
+      { id: 'research-1', symbol: 'NVDA.US', status: 'partial', manifest: dirtyManifest('research-1') },
+    ];
+
+    const runs = await host.researchListRuns();
+
+    expect(runs[0].id).toBe('research-1');
+    expect((runs[0].manifest?.modelParams as Record<string, unknown>).apiKey).toBe('[redacted]');
+    expect(runs[0].manifest?.modelParams?.maxTokens).toBe(4096);
+    host.dispose();
+  });
+
+  it('redacts manifests returned by the ordinary Deep Research run read path', async () => {
+    const host = new AgentKernelHost();
+    const research = (
+      host as unknown as { researchService: { getRun: (runId: string) => Promise<unknown> } }
+    ).researchService;
+    research.getRun = async () => ({ id: 'research-1', manifest: dirtyManifest('research-1') });
+
+    const run = await host.researchGetRun({ runId: 'research-1' });
+
+    expect(run?.id).toBe('research-1');
+    expect((run?.manifest?.modelParams as Record<string, unknown>).apiKey).toBe('[redacted]');
+    expect(run?.manifest?.modelParams?.maxTokens).toBe(4096);
+    host.dispose();
+  });
 });
