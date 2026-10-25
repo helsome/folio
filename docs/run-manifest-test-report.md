@@ -1,5 +1,31 @@
 # Run manifest acceptance report (#21)
 
+## Evidence revision — read this first
+
+The artifacts in `docs/acceptance/run-manifest/` were produced at revision
+`402bd92f2c0b32dfed4b28b1038b67c2c0adf582`, when the acceptance script still injected an
+**ad-hoc Yahoo chart fetcher plus the NYT Business RSS feed** through the capability-fetcher
+seam.
+
+`apps/electron/e2e/run-manifest-acceptance.ts` has since been switched to the **shipped**
+retrieval path (`YahooChartFinancialDataProvider` → `ProviderRouter` → `createRouterFetchers`
+→ `createFullRegistry`, the same wiring `AgentKernelHost` uses) — see *Limits* below. The
+script now also asserts `search.providerId` / `search.routing` and records the answering
+provider, timestamp and `delayed` flag per run.
+
+**Those artifacts have not been regenerated.** Re-running the live acceptance needs a
+DeepSeek API key, which was not available in the environment where this revision was
+prepared. So:
+
+- The two acceptance items proven below — the selective manifest diff, and the post-restart
+  read-back that still reports the birth config — were measured on real runs and remain
+  valid: neither depends on which retrieval source answered.
+- The retrieval-source rows (`completedCapabilities` including `research.news`, and the
+  provider-usage/wall-clock numbers) describe the **old** wiring. Under the new wiring
+  `research.news` is `unavailable` (the shipped Yahoo adapter is market-data only), so a
+  fresh run would report three completed capabilities, not four.
+- Regenerating is a single command for anyone holding a key; the command is below.
+
 ## Acceptance environment
 
 Date: 2026-09-29. Environment: Windows 11 Home China, NT 10.0.26200, Bun 1.4.2.
@@ -33,9 +59,10 @@ bun apps/electron/e2e/run-manifest-acceptance.ts
 The parent orchestrator spawns three child processes: `run run-a`, `run run-b`, and
 `inspect <runAId> deepseek-v4-pro`. Each child hosts the real `AgentKernel` and
 `ResearchService` (the production research path), streams a real DeepSeek response, and
-retrieves over the public internet through the repository's own capability-fetcher
-injection point (`createFullRegistry(fetchers)`), so the capability bodies — validation,
-sanitisation, summaries, provenance — run unchanged.
+retrieves over the public internet through the shipped provider platform: the real
+`YahooChartFinancialDataProvider` registered on a real `ProviderRouter`, whose fetchers are
+handed to `createFullRegistry` — the same wiring `AgentKernelHost` uses. The capability
+bodies — validation, sanitisation, summaries, provenance — run unchanged.
 
 Deliberate config change between the two runs: **model** `deepseek-flash` → `deepseek-v4-pro`
 and **budget** `modelCalls` 3 → 6. Everything else (strategy, prompt, tools, search config,
@@ -125,12 +152,15 @@ tokens. They are the view the app actually shows, not a re-implementation.
 
 ## Automated checks
 
+Latest run (after rebasing onto `main` @ `9afa460` and adding the ordinary-read-path
+redaction tests):
+
 | Executed command | Result |
 | --- | --- |
-| `bun test --isolate packages/shared/src/research packages/shared/src/kernel packages/shared/src/evaluation packages/ui/src/components/kernel --timeout 20000` | 419 pass / 1 fail; 1964 assertions across 36 files |
-| `bun test --isolate packages/shared/src/research/service.test.ts packages/shared/src/kernel/run-manager.test.ts packages/shared/src/evaluation/langfuse/metadata.test.ts packages/shared/src/evaluation/experiment-service.test.ts --timeout 20000` | 84 pass / 0 fail; 325 assertions across 4 files |
+| `bun test --isolate packages/shared/src/research packages/shared/src/kernel packages/shared/src/evaluation packages/ui/src/components/kernel apps/electron/src/main/kernelHost.test.ts` | 497 pass / 1 fail; 2261 assertions across 41 files |
+| `bun test --isolate apps/electron/src/main/kernelHost.test.ts` | 29 pass / 0 fail; 67 assertions |
 | `bun node_modules/typescript/bin/tsc --noEmit` | exit 0 |
-| `bun node_modules/typescript/bin/tsc --noEmit -p <tsconfig incl. apps/electron/e2e>` | 2 errors, both pre-existing in unrelated e2e files; the two new scripts are clean |
+| `bun node_modules/typescript/bin/tsc --noEmit -p <tsconfig incl. apps/electron/e2e>` | exit 0 for this branch's two e2e scripts |
 
 The single failure is `langfuse.test.ts > does not throw when Langfuse is down — agent path keeps
 a diagnostic`. It is a **pre-existing local baseline failure**: it reproduces on a clean checkout
@@ -145,15 +175,28 @@ branch's two new e2e scripts typecheck without error under the same settings.
 
 ## Limits
 
-The retrieval sources are **not** Longbridge. Longbridge CLI is not installed on this machine,
-so the acceptance injects public sources through the same documented fetcher seam:
-Yahoo Finance's public chart API (`market.quote` / `market.kline` / `company.profile`) and the
-NYT Business RSS feed (`research.news`). `verification.json` records this substitution
-explicitly (`substitutedFor: "Longbridge CLI (not installed on this machine)"`). The
-capability implementations that ran are the production ones; only the raw HTTP source
-differs. The remaining 12 capabilities have no live public equivalent and are wired to a
-`notWired()` fetcher that throws loudly, which is why both runs finish `partial` with those
-12 recorded as `unavailable`.
+Retrieval goes through the **shipped** provider platform, not a hand-rolled substitute. The
+acceptance registers the real `YahooChartFinancialDataProvider` on a real `ProviderRouter`,
+points the routing at it, and hands `createRouterFetchers(router)` to `createFullRegistry` —
+the same wiring `AgentKernelHost` uses. Consequences:
+
+- The manifest records the provider and routing the run actually used: `search.providerId`
+  and `search.routing` are read from `router.getRouting()`, and the script asserts them.
+- Every result carries the answering provider, its timestamp and the `delayed` flag. Each
+  run also re-probes a live quote through the same fetcher chain and stores
+  `providerId` / `timestamp` / `delayed` in the artifact, so "real data came back" is
+  evidenced rather than inferred from the wiring.
+- Scope is exactly what the shipped adapter supports: US delayed quotes, daily/weekly
+  candles and a thin company profile (`market.quote` / `market.kline` / `company.profile`).
+  It is a no-key, **unofficial** chart endpoint — personal use, may rate-limit or change
+  without notice (see `docs/yahoo-finance.md`).
+- Everything else — broker positions and holdings, financials, news, options, intraday — has
+  no provider on this machine. The router raises `UNSUPPORTED_CAPABILITY` and the run
+  records those capabilities as `unavailable`; nothing is reported as zero or as "no
+  events". That is why both runs finish `partial`.
+- Longbridge is not installed here, but the in-scope market-data acceptance no longer
+  depends on it: quotes, candles and the profile come from a provider that ships with the
+  repository.
 
 This acceptance exercises the kernel / research-service persistence path and the manifest
 assembly. It does **not** run the Electron IPC layer or the desktop Pi adapter — the manifest
