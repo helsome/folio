@@ -1,5 +1,6 @@
 import type { ScreeningRun } from '@finagent/core'
 import type { JsonFileStore } from '../storage/json-file-store.ts'
+import { withWriteLock } from '../storage/write-lock.ts'
 
 /**
  * Screening run persistence — a single JSON file under the injected store
@@ -21,9 +22,12 @@ export class ScreeningRunRepository {
   }
 
   async saveRun(run: ScreeningRun): Promise<void> {
-    const file = await this.store.read<RunsFile>(RUNS_FILE, { runs: [] })
-    await this.store.write(RUNS_FILE, {
-      runs: [run, ...file.runs.filter((entry) => entry.id !== run.id)],
+    // Atomic replacement alone cannot protect overlapping read-modify-write cycles.
+    await withWriteLock(this.store.resolve(RUNS_FILE), async () => {
+      const file = await this.store.read<RunsFile>(RUNS_FILE, { runs: [] })
+      await this.store.write(RUNS_FILE, {
+        runs: [run, ...file.runs.filter((entry) => entry.id !== run.id)],
+      })
     })
   }
 
