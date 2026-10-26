@@ -1,16 +1,26 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { useAtom } from 'jotai';
-import { compareSymbolsAtom, comparisonStateAtom, withComparisonSymbols } from '../../atoms/compareAtoms';
+import {
+  compareSymbolsAtom,
+  compareViewSettingsAtom,
+  comparisonStateAtom,
+  withComparisonSymbols,
+} from '../../atoms/compareAtoms';
 import { loadComparison } from '../../client/compare';
 import { Button } from '../primitives/Button';
 import { DataFreshness } from '../primitives/DataFreshness';
+import { CompareSavedViewsBar } from './CompareSavedViewsBar';
 import { CompareTable } from './CompareTable';
+import {
+  type SavedCompareView,
+} from '../../lib/compareViewState';
 
 /** Symbol picker (2–4) + comparison table + agent-context note. */
 export const CompareWorkspace: React.FC = () => {
   const { t } = useTranslation();
   const [symbols, setSymbols] = useAtom(compareSymbolsAtom);
+  const [settings, setSettings] = useAtom(compareViewSettingsAtom);
   const [state, setState] = useAtom(comparisonStateAtom);
   const [input, setInput] = useState('');
 
@@ -28,8 +38,27 @@ export const CompareWorkspace: React.FC = () => {
   );
 
   useEffect(() => {
-    if (symbols.length >= 2) build(symbols);
-  }, [symbols, build]);
+    if (symbols.length >= 2) {
+      void build(symbols);
+    } else {
+      setState({ data: null, loading: false, error: null });
+    }
+  }, [symbols, build, setState]);
+
+  const restoreSavedView = useCallback(
+    (view: SavedCompareView) => {
+      setSettings(view.settings);
+      if (
+        symbols.length === view.symbols.length
+        && symbols.every((symbol, index) => symbol === view.symbols[index])
+      ) {
+        void build(view.symbols);
+        return;
+      }
+      setSymbols(view.symbols);
+    },
+    [build, setSettings, setSymbols, symbols]
+  );
 
   const add = () => {
     const symbol = input.trim().toUpperCase();
@@ -59,7 +88,14 @@ export const CompareWorkspace: React.FC = () => {
       </div>
 
       <div className="folio-compare-controls mt-4 rounded-[10px] border border-border bg-background/45 p-3">
-        <div className="flex items-center gap-2">
+        <CompareSavedViewsBar
+          symbols={symbols}
+          settings={settings}
+          onRestore={restoreSavedView}
+          onSettingsChange={setSettings}
+        />
+
+        <div className="mt-3 flex items-center gap-2">
           <input
             data-testid="compare-symbol-input"
             value={input}
@@ -103,7 +139,11 @@ export const CompareWorkspace: React.FC = () => {
         ) : state.error ? (
           <div className="rounded-[10px] border border-dashed border-border px-4 py-8 text-center text-[12.5px] text-text-muted">{state.error}</div>
         ) : state.data ? (
-          <CompareTable comparison={state.data} />
+          <CompareTable
+            comparison={state.data}
+            visibleMetricIds={settings.visibleMetricIds}
+            density={settings.density}
+          />
         ) : (
           <div className="folio-compare-empty rounded-[10px] border border-dashed border-border px-4 py-8 text-center text-[12.5px] text-text-muted">
             {t('compare.addTwo')}

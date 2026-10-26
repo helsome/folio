@@ -8,6 +8,30 @@ export const compare = {
   addTwo: 'Add at least two symbols to build a comparison.',
   agentContext: 'The agent context carries these symbols while the Compare workspace is focused.',
   unavailable: 'Comparison is unavailable in this environment.',
+  savedViews: {
+    label: 'Saved views',
+    placeholder: 'Choose a view',
+    namePlaceholder: 'View name (optional)',
+    save: 'Save view',
+    delete: 'Delete saved view',
+  },
+  viewSettings: {
+    metrics: 'Metrics',
+    returnWindow: 'Return window',
+    compactRows: 'Compact rows',
+    presets: {
+      all: 'All metrics',
+      priceReturns: 'Price & returns',
+      valuation: 'Valuation',
+      fundamentals: 'Fundamentals',
+    },
+    windows: {
+      all: 'All',
+      oneMonth: '1 month',
+      threeMonths: '3 months',
+      oneYear: '1 year',
+    },
+  },
   metrics: {
     price: 'Price',
     marketCap: 'Market Cap',
