@@ -10,11 +10,15 @@
  */
 import type { ImportSource, PortfolioImportRow } from '@finagent/core'
 
-/** Canonical symbol: 1–8 alphanumerics plus a known market suffix. */
-export const SYMBOL_RE = /^[A-Z0-9]{1,8}\.(US|HK|SG|SH|SZ|HAS)$/
+/**
+ * Canonical symbol: 1–6 alphanumerics plus a known market suffix.
+ * Matches `symbolSchema` / Longbridge validation. A-share codes are 6 digits;
+ * 7–8 character bodies are not canonical and must not import as clean rows.
+ */
+export const SYMBOL_RE = /^[A-Z0-9]{1,6}\.(US|HK|SG|SH|SZ|HAS)$/
 
 /** Bare ticker with no market suffix — usable, but ambiguous (review). */
-export const BARE_TICKER_RE = /^[A-Z0-9]{1,8}$/
+export const BARE_TICKER_RE = /^[A-Z0-9]{1,6}$/
 
 export type HeaderField = 'symbol' | 'name' | 'quantity' | 'cost' | 'currency' | 'account'
 
@@ -26,18 +30,24 @@ export const HEADER_ALIASES: Record<HeaderField, readonly string[]> = {
   symbol: ['symbol', 'ticker', 'code', 'stock', '代码', '股票代码', '证券代码'],
   name: ['name', 'company', 'stockname', '名称', '股票名称', '证券名称'],
   quantity: ['quantity', 'qty', 'shares', '数量', '持股数量', '股数', '持仓数量'],
+  // Specific cost headers come first. `price` / `价格` are fallbacks only:
+  // a leftmost "Price" column must not steal the value when "Cost" or
+  // "Avg Cost" is also present.
   cost: [
     'cost',
     'costprice',
     'cost price',
-    'price',
     'avgcost',
     'avg cost',
+    'averagecost',
+    'average cost',
     '成本',
     '成本价',
     '买入价',
     '持仓成本',
     '均价',
+    '价格',
+    'price',
   ],
   currency: ['currency', 'ccy', '货币', '币种'],
   account: ['account', '账户', '账号', '组合'],
@@ -83,9 +93,58 @@ export function checkSymbol(raw: string): SymbolCheck {
   }
 }
 
+/** Map fullwidth digits and separators onto the ASCII forms `Number` understands. */
+function foldNumericWidth(value: string): string {
+  return value
+    .replace(/[０-９]/g, (digit) => String.fromCharCode(digit.charCodeAt(0) - 0xfee0))
+    .replace(/．/g, '.')
+    .replace(/，/g, ',')
+    .replace(/[－−]/g, '-')
+    .replace(/＄/g, '$')
+}
+
+/**
+ * Accounting exports write negatives as `(180.50)` or `180.50-`.
+ * Fullwidth parentheses are accepted. A normal leading minus is left for
+ * the numeric parse.
+ */
+function takeAccountingSign(value: string): { text: string; negative: boolean } {
+  let text = value.trim()
+  let negative = false
+  const wrapped = /^(?:\(|（)\s*(.*?)\s*(?:\)|）)$/.exec(text)
+  if (wrapped) {
+    negative = true
+    text = wrapped[1].trim()
+  }
+  if (text.endsWith('-') && !/^[+-]/.test(text)) {
+    negative = true
+    text = text.slice(0, -1).trim()
+  }
+  return { text, negative }
+}
+
+/**
+ * Drop currency markers brokerage exports glue onto a number.
+ * `HK$1,234.50`, `US$180`, `¥180.5`, `180.50 USD` all reduce to the digits.
+ * A leading sign is preserved (`-HK$12` stays negative).
+ */
+function stripCurrencyAffixes(value: string): string {
+  let text = value.trim()
+  const sign = text.startsWith('-') || text.startsWith('+') ? text[0] : ''
+  if (sign !== '') text = text.slice(1).trim()
+  text = text.replace(/^(?:HK|US|S|A|C)\s*\$\s*/i, '')
+  text = text.replace(/^(?:CN|RMB)\s*[¥￥]\s*/i, '')
+  text = text.replace(/^(?:RMB|CNY|USD|HKD|SGD|EUR|GBP|AUD|CAD)\s*/i, '')
+  text = text.replace(/^[¥￥€£$]\s*/, '')
+  text = text.replace(/\s*(?:RMB|CNY|USD|HKD|SGD|EUR|GBP|AUD|CAD)\s*$/i, '')
+  text = text.replace(/\s*[$¥￥€£]\s*$/, '')
+  return `${sign}${text.trim()}`
+}
+
 /**
  * Coerce a CSV/paste cell to a finite number. Strings with thousands
- * separators or a leading `$` are handled; empty/null/non-numeric → undefined.
+ * separators or a currency prefix (`$`, `HK$`, `US$`, `¥`, `USD`) are
+ * handled; empty/null/non-numeric → undefined.
  */
 export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value === 'number') {
@@ -94,17 +153,20 @@ export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value !== 'string') {
     return undefined
   }
-  const trimmed = value.trim()
+  const accounting = takeAccountingSign(foldNumericWidth(stripInvisible(value)))
+  const trimmed = stripCurrencyAffixes(accounting.text)
   if (trimmed === '') {
     return undefined
   }
   const cleaned = trimmed.replace(/[,$\s]/g, '')
   // Number('') is zero, but formatting alone does not supply a numeric value.
-  if (cleaned === '') {
+  if (cleaned === '' || cleaned === '+' || cleaned === '-') {
     return undefined
   }
   const parsed = Number(cleaned)
-  return Number.isFinite(parsed) ? parsed : undefined
+  if (!Number.isFinite(parsed)) return undefined
+  if (parsed === 0) return 0
+  return accounting.negative ? -Math.abs(parsed) : parsed
 }
 
 // ── CSV ────────────────────────────────────────────────────────────────────
@@ -171,8 +233,29 @@ export function splitCsvLine(line: string, delimiter: ',' | '\t' = csvDelimiter(
   return cells
 }
 
+/** Characters `trim` does not remove, but spreadsheets and web paste often insert. */
+const INVISIBLE_CHARS = /[\uFEFF\u200B\u200C\u200D\u2060]/g
+
+function stripInvisible(value: string): string {
+  return value.replace(INVISIBLE_CHARS, '')
+}
+
 function normalizeHeaderCell(cell: string): string {
-  return cell.trim().toLowerCase().replace(/[\s_\-]/g, '')
+  return stripInvisible(cell).trim().toLowerCase().replace(/[\s_\-]/g, '')
+}
+
+/**
+ * Pick a column by alias specificity, not by leftmost match.
+ * The first alias that appears anywhere in the row wins, so a generic
+ * fallback such as `price` does not override an earlier specific header
+ * that happens to sit further right.
+ */
+function columnForAliases(cells: readonly string[], aliases: readonly string[]): number {
+  for (const alias of aliases) {
+    const index = cells.indexOf(normalizeHeaderCell(alias))
+    if (index >= 0) return index
+  }
+  return -1
 }
 
 /** Field → resolved column index for one CSV file. */
@@ -204,7 +287,7 @@ export function resolveCsvColumns(
       found = cells.indexOf(normalizeHeaderCell(explicit))
     }
     if (found === -1) {
-      found = cells.findIndex((cell) => HEADER_ALIASES[field].some((alias) => normalizeHeaderCell(alias) === cell))
+      found = columnForAliases(cells, HEADER_ALIASES[field])
     }
     if (found >= 0) byIndex.set(found, field)
   }
