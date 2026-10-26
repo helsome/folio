@@ -774,9 +774,12 @@ export class AgentKernelHost {
     return reports[0] ?? null;
   }
 
-  async thesisSaveFromReport(symbol: unknown): Promise<InvestmentThesis> {
-    const report = await this.thesisGetReport(symbol);
-    if (!report) {
+  async thesisSaveFromReport(input: unknown): Promise<InvestmentThesis> {
+    const request = typeof input === 'string' ? { symbol: input } : requireObject(input);
+    const symbol = requireString(request.symbol, 'symbol').toUpperCase();
+    const reportId = request.reportId === undefined ? undefined : requireString(request.reportId, 'reportId');
+    const report = reportId ? await this.researchService.getReport(reportId) : await this.thesisGetReport(symbol);
+    if (!report || report.symbol !== symbol) {
       throw createCodeError(
         'REPORT_NOT_FOUND',
         'No research report for this symbol. Run Deep Research first.'
@@ -2126,16 +2129,21 @@ export class AgentKernelHost {
   async researchGetDiff(input: unknown): Promise<ResearchDiff | undefined> {
     const request = requireObject(input);
     const symbol = requireString(request.symbol, 'symbol').toUpperCase();
-    const cached = await this.diffRepository.getBySymbol(symbol);
-    if (cached) return cached;
-    // Fallback: build on demand from the two latest reports.
+    const reportId = request.reportId === undefined ? undefined : requireString(request.reportId, 'reportId');
     const reports = await this.researchService.listReports(symbol);
-    if (reports.length < 2) return undefined;
     const sorted = [...reports].sort((a, b) => b.generatedAt - a.generatedAt);
-    const diff = await buildDiff(sorted[1]!, sorted[0]!, {
+    const index = reportId ? sorted.findIndex((report) => report.id === reportId) : 0;
+    const current = sorted[index];
+    const previous = sorted[index + 1];
+    if (index < 0 || !current || !previous) return undefined;
+    const cached = (await this.diffRepository.list()).find((diff) =>
+      diff.symbol === symbol && diff.currentReportId === current.id && diff.previousReportId === previous.id
+    );
+    if (cached) return cached;
+    const diff = await buildDiff(previous, current, {
       thesis: await this.latestThesisFor(symbol),
     });
-    await this.diffRepository.save(diff);
+    if (index === 0) await this.diffRepository.save(diff);
     return diff;
   }
 

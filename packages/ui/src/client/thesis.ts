@@ -12,7 +12,7 @@ interface ThesisElectronApi {
   thesis?: {
     list?: (symbol?: string) => Promise<unknown>;
     getReport?: (symbol: string) => Promise<unknown>;
-    saveFromReport?: (symbol: string) => Promise<unknown>;
+    saveFromReport?: (input: string | { symbol: string; reportId?: string }) => Promise<unknown>;
     reEvaluate?: (symbol: string) => Promise<unknown>;
     update?: (thesis: InvestmentThesis) => Promise<unknown>;
     listImpacts?: (symbol: string) => Promise<unknown>;
@@ -43,11 +43,11 @@ export async function loadResearchReport(symbol: string): Promise<ResearchReport
   }
 }
 
-export async function saveThesisFromReport(symbol: string): Promise<InvestmentThesis | null> {
+export async function saveThesisFromReport(symbol: string, reportId?: string): Promise<InvestmentThesis | null> {
   try {
     const loader = thesisApi()?.saveFromReport;
     if (typeof loader !== 'function') return null;
-    return unwrapIpcResult<InvestmentThesis>(await loader(symbol));
+    return unwrapIpcResult<InvestmentThesis>(await loader(reportId === undefined ? symbol : { symbol, reportId }));
   } catch {
     return null;
   }

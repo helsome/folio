@@ -238,7 +238,7 @@ export interface FinagentClient {
     getRun: (input: { runId: string }) => Promise<ApiResult<ResearchRunSummary | undefined>>;
     listReports: (input: { symbol?: string }) => Promise<ApiResult<ResearchReport[]>>;
     getReport: (input: { reportId: string }) => Promise<ApiResult<ResearchReport | undefined>>;
-    getDiff: (input: { symbol: string }) => Promise<ApiResult<ResearchDiff | undefined>>;
+    getDiff: (input: { symbol: string; reportId?: string }) => Promise<ApiResult<ResearchDiff | undefined>>;
   };
   screening?: ScreeningChannel;
   outcome?: {
@@ -259,7 +259,7 @@ export interface FinagentClient {
   thesis?: {
     list: (symbol?: string) => Promise<ApiResult<InvestmentThesis[]>>;
     getReport: (symbol: string) => Promise<ApiResult<ResearchReport | null>>;
-    saveFromReport: (symbol: string) => Promise<ApiResult<InvestmentThesis>>;
+    saveFromReport: (input: string | { symbol: string; reportId?: string }) => Promise<ApiResult<InvestmentThesis>>;
     reEvaluate: (symbol: string) => Promise<ApiResult<ThesisImpact>>;
     update: (thesis: InvestmentThesis) => Promise<ApiResult<InvestmentThesis>>;
     listImpacts: (symbol: string) => Promise<ApiResult<ThesisImpact[]>>;
