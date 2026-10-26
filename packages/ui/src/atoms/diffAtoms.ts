@@ -21,7 +21,7 @@ export const researchDiffAtom = atom<ResearchDiffState>({ loading: false, diff: 
 /** Minimal shape of the electron API surface we consume. */
 interface DiffElectronApi {
   research?: {
-    getDiff?: (input: { symbol: string }) => Promise<unknown>;
+    getDiff?: (input: { symbol: string; reportId?: string }) => Promise<unknown>;
   };
 }
 
@@ -34,12 +34,12 @@ function api(): DiffElectronApi['research'] {
  * Fetch the latest diff for a symbol. Returns undefined when unwired or when
  * the symbol has no previous report (the What Changed section then hides).
  */
-export async function loadResearchDiff(symbol: string): Promise<ResearchDiff | undefined> {
+export async function loadResearchDiff(symbol: string, reportId?: string): Promise<ResearchDiff | undefined> {
   try {
     const research = api();
     if (!research?.getDiff) return undefined;
     return (
-      unwrapIpcResult<ResearchDiff | undefined>(await research.getDiff({ symbol: symbol.toUpperCase() })) ??
+      unwrapIpcResult<ResearchDiff | undefined>(await research.getDiff({ symbol: symbol.toUpperCase(), reportId })) ??
       undefined
     );
   } catch {

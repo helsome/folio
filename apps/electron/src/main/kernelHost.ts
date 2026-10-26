@@ -766,16 +766,23 @@ export class AgentKernelHost {
     return this.thesisRepository.list();
   }
 
-  /** Latest research report for a symbol (used by "Save as Thesis"). */
-  async thesisGetReport(symbol: unknown): Promise<ResearchReport | null> {
-    const reports = await this.researchService.listReports(
-      requireString(symbol, 'symbol').toUpperCase()
-    );
+  /** Research report for "Save as Thesis"; a report id pins the selected version. */
+  async thesisGetReport(input: unknown): Promise<ResearchReport | null> {
+    const request = typeof input === 'string' ? { symbol: input } : requireObject(input);
+    const symbol = requireString(request.symbol, 'symbol').toUpperCase();
+    const reportId = typeof request.reportId === 'string' && request.reportId.length > 0
+      ? request.reportId
+      : undefined;
+    if (reportId) {
+      const report = await this.researchService.getReport(reportId);
+      return report?.symbol === symbol ? report : null;
+    }
+    const reports = await this.researchService.listReports(symbol);
     return reports[0] ?? null;
   }
 
-  async thesisSaveFromReport(symbol: unknown): Promise<InvestmentThesis> {
-    const report = await this.thesisGetReport(symbol);
+  async thesisSaveFromReport(input: unknown): Promise<InvestmentThesis> {
+    const report = await this.thesisGetReport(input);
     if (!report) {
       throw createCodeError(
         'REPORT_NOT_FOUND',
@@ -2126,6 +2133,28 @@ export class AgentKernelHost {
   async researchGetDiff(input: unknown): Promise<ResearchDiff | undefined> {
     const request = requireObject(input);
     const symbol = requireString(request.symbol, 'symbol').toUpperCase();
+    const reportId = typeof request.reportId === 'string' && request.reportId.length > 0
+      ? request.reportId
+      : undefined;
+
+    if (reportId) {
+      const cached = (await this.diffRepository.list()).find((diff) => diff.currentReportId === reportId);
+      if (cached) return cached;
+
+      const current = await this.researchService.getReport(reportId);
+      if (!current || current.symbol !== symbol) return undefined;
+      const reports = (await this.researchService.listReports(symbol))
+        .sort((a, b) => b.generatedAt - a.generatedAt);
+      const currentIndex = reports.findIndex((report) => report.id === reportId);
+      const previous = currentIndex >= 0 ? reports[currentIndex + 1] : undefined;
+      if (!previous) return undefined;
+      const diff = await buildDiff(previous, current, {
+        thesis: await this.latestThesisFor(symbol),
+      });
+      await this.diffRepository.save(diff);
+      return diff;
+    }
+
     const cached = await this.diffRepository.getBySymbol(symbol);
     if (cached) return cached;
     // Fallback: build on demand from the two latest reports.

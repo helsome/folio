@@ -65,12 +65,12 @@ export interface ElectronAPI {
     getRun: (input: { runId: string }) => Promise<unknown>;
     listReports: (input: { symbol?: string }) => Promise<unknown>;
     getReport: (input: { reportId: string }) => Promise<unknown>;
-    getDiff: (input: { symbol: string }) => Promise<unknown>;
+    getDiff: (input: { symbol: string; reportId?: string }) => Promise<unknown>;
   };
   thesis: {
     list: (symbol?: string) => Promise<unknown>;
-    getReport: (symbol: string) => Promise<unknown>;
-    saveFromReport: (symbol: string) => Promise<unknown>;
+    getReport: (input: { symbol: string; reportId?: string }) => Promise<unknown>;
+    saveFromReport: (input: { symbol: string; reportId?: string }) => Promise<unknown>;
     reEvaluate: (symbol: string) => Promise<unknown>;
     update: (thesis: unknown) => Promise<unknown>;
     listImpacts: (symbol: string) => Promise<unknown>;
@@ -268,12 +268,12 @@ const electronAPI: ElectronAPI = {
     getRun: (input: { runId: string }) => ipcRenderer.invoke('research:getRun', input),
     listReports: (input: { symbol?: string }) => ipcRenderer.invoke('research:listReports', input),
     getReport: (input: { reportId: string }) => ipcRenderer.invoke('research:getReport', input),
-    getDiff: (input: { symbol: string }) => ipcRenderer.invoke('research:getDiff', input),
+    getDiff: (input: { symbol: string; reportId?: string }) => ipcRenderer.invoke('research:getDiff', input),
   },
   thesis: {
     list: (symbol?: string) => ipcRenderer.invoke('thesis:list', symbol),
-    getReport: (symbol: string) => ipcRenderer.invoke('thesis:getReport', symbol),
-    saveFromReport: (symbol: string) => ipcRenderer.invoke('thesis:saveFromReport', symbol),
+    getReport: (input: { symbol: string; reportId?: string }) => ipcRenderer.invoke('thesis:getReport', input),
+    saveFromReport: (input: { symbol: string; reportId?: string }) => ipcRenderer.invoke('thesis:saveFromReport', input),
     reEvaluate: (symbol: string) => ipcRenderer.invoke('thesis:reEvaluate', symbol),
     update: (thesis: unknown) => ipcRenderer.invoke('thesis:update', thesis),
     listImpacts: (symbol: string) => ipcRenderer.invoke('thesis:listImpacts', symbol),
