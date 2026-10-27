@@ -170,6 +170,7 @@ export interface ElectronAPI {
   };
   export: {
     markdown: (input: { reportId: string }) => Promise<unknown>;
+    json: (input: { reportId: string }) => Promise<unknown>;
     shareCard: (input: { reportId: string }) => Promise<unknown>;
   };
   evaluation: {
@@ -396,6 +397,7 @@ const electronAPI: ElectronAPI = {
   },
   export: {
     markdown: (input: { reportId: string }) => ipcRenderer.invoke('export:markdown', input),
+    json: (input: { reportId: string }) => ipcRenderer.invoke('export:json', input),
     shareCard: (input: { reportId: string }) => ipcRenderer.invoke('export:shareCard', input),
   },
   evaluation: {

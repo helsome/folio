@@ -125,6 +125,7 @@ const fakeRuns = {
 };
 
 const { HeatmapService, parseHeatmapSource } = await import('../../../../packages/shared/src/heatmap/service.ts');
+const { reportToJson } = await import('../../../../packages/shared/src/export/archive.ts');
 
 class FakeAgentKernel {
   sessions = fakeSessions;
@@ -332,6 +333,7 @@ mock.module('@finagent/shared', () => ({
   THESIS_REVIEW_HOUR: 9,
   WEEKDAYS: [1, 2, 3, 4, 5],
   reportToMarkdown: () => '',
+  reportToJson,
   reportToShareCard: () => ({ svg: '', text: '' }),
   redactForShare: (report: unknown) => report,
   computeSkillCalibrations: () => [],

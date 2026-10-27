@@ -564,6 +564,10 @@ ipcMain.handle('export:markdown', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.exportMarkdown(input))
 );
 
+ipcMain.handle('export:json', async (_event, input: unknown) =>
+  toIpcResult(() => agentKernelHost.exportJson(input))
+);
+
 ipcMain.handle('export:shareCard', async (_event, input: unknown) =>
   toIpcResult(() => agentKernelHost.exportShareCard(input))
 );
