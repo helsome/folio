@@ -44,6 +44,7 @@ export const COMPREHENSIVE_CAPABILITY_IDS = [
   'company.earnings',
   'company.ratings',
   'research.news',
+  'research.documents',
   'research.events',
 ] as const;
 
