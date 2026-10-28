@@ -180,7 +180,7 @@ function tokens(text: string): Set<string> {
 function similarityTokens(text: string): Set<string> {
   const result = new Set<string>();
   for (const token of normalizeSourceTitle(text).split(' ').filter(Boolean)) {
-    if (/[\\p{Script=Han}\\p{Script=Hiragana}\\p{Script=Katakana}\\p{Script=Hangul}]/u.test(token)) {
+    if (/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(token)) {
       const chars = Array.from(token);
       if (chars.length === 1) result.add(token);
       for (let index = 0; index < chars.length - 1; index += 1) {
