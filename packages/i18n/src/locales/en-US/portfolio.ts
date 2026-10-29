@@ -6,6 +6,7 @@ export const portfolio = {
   heatmap: {
     title: 'Watchlist / holdings heatmap', legend: 'Daily price change', size: 'Tile size',
     equal: 'Equal', weighted: 'Market value', map: 'Heatmap', table: 'Table', refresh: 'Refresh heatmap',
+    instrumentsCount: '{{count}} symbols',
     loading: 'Loading market data…', empty: 'No instruments in this snapshot.', unknown: 'Unknown',
     current: 'Current', stale: 'Stale', unknownIndustry: 'Unknown industry', instrument: 'Instrument',
     industry: 'Industry', change: 'Today', weight: 'Weight', source: 'Source', status: 'Session / time',

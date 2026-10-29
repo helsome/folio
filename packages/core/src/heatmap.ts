@@ -69,11 +69,11 @@ export function heatmapHoldingValue(
 export function heatmapColor(tile: Pick<HeatmapTile, 'state' | 'changePercent'>): string {
   if (tile.state !== 'current' || tile.changePercent === null) return '#6b7280';
   const change = tile.changePercent;
-  if (change <= -3) return '#9f2434';
-  if (change < -1) return '#c74653';
-  if (change < 0) return '#a8646c';
-  if (change === 0) return '#575c63';
-  if (change < 1) return '#428077';
-  if (change < 3) return '#18786a';
-  return '#075e50';
+  if (change <= -3) return '#8f1f2b';
+  if (change < -1) return '#bf3440';
+  if (change < 0) return '#9c535d';
+  if (change === 0) return '#535b63';
+  if (change < 1) return '#4e8176';
+  if (change < 3) return '#17745d';
+  return '#0b5c45';
 }

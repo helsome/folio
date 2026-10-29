@@ -1356,6 +1356,12 @@ button:disabled { cursor: not-allowed; }
   border-radius: var(--radius);
 }
 
+.heatmap-size-control > button,
+.heatmap-size-control > button:focus,
+.heatmap-size-control > button:focus-visible {
+  background-color: transparent !important;
+}
+
 .dark .folio-finance-workspace,
 .dark .folio-today-view,
 .dark .folio-discover-view,

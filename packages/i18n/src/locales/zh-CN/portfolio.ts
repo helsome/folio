@@ -7,6 +7,7 @@ export const portfolio = {
   heatmap: {
     title: '自选 / 持仓热力图', legend: '当日涨跌幅', size: '色块面积', equal: '等面积', weighted: '按市值',
     map: '热力图', table: '表格', refresh: '刷新热力图', loading: '正在加载行情…', empty: '此快照中没有标的。',
+    instrumentsCount: '{{count}} 个标的',
     unknown: '未知', current: '最新', stale: '延迟', unknownIndustry: '未知行业', instrument: '标的',
     industry: '行业', change: '今日', weight: '权重', source: '来源', status: '交易时段 / 时间',
     market: '市场', currency: '币种', asOf: '行情时间', delayed: '延迟行情',

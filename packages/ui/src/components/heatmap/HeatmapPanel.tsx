@@ -1,7 +1,7 @@
 import React, { useEffect, useMemo, useRef, useState } from 'react';
 import { hierarchy, treemap, treemapSquarify } from 'd3-hierarchy';
 import { useTranslation } from 'react-i18next';
-import { RefreshCw, Table2, LayoutGrid } from 'lucide-react';
+import { RefreshCw, Table2, LayoutGrid, Check } from 'lucide-react';
 import { formatDateTime, formatPercent, formatPercentRatio } from '@finagent/i18n';
 import type { HeatmapSnapshot, HeatmapSourceSnapshot, HeatmapTile } from '@finagent/core';
 import { heatmapColor } from '@finagent/core';
@@ -43,12 +43,15 @@ export function heatmapRectangles(snapshot: HeatmapSnapshot, mode: DisplayMode, 
     .sum((node) => (typeof node.value === 'number' ? node.value : 0))
     .sort((a, b) => (b.value ?? 0) - (a.value ?? 0));
   const layout = treemap<HeatmapNode>().tile(treemapSquarify).size([width, height]).paddingInner(2)
-    .paddingTop((node) => node.depth === 1 ? 18 : 2)(root);
+    .paddingTop((node) => node.depth === 1 ? 30 : 2)(root);
   return {
     groups: (layout.children ?? []).map((group) => ({
       key: group.data.key ?? '',
       label: group.children?.[0]?.data.tile?.industry?.name ?? '',
-      x: group.x0, y: group.y0, width: group.x1 - group.x0,
+      classification: group.children?.[0]?.data.tile?.industry?.classification,
+      code: group.children?.[0]?.data.tile?.industry?.code,
+      count: group.leaves().length,
+      x: group.x0, y: group.y0, width: group.x1 - group.x0, height: group.y1 - group.y0,
     })),
     tiles: layout.leaves().filter((leaf) => leaf.data.tile).map((leaf) => ({
       tile: leaf.data.tile!,
@@ -160,26 +163,37 @@ export function HeatmapPanel({
   return (
     <section className="space-y-3 border-y border-border py-3" data-testid="heatmap-panel">
       <div className="flex flex-wrap items-center justify-between gap-2">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="text-[12px] font-semibold">{t('heatmap.title')}</span>
-          <div className="flex flex-wrap items-center gap-2 text-[10px] text-foreground/68" aria-label={t('heatmap.legend')}>
+        <div className="min-w-0">
+          <h3 className="text-[14px] font-semibold leading-5">{t('heatmap.title')}</h3>
+          <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-[11px] text-foreground/68" aria-label={t('heatmap.legend')}>
             {legend.map(({ value, label }) => (
-              <span key={value} className="flex items-center gap-1" aria-label={label}>
-                <span aria-hidden="true" className="h-2.5 w-2.5" style={{ backgroundColor: heatmapColor({ state: 'current', changePercent: value }) }} />
+              <span key={value} className="flex items-center gap-1.5" aria-label={label}>
+                <span aria-hidden="true" className="h-3 w-3 shrink-0" style={{ backgroundColor: heatmapColor({ state: 'current', changePercent: value }) }} />
                 <span>{label}</span>
               </span>
             ))}
-            <span className="flex items-center gap-1"><span className="h-2.5 w-2.5 bg-gray-500" />{t('heatmap.unknown')} / {t('heatmap.stale')}</span>
+            <span className="flex items-center gap-1.5"><span className="h-3 w-3 shrink-0 bg-gray-500" />{t('heatmap.unknown')} / {t('heatmap.stale')}</span>
           </div>
         </div>
-        <div className="flex items-center gap-1">
-          <label className="text-[11px] text-foreground/58" htmlFor="heatmap-weight">{t('heatmap.size')}</label>
-          <select id="heatmap-weight" value={effectiveMode} onChange={(event) => setDisplayMode(event.target.value as DisplayMode)} className="h-7 rounded border border-border bg-surface px-2 text-[11px]" disabled={source.kind !== 'portfolio' || !snapshot?.weightedAvailable}>
-            <option value="equal">{t('heatmap.equal')}</option>
-            <option value="weight">{t('heatmap.weighted')}</option>
-          </select>
-          <Button variant="ghost" size="icon" title={t('heatmap.map')} aria-label={t('heatmap.map')} aria-pressed={viewMode === 'map'} onClick={() => setViewMode('map')}><LayoutGrid className="h-4 w-4" /></Button>
-          <Button variant="ghost" size="icon" title={t('heatmap.table')} aria-label={t('heatmap.table')} aria-pressed={viewMode === 'table'} onClick={() => setViewMode('table')}><Table2 className="h-4 w-4" /></Button>
+        <div className="flex shrink-0 items-center gap-2">
+          <div role="group" aria-label={t('heatmap.size')} className="heatmap-size-control flex h-8 items-center rounded border border-border bg-foreground/[0.035] p-0.5">
+            {(['equal', 'weight'] as const).map((mode) => (
+              <button
+                key={mode}
+                type="button"
+                aria-pressed={effectiveMode === mode}
+                disabled={mode === 'weight' && (source.kind !== 'portfolio' || !snapshot?.weightedAvailable)}
+                onClick={() => setDisplayMode(mode)}
+                className="flex h-full items-center gap-1.5 rounded-sm px-2.5 text-[11px] font-medium transition-colors disabled:cursor-not-allowed disabled:opacity-40"
+              >
+                {effectiveMode === mode && <Check aria-hidden="true" className="h-3 w-3 text-accent" />}
+                <span className="text-foreground/80">{t(mode === 'weight' ? 'heatmap.weighted' : 'heatmap.equal')}</span>
+              </button>
+            ))}
+          </div>
+          <span className="mx-0.5 h-5 w-px bg-border" aria-hidden="true" />
+          <Button variant="ghost" size="icon" style={viewMode === 'map' ? { backgroundColor: 'var(--surface-hover)' } : undefined} title={t('heatmap.map')} aria-label={t('heatmap.map')} aria-pressed={viewMode === 'map'} onClick={() => setViewMode('map')}><LayoutGrid className="h-4 w-4" /></Button>
+          <Button variant="ghost" size="icon" style={viewMode === 'table' ? { backgroundColor: 'var(--surface-hover)' } : undefined} title={t('heatmap.table')} aria-label={t('heatmap.table')} aria-pressed={viewMode === 'table'} onClick={() => setViewMode('table')}><Table2 className="h-4 w-4" /></Button>
           <Button variant="ghost" size="icon" title={t('heatmap.refresh')} aria-label={t('heatmap.refresh')} onClick={() => setRefresh((value) => value + 1)} disabled={busy}><RefreshCw className={`h-4 w-4 ${busy ? 'animate-spin' : ''}`} /></Button>
         </div>
       </div>
@@ -189,8 +203,20 @@ export function HeatmapPanel({
       {snapshot && snapshot.tiles.length > 0 && (
         <>
           {viewMode === 'map' ? (
-            <div ref={mapRef} className="relative h-[360px] w-full min-w-0 overflow-hidden bg-background" role="group" aria-label={t('heatmap.title')}>
-              {layout.groups.map((group) => <span key={group.key} aria-hidden="true" className="pointer-events-none absolute z-10 truncate px-1 text-[9px] font-medium text-foreground/72" style={{ left: `${group.x / dimensions.width * 100}%`, top: `${group.y / dimensions.height * 100}%`, width: `${group.width / dimensions.width * 100}%` }}>{group.label || t('heatmap.unknownIndustry')}</span>)}
+            <div ref={mapRef} className="relative h-[340px] w-full min-w-0 overflow-hidden border border-border bg-foreground/[0.075] sm:h-[420px]" role="group" aria-label={t('heatmap.title')}>
+              {layout.groups.map((group) => (
+                <div
+                  key={group.key}
+                  aria-hidden="true"
+                  title={`${group.label || t('heatmap.unknownIndustry')}${group.classification ? ` · ${group.classification}${group.code ? ` ${group.code}` : ''}` : ''} · ${t('heatmap.instrumentsCount', { count: group.count })}`}
+                  className="pointer-events-none absolute z-10 flex items-center justify-between gap-2 overflow-hidden border-b border-border/70 bg-background/95 px-2.5 text-foreground/82"
+                  style={{ left: `${group.x / dimensions.width * 100}%`, top: `${group.y / dimensions.height * 100}%`, width: `${group.width / dimensions.width * 100}%`, height: `${Math.min(group.height, 30)}px` }}
+                >
+                  <span className="min-w-0 truncate text-[12px] font-semibold leading-none">{group.label || t('heatmap.unknownIndustry')}</span>
+                  {group.width >= 150 && <span className="shrink-0 text-[10px] text-foreground/48">{group.classification}{group.code ? ` · ${group.code}` : ''}</span>}
+                  <span className="shrink-0 text-[10px] text-foreground/55">{group.width >= 150 ? t('heatmap.instrumentsCount', { count: group.count }) : group.count}</span>
+                </div>
+              ))}
               {layout.tiles.map(({ tile, x, y, width, height }) => (
                 <button
                   key={tile.instrument.instrumentId}
@@ -208,11 +234,12 @@ export function HeatmapPanel({
                   aria-label={`${tile.instrument.name}, ${tile.workspaceSymbol}, ${moveLabel(tile)}. ${t('heatmap.openResearch')}`}
                   aria-pressed={selected?.instrument.instrumentId === tile.instrument.instrumentId}
                   data-testid={`heatmap-tile-${tile.instrument.symbol}`}
-                  className={`absolute flex min-h-0 flex-col items-start justify-center overflow-hidden border-2 p-1.5 text-left text-white focus:z-10 focus:outline focus:outline-2 focus:outline-white ${selected?.instrument.instrumentId === tile.instrument.instrumentId ? 'border-white' : 'border-white/35'}`}
+                  className={`absolute flex min-h-0 flex-col items-start justify-center overflow-hidden border border-white/55 text-left text-white transition-[filter] duration-100 hover:z-20 hover:brightness-110 focus-visible:z-20 focus-visible:outline focus-visible:outline-2 focus-visible:outline-white ${width >= 150 && height >= 92 ? 'px-3 py-2.5' : width >= 86 && height >= 58 ? 'px-2 py-1.5' : 'p-1'} ${selected?.instrument.instrumentId === tile.instrument.instrumentId ? 'z-10 ring-2 ring-inset ring-white' : ''}`}
                   style={{ left: `${x / dimensions.width * 100}%`, top: `${y / dimensions.height * 100}%`, width: `${width / dimensions.width * 100}%`, height: `${height / dimensions.height * 100}%`, backgroundColor: heatmapColor(tile), minWidth: 0 }}
                 >
-                  <span className="max-w-full truncate text-[12px] font-semibold">{tile.instrument.symbol}</span>
-                  <span className="max-w-full truncate text-[10px]">{moveLabel(tile)}</span>
+                  <span className={`max-w-full truncate font-semibold leading-tight ${width >= 150 && height >= 92 ? 'text-[16px]' : width >= 86 && height >= 58 ? 'text-[13px]' : 'text-[11px]'}`}>{tile.instrument.symbol}</span>
+                  {width >= 150 && height >= 92 && <span className="mt-0.5 max-w-full truncate text-[11px] leading-tight text-white/82">{tile.instrument.name}</span>}
+                  <span className={`mt-1 max-w-full truncate font-medium leading-tight ${width >= 150 && height >= 92 ? 'text-[13px]' : 'text-[10px]'}`}>{moveLabel(tile)}</span>
                 </button>
               ))}
             </div>

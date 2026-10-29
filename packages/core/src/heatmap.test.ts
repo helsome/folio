@@ -21,4 +21,12 @@ describe('heatmap value mapping', () => {
     expect(heatmapColor({ changePercent: 0, state: 'current' })).not.toBe('#6b7280');
     expect(heatmapColor({ changePercent: -4, state: 'stale' })).toBe('#6b7280');
   });
+
+  it('keeps a distinct red-to-green palette across fixed daily-change bands', () => {
+    expect(heatmapColor({ changePercent: -3, state: 'current' })).toBe('#8f1f2b');
+    expect(heatmapColor({ changePercent: -1, state: 'current' })).toBe('#9c535d');
+    expect(heatmapColor({ changePercent: 0, state: 'current' })).toBe('#535b63');
+    expect(heatmapColor({ changePercent: 1, state: 'current' })).toBe('#17745d');
+    expect(heatmapColor({ changePercent: 3, state: 'current' })).toBe('#0b5c45');
+  });
 });

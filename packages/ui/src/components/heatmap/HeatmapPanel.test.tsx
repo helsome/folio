@@ -98,6 +98,7 @@ describe('HeatmapPanel', () => {
     console.info(`heatmap renderer benchmark: 100 fixture securities, ${layout.tiles.length} rectangles, ${(performance.now() - started).toFixed(1)}ms`);
     expect(layout.tiles).toHaveLength(100);
     expect(layout.groups).toHaveLength(10);
+    expect(layout.groups.every((group) => group.count === 10 && group.height > 30)).toBe(true);
     expect(layout.tiles.every((item) => item.x >= 0 && item.y >= 0 && item.x + item.width <= 960.01 && item.y + item.height <= 360.01)).toBe(true);
   });
 
@@ -159,6 +160,21 @@ describe('HeatmapPanel', () => {
     expect(panel.host.querySelector('[data-testid="heatmap-detail"]')?.textContent).toContain('25%');
     await act(async () => (panel.host.querySelector('[aria-label="Table"]') as HTMLButtonElement).click());
     expect(panel.host.querySelector('[data-testid="heatmap-table"]')?.textContent).toContain('25%');
+    await panel.close();
+  });
+
+  it('presents industry hierarchy and tile-size modes as readable controls', async () => {
+    const nvidia = DEFAULT_INSTRUMENT_CATALOG.find((item) => item.instrumentId === 'XNAS:NVDA')!;
+    const tiles = [tile, { ...tile, instrument: nvidia, workspaceSymbol: 'NVDA.US' }];
+    const panel = await mountPanel(createClient(() => ({ ...snapshot, tiles })));
+    expect(panel.host.textContent).toContain('Technology');
+    expect(panel.host.textContent).toContain('SIC');
+    expect(panel.host.textContent).toContain('2 symbols');
+    const sizeGroup = panel.host.querySelector('[role="group"][aria-label="Tile size"]')!;
+    expect(sizeGroup.querySelector('[aria-pressed="true"]')?.textContent).toBe('Equal');
+    expect(sizeGroup.querySelectorAll('button[aria-pressed="true"] svg')).toHaveLength(1);
+    expect((sizeGroup.querySelector('button[aria-pressed="false"]') as HTMLButtonElement).disabled).toBe(true);
+    expect(panel.host.querySelectorAll('[data-testid^="heatmap-tile-"]')).toHaveLength(2);
     await panel.close();
   });
 
