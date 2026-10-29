@@ -61,13 +61,14 @@ function resultType(toolCall: EvaluationRun['toolCalls'][number]): string {
 export const CaseDetail: React.FC<{
   caseRef: CaseRef;
   detail: EvaluationExperimentDetail | null;
-  onLoadDetail: () => void;
+  onLoadDetail: (signal?: AbortSignal) => Promise<EvaluationExperimentDetail | null>;
   onBack: () => void;
 }> = ({ caseRef, detail, onLoadDetail, onBack }) => {
   const { t } = useTranslation();
   const client = useFinagentClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
   const [caseDef, setCaseDef] = useState<EvaluationCase | null>(null);
   const [feedback, setFeedback] = useState<'good' | 'bad' | null>(null);
   const [note, setNote] = useState('');
@@ -78,14 +79,31 @@ export const CaseDetail: React.FC<{
   const [traceDialog, setTraceDialog] = useState<{ loading: boolean; trace: FolioTrace | null } | null>(null);
 
   useEffect(() => {
-    if (detail) return;
+    if (detail) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     void (async () => {
-      await onLoadDetail();
-      setLoading(false);
+      try {
+        const loaded = await onLoadDetail(controller.signal);
+        if (!controller.signal.aborted && !loaded) {
+          setError(t('evaluation.caseError', { id: caseRef.caseId }));
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+          setError(message || t('evaluation.caseError', { id: caseRef.caseId }));
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
     })();
-  }, [detail, onLoadDetail]);
+    return () => controller.abort();
+  }, [caseRef.caseId, caseRef.experimentId, detail, onLoadDetail, retryToken, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -166,8 +184,11 @@ export const CaseDetail: React.FC<{
             <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
         </div>
-        <div className="p-4 text-[12px] text-foreground/48">
+        <div role="alert" className="p-4 text-[12px] text-foreground/48">
           {error ?? t('evaluation.caseError', { id: caseRef.caseId })}
+          <Button variant="secondary" size="sm" className="ml-3" onClick={() => setRetryToken((value) => value + 1)}>
+            {t('evaluation.retry')}
+          </Button>
         </div>
       </div>
     );

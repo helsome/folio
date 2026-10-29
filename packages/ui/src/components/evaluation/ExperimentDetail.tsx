@@ -48,7 +48,7 @@ const STATUS_KEY: Record<string, string> = {
 export const ExperimentDetail: React.FC<{
   experimentId: string;
   detail: EvaluationExperimentDetail | null;
-  onLoadDetail: () => void;
+  onLoadDetail: (signal?: AbortSignal) => Promise<EvaluationExperimentDetail | null>;
   onBack: () => void;
   onOpenCase: (caseRef: CaseRef) => void;
 }> = ({ experimentId, detail, onLoadDetail, onBack, onOpenCase }) => {
@@ -56,16 +56,34 @@ export const ExperimentDetail: React.FC<{
   const client = useFinagentClient();
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [retryToken, setRetryToken] = useState(0);
 
   useEffect(() => {
-    if (detail) return;
+    if (detail) {
+      setLoading(false);
+      setError(null);
+      return;
+    }
+    const controller = new AbortController();
     setLoading(true);
     setError(null);
     void (async () => {
-      await onLoadDetail();
-      setLoading(false);
+      try {
+        const loaded = await onLoadDetail(controller.signal);
+        if (!controller.signal.aborted && !loaded) {
+          setError(t('evaluation.experimentError', { id: experimentId }));
+        }
+      } catch (error) {
+        if (!controller.signal.aborted) {
+          const message = error instanceof Error ? error.message : typeof error === 'string' ? error : '';
+          setError(message || t('evaluation.experimentError', { id: experimentId }));
+        }
+      } finally {
+        if (!controller.signal.aborted) setLoading(false);
+      }
     })();
-  }, [detail, onLoadDetail]);
+    return () => controller.abort();
+  }, [detail, experimentId, onLoadDetail, retryToken, t]);
 
   const openTrace = (url: string): void => {
     void client.openExternal?.(url);
@@ -94,8 +112,11 @@ export const ExperimentDetail: React.FC<{
             <ArrowLeft className="h-3.5 w-3.5" /> {t('evaluation.back')}
           </Button>
         </div>
-        <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-4 text-[12px] text-foreground/48 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
+        <div role="alert" className="rounded-[10px] border border-[var(--mac-border)] bg-white p-4 text-[12px] text-foreground/48 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
           {error ?? t('evaluation.experimentError', { id: experimentId })}
+          <Button variant="secondary" size="sm" className="ml-3" onClick={() => setRetryToken((value) => value + 1)}>
+            {t('evaluation.retry')}
+          </Button>
         </div>
       </div>
     );

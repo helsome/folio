@@ -1,4 +1,4 @@
-import React, { useCallback, useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ChevronRight, ExternalLink, RefreshCw } from 'lucide-react';
 import type {
@@ -59,6 +59,7 @@ export const EvaluationCenter: React.FC = () => {
   const [experiments, setExperiments] = useState<EvaluationExperiment[]>([]);
   const [baselines, setBaselines] = useState<EvaluationBaseline[]>([]);
   const [details, setDetails] = useState<Record<string, EvaluationExperimentDetail>>({});
+  const detailRequests = useRef({ sequence: 0, latest: new Map<string, number>() });
   const [loading, setLoading] = useState(true);
   const [loadError, setLoadError] = useState<string | null>(null);
 
@@ -83,6 +84,8 @@ export const EvaluationCenter: React.FC = () => {
     void refresh();
   }, [refresh]);
 
+  useEffect(() => () => { detailRequests.current.latest.clear(); }, []);
+
   const openExperiment = useCallback((experimentId: string) => {
     setSelectedExperimentId(experimentId);
     setSelectedCase(null);
@@ -94,23 +97,24 @@ export const EvaluationCenter: React.FC = () => {
   }, []);
 
   const loadDetail = useCallback(
-    async (experimentId: string): Promise<EvaluationExperimentDetail | null> => {
+    async (experimentId: string, signal?: AbortSignal): Promise<EvaluationExperimentDetail | null> => {
+      if (signal?.aborted) return null;
       if (details[experimentId]) return details[experimentId];
+      const request = ++detailRequests.current.sequence;
+      detailRequests.current.latest.set(experimentId, request);
       const result = await client.evaluation?.getExperiment(experimentId);
-      if (result?.ok) {
-        const data = result.data;
-        if (data) {
-          setDetails((current) => {
-            const next = { ...current };
-            next[experimentId] = data;
-            return next;
-          });
-          return data;
-        }
+      // Departed detail views and superseded background prefetches cannot fill the cache.
+      if (signal?.aborted || detailRequests.current.latest.get(experimentId) !== request) return null;
+      if (!result) throw new Error(t('evaluation.experimentError', { id: experimentId }));
+      if (!result.ok) throw new Error(result.error.message);
+      const data = result.data;
+      if (data) {
+        setDetails((current) => ({ ...current, [experimentId]: data }));
+        return data;
       }
       return null;
     },
-    [client, details]
+    [client, details, t]
   );
 
   // All hooks must run before any conditional early return (React rules):
@@ -126,7 +130,7 @@ export const EvaluationCenter: React.FC = () => {
       <CaseDetail
         caseRef={selectedCase}
         detail={details[selectedCase.experimentId] ?? null}
-        onLoadDetail={() => void loadDetail(selectedCase.experimentId)}
+        onLoadDetail={(signal) => loadDetail(selectedCase.experimentId, signal)}
         onBack={() => setSelectedCase(null)}
       />
     );
@@ -137,7 +141,7 @@ export const EvaluationCenter: React.FC = () => {
       <ExperimentDetail
         experimentId={selectedExperimentId}
         detail={details[selectedExperimentId] ?? null}
-        onLoadDetail={() => void loadDetail(selectedExperimentId)}
+        onLoadDetail={(signal) => loadDetail(selectedExperimentId, signal)}
         onBack={() => setSelectedExperimentId(null)}
         onOpenCase={openCase}
       />
