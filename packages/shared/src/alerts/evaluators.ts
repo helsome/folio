@@ -11,6 +11,7 @@ import type {
   SymbolAlertRuleBase,
 } from '@finagent/core';
 import type { AlertRuleSnapshot } from './rules-repository.ts';
+import { isCalendarEventInWindow } from '../calendar/window.ts';
 
 /**
  * Per-rule evaluators. Each turns one `AlertRule` + the capability registry
@@ -69,6 +70,8 @@ export interface CalendarEventData {
   date: number; // epoch seconds
   type?: string; // raw calendar type; earnings announcements carry 'financial'
   symbol?: string;
+  localDate?: string;
+  market?: string;
 }
 
 /** `portfolio.positions` → raw account holdings (no market value). */
@@ -225,13 +228,12 @@ async function evaluateEarnings(
   );
   if (!events || events.length === 0) return null;
   const now = ctx.now();
-  const horizonEnd = now + rule.horizonDays * DAY_MS;
   const upcoming = events
     .filter((event) => (event.type ?? 'financial').toLowerCase() === 'financial')
     .filter((event) => !event.symbol || sameSymbol(event.symbol, rule.symbol))
     .filter((event) => {
       const dateMs = secondsToMs(event.date);
-      return dateMs >= now && dateMs <= horizonEnd;
+      return isCalendarEventInWindow(event, dateMs, now, rule.horizonDays);
     })
     .sort((a, b) => a.date - b.date);
   if (upcoming.length === 0) return null;
