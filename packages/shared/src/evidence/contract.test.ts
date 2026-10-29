@@ -56,6 +56,15 @@ function news(overrides: Partial<NewsItem> = {}): NewsItem {
 }
 
 describe('evidence contract identity', () => {
+  it.each([true, false, undefined])('preserves explicit delayed=%s without guessing for older envelopes', (delayed) => {
+    const bundle = buildEvidenceBundle(projectFinancialEvidence([envelope({ delayed })]));
+    const freshness = bundle.evidence[0]!.freshness;
+    expect(freshness.stale).toBe(false);
+    if (delayed === undefined) expect(freshness).not.toHaveProperty('delayed');
+    else expect(freshness.delayed).toBe(delayed);
+    expect(parseEvidenceBundle(serializeEvidenceBundle(bundle))).toEqual(bundle);
+  });
+
   it('derives identical ids for identical inputs and distinct ids for different inputs', () => {
     const first = projectFinancialEvidence([envelope()]);
     const second = projectFinancialEvidence([envelope()]);

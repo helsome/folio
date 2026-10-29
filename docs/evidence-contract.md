@@ -63,6 +63,9 @@ EvidenceSource ──< EvidenceItem >── EvidenceClaim ──> Answer / Resea
 - **结构化金融数据不伪造 URL**。`structured_finance` 来源没有公开文档，
   `canonicalUrl` 恒为空；其身份由 publisher + dataset + query 承担。
   缺 URL 是有语义的，不是缺失。
+- **延迟与陈旧分开保留**。金融信封的显式 `delayed` 透传到 evidence 的
+  `freshness.delayed`，不与 `stale` 混用；旧记录缺少该字段时仍保持未知，
+  不推断为实时数据。来源 provider 与市场/检索时间继续沿用信封中的实际值。
 - **authority 元数据只在实际已知时填写**（如监管备案 =
   `{ primary: true, sourceClass: 'regulator' }`），投影从不猜测。
 - **冲突与不可用有显式状态位**（`availability: 'conflicted' | 'unavailable'`）。
