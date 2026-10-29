@@ -45,9 +45,13 @@ short entries is excluded rather than representing a gross absolute exposure.
 
 ## Display and selection
 
-D3's treemap groups canonical listings by industry. A fixed visible legend
-shows daily percentage-change bucket boundaries. Positive/negative numbers and
-unknown/stale labels supplement color. Stale and missing quotes are gray;
+D3's treemap groups canonical listings by industry. A TradingView-inspired
+continuous red-to-deep-gray-to-green legend is clamped at -3% and +3%.
+Positive/negative numbers and unknown/stale labels supplement color. Stale and
+unknown returns use separate neutral grays;
+tiles use 1px inner spacing, 4px industry separation, responsive labels, white
+selection outlines, and bounded hover cards with identity, move, industry,
+weight, source, and market time. Stale and missing quotes are gray;
 unknown returns remain null. Delayed quotes, closed sessions, provider-stale
 quotes and quotes older than 15 minutes are marked stale. Demo quotes and
 quotes with missing time or mismatched identity never become current data.
