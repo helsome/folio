@@ -26,11 +26,20 @@ try {
   const renderMs = performance.now() - started;
   await page.screenshot({ path: resolve(output, 'heatmap-equal.png'), fullPage: true });
 
-  await page.getByLabel('Tile size').selectOption('weight');
+  await page.getByRole('button', { name: 'Market value', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: 'Market value', exact: true }).getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.getByRole('button', { name: 'Equal', exact: true }).getAttribute('aria-pressed'), 'false');
+  assert.equal(await page.getByRole('button', { name: 'Market value', exact: true }).locator('svg').count(), 1);
+  assert.equal(await page.getByRole('button', { name: 'Equal', exact: true }).locator('svg').count(), 0);
   assert.ok(Math.abs(await relativeArea() - 1.2) < 0.08, 'Weighted area follows snapshot values');
-  assert.ok((await page.getByTestId('heatmap-tile-AAPL').getAttribute('title')).includes('30%'));
+  assert.ok((await page.getByTestId('heatmap-tile-AAPL').textContent()).includes('30%'));
+  assert.ok((await page.getByTestId('heatmap-tile-AAPL').textContent()).includes('Apple Inc.'));
+  assert.ok((await page.textContent('[data-testid="heatmap-panel"]')).includes('Fixture technology'));
+  assert.ok((await page.textContent('[data-testid="heatmap-panel"]')).includes('3 symbols'));
   await page.screenshot({ path: resolve(output, 'heatmap-weighted.png'), fullPage: true });
   await page.getByRole('button', { name: 'Table', exact: true }).click();
+  assert.equal(await page.getByRole('button', { name: 'Table', exact: true }).getAttribute('aria-pressed'), 'true');
+  assert.equal(await page.getByRole('button', { name: 'Heatmap', exact: true }).getAttribute('aria-pressed'), 'false');
   assert.equal(await page.getByTestId('heatmap-table').locator('tbody tr').count(), 6);
   await page.getByTestId('heatmap-table').getByRole('button', { name: /Apple Inc/ }).click();
   assert.ok((await page.getByTestId('heatmap-detail').textContent()).includes('30%'));

@@ -65,15 +65,28 @@ export function heatmapHoldingValue(
   return { value };
 }
 
-/** Fixed daily-move buckets, shared by the visible legend and tile rendering. */
+const HEATMAP_RED = '#F23645';
+const HEATMAP_NEUTRAL = '#343a40';
+const HEATMAP_GREEN = '#089981';
+const HEATMAP_STALE = '#6b7280';
+const HEATMAP_UNKNOWN = '#4b5563';
+
+function hexToRgb(hex: string): [number, number, number] {
+  return [1, 3, 5].map((offset) => Number.parseInt(hex.slice(offset, offset + 2), 16)) as [number, number, number];
+}
+
+function blend(from: string, to: string, amount: number): string {
+  const a = hexToRgb(from);
+  const b = hexToRgb(to);
+  return `#${a.map((value, index) => Math.round(value + (b[index] - value) * amount).toString(16).padStart(2, '0')).join('')}`;
+}
+
+/** Continuous red-to-green daily-move palette, capped at +/-3%. */
 export function heatmapColor(tile: Pick<HeatmapTile, 'state' | 'changePercent'>): string {
-  if (tile.state !== 'current' || tile.changePercent === null) return '#6b7280';
-  const change = tile.changePercent;
-  if (change <= -3) return '#9f2434';
-  if (change < -1) return '#c74653';
-  if (change < 0) return '#a8646c';
-  if (change === 0) return '#575c63';
-  if (change < 1) return '#428077';
-  if (change < 3) return '#18786a';
-  return '#075e50';
+  if (tile.state === 'stale') return HEATMAP_STALE;
+  if (tile.state !== 'current' || tile.changePercent === null) return HEATMAP_UNKNOWN;
+  const change = Math.max(-3, Math.min(3, tile.changePercent));
+  return change < 0
+    ? blend(HEATMAP_RED, HEATMAP_NEUTRAL, (change + 3) / 3)
+    : blend(HEATMAP_NEUTRAL, HEATMAP_GREEN, change / 3);
 }
