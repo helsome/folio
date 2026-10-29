@@ -67,7 +67,7 @@ describe('OutcomeEngine direction matrix', () => {
 })
 
 describe('OutcomeEngine entry and exit resolution', () => {
-  it('falls back to the first history close when the opinion has no entryPrice', () => {
+  it('falls back to the first in-window close when the opinion has no entryPrice', () => {
     const opinion = makeOpinion({ entryPrice: undefined })
     const outcome = engine.evaluate(opinion, dailyBars(startSec, [50, 55]))
     expect(outcome.status).toBe('evaluated')
@@ -124,6 +124,101 @@ describe('OutcomeEngine drawdown', () => {
   it('maxDrawdownPct handles a flat series', () => {
     expect(maxDrawdownPct([50, 50, 50])).toBe(0)
   })
+})
+
+describe('OutcomeEngine committed window', () => {
+  it('anchors a missing entry to the first in-window close without changing shared history', () => {
+    const opinion = makeOpinion({ entryPrice: undefined, horizon: '1w' })
+    const history = dailyBars(startSec - 2 * DAY_SEC, [40, 40, 100, 100, 100, 100, 100, 100, 100, 100]).reverse()
+    const original = history.map((bar) => ({ ...bar }))
+
+    const outcome = engine.evaluate(opinion, history)
+
+    expect(outcome.status).toBe('evaluated')
+    expect(outcome.entryPrice).toBe(100)
+    expect(outcome.exitPrice).toBe(100)
+    expect(outcome.returnPercent).toBe(0)
+    expect(outcome.directionCorrect).toBe(false)
+    expect(history).toEqual(original)
+    expect(opinion.entryPrice).toBeUndefined()
+  })
+
+  it('keeps the entry snapshot and excludes pre-creation drawdowns', () => {
+    const opinion = makeOpinion({ entryPrice: 80, horizon: '1w' })
+    const history = dailyBars(startSec - 2 * DAY_SEC, [200, 20, 100, 100])
+
+    const outcome = engine.evaluate(opinion, history)
+
+    expect(outcome.entryPrice).toBe(80)
+    expect(outcome.exitPrice).toBe(100)
+    expect(outcome.returnPercent).toBe(25)
+    expect(outcome.maximumDrawdown).toBe(0)
+  })
+
+  it('includes bars exactly at creation and horizon end, excluding both outer sides', () => {
+    const endSec = startSec + 7 * DAY_SEC
+    const history = [
+      makeKline(startSec - 1, 400),
+      makeKline(startSec, 100),
+      makeKline(endSec, 110),
+      makeKline(endSec + 1, 1),
+    ]
+
+    const outcome = engine.evaluate(makeOpinion({ entryPrice: undefined, horizon: '1w' }), history)
+
+    expect(outcome.entryPrice).toBe(100)
+    expect(outcome.exitPrice).toBe(110)
+    expect(outcome.returnPercent).toBe(10)
+    expect(outcome.maximumDrawdown).toBe(0)
+  })
+
+  it('excludes a bar only one millisecond before creation without rounding to its day or second', () => {
+    const opinion = makeOpinion({ createdAt: NOW_MS + 1, entryPrice: undefined })
+    const history = [makeKline(startSec, 40), makeKline(startSec + 1, 100)]
+
+    const outcome = engine.evaluate(opinion, history)
+
+    expect(outcome.entryPrice).toBe(100)
+    expect(outcome.returnPercent).toBe(0)
+  })
+
+  it('excludes a bar only one millisecond after the horizon end', () => {
+    const endSec = startSec + 7 * DAY_SEC
+    const opinion = makeOpinion({ createdAt: NOW_MS - 1, entryPrice: undefined, horizon: '1w' })
+    const history = [makeKline(startSec, 100), makeKline(endSec - 1, 110), makeKline(endSec, 1)]
+
+    const outcome = engine.evaluate(opinion, history)
+
+    expect(outcome.entryPrice).toBe(100)
+    expect(outcome.exitPrice).toBe(110)
+    expect(outcome.returnPercent).toBe(10)
+    expect(outcome.maximumDrawdown).toBe(0)
+  })
+
+  for (const entryPrice of [undefined, 100]) {
+    it(`cannot evaluate pre-creation-only history with entry ${entryPrice}`, () => {
+      const opinion = makeOpinion({ entryPrice, horizon: '1w' })
+      const outcome = engine.evaluate(opinion, dailyBars(startSec - 3 * DAY_SEC, [40, 50, 60]))
+
+      expect(outcome.status).toBe('unable')
+      expect(outcome.reason).toBe('delisted')
+      expect(outcome.entryPrice).toBe(entryPrice)
+      expect(outcome.exitPrice).toBeUndefined()
+      expect(outcome.returnPercent).toBeUndefined()
+      expect(outcome.maximumDrawdown).toBeUndefined()
+    })
+
+    it(`cannot use post-horizon-only history to backfill entry ${entryPrice}`, () => {
+      const opinion = makeOpinion({ entryPrice, horizon: '1w' })
+      const outcome = engine.evaluate(opinion, dailyBars(startSec + 8 * DAY_SEC, [200, 210]))
+
+      expect(outcome.status).toBe('unable')
+      expect(outcome.reason).toBe('delisted')
+      expect(outcome.entryPrice).toBe(entryPrice)
+      expect(outcome.exitPrice).toBeUndefined()
+      expect(outcome.returnPercent).toBeUndefined()
+    })
+  }
 })
 
 describe('OutcomeEngine unable paths', () => {
