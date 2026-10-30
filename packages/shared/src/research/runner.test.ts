@@ -205,6 +205,34 @@ describe('ResearchRunner', () => {
     });
   });
 
+  it('keeps distinct news without URLs in the synthesis bundle', async () => {
+    const news = fakeCap('research.news');
+    news.execute = async () => ({
+      data: [
+        { id: 'a', title: 'First company revenue rises', url: '' },
+        { id: 'b', title: 'Second company faces lawsuit', url: '  ' },
+      ],
+      provenance: { provider: 'test', fetchedAt: 1, stale: false },
+    });
+    let observed: Record<string, unknown> = {};
+    const runner = new ResearchRunner({
+      registry: createCapabilityRegistry([news]),
+      synthesizer: {
+        async synthesize(input) {
+          observed = JSON.parse(input.dataBundle) as Record<string, unknown>;
+          return new LocalResearchSynthesizer().synthesize(input);
+        },
+      },
+    });
+
+    await runner.run({ symbol: 'NVDA.US', runId: 'news-without-urls' });
+
+    const bundle = observed['research.news'] as { items: Array<{ id: string }> };
+    const ranking = observed['research.news:ranking'] as { independentSourceCount: number };
+    expect(bundle.items.map((item) => item.id)).toEqual(['a', 'b']);
+    expect(ranking.independentSourceCount).toBe(2);
+  });
+
   it('keeps malformed news payloads inside the untrusted envelope', async () => {
     const news = fakeCap('research.news');
     news.execute = async () => ({
