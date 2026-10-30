@@ -5,6 +5,7 @@ import { useTranslation } from 'react-i18next'
 import type { TFunction } from 'i18next';
 import { useAtomValue, useSetAtom } from 'jotai'
 import type { AlertTriggerEvent, ApiResult, CalendarEvent, HeatmapTile, InvestmentThesis, ResearchReport } from '@finagent/core'
+import { formatShortDate } from '@finagent/i18n'
 import {
   activeSymbolAtom,
   alertStateAtom,
@@ -48,7 +49,7 @@ function formatWhen(timestamp: number, t: TFunction): string {
   if (diff < 60_000) return t('today.justNow')
   if (diff < 3_600_000) return t('today.minutesAgo', { count: Math.floor(diff / 60_000) })
   if (diff < 86_400_000) return t('today.hoursAgo', { count: Math.floor(diff / 3_600_000) })
-  return new Date(timestamp).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+  return formatShortDate(timestamp)
 }
 
 /**

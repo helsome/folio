@@ -1,7 +1,7 @@
 import React from 'react'
 import { useTranslation } from 'react-i18next'
 import type { AutomationRule, AutomationRun, AutomationType } from '@finagent/core'
-import { i18nCurrentLocale } from '@finagent/i18n'
+import { formatShortDate, i18nCurrentLocale } from '@finagent/i18n'
 
 interface RuleCardProps {
   rule: AutomationRule
@@ -27,7 +27,7 @@ function formatWhen(timestamp: number, t: TFunc): string {
   if (diff < 60_000) return t('automation.schedule.justNow')
   if (diff < 3_600_000) return t('automation.schedule.minutesAgo', { count: Math.floor(diff / 60_000) })
   if (diff < 86_400_000) return t('automation.schedule.hoursAgo', { count: Math.floor(diff / 3_600_000) })
-  return new Intl.DateTimeFormat(i18nCurrentLocale(), { month: 'short', day: 'numeric' }).format(timestamp)
+  return formatShortDate(timestamp)
 }
 
 const WEEKDAYS = [1, 2, 3, 4, 5]
