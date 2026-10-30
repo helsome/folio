@@ -20,6 +20,7 @@ import type {
   EvaluationMetricId,
   ExperimentConfig,
   Run,
+  RunManifestContextPatch,
   ToolCall,
   ToolCallRecord,
 } from '@finagent/core';
@@ -97,6 +98,8 @@ class FakeKernel implements ExperimentKernel {
   startedRuns = 0;
   /** When set, `startRun` rejects with this error (infra start failure). */
   startRunError?: ApiError;
+  /** Manifest context handed to the most recent `startRun` (#21). */
+  lastManifestContext?: RunManifestContextPatch;
   private readonly listeners = new Set<(event: AgentEvent) => void>();
   private readonly sessionTitles = new Map<string, string>();
   private readonly scripts = new Map<string, ScriptedRun>();
@@ -157,7 +160,14 @@ class FakeKernel implements ExperimentKernel {
       this.listeners.add(listener);
       return () => this.listeners.delete(listener);
     },
-    startRun: async (sessionId: string, content: string): Promise<Run> => {
+    startRun: async (
+      sessionId: string,
+      content: string,
+      _workspaceContext?: unknown,
+      _locale?: unknown,
+      manifestContext?: RunManifestContextPatch
+    ): Promise<Run> => {
+      this.lastManifestContext = manifestContext;
       if (this.startRunError) {
         throw Object.assign(new Error(this.startRunError.message), { code: this.startRunError.code });
       }
@@ -410,6 +420,23 @@ describe('ExperimentService.runExperiment', () => {
     expect(scores.groundedness).toBeUndefined(); // no judge configured
 
     expect(kernel.deletedSessions).toBe(1);
+  });
+
+  it('stamps the gold case and dataset version into the run manifest (#21 / #15)', async () => {
+    const dataset = makeDataset([makeCase('case-ok')]);
+    const kernel = new FakeKernel();
+    scriptSuccess(kernel, 'case-ok');
+    const service = createService(kernel);
+
+    await service.runExperiment({ dataset, config: makeConfig() });
+
+    // The evaluation runner only adds what it owns; the model/prompt/tool config
+    // comes from the kernel's base manifest context.
+    expect(kernel.lastManifestContext?.evaluation).toEqual({
+      datasetId: 'test-dataset',
+      caseId: 'case-ok',
+      datasetVersion: '1.0.0',
+    });
   });
 
   it('counts a timeout after execution starts as a negative quality result', async () => {
