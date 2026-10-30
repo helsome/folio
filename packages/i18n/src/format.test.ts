@@ -8,7 +8,9 @@ import {
   formatPercent,
   formatPercentRatio,
   formatRelativeTime,
+  formatShortDate,
   formatSignedCurrency,
+  i18nCurrentLocale,
   i18nSetCurrentLocale,
 } from './format.ts';
 
@@ -70,5 +72,35 @@ describe('formatters (spec §52–59)', () => {
     i18nSetCurrentLocale('en-US');
     expect(formatCurrency(100, 'USD')).not.toContain('US$');
     i18nSetCurrentLocale('zh-CN');
+  });
+
+  it('short date has no year and follows the app locale, not the host locale', () => {
+    const ts = Date.UTC(2024, 10, 21, 9, 20, 0);
+    const host = new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' });
+    const saved = i18nCurrentLocale();
+    try {
+      expect(formatShortDate(ts, 'en-US')).not.toContain('2024');
+      expect(formatShortDate(ts, 'zh-CN')).toContain('月');
+      expect(formatShortDate(ts, 'zh-CN')).not.toContain('2024');
+      expect(formatShortDate(undefined, 'en-US')).toBe('—');
+
+      let sawMismatch = false;
+      for (const locale of ['zh-CN', 'en-US'] as const) {
+        i18nSetCurrentLocale(locale);
+        const expected = formatShortDate(ts);
+        if (expected === host) continue;
+        sawMismatch = true;
+        expect(formatShortDate(ts)).toBe(expected);
+        expect(formatShortDate(ts)).not.toBe(host);
+        break;
+      }
+      if (!sawMismatch) {
+        throw new Error(
+          `host locale renders ${JSON.stringify(host)} identically to both supported locales — the assertion would be vacuous`,
+        );
+      }
+    } finally {
+      i18nSetCurrentLocale(saved);
+    }
   });
 });

@@ -27,6 +27,7 @@ export {
   formatPercent,
   formatPercentRatio,
   formatDate,
+  formatShortDate,
   formatDateTime,
   formatMarketTime,
   formatRelativeTime,
