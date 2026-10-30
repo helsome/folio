@@ -167,6 +167,20 @@ describe('parseCsv', () => {
     expect(rows[1]).toMatchObject({ symbol: '0700.HK', currency: 'HKD' })
   })
 
+  it('strips a leading UTF-8 BOM from English headers', () => {
+    const plain = 'Symbol,Quantity,Cost\nAAPL.US,10,100'
+    const rows = parseCsv(`\uFEFF${plain}`)
+    expect(rows).toEqual(parseCsv(plain))
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 10, costPrice: 100, confidence: 1, issues: [] })
+  })
+
+  it('strips a leading UTF-8 BOM from 中文 headers', () => {
+    const plain = '代码,数量,成本\nAAPL.US,10,100'
+    const rows = parseCsv(`\uFEFF${plain}`)
+    expect(rows).toEqual(parseCsv(plain))
+    expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 10, costPrice: 100, confidence: 1, issues: [] })
+  })
+
   it('detects alias variants (qty / shares / price / code)', () => {
     const rows = parseCsv('Code,Shares,Price\nAAPL.US,100,180.5')
     expect(rows[0]).toMatchObject({ symbol: 'AAPL.US', quantity: 100, costPrice: 180.5 })
