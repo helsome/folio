@@ -101,7 +101,7 @@ export function buildBrief(inputs: BriefInputs, now: number = Date.now()): Daily
     ...portfolioItems(inputs),
     ...watchlistItems(inputs),
     ...thesisItems(inputs),
-    ...alertItems(inputs),
+    ...alertItems(inputs, now),
     ...automationItems(todaysRuns),
   ]
   items.sort(compareItems)
@@ -203,8 +203,9 @@ function thesisItems(inputs: BriefInputs): BriefItem[] {
     })
 }
 
-function alertItems(inputs: BriefInputs): BriefItem[] {
-  return inputs.alerts.map((alert) => ({
+function alertItems(inputs: BriefInputs, now: number): BriefItem[] {
+  const today = new Date(now).toDateString()
+  return inputs.alerts.filter((alert) => new Date(alert.triggeredAt).toDateString() === today).map((alert) => ({
     id: `alert-${alert.id}`,
     symbol: alert.symbol,
     title: alert.title,
