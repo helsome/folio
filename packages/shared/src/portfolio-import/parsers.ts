@@ -20,7 +20,8 @@ export type HeaderField = 'symbol' | 'name' | 'quantity' | 'cost' | 'currency' |
 
 /**
  * Header aliases for CSV column detection (English + 中文). Header cells are
- * matched after lowercasing and stripping spaces/underscores/hyphens.
+ * matched after stripping a leading UTF-8 BOM (U+FEFF), lowercasing, and
+ * removing spaces, underscores, and hyphens.
  */
 export const HEADER_ALIASES: Record<HeaderField, readonly string[]> = {
   symbol: ['symbol', 'ticker', 'code', 'stock', '代码', '股票代码', '证券代码'],
@@ -172,7 +173,9 @@ export function splitCsvLine(line: string, delimiter: ',' | '\t' = csvDelimiter(
 }
 
 function normalizeHeaderCell(cell: string): string {
-  return cell.trim().toLowerCase().replace(/[\s_\-]/g, '')
+  // Excel "CSV UTF-8" prefixes the first cell with U+FEFF. Strip that BOM
+  // before alias matching so the header matches the same file without one.
+  return cell.replace(/^\uFEFF+/, '').trim().toLowerCase().replace(/[\s_\-]/g, '')
 }
 
 /** Field → resolved column index for one CSV file. */
