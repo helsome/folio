@@ -79,6 +79,25 @@ describe('toFiniteNumber', () => {
     expect(toFiniteNumber(' 1,234.56 ')).toBe(1234.56)
   })
 
+  it('strips a decorative trailing percent without dividing by 100', () => {
+    expect(toFiniteNumber('100%')).toBe(100)
+    expect(toFiniteNumber('12.5%')).toBe(12.5)
+    expect(toFiniteNumber('-3.25%')).toBe(-3.25)
+    expect(toFiniteNumber('0%')).toBe(0)
+    expect(toFiniteNumber('1,000%')).toBe(1000)
+    expect(toFiniteNumber(' 100 % ')).toBe(100)
+    expect(toFiniteNumber('$12.5%')).toBe(12.5)
+  })
+
+  it('leaves ordinary numbers and non-decorative percents unchanged', () => {
+    expect(toFiniteNumber('100')).toBe(100)
+    expect(toFiniteNumber('12.5')).toBe(12.5)
+    expect(toFiniteNumber('%')).toBeUndefined()
+    expect(toFiniteNumber('100%%')).toBeUndefined()
+    expect(toFiniteNumber('10%5')).toBeUndefined()
+    expect(toFiniteNumber('12% off')).toBeUndefined()
+  })
+
   it('returns undefined for null, empty, and junk', () => {
     expect(toFiniteNumber(null)).toBeUndefined()
     expect(toFiniteNumber(undefined)).toBeUndefined()
@@ -130,6 +149,13 @@ describe('parseCsv', () => {
     expect(row).toMatchObject({ name: 'Apple, Inc.', quantity: 1000, costPrice: 180.5, issues: [] })
     const [mapped] = parseCsv('Ticker\tUnits\tAvg Cost\nAAPL.US\t1,000\t180.5', { symbol: 'Ticker', quantity: 'Units', cost: 'Avg Cost' })
     expect(mapped).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, issues: [] })
+  })
+
+  it('strips a decorative trailing percent on quantity and cost without scaling', () => {
+    const [row] = parseCsv('Symbol,Quantity,Cost\nAAPL.US,10%,100%')
+    expect(row).toMatchObject({ symbol: 'AAPL.US', quantity: 10, costPrice: 100, confidence: 1, issues: [] })
+    const [fraction] = parseCsv('Symbol,Quantity,Cost\nMSFT.US,12.5%,180.5')
+    expect(fraction).toMatchObject({ symbol: 'MSFT.US', quantity: 12.5, costPrice: 180.5, confidence: 1, issues: [] })
   })
 
   it('flags formatting-only quantities and costs without inventing zeros', () => {
@@ -299,6 +325,13 @@ describe('parsePaste (spec §46)', () => {
       expect(row.confidence).toBe(0.6)
       expect(row.issues).toEqual(['Invalid quantity "$"', 'Invalid cost price "$"'])
     }
+  })
+
+  it('strips a decorative trailing percent on pasted quantity and cost', () => {
+    const [row] = parsePaste('AAPL.US 10% 100%')
+    expect(row).toMatchObject({ symbol: 'AAPL.US', quantity: 10, costPrice: 100, confidence: 1, issues: [] })
+    const [fraction] = parsePaste('MSFT.US, 12.5%, 180.5')
+    expect(fraction).toMatchObject({ symbol: 'MSFT.US', quantity: 12.5, costPrice: 180.5, confidence: 1, issues: [] })
   })
 
   it('parses SYMBOL QTY COST', () => {

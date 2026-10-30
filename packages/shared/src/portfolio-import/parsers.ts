@@ -16,6 +16,12 @@ export const SYMBOL_RE = /^[A-Z0-9]{1,8}\.(US|HK|SG|SH|SZ|HAS)$/
 /** Bare ticker with no market suffix — usable, but ambiguous (review). */
 export const BARE_TICKER_RE = /^[A-Z0-9]{1,8}$/
 
+/**
+ * A plain decimal with one decorative trailing `%`.
+ * Only that `%` is removed; the number is not divided by 100 (`100%` stays 100).
+ */
+const DECORATIVE_TRAILING_PERCENT_RE = /^-?\d+(\.\d+)?%$/
+
 export type HeaderField = 'symbol' | 'name' | 'quantity' | 'cost' | 'currency' | 'account'
 
 /**
@@ -85,7 +91,9 @@ export function checkSymbol(raw: string): SymbolCheck {
 
 /**
  * Coerce a CSV/paste cell to a finite number. Strings with thousands
- * separators or a leading `$` are handled; empty/null/non-numeric → undefined.
+ * separators or a leading `$` are handled. A decorative trailing `%` on a
+ * plain decimal is removed and is not treated as a weight (`100%` → 100, not 1).
+ * Empty/null/non-numeric → undefined.
  */
 export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value === 'number') {
@@ -103,7 +111,8 @@ export function toFiniteNumber(value: unknown): number | undefined {
   if (cleaned === '') {
     return undefined
   }
-  const parsed = Number(cleaned)
+  const numeric = DECORATIVE_TRAILING_PERCENT_RE.test(cleaned) ? cleaned.slice(0, -1) : cleaned
+  const parsed = Number(numeric)
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
