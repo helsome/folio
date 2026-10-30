@@ -42,6 +42,76 @@ describe('normalizeSourceTitle', () => {
 });
 
 describe('rankRetrievalSources', () => {
+  it('does not merge reports with contradictory signed figures', () => {
+    const result = rankRetrievalSources([
+      source('gain', 'https://a.test/1', 'Company reports a gain', 'The company reported a change of +10% in quarterly revenue.'),
+      source('loss', 'https://b.test/2', 'Company reports a loss', 'The company reported a change of -10% in quarterly revenue.'),
+    ], { now: NOW });
+    expect(result.independentSourceCount).toBe(2);
+  });
+
+  it('keeps different figures apart even when titles match', () => {
+    const result = rankRetrievalSources([
+      source('a', 'https://a.test/1', 'Quarterly earnings', 'Revenue was $1,000.50 million.'),
+      source('b', 'https://b.test/2', 'Quarterly earnings', 'Revenue was $1,200.50 million.'),
+    ], { now: NOW });
+    expect(result.independentSourceCount).toBe(2);
+  });
+
+  it('preserves opposite figures in titles when excerpts are missing', () => {
+    const result = rankRetrievalSources([
+      source('a', 'https://a.test/1', 'Revenue changes +10%'),
+      source('b', 'https://b.test/2', 'Revenue changes -10%'),
+    ], { now: NOW });
+    expect(result.independentSourceCount).toBe(2);
+  });
+
+  it('still deduplicates equivalent figures and unchanged URLs', () => {
+    const equivalent = rankRetrievalSources([
+      source('a', 'https://a.test/1', 'Quarterly earnings', 'Revenue grew by +10.0% to $1,000.'),
+      source('b', 'https://b.test/2', 'Quarterly earnings', 'Revenue grew by 10% to $1000.'),
+    ], { now: NOW });
+    expect(equivalent.independentSourceCount).toBe(1);
+
+    const sameUrl = rankRetrievalSources([
+      source('a', 'https://a.test/1', 'Early report', 'Revenue was 10.'),
+      source('b', 'https://a.test/1', 'Updated report', 'Revenue was 20.'),
+    ], { now: NOW });
+    expect(sameUrl.clusters[0].duplicateRelations[0].relation).toBe('same_url');
+  });
+
+  it('does not infer conflicting figures when one excerpt has no numbers', () => {
+    const result = rankRetrievalSources([
+      source('a', 'https://a.test/1', 'Quarterly earnings', 'Revenue grew 10%.'),
+      source('b', 'https://b.test/2', 'Quarterly earnings', 'Revenue grew.'),
+    ], { now: NOW });
+    expect(result.independentSourceCount).toBe(1);
+  });
+
+  it.each([
+    [0, 1, 2], [0, 2, 1], [1, 0, 2],
+    [1, 2, 0], [2, 0, 1], [2, 1, 0],
+  ])('keeps conflicting reports apart through a numberless bridge: %i %i %i', (a, b, c) => {
+    const sources = [
+      source('gain', 'https://a.test/1', 'Quarterly earnings', 'Revenue rose +10%.'),
+      source('loss', 'https://b.test/2', 'Quarterly earnings', 'Revenue rose -10%.'),
+      source('bridge', 'https://c.test/3', 'Quarterly earnings', 'Revenue changed.'),
+    ];
+    const result = rankRetrievalSources([sources[a], sources[b], sources[c]], { now: NOW });
+    expect(result.independentSourceCount).toBe(2);
+    expect(result.clusters.some((cluster) =>
+      cluster.memberIds.includes('gain') && cluster.memberIds.includes('loss')
+    )).toBe(false);
+  });
+
+  it('recognizes Unicode minus and currency signs without losing large integer precision', () => {
+    const result = rankRetrievalSources([
+      source('a', 'https://a.test/1', 'Report', 'Net change was −$9007199254740992.'),
+      source('b', 'https://b.test/2', 'Report', 'Net change was $9007199254740993.'),
+    ], { now: NOW });
+    expect(result.independentSourceCount).toBe(2);
+  });
+
   it('clusters tracking variants as one independent source', () => {
     const result = rankRetrievalSources(
       [

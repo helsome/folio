@@ -2,7 +2,7 @@
 
 Folio applies deterministic source normalization before news results enter
 Deep Research synthesis. The policy implementation is in
-`packages/shared/src/retrieval` and is versioned as `folio-retrieval-v1`.
+`packages/shared/src/retrieval` and is versioned as `folio-retrieval-v2`.
 
 The pipeline:
 
@@ -36,7 +36,15 @@ not part of ordinary unit tests or CI.
 
 ## Boundaries
 
-Version 1 does not fetch article bodies or resolve network redirects. Providers
+Version 2 conservatively keeps sources with differing numeric titles or excerpts apart when matching
+by title or content, including through numberless bridges. It normalizes common
+decimal, grouped, signed and percent forms; it does not interpret units or
+context, so different figures in syndicated excerpts may remain separate.
+Identical URLs still identify the same source even when its content changes.
+Ambiguous bridges attach to the first compatible cluster in input order.
+This is not a claim-verification mechanism.
+
+The policy does not fetch article bodies or resolve network redirects. Providers
 may supply a resolved `canonicalUrl`; otherwise Folio uses deterministic URL,
 title, and excerpt signals. UI display of clusters and claim-level citation
 verification remain separate integration work.
