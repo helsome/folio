@@ -81,9 +81,21 @@ node apps/electron/e2e/research-export.mjs
 报告和非法身份，再操作菜单下载并重新加载。输出保存在被忽略的
 `apps/electron/e2e/artifacts/research-export-*`。
 
-本机执行停在 Electron 启动阶段，未进入脚本中的功能断言。相同 Electron 二进制
-单独执行 `--version` 也以 `2147483651`（`0x80000003`）退出；其 Node 模式能够
-运行。当前原因仍需进一步确认。此次没有完成 Electron 菜单下载验收，也没有
-取得实际产品截图；草稿 PR 保持此状态，完成验收后再进入正式审核。
+2026-10-31 在上述 Windows 环境中执行成功，结果为：
+
+```text
+PASS: real Electron IPC, menu download, reload; recorded report report-research-1de3f102-13b4-4261-810e-93e5bff7abde
+```
+
+测试启动参数沿用仓库 `electron-harness.mjs` 的 `--no-sandbox` 和
+`--disable-gpu`，并显式设置 Playwright `acceptDownloads: true`。
+这些参数仅用于验收脚本，产品启动配置保持不变。
+
+实际 preload / IPC 返回的归档与公开报告一致，所有证据引用均可解析，缺失报告
+及非法身份被拒绝。通过真实菜单下载的 `NVDA.US-research.json` 与 IPC 输出
+逐字节一致；重新加载后的导出结果也相同。结构化结果位于被忽略目录
+`apps/electron/e2e/artifacts/research-export-r3fuJ7/verification.json`。
+
+尚未提供新增菜单的产品截图，草稿 PR 保持此状态。
 
 本次只覆盖 JSON 子能力；#36 要求的完整金融/Web 来源及表格验收尚未完成。

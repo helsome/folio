@@ -30,7 +30,8 @@ await writeFile(join(userData, 'store/research/runs.json'), JSON.stringify({ run
 
 const application = await electron.launch({
   executablePath: resolveElectronBinary(appRoot, repoRoot),
-  args: [join(appRoot, 'src/main/index.js')],
+  acceptDownloads: true,
+  args: [join(appRoot, 'src/main/index.js'), '--no-sandbox', '--disable-gpu'],
   cwd: repoRoot,
   env: { ...process.env, FINAGENT_FORCE_PROD_LOAD: '1', FINAGENT_E2E_HIDDEN: '1',
     FINAGENT_USER_DATA_DIR: userData, FINAGENT_DEMO_DATA: '0' },
