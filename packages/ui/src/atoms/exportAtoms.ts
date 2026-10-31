@@ -3,11 +3,10 @@ import { unwrapIpcResult } from '../client/unwrap';
 /**
  * Export & share loaders (spec §54–55).
  *
- * The main process renders Markdown / the share card from a stored report
- * with the pure functions in packages/shared/src/export and answers over the
- * `export:markdown` / `export:shareCard` channels with the usual
- * `{ ok, data | error }` envelope. Every loader degrades to `null` when the
- * channel is not wired yet, so the ExportMenu never crashes pre-integration.
+ * The main process renders stored reports using packages/shared/src/export
+ * and answers over the export IPC channels with the usual
+ * `{ ok, data | error }` envelope. JSON failures reject so ExportMenu can
+ * display the existing error state.
  */
 
 /** Renderer-facing mirror of the shared ShareCard payload. */
@@ -20,6 +19,7 @@ export interface ShareCardPayload {
 interface ExportElectronApi {
   export?: {
     markdown?: (input: { reportId: string }) => Promise<unknown>;
+    json?: (input: { reportId: string }) => Promise<unknown>;
     shareCard?: (input: { reportId: string }) => Promise<unknown>;
   };
 }
@@ -38,6 +38,15 @@ export async function loadExportMarkdown(reportId: string): Promise<string | nul
   } catch {
     return null;
   }
+}
+
+/** Load the persisted report's JSON archive; reject unavailable or failed exports. */
+export async function loadExportJson(reportId: string): Promise<string> {
+  const channel = api();
+  if (!channel?.json) throw new Error('JSON export channel is unavailable');
+  const value = unwrapIpcResult<string>(await channel.json({ reportId }));
+  if (typeof value !== 'string') throw new Error('JSON export failed');
+  return value;
 }
 
 /** Render the share card (SVG + text); null when unwired or failing. */

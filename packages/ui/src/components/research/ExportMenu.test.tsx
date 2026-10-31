@@ -115,7 +115,7 @@ function byTestId(container: HTMLElement, testId: string): HTMLElement | null {
 }
 
 describe('ExportMenu', () => {
-  it('opens a menu with all four export actions', async () => {
+  it('opens the report export menu', async () => {
     const { container, root } = renderMenu();
     expect(byTestId(container, 'export-menu-panel')).toBeNull();
     act(() => {
@@ -126,6 +126,7 @@ describe('ExportMenu', () => {
     for (const testId of [
       'export-copy-markdown',
       'export-download-markdown',
+      'export-download-json',
       'export-copy-share-text',
       'export-download-card',
     ]) {
