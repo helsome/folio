@@ -2,8 +2,11 @@
 // must inform intent routing without being named in the user message.
 
 import { describe, expect, it } from 'bun:test';
+import { Type } from '@sinclair/typebox';
+import type { FinanceCapability } from '@finagent/core';
 import { LocalRuntimeAdapter } from './local-runtime-adapter.ts';
 import { LocalFinanceAgentBackend } from './local-finance-agent-backend.ts';
+import { FinanceToolRegistry } from './finance-tool-registry.ts';
 
 function fakeMarketData() {
   return {
@@ -64,5 +67,51 @@ describe('WorkspaceContext → agent run (local)', () => {
     }
 
     expect(answers.join('')).toContain('标的代码');
+  });
+
+  it('propagates cancellation to an in-flight capability execution', async () => {
+    let markStarted = () => {};
+    const started = new Promise<void>((resolve) => {
+      markStarted = resolve;
+    });
+    const hangingQuote = {
+      id: 'market.quote',
+      name: 'Quote',
+      description: 'A hanging quote capability for cancellation tests.',
+      category: 'market',
+      riskLevel: 'read',
+      auth: 'public',
+      toolName: 'get_quote',
+      inputSchema: Type.Object({ symbol: Type.String() }),
+      async execute() {
+        markStarted();
+        await new Promise<never>(() => undefined);
+        return { data: { symbol: 'AAPL.US' } };
+      },
+    } as unknown as FinanceCapability;
+    const registry = new FinanceToolRegistry({
+      list: () => [hangingQuote],
+      get: () => hangingQuote,
+      query: () => [hangingQuote],
+    });
+    const adapter = new LocalRuntimeAdapter({
+      backend: new LocalFinanceAgentBackend({ registry }),
+    });
+    const iterator = adapter.run({
+      sessionId: 's-cancel',
+      runId: 'r-cancel',
+      content: 'AAPL.US quote',
+    })[Symbol.asyncIterator]();
+
+    const nextEvent = iterator.next();
+    await started;
+    await adapter.cancel({ sessionId: 's-cancel', runId: 'r-cancel' });
+    const event = await nextEvent;
+
+    expect(event.done).toBe(false);
+    expect(event.value?.type).toBe('run_failed');
+    if (event.value?.type === 'run_failed') {
+      expect(event.value.payload.error.code).toBe('RUN_CANCELLED');
+    }
   });
 });
