@@ -39,6 +39,8 @@ export interface CitationSource {
   envelopeId?: string;
   kind: CitationSourceKind;
   toolName: string;
+  /** Redacted tool-call arguments, shown as provenance for non-financial origins. */
+  args?: Record<string, unknown>;
   provider?: string;
   /** One-line summary, e.g. `AAPL · lastPrice` or a news headline. */
   title?: string;
@@ -47,6 +49,10 @@ export interface CitationSource {
   /** Epoch milliseconds — mirrors FinancialEvidenceValue.asOf. */
   asOf?: number;
   stale?: boolean;
+  /** True when the provider reported a delayed value rather than live data. */
+  delayed?: boolean;
+  /** Provider-conflict resolution metadata (#24/#26), when more than one source backed the fact. */
+  reconciliation?: { providers: string[]; method: string };
   status: 'success' | 'error';
 }
 

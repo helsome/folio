@@ -62,7 +62,24 @@ describe('collectCitationSources', () => {
     }));
     expect(index.byId.get('get_news-1')?.kind).toBe('news');
     expect(index.byId.get('get_news-1')?.url).toBe('https://example.com/a');
+    expect(index.byId.get('get_news-1')?.title).toBe('Headline');
+    expect(index.byId.get('get_news-1')?.args).toEqual({});
     expect(index.byId.get('get_other-1')?.kind).toBe('tool');
+  });
+
+  it('carries delayed and reconciliation metadata from the envelope', () => {
+    const index = collectCitationSources(message({
+      toolCalls: [{ id: 'get_quote-1', toolName: 'get_quote', args: { symbol: 'aapl.us' }, startedAt: 1, status: 'success' }],
+      financialEvidence: [envelope({
+        delayed: true,
+        reconciliation: { providers: ['longbridge', 'eastmoney'], method: 'priority' },
+      })],
+    }));
+    expect(index.byId.get('get_quote-1')?.delayed).toBe(true);
+    expect(index.byId.get('get_quote-1')?.reconciliation).toEqual({
+      providers: ['longbridge', 'eastmoney'],
+      method: 'priority',
+    });
   });
 
   it('skips errored tool calls — failed calls are not citable origins', () => {

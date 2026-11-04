@@ -49,11 +49,36 @@ const MESSAGE: Message = {
   }],
 };
 
+const NEWS_MESSAGE: Message = {
+  id: 'm2',
+  role: 'assistant',
+  content: '',
+  timestamp: 0,
+  toolCalls: [
+    {
+      id: 'get_news-1',
+      toolName: 'get_news',
+      args: { symbol: 'aapl.us', limit: 5 },
+      startedAt: 1,
+      completedAt: 1_700_000_000_000,
+      status: 'success',
+      result: {
+        data: [{
+          title: 'Apple unveils new MacBook lineup',
+          url: 'https://news.example.com/apple-macbook',
+        }],
+      },
+    },
+  ],
+};
+
 const ANSWER = `AAPL last traded at 182.31 USD.⟦cite:get_quote-1⟧ More text.`;
 const FABRICATED = `Claim.⟦cite:made-up-id⟧`;
 
 async function renderElement(element: React.ReactElement): Promise<HTMLElement> {
   const container = document.createElement('div');
+  // Attach to the document so focus and :focus-based happy-dom behavior work.
+  document.body.appendChild(container);
   const root = createRoot(container);
   const i18n = makeAnswerBlockTestI18n('en-US');
   await act(async () => {
@@ -182,5 +207,71 @@ describe('SourceInspector', () => {
     });
     expect(second?.getAttribute('aria-current')).toBe('true');
     expect(first?.getAttribute('aria-current')).toBeNull();
+  });
+
+  it('renders non-financial provenance with title, link, and tool arguments', async () => {
+    const container = await renderElement(<SourceInspector message={NEWS_MESSAGE} onClose={() => {}} />);
+    const details = container.querySelector('[data-testid="source-details"]');
+    expect(details?.textContent).toContain('Apple unveils new MacBook lineup');
+    expect(details?.textContent).toContain('get_news');
+    expect(details?.textContent).toContain('aapl.us');
+
+    const link = container.querySelector('[data-testid="source-link"]') as HTMLAnchorElement | null;
+    expect(link).not.toBeNull();
+    expect(link?.getAttribute('href')).toBe('https://news.example.com/apple-macbook');
+    expect(link?.getAttribute('target')).toBe('_blank');
+    expect(link?.getAttribute('rel')).toBe('noreferrer');
+  });
+
+  it('surfaces delayed and reconciled financial provenance', async () => {
+    const message: Message = {
+      ...MESSAGE,
+      financialEvidence: [{
+        ...MESSAGE.financialEvidence![0],
+        delayed: true,
+        reconciliation: { providers: ['longbridge', 'eastmoney'], method: 'priority' },
+      }],
+    };
+    const container = await renderElement(<SourceInspector message={message} onClose={() => {}} />);
+    expect(container.textContent).toContain('Delayed data');
+    const reconciliation = container.querySelector('[data-testid="source-reconciliation"]');
+    expect(reconciliation?.textContent).toContain('longbridge, eastmoney');
+    expect(reconciliation?.textContent).toContain('priority');
+  });
+
+  it('supports roving arrow-key focus across source rows', async () => {
+    const message: Message = {
+      ...MESSAGE,
+      toolCalls: [
+        { id: 'get_news-1', toolName: 'get_news', args: {}, startedAt: 1, status: 'success' },
+        { id: 'get_filing-1', toolName: 'get_filing_document', args: {}, startedAt: 2, status: 'success' },
+      ],
+      financialEvidence: undefined,
+    };
+    const container = await renderElement(<SourceInspector message={message} onClose={() => {}} />);
+    const first = container.querySelector('[data-source-id="get_news-1"]') as HTMLButtonElement;
+    const second = container.querySelector('[data-source-id="get_filing-1"]') as HTMLButtonElement;
+
+    expect(first.tabIndex).toBe(0);
+    expect(second.tabIndex).toBe(-1);
+
+    await act(async () => {
+      first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    });
+    expect(second.getAttribute('aria-current')).toBe('true');
+    expect(second.tabIndex).toBe(0);
+    expect(first.tabIndex).toBe(-1);
+    expect(container.ownerDocument.activeElement).toBe(second);
+
+    await act(async () => {
+      second.dispatchEvent(new KeyboardEvent('keydown', { key: 'Home', bubbles: true }));
+    });
+    expect(first.getAttribute('aria-current')).toBe('true');
+    expect(container.ownerDocument.activeElement).toBe(first);
+
+    await act(async () => {
+      first.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    });
+    expect(second.getAttribute('aria-current')).toBe('true');
   });
 });
