@@ -20,6 +20,16 @@ export const activeViewAtom = atom<WorkspaceView>('overview');
 /** Selected portfolio position (portfolio view). */
 export const selectedPositionAtom = atom<string | null>(null);
 
+/**
+ * Historical research report version the user explicitly opened (#331).
+ * Null means "no explicit version selected" — consumers must re-resolve
+ * latest, never carry the previous symbol's version across a symbol switch.
+ */
+export const selectedReportIdAtom = atom<string | null>(null);
+
+/** Thesis the user last explicitly selected/acted on (#331). */
+export const selectedThesisIdAtom = atom<string | null>(null);
+
 /** Sidebar navigation section (app-level views). */
 export type NavSection =
   | 'sessions'
@@ -68,10 +78,16 @@ export const workspaceContextAtom = atom<WorkspaceContext>((get) => {
   const activeView = get(activeViewAtom);
   const selectedPosition = get(selectedPositionAtom);
   const comparisonSymbols = get(compareSymbolsAtom);
+  // Version-scoped selection identity (#331): flows to agent runs so the
+  // Copilot sees exactly which report/thesis the user is looking at.
+  const selectedReportId = get(selectedReportIdAtom);
+  const selectedThesisId = get(selectedThesisIdAtom);
   return {
     ...(activeSymbol ? { activeSymbol } : {}),
     ...(activeView ? { activeView } : {}),
     ...(selectedPosition ? { selectedPosition } : {}),
     ...(comparisonSymbols.length > 0 ? { comparisonSymbols } : {}),
+    ...(selectedReportId ? { selectedReportId } : {}),
+    ...(selectedThesisId ? { selectedThesisId } : {}),
   };
 });

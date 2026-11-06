@@ -234,6 +234,59 @@ describe('ThesisService', () => {
     });
   });
 
+  it('reEvaluate with an explicit thesisId evaluates THAT thesis, not the latest (#326)', async () => {
+    let seq = 0;
+    const repository = new ThesisRepository({ storageDir: dir, idGen: () => 'thesis-' + (++seq) });
+    const impactRepository = new ThesisImpactRepository({
+      storageDir: dir,
+      idGen: () => 'impact-' + (++seq),
+    });
+    const service = new ThesisService({
+      registry: registryFor(),
+      repository,
+      impactRepository,
+      evaluator: createLocalThesisEvaluator(now),
+      now,
+    });
+    const t1 = await service.saveFromReport(makeReport());
+    currentNow = 1500;
+    const t2 = await service.saveFromReport({ ...makeReport(), summary: 'Second look.' });
+    expect(t2.id).not.toBe(t1.id);
+    currentNow = 2000;
+
+    const impact = await service.reEvaluate('NVDA.US', undefined, t1.id);
+
+    // The clicked (older) thesis was evaluated and is the impact's subject.
+    expect(impact.thesisId).toBe(t1.id);
+    expect(impact.thesis.id).toBe(t1.id);
+    // The newer thesis stays untouched, and nothing was written against it.
+    expect((await repository.get(t2.id))?.updatedAt).toBe(1500);
+    expect((await repository.get(t2.id))?.summary).toBe('Second look.');
+    expect(await impactRepository.list(t2.id)).toHaveLength(0);
+  });
+
+  it('reEvaluate rejects a thesisId that does not belong to the symbol (#326)', async () => {
+    let seq = 0;
+    const repository = new ThesisRepository({ storageDir: dir, idGen: () => 'thesis-' + (++seq) });
+    const impactRepository = new ThesisImpactRepository({
+      storageDir: dir,
+      idGen: () => 'impact-' + (++seq),
+    });
+    const service = new ThesisService({
+      registry: registryFor(),
+      repository,
+      impactRepository,
+      evaluator: createLocalThesisEvaluator(now),
+      now,
+    });
+    const other = await service.saveFromReport(makeReport());
+    currentNow = 2000;
+
+    await expect(service.reEvaluate('MISSING.US', undefined, other.id)).rejects.toMatchObject({
+      code: 'THESIS_NOT_FOUND',
+    });
+  });
+
   it('updateThesis persists a user edit and bumps updatedAt', async () => {
     const { service } = buildService();
     const thesis = await service.saveFromReport(makeReport());

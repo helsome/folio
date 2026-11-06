@@ -16,6 +16,13 @@ export const researchRunsAtom = atom<ResearchRunSummary[]>([]);
 /** The report currently shown in the report view. */
 export const researchReportAtom = atom<ResearchReport | null>(null);
 
+/**
+ * Deep-link intent (#331/#327): a specific historical report the user asked to
+ * open (Today's continue button). Consumed once by the ResearchPanel, which
+ * loads THAT version instead of re-resolving the symbol's latest report.
+ */
+export const pendingResearchReportIdAtom = atom<string | null>(null);
+
 /** Reports available for the active symbol (hydrated from `research:listReports`). */
 export const symbolReportsAtom = atom<ResearchReport[]>([]);
 
