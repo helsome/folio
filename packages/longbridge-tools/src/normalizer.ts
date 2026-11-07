@@ -182,15 +182,27 @@ export function computeUnrealizedPnL(
   return (marketPrice - costPrice) * quantity;
 }
 
-/** Unrealized P&L percent (already ×100), computed when the vendor omits it. */
+/**
+ * Unrealized P&L percent (already ×100), computed when the vendor omits it.
+ *
+ * 空头（quantity < 0）的盈亏方向与价格涨跌相反：价格从 100 涨到 120 时，
+ * 空头是亏损。因此传入 quantity 时按数量方向取符号，与
+ * `computeUnrealizedPnL` 的金额保持同号。不传 quantity（旧的两参数调用）
+ * 或数量为 0 时保持原来的纯价格口径。
+ */
 export function computeUnrealizedPnLPercent(
   costPrice: number | undefined,
-  marketPrice: number | undefined
+  marketPrice: number | undefined,
+  quantity?: number
 ): number | undefined {
   if (costPrice === undefined || marketPrice === undefined || costPrice === 0) {
     return undefined;
   }
-  return ((marketPrice - costPrice) / costPrice) * 100;
+  const pricePercent = ((marketPrice - costPrice) / costPrice) * 100;
+  if (quantity === undefined || !Number.isFinite(quantity) || quantity === 0) {
+    return pricePercent;
+  }
+  return quantity < 0 ? -pricePercent : pricePercent;
 }
 
 // ── Normalizers ────────────────────────────────────────────────────────────
@@ -211,7 +223,7 @@ function normalizeHolding(h: RawPortfolioHolding | undefined): Holding {
     marketValue: toFiniteNumber(h?.market_value),
     marketValueBase: toFiniteNumber(h?.market_value_usd),
     unrealizedPnL: computeUnrealizedPnL(costPrice, marketPrice, quantity),
-    unrealizedPnLPercent: computeUnrealizedPnLPercent(costPrice, marketPrice),
+    unrealizedPnLPercent: computeUnrealizedPnLPercent(costPrice, marketPrice, quantity),
     prevClose: toFiniteNumber(h?.prev_close),
   };
 }

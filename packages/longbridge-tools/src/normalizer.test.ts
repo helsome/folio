@@ -2,6 +2,7 @@ import { describe, expect, it } from 'bun:test';
 import { existsSync } from 'node:fs';
 import {
   classifyPortfolioFailure,
+  computeUnrealizedPnL,
   computeUnrealizedPnLPercent,
   normalizePortfolioSnapshot,
   toFiniteNumber,
@@ -69,6 +70,26 @@ describe('computeUnrealizedPnLPercent', () => {
     expect(computeUnrealizedPnLPercent(0, 100)).toBeUndefined();
     expect(computeUnrealizedPnLPercent(undefined, 100)).toBeUndefined();
     expect(computeUnrealizedPnLPercent(100, undefined)).toBeUndefined();
+  });
+
+  it('flips the sign for short positions so it agrees with the signed PnL', () => {
+    const cost = 100;
+    const market = 120;
+    const shortQty = -10;
+    expect(computeUnrealizedPnLPercent(cost, market, shortQty)).toBeCloseTo(-20);
+    expect(computeUnrealizedPnLPercent(cost, 80, shortQty)).toBeCloseTo(20);
+    // 金额与百分比必须同号：空头下价格下跌是盈利
+    expect(Math.sign(computeUnrealizedPnL(cost, market, shortQty) ?? 0))
+      .toBe(Math.sign(computeUnrealizedPnLPercent(cost, market, shortQty) ?? 0));
+    expect(Math.sign(computeUnrealizedPnL(cost, 80, shortQty) ?? 0))
+      .toBe(Math.sign(computeUnrealizedPnLPercent(cost, 80, shortQty) ?? 0));
+  });
+
+  it('keeps the long, flat and missing-quantity behaviour unchanged', () => {
+    expect(computeUnrealizedPnLPercent(100, 120, 10)).toBeCloseTo(20);
+    expect(computeUnrealizedPnLPercent(100, 120, 0)).toBeCloseTo(20);
+    expect(computeUnrealizedPnLPercent(100, 120, Number.NaN)).toBeCloseTo(20);
+    expect(computeUnrealizedPnLPercent(100, 120)).toBeCloseTo(20);
   });
 });
 
