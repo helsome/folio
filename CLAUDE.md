@@ -6,6 +6,7 @@ AI-powered personal investment assistant desktop application.
 
 ## MUST READ Before Any Work
 
+
 ### Required Skills
 
 **Always load these skills when working on this project:**
