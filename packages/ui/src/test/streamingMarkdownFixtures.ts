@@ -25,6 +25,15 @@ export const STREAMING_MARKDOWN_FIXTURES: StreamingMarkdownFixture[] = [
     partialSelector: 'pre code',
   },
   {
+    name: 'fenced code block with internal blank lines',
+    // A fence is opaque: the blank line inside must not become a block
+    // boundary, or the tail of the code block renders as a paragraph.
+    partial: '```py\nmargin = 0.21\n\nfcf = 312\n',
+    complete: '```py\nmargin = 0.21\n\nfcf = 312\n```',
+    stableText: 'fcf',
+    partialSelector: 'pre code',
+  },
+  {
     name: 'unclosed GFM table',
     partial: '| Metric | Value |\n| --- | ---: |\n| Revenue | 12,400',
     complete: '| Metric | Value |\n| --- | ---: |\n| Revenue | 12,400 |',
@@ -35,6 +44,14 @@ export const STREAMING_MARKDOWN_FIXTURES: StreamingMarkdownFixture[] = [
     name: 'unclosed ordered list',
     partial: '1. Revenue growth\n2. Operating margin\n3.',
     complete: '1. Revenue growth\n2. Operating margin\n3. Free cash flow',
+    stableText: 'Operating margin',
+    partialSelector: 'ol li',
+  },
+  {
+    name: 'loose list across a blank line',
+    // Blank-line separated items are one loose list, not two lists.
+    partial: '1. Revenue growth\n\n2. Operating margin',
+    complete: '1. Revenue growth\n\n2. Operating margin\n\n3. Free cash flow',
     stableText: 'Operating margin',
     partialSelector: 'ol li',
   },

@@ -1,6 +1,7 @@
-import React, { useEffect, useRef, useState } from 'react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 import ReactMarkdown, { type Components } from 'react-markdown';
 import remarkGfm from 'remark-gfm';
+import { splitMarkdownBlocks } from './markdownBlocks';
 
 const SAFE_URL_PROTOCOLS = new Set(['http:', 'https:', 'mailto:', 'tel:']);
 const CodeBlockContext = React.createContext(false);
@@ -73,6 +74,17 @@ function useStreamingContent(content: string, streaming: boolean): string {
   // the buffered state is only a performance detail while streaming.
   return streaming ? displayContent : content;
 }
+
+/**
+ * One render-stable Markdown block. Completed blocks keep identical props for
+ * the rest of the stream, so React skips them entirely and only the block that
+ * is still arriving is re-parsed per frame (#28).
+ */
+const MarkdownBlock = React.memo<{ text: string }>(({ text }) => (
+  <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={safeUrl}>
+    {text}
+  </ReactMarkdown>
+));
 
 /**
  * Render agent-authored Markdown without allowing raw HTML to enter the DOM.
@@ -157,18 +169,38 @@ const components: Components = {
   ),
 };
 
-export const MarkdownContent: React.FC<{
+export const MarkdownContent = React.memo<{
   content: string;
   className?: string;
   streaming?: boolean;
-}> = ({ content, className = '', streaming = false }) => {
+}>(({ content, className = '', streaming = false }) => {
   const displayContent = useStreamingContent(content, streaming);
+  // While a stream is live, render block-by-block: every block before the one
+  // still arriving is memoized, so a token burst re-parses only the tail
+  // instead of the whole document (#28). A completed answer renders as one
+  // document, which keeps the final DOM exactly the static render it was.
+  const blocks = useMemo(
+    () => (streaming ? splitMarkdownBlocks(displayContent) : null),
+    [displayContent, streaming],
+  );
 
   return (
     <div className={`markdown-content break-words text-[14px] leading-relaxed ${className}`}>
-      <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={safeUrl}>
-        {displayContent}
-      </ReactMarkdown>
+      {blocks ? (
+        blocks.map((text, index) => (
+          <React.Fragment key={index}>
+            {/* react-markdown separates top-level blocks with a newline text
+                node; reproduce it between sibling blocks so a streamed render
+                stays textually identical to the whole-document render. */}
+            {index > 0 ? '\n' : null}
+            <MarkdownBlock text={text} />
+          </React.Fragment>
+        ))
+      ) : (
+        <ReactMarkdown remarkPlugins={[remarkGfm]} components={components} urlTransform={safeUrl}>
+          {displayContent}
+        </ReactMarkdown>
+      )}
     </div>
   );
-};
+});
