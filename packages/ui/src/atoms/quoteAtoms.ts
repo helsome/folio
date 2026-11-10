@@ -2,6 +2,7 @@ import { atom } from 'jotai';
 import { atomFamily } from 'jotai/utils';
 import type { Quote } from '@finagent/core';
 import type { FinagentClient } from '../client';
+import { persistedAtom } from '../lib/persistedPrefs';
 
 const CACHE_TTL = 30 * 1000; // 30 seconds
 
@@ -26,7 +27,10 @@ export const quoteCacheAtomFamily = atomFamily((symbol: string) =>
 );
 
 // Watchlist atoms
-export const watchlistAtom = atom<string[]>(['AAPL.US', 'TSLA.US', 'NVDA.US']);
+export const watchlistAtom = persistedAtom<string[]>(
+  'watchlist', ['AAPL.US', 'TSLA.US', 'NVDA.US'],
+  (value) => Array.isArray(value) && value.every((symbol) => typeof symbol === 'string' && symbol.trim().length > 0)
+);
 
 /** Provider names actually stamped on watchlist quotes, for the §34 freshness line. */
 export const watchlistMarketSourceAtom = atom<{ providerName?: string; delayed: boolean }>((get) => {

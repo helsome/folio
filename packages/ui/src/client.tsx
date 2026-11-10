@@ -187,7 +187,8 @@ export interface FinagentClient {
     startRun: (
       sessionId: string,
       content: string,
-      workspaceContext?: WorkspaceContext
+      workspaceContext?: WorkspaceContext,
+      watchlistSymbols?: string[]
     ) => Promise<ApiResult<Run>>;
     cancelRun: (sessionId: string, runId: string) => Promise<ApiResult<void>>;
     streamReplay: (input: { runId: string; lastSequence: number }) => Promise<ApiResult<unknown>>;

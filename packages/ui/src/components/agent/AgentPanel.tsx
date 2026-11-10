@@ -26,6 +26,8 @@ import { ModelSelector } from './ModelSelector';
 import { ThinkingSelector } from './ThinkingSelector';
 import { ToolActivity } from './ToolActivity';
 import { ContextChip } from './ContextChip';
+import { WatchlistContextControl } from './WatchlistContextControl';
+import { selectedWatchlistSymbolsAtom } from '../../atoms/watchlistContextAtoms';
 import { TraceInspector } from '../trace/TraceInspector';
 import { loadSessionTraceSources, projectSessionTrace } from '../../lib/traceData';
 import { QuoteCard } from './structured/QuoteCard';
@@ -98,6 +100,7 @@ export const AgentPanel: React.FC = () => {
   const cancelRun = useSetAtom(cancelRunAtom);
   const [lastRun, setLastRun] = useAtom(lastRunSummaryAtom);
   const workspaceContext = useAtomValue(workspaceContextAtom);
+  const watchlistSymbols = useAtomValue(selectedWatchlistSymbolsAtom);
 
   const [input, setInput] = useState('');
   const [sendError, setSendError] = useState<string | null>(null);
@@ -159,7 +162,7 @@ export const AgentPanel: React.FC = () => {
       toolCount: 0,
       workspaceContext,
     }));
-    const result = await client.kernel.startRun(activeSessionId, text, workspaceContext);
+    const result = await client.kernel.startRun(activeSessionId, text, workspaceContext, watchlistSymbols);
     if (!result.ok) {
       setSendError(result.error.message);
       setInput(text);
@@ -201,7 +204,7 @@ export const AgentPanel: React.FC = () => {
     const lastUser = [...messages].reverse().find((message) => message.role === 'user');
     if (!lastUser || !activeSessionId) return;
     setSendError(null);
-    const result = await client.kernel.startRun(activeSessionId, lastUser.content, workspaceContext);
+    const result = await client.kernel.startRun(activeSessionId, lastUser.content, workspaceContext, watchlistSymbols);
     if (!result.ok) {
       setSendError(result.error.message);
     }
@@ -327,6 +330,7 @@ export const AgentPanel: React.FC = () => {
 
       {/* Input / send / stop — send lives inline in the composer (Stitch design) */}
       <div className="folio-agent-composer border-t mac-section-divider bg-surface px-3 py-3">
+        <WatchlistContextControl sessionId={activeSessionId} isRunning={isRunning} />
         <div className="relative">
           <textarea
             data-testid="agent-input"

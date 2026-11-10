@@ -46,4 +46,15 @@ describe('persistedPrefs (V9 remember-the-user)', () => {
     expect(() => createStore().get(atom)).not.toThrow();
     expect(createStore().get(atom)).toBe('today');
   });
+
+  it('rejects incompatible stored data when a context supplies a validator', () => {
+    writePersisted('watchlist', { symbols: ['AAPL.US'] });
+    const atom = persistedAtom<string[]>(
+      'watchlist', ['MSFT.US'], (value) => Array.isArray(value) && value.every((entry) => typeof entry === 'string')
+    );
+    expect(createStore().get(atom)).toEqual(['MSFT.US']);
+    const store = createStore();
+    store.set(atom, ['AAPL.US']);
+    expect(createStore().get(persistedAtom<string[]>('watchlist', []))).toEqual(['AAPL.US']);
+  });
 });
