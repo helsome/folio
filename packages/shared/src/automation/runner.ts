@@ -113,7 +113,12 @@ export async function runAutomation(
 
   for (const raw of symbols) {
     const symbol = raw.trim().toUpperCase()
-    let evaluation: { signals: MaterialSignals; quote: Quote; probeFailed?: boolean } | null
+    let evaluation: {
+      signals: MaterialSignals
+      quote: Quote
+      probeFailed?: boolean
+      quoteStale?: boolean
+    } | null
     try {
       evaluation = await evaluateSymbol(symbol, ctx)
     } catch {
@@ -125,6 +130,12 @@ export async function runAutomation(
       continue
     }
     evaluated += 1
+    // Provider/Router already decided this quote is a stale-cache downgrade.
+    // A flat or material reading of that quote must not become a completed
+    // `no_material_update` (issue #185 point 3).
+    if (evaluation.quoteStale === true) {
+      fail(`${symbol}: quote stale`)
+    }
     if (!Number.isFinite(evaluation.signals.priceMovePct)) {
       fail(`${symbol}: previous close unavailable`)
     }
@@ -197,9 +208,19 @@ async function resolveScope(
               failure: 'portfolio snapshot unavailable',
             }
           }
-          return {
-            snapshot: makeScopeSnapshot('portfolio', portfolio.symbols, capturedAt, portfolio.fetchedAt),
+          const snapshot = makeScopeSnapshot(
+            'portfolio',
+            portfolio.symbols,
+            capturedAt,
+            portfolio.fetchedAt
+          )
+          // A previous local day's membership cannot support "no material
+          // change" for today's brief. Quotes do not use this check — they
+          // follow `provenance.stale` (issue #185 point 3).
+          if (!portfolioSnapshotCoversRun(portfolio.fetchedAt, capturedAt)) {
+            return { snapshot, failure: 'portfolio snapshot expired' }
           }
+          return { snapshot }
         } catch {
           return {
             snapshot: makeScopeSnapshot('portfolio', [], capturedAt),
@@ -214,6 +235,38 @@ async function resolveScope(
     default:
       return { snapshot: makeScopeSnapshot('hook', [], capturedAt) }
   }
+}
+
+/**
+ * Whether a portfolio membership snapshot can support this run's conclusion.
+ *
+ * `sourceFetchedAt` is the broker snapshot's own fetch time (epoch ms), not a
+ * quote. The daily brief claims "no material change" about one local calendar
+ * day's book — the same civil day the host uses to claim an occurrence
+ * (`Date#toDateString`) and the scheduler uses when it scans local dates.
+ * A snapshot from an earlier local day is a different day's membership:
+ * trades, transfers, or corporate actions after that fetch are invisible, so
+ * the snapshot must not authorize `no_material_update`.
+ *
+ * This is not a fixed 24 hour TTL.
+ * - A snapshot taken just after local midnight stays usable until the next
+ *   local midnight, almost a full day later.
+ * - A snapshot taken late the previous evening is already expired a few
+ *   minutes after midnight, while it is still only hours old.
+ * - A Friday snapshot does not cover Monday. The weekend is longer than 24h
+ *   and the market is closed, but holdings have no `provenance.stale` bit to
+ *   say "closed, still current". Each local day needs its own snapshot.
+ *   A live portfolio fetch stamps `fetchedAt` at fetch time (the in-process
+ *   cache is about a minute), so a book that was actually refreshed today
+ *   passes. Only a replayed older snapshot fails closed.
+ *
+ * A stamp later than `ranAt` on the same local day is still fresh: `ranAt` is
+ * captured when the run starts, and the snapshot is fetched while resolving
+ * scope.
+ */
+function portfolioSnapshotCoversRun(sourceFetchedAt: number, ranAt: number): boolean {
+  if (!Number.isFinite(sourceFetchedAt) || !Number.isFinite(ranAt)) return false
+  return new Date(sourceFetchedAt).toDateString() === new Date(ranAt).toDateString()
 }
 
 function resolveProviderScope(
@@ -257,9 +310,10 @@ function makeScopeSnapshot(
 async function evaluateSymbol(
   symbol: string,
   ctx: AutomationRunContext
-): Promise<{ signals: MaterialSignals; quote: Quote; probeFailed?: boolean } | null> {
-  const quote = await fetchQuote(symbol, ctx)
-  if (quote === null) return null
+): Promise<{ signals: MaterialSignals; quote: Quote; probeFailed?: boolean; quoteStale?: boolean } | null> {
+  const fetched = await fetchQuote(symbol, ctx)
+  if (fetched === null) return null
+  const { quote } = fetched
   const diff = await ctx.diffRepo.getBySymbol(symbol)
   const signals: MaterialSignals = {
     priceMovePct: priceMovePct(quote),
@@ -275,15 +329,33 @@ async function evaluateSymbol(
       probeFailed = true
     }
   }
-  return { signals, quote, probeFailed }
+  return {
+    signals,
+    quote,
+    probeFailed,
+    ...(fetched.stale ? { quoteStale: true } : {}),
+  }
 }
 
-async function fetchQuote(symbol: string, ctx: AutomationRunContext): Promise<Quote | null> {
+/**
+ * Read `market.quote` and keep the capability provenance the Provider/Router
+ * already computed. `provenance.stale === true` is the explicit stale-cache
+ * downgrade (every live provider failed). `delayed` — a closed session or a
+ * vendor that is contractually delayed — stays a normal quote. This function
+ * does not apply a wall-clock age to `Quote.timestamp`.
+ */
+async function fetchQuote(
+  symbol: string,
+  ctx: AutomationRunContext
+): Promise<{ quote: Quote; stale: boolean } | null> {
   const cap = ctx.registry.get('market.quote')
   if (!cap) return null
   try {
     const result = await cap.execute({ symbol }, { now: ctx.now })
-    return result.data as Quote
+    return {
+      quote: result.data as Quote,
+      stale: result.provenance?.stale === true,
+    }
   } catch {
     return null
   }
