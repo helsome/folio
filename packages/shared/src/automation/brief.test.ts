@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'bun:test'
+import { mkdtempSync, rmSync } from 'node:fs'
+import { tmpdir } from 'node:os'
+import { join } from 'node:path'
 import type { AlertTriggerEvent, AutomationRun, ResearchDiff } from '@finagent/core'
+import { AlertEventLog } from '../alerts/events.ts'
+import { JsonFileStore } from '../storage/json-file-store.ts'
 import {
   buildBrief,
   type BriefInputs,
@@ -70,6 +75,39 @@ function mover(symbol: string, changePercent: number): BriefWatchlistMover {
 }
 
 describe('buildBrief', () => {
+  it('only includes alerts from the current local day', () => {
+    const now = new Date(2026, 9, 30, 12).getTime()
+    const yesterday = new Date(2026, 9, 29, 23, 59).getTime()
+    const today = new Date(2026, 9, 30, 9).getTime()
+    const tomorrow = new Date(2026, 9, 31, 0, 1).getTime()
+    const alerts = [
+      { ...alert('old', 'AAPL.US', 'old alert'), triggeredAt: yesterday },
+      { ...alert('today', 'MSFT.US', 'today alert'), triggeredAt: today },
+      { ...alert('future', 'TSLA.US', 'future alert'), triggeredAt: tomorrow },
+    ]
+    const brief = buildBrief(inputs({ alerts }), now)
+    expect(brief.items.filter((item) => item.source === 'Alert').map((item) => item.id))
+      .toEqual(['alert-today'])
+    expect(brief.summary).toBe('1 thing needs your attention.')
+    expect(alerts).toHaveLength(3)
+  })
+
+  it('filters a reloaded alert history without deleting historical events', async () => {
+    const dir = mkdtempSync(join(tmpdir(), 'folio-brief-alerts-'))
+    try {
+      const now = new Date(2026, 9, 30, 12).getTime()
+      const log = new AlertEventLog(new JsonFileStore(dir))
+      await log.append({ ...alert('old', 'AAPL.US', 'old'), triggeredAt: new Date(2026, 9, 29, 23, 59).getTime() })
+      await log.append({ ...alert('today', 'MSFT.US', 'today'), triggeredAt: new Date(2026, 9, 30, 0, 0).getTime() })
+      const reloaded = new AlertEventLog(new JsonFileStore(dir))
+      const brief = buildBrief(inputs({ alerts: await reloaded.list() }), now)
+      expect(brief.items.filter((item) => item.source === 'Alert').map((item) => item.id)).toEqual(['alert-today'])
+      expect((await reloaded.list()).map((event) => event.id)).toEqual(['today', 'old'])
+    } finally {
+      rmSync(dir, { recursive: true, force: true })
+    }
+  })
+
   it('builds an empty quiet brief from empty inputs', () => {
     const brief = buildBrief(inputs(), 1_700_000_000_000)
     expect(brief.generatedAt).toBe(1_700_000_000_000)
