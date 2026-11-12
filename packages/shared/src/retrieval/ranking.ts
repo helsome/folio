@@ -247,7 +247,7 @@ function duplicateRelation(
   right: RankedSource,
   threshold: number
 ): DuplicateRelation | undefined {
-  if (left.canonicalUrl === right.canonicalUrl) return 'same_url';
+  if (left.canonicalUrl && left.canonicalUrl === right.canonicalUrl) return 'same_url';
   if (
     left.normalizedTitle.length > 0 &&
     left.normalizedTitle === right.normalizedTitle &&
