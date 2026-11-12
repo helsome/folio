@@ -2,19 +2,24 @@ import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test';
-import type {
-  AgentEvent,
-  AgentEventPayload,
-  AgentRunInput,
-  AgentRuntime,
-  ApiResult,
-  CapabilityId,
-  FinancialDataProvider,
-  ProviderHealth,
-  ProviderResult,
-  RuntimeSession,
-  ToolDefinition,
+import {
+  reconcileFinancialFacts,
+  renderCitationMarker,
+  type AgentEvent,
+  type AgentEventPayload,
+  type AgentRunInput,
+  type AgentRuntime,
+  type ApiResult,
+  type CapabilityId,
+  type FinancialDataProvider,
+  type ProviderHealth,
+  type ProviderResult,
+  type RuntimeSession,
+  type ToolDefinition,
 } from '@finagent/core';
+import { renderBlockFence } from '../agent/answer-block-emitter.ts';
+import { buildFinancialEvidence } from '../evidence/financial-evidence.ts';
+import { resolveCopilotCitationTrace } from '../evidence/citation-trace.ts';
 import { createCapabilityTools } from '../capabilities/pi-tools.ts';
 import { createMarketQuoteCapability } from '../capabilities/manifests/market-quote.ts';
 import { JsonFileStore } from '../storage/json-file-store.ts';
@@ -266,5 +271,137 @@ describe('quote provenance acceptance slice (#101, controlled fixture)', () => {
     // persisted as part of the assistant message, not recomputed on reload.
     const reloaded = await new MessageRepository(store).list(session.id);
     expect(reloaded[1].financialEvidence).toEqual(messages[1].financialEvidence);
+  });
+
+  it('traces the reloaded answer from the question to the cited fact without averaging a conflict', async () => {
+    const tool = makeQuoteTool();
+    const toolResult = await tool.execute('quote-1', { symbol: 'aapl.us' }, new AbortController().signal);
+    const reconciliation = reconcileFinancialFacts(
+      [
+        { provider: 'longbridge', value: 180, currency: 'USD', unit: 'price' },
+        { provider: 'massive', value: 250, currency: 'USD', unit: 'price' },
+      ],
+      { version: 'financial-facts.v1', relativeTolerance: 0.01, providerPriority: ['massive'] }
+    );
+    const priorEvidence = toolResult.evidence && typeof toolResult.evidence === 'object'
+      ? toolResult.evidence as Record<string, unknown>
+      : {};
+    const structuredResult = {
+      data: toolResult.details,
+      provenance: toolResult.provenance,
+      evidence: {
+        ...priorEvidence,
+        currencies: { lastPrice: 'USD' },
+        units: { lastPrice: 'price' },
+        reconciliation,
+      },
+    };
+    const question = "What is Apple's current price, what time is it from, and where did it come from?";
+    const runtime = new ScriptedRuntime(async function* (input) {
+      const preview = buildFinancialEvidence({
+        sessionId: input.sessionId,
+        runId: input.runId,
+        toolCalls: [{
+          id: 'quote-1',
+          toolName: 'get_quote',
+          args: { symbol: 'AAPL.US' },
+          startedAt: clock,
+          completedAt: clock,
+          status: 'success',
+          result: structuredResult,
+        }],
+      });
+      const envelopeId = preview[0]?.id ?? 'fe_missing';
+      const answer = [
+        `Apple last traded at 200 USD. ${renderCitationMarker('quote-1')}`,
+        '',
+        renderBlockFence({
+          version: 1,
+          type: 'metric_grid',
+          title: 'AAPL.US',
+          evidenceIds: [envelopeId],
+          metrics: [{
+            label: 'Last',
+            value: 200,
+            unit: 'price',
+            currency: 'USD',
+            evidenceIds: ['quote-1'],
+          }],
+        }),
+      ].join('\n');
+      yield event(input.sessionId, input.runId, 'tool_completed', {
+        toolCall: {
+          id: 'quote-1',
+          toolName: 'get_quote',
+          args: { symbol: 'AAPL.US' },
+          startedAt: clock,
+          completedAt: clock,
+          status: 'success',
+          result: structuredResult,
+        },
+      });
+      yield event(input.sessionId, input.runId, 'message_completed', { answer });
+      yield event(input.sessionId, input.runId, 'run_completed', { answer, toolCalls: [] });
+    });
+    const store = new JsonFileStore(dir);
+    const sessions = new SessionManager({
+      sessions: new SessionRepository(store),
+      messages: new MessageRepository(store),
+      runs: new RunRepository(store),
+      piSessionDir: join(dir, 'pi-sessions'),
+      now: () => clock,
+    });
+    const runs = new RunManager({
+      sessions,
+      runs: new RunRepository(store),
+      runtime,
+      now: () => clock,
+    });
+    const session = await sessions.createSession('Citation trace');
+    await runs.startRun(session.id, question);
+    await waitFor(() => !runs.isRunning());
+
+    const reloaded = await new MessageRepository(new JsonFileStore(dir)).list(session.id);
+    const user = reloaded.find((message) => message.role === 'user');
+    const assistant = reloaded.find((message) => message.role === 'assistant');
+    expect(user?.content).toBe(question);
+    expect(assistant?.financialEvidence?.[0]?.provider).toBe('massive');
+
+    const trace = resolveCopilotCitationTrace({
+      question: user?.content ?? '',
+      answer: assistant?.content ?? '',
+      financialEvidence: assistant?.financialEvidence,
+    });
+    const cited = trace.citations.find((citation) => citation.citationId === 'quote-1');
+    const byEnvelope = trace.citations.find((citation) => citation.resolution === 'envelope');
+    expect(cited).toMatchObject({
+      resolution: 'tool_call',
+      provider: 'massive',
+      instrumentId: 'XNAS:AAPL',
+      metric: 'lastPrice',
+      value: 200,
+      currency: 'USD',
+      unit: 'price',
+      asOf: MARKET_TIME,
+      retrievedAt: FETCHED_AT,
+      delayed: true,
+      stale: false,
+      availability: 'conflicted',
+      fallback: { from: 'longbridge', to: 'massive', reason: 'TIMEOUT' },
+      runId: assistant?.financialEvidence?.[0]?.runId,
+      toolName: 'get_quote',
+    });
+    expect(cited?.value).not.toBe(215);
+    expect(cited?.reconciliation?.state).toBe('material-conflict');
+    expect(cited?.reconciliation?.candidates?.map((candidate) => candidate.value)).toEqual([180, 250]);
+    expect(byEnvelope?.envelopeId).toBe(cited?.envelopeId);
+    expect(byEnvelope?.values.map((value) => value.evidenceId)).toEqual(cited?.values.map((value) => value.evidenceId));
+
+    const again = resolveCopilotCitationTrace({
+      question: user?.content ?? '',
+      answer: assistant?.content ?? '',
+      financialEvidence: JSON.parse(JSON.stringify(assistant?.financialEvidence)),
+    });
+    expect(again).toEqual(trace);
   });
 });

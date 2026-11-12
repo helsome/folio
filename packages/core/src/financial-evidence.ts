@@ -1,3 +1,5 @@
+import type { FinancialFactCandidate, ReconciliationState } from './reconciliation.ts';
+
 /** Machine-readable lineage for structured financial facts used by Copilot. */
 
 export const FINANCIAL_EVIDENCE_SCHEMA_VERSION = 'financial-evidence/v1' as const;
@@ -34,7 +36,25 @@ export interface FinancialEvidenceMetadata {
   dataset?: string;
   cacheHit?: boolean;
   fallback?: FinancialEvidenceEnvelope['fallback'];
-  reconciliation?: FinancialEvidenceEnvelope['reconciliation'];
+  reconciliation?: FinancialEvidenceReconciliation;
+}
+
+/**
+ * Provider disagreement recorded on a persisted fact.
+ *
+ * `providers` + `method` is the original shape. `state` and `candidates` are
+ * additive: a material conflict keeps every candidate and never replaces them
+ * with an average. Older records that only stored providers/method stay valid.
+ */
+export interface FinancialEvidenceReconciliation {
+  providers: string[];
+  method: string;
+  state?: ReconciliationState;
+  candidates?: FinancialFactCandidate[];
+  discrepancy?: number;
+  selectedProvider?: string;
+  /** Verbatim reconciler explanation, when the producer supplied one. */
+  reason?: string;
 }
 
 export interface FinancialEvidenceEnvelope {
@@ -59,7 +79,7 @@ export interface FinancialEvidenceEnvelope {
   delayed?: boolean;
   cacheHit: boolean;
   fallback?: { from: string; to: string; reason?: string };
-  reconciliation?: { providers: string[]; method: string };
+  reconciliation?: FinancialEvidenceReconciliation;
   resultSnapshot: unknown;
   resultHash: string;
   lineage: FinancialEvidenceLineageStep[];

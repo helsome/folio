@@ -4,7 +4,10 @@ import type {
   FinancialEvidenceKind,
   FinancialEvidenceLineageStep,
   FinancialEvidenceMetadata,
+  FinancialEvidenceReconciliation,
   FinancialEvidenceValue,
+  FinancialFactCandidate,
+  ReconciliationState,
   ToolCall,
 } from '@finagent/core';
 import {
@@ -56,6 +59,7 @@ export function buildFinancialEvidence(input: BuildFinancialEvidenceInput): Fina
     const values = collectValues(result.data, result.evidence);
     const snapshot = redact(result.data);
     const resultHash = hashJson(snapshot);
+    const reconciliation = normalizeReconciliation(result.evidence?.reconciliation);
     const lineage: FinancialEvidenceLineageStep[] = [
       { kind: 'provider', description: `Retrieved ${mapping.capabilityId} from ${provider}.` },
       ...(result.evidence?.lineage ?? []),
@@ -86,7 +90,7 @@ export function buildFinancialEvidence(input: BuildFinancialEvidenceInput): Fina
       ...(provenance.delayed === true ? { delayed: true } : {}),
       cacheHit: result.evidence?.cacheHit === true,
       ...(result.evidence?.fallback ? { fallback: result.evidence.fallback } : {}),
-      ...(result.evidence?.reconciliation ? { reconciliation: result.evidence.reconciliation } : {}),
+      ...(reconciliation ? { reconciliation } : {}),
       resultSnapshot: snapshot,
       resultHash,
       lineage,
@@ -118,6 +122,76 @@ export function financialEvidenceToJson(evidence: FinancialEvidenceEnvelope[]): 
     schemaVersion: FINANCIAL_EVIDENCE_SCHEMA_VERSION,
     evidence: redact(evidence),
   }, null, 2)}\n`;
+}
+
+const RECONCILIATION_STATES = new Set<ReconciliationState>([
+  'agreement',
+  'within-tolerance',
+  'material-conflict',
+  'incomparable',
+  'insufficient-sources',
+]);
+
+/**
+ * Keep a reconciler result on the persisted fact without collapsing candidates
+ * into one number. Accepts both the historical `{ providers, method }` shape
+ * and a full `ReconciliationResult`.
+ */
+function normalizeReconciliation(value: unknown): FinancialEvidenceReconciliation | undefined {
+  const record = asRecord(value);
+  if (Object.keys(record).length === 0) return undefined;
+
+  const state = typeof record.state === 'string' && RECONCILIATION_STATES.has(record.state as ReconciliationState)
+    ? record.state as ReconciliationState
+    : undefined;
+  const candidates = readCandidates(record.candidates);
+  const providers = readProviders(record.providers);
+  const candidateProviders = (candidates ?? []).map((candidate) => candidate.provider);
+  const resolvedProviders = providers.length > 0 ? providers : candidateProviders;
+  const method = stringValue(record.method) ?? stringValue(record.policyVersion) ?? state;
+  if (!method || (resolvedProviders.length === 0 && !state)) return undefined;
+
+  const selected = asRecord(record.selected);
+  const selectedProvider = stringValue(record.selectedProvider) ?? stringValue(selected.provider);
+  const discrepancy = numberValue(record.discrepancy);
+  const reason = stringValue(record.reason);
+
+  return {
+    providers: resolvedProviders,
+    method,
+    ...(state ? { state } : {}),
+    ...(candidates && candidates.length > 0 ? { candidates } : {}),
+    ...(discrepancy !== undefined ? { discrepancy } : {}),
+    ...(selectedProvider ? { selectedProvider } : {}),
+    ...(reason ? { reason } : {}),
+  };
+}
+
+function readProviders(value: unknown): string[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter((provider): provider is string => typeof provider === 'string' && provider.length > 0);
+}
+
+function readCandidates(value: unknown): FinancialFactCandidate[] | undefined {
+  if (!Array.isArray(value)) return undefined;
+  const candidates: FinancialFactCandidate[] = [];
+  for (const candidate of value) {
+    const item = asRecord(candidate);
+    const provider = stringValue(item.provider);
+    const amount = numberValue(item.value);
+    if (!provider || amount === undefined) continue;
+    candidates.push({
+      provider,
+      value: amount,
+      ...(stringValue(item.instrument) ? { instrument: stringValue(item.instrument) } : {}),
+      ...(numberValue(item.asOf) !== undefined ? { asOf: numberValue(item.asOf) } : {}),
+      ...(stringValue(item.period) ? { period: stringValue(item.period) } : {}),
+      ...(stringValue(item.currency) ? { currency: stringValue(item.currency) } : {}),
+      ...(stringValue(item.unit) ? { unit: stringValue(item.unit) } : {}),
+      ...(stringValue(item.adjustment) ? { adjustment: stringValue(item.adjustment) } : {}),
+    });
+  }
+  return candidates;
 }
 
 function readStructuredResult(value: unknown): StructuredResult {

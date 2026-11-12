@@ -5,6 +5,14 @@ export {
   type BuildFinancialEvidenceInput,
 } from './financial-evidence.ts';
 export {
+  resolveCopilotCitationTrace,
+  COPILOT_CITATION_TRACE_SCHEMA_VERSION,
+  type CopilotCitation,
+  type CopilotCitationTrace,
+  type CopilotCitedValue,
+  type ResolveCopilotCitationTraceInput,
+} from './citation-trace.ts';
+export {
   buildEvidenceBundle,
   buildReportEvidenceBundle,
   isEvidenceBundle,

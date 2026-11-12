@@ -92,6 +92,11 @@ export interface EvidenceFreshness {
   /** Market-time of the fact itself, when known. */
   asOf?: number;
   stale: boolean;
+  /**
+   * True when the producing provider reported a delayed or end-of-day value.
+   * Omitted when the provider did not say so — absence is not "live".
+   */
+  delayed?: boolean;
 }
 
 export interface EvidenceItem {
@@ -116,6 +121,11 @@ export interface EvidenceItem {
     provider?: string;
     /** Scoping instrument for non-financial evidence (news about a listing). */
     instrumentId?: string;
+    /**
+     * Persisted `fe_*` envelope id. Copilot answers cite either this id or the
+     * tool-call id; both must join back to the same observation.
+     */
+    envelopeId?: string;
   };
 }
 

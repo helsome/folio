@@ -1,5 +1,6 @@
 import { createHash } from 'node:crypto';
 import type {
+  EvidenceAvailability,
   EvidenceBundle,
   EvidenceClaim,
   EvidenceItem,
@@ -92,14 +93,19 @@ export function projectFinancialEvidence(
           retrievedAt: envelope.retrievedAt,
           ...(resolvedAsOf !== undefined ? { asOf: resolvedAsOf } : {}),
           stale: envelope.stale,
+          ...(envelope.delayed === true ? { delayed: true } : {}),
         },
-        availability: 'available',
+        // Conflict is a property of the observation. The selected normalized
+        // value is kept as reported; candidates stay on the source and are
+        // never averaged into `financial.value`.
+        availability: availabilityForEnvelope(envelope),
         provenance: {
           runId: envelope.runId,
           toolCallId: envelope.toolCallId,
           toolName: envelope.toolName,
           ...(envelope.capabilityId ? { capabilityId: envelope.capabilityId } : {}),
           provider: envelope.provider,
+          envelopeId: envelope.id,
         },
       });
     }
@@ -342,6 +348,12 @@ export function parseEvidenceBundle(json: string): EvidenceBundle | undefined {
   } catch {
     return undefined;
   }
+}
+
+function availabilityForEnvelope(envelope: FinancialEvidenceEnvelope): EvidenceAvailability {
+  const state = envelope.reconciliation?.state;
+  if (state === 'material-conflict' || state === 'incomparable') return 'conflicted';
+  return 'available';
 }
 
 function deriveSourceId(

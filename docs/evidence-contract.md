@@ -66,8 +66,12 @@ EvidenceSource ──< EvidenceItem >── EvidenceClaim ──> Answer / Resea
 - **authority 元数据只在实际已知时填写**（如监管备案 =
   `{ primary: true, sourceClass: 'regulator' }`），投影从不猜测。
 - **冲突与不可用有显式状态位**（`availability: 'conflicted' | 'unavailable'`）。
-  当前投影仅产出 `available`；金融数据的 `reconciliation` 只保留在
-  `source.providerMeta`，尚未映射到 `availability`。
+  结构化金融投影在 `reconciliation.state` 为 `material-conflict` 或
+  `incomparable` 时把每条事实标为 `conflicted`。选中的规范化数值保持原样，
+  候选值留在 `source.providerMeta.reconciliation.candidates`，**不会被平均**。
+  `agreement` / `within-tolerance` / 仅有 `providers`+`method` 的旧记录仍是
+  `available`。`freshness.delayed` 只在信封 `delayed === true` 时写入。
+  `provenance.envelopeId` 保留原始 `fe_*` id，供引用加入。
 - **验证状态**首版恒为 `unverified`。现有
   `packages/shared/src/research/claim-verifier.ts` 使用独立的 claim ID 与状态契约；
   接入 claim 级验证（#13）或来源漂移检测（#20）时需要显式映射。
@@ -79,6 +83,13 @@ EvidenceSource ──< EvidenceItem >── EvidenceClaim ──> Answer / Resea
 - **Source Inspector（#30）与引用检查器**尚未接入 bundle；当前 Inspector
   仍由 `Message.financialEvidence` / `toolCalls` 组装。后续接线可使用 bundle
   的来源类别、URL、摘录与溯源字段，但需显式处理现有 ID 空间的映射。
+- **Copilot 引用溯源（#101 的一个切片）**由
+  `resolveCopilotCitationTrace` 按需计算，不新增持久化。它从已保存的问题、
+  回答文本和 `financialEvidence` 出发，把行内 `⟦cite:toolCallId⟧` 与已闭合
+  `folio-block` 的 `evidenceIds`（工具调用 id 或 `fe_*`）解析到同一条事实：
+  provider、instrument、metric、unit/currency、`asOf` 与 `retrievedAt`、
+  delayed / stale / fallback，以及冲突候选。无法解析的引用留在
+  `resolution: 'unmapped'`，不会被静默丢掉，也不会用实时行情重算。
 - **评测（#14/#15）**后续可基于 claimId/evidenceId 统计引用覆盖率。
 
 ## 集成示例
