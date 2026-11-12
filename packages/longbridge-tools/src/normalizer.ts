@@ -182,15 +182,18 @@ export function computeUnrealizedPnL(
   return (marketPrice - costPrice) * quantity;
 }
 
-/** Unrealized P&L percent (already ×100), computed when the vendor omits it. */
+/** Computed P&L percent (already ×100); negative quantities reverse the price move. */
 export function computeUnrealizedPnLPercent(
   costPrice: number | undefined,
-  marketPrice: number | undefined
+  marketPrice: number | undefined,
+  quantity?: number
 ): number | undefined {
   if (costPrice === undefined || marketPrice === undefined || costPrice === 0) {
     return undefined;
   }
-  return ((marketPrice - costPrice) / costPrice) * 100;
+  const percent = ((marketPrice - costPrice) / costPrice) * 100;
+  // Keep an unchanged price at zero rather than creating a displayable -0%.
+  return percent !== 0 && quantity !== undefined && quantity < 0 ? -percent : percent;
 }
 
 // ── Normalizers ────────────────────────────────────────────────────────────
@@ -211,7 +214,7 @@ function normalizeHolding(h: RawPortfolioHolding | undefined): Holding {
     marketValue: toFiniteNumber(h?.market_value),
     marketValueBase: toFiniteNumber(h?.market_value_usd),
     unrealizedPnL: computeUnrealizedPnL(costPrice, marketPrice, quantity),
-    unrealizedPnLPercent: computeUnrealizedPnLPercent(costPrice, marketPrice),
+    unrealizedPnLPercent: computeUnrealizedPnLPercent(costPrice, marketPrice, quantity),
     prevClose: toFiniteNumber(h?.prev_close),
   };
 }

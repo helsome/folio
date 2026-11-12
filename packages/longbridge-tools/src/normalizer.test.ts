@@ -70,6 +70,22 @@ describe('computeUnrealizedPnLPercent', () => {
     expect(computeUnrealizedPnLPercent(undefined, 100)).toBeUndefined();
     expect(computeUnrealizedPnLPercent(100, undefined)).toBeUndefined();
   });
+
+  it.each([-10, -0.25])('uses the direction of short quantity %s', (quantity) => {
+    expect(computeUnrealizedPnLPercent(100, 120, quantity)).toBe(-20);
+    expect(computeUnrealizedPnLPercent(100, 80, quantity)).toBe(20);
+    expect(computeUnrealizedPnLPercent(100, 100, quantity)).toBe(0);
+  });
+
+  it('preserves positive, zero and unspecified quantity behavior', () => {
+    for (const quantity of [10, 0.25, 0, undefined]) {
+      expect(computeUnrealizedPnLPercent(100, 120, quantity)).toBe(20);
+      expect(computeUnrealizedPnLPercent(100, 80, quantity)).toBe(-20);
+      expect(computeUnrealizedPnLPercent(0, 120, quantity)).toBeUndefined();
+      expect(computeUnrealizedPnLPercent(undefined, 120, quantity)).toBeUndefined();
+      expect(computeUnrealizedPnLPercent(100, undefined, quantity)).toBeUndefined();
+    }
+  });
 });
 
 describe('normalizePortfolioSnapshot fixture matrix (spec §59)', () => {
