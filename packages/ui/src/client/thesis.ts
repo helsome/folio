@@ -11,8 +11,8 @@ import { unwrapIpcResult } from './unwrap';
 interface ThesisElectronApi {
   thesis?: {
     list?: (symbol?: string) => Promise<unknown>;
-    getReport?: (symbol: string) => Promise<unknown>;
-    saveFromReport?: (symbol: string) => Promise<unknown>;
+    getReport?: (input: { symbol: string; reportId?: string }) => Promise<unknown>;
+    saveFromReport?: (input: { symbol: string; reportId?: string }) => Promise<unknown>;
     reEvaluate?: (symbol: string) => Promise<unknown>;
     update?: (thesis: InvestmentThesis) => Promise<unknown>;
     listImpacts?: (symbol: string) => Promise<unknown>;
@@ -33,21 +33,21 @@ export async function loadTheses(symbol?: string): Promise<InvestmentThesis[]> {
   }
 }
 
-export async function loadResearchReport(symbol: string): Promise<ResearchReport | null> {
+export async function loadResearchReport(input: { symbol: string; reportId?: string }): Promise<ResearchReport | null> {
   try {
     const loader = thesisApi()?.getReport;
     if (typeof loader !== 'function') return null;
-    return unwrapIpcResult<ResearchReport | null>(await loader(symbol));
+    return unwrapIpcResult<ResearchReport | null>(await loader(input));
   } catch {
     return null;
   }
 }
 
-export async function saveThesisFromReport(symbol: string): Promise<InvestmentThesis | null> {
+export async function saveThesisFromReport(input: { symbol: string; reportId?: string }): Promise<InvestmentThesis | null> {
   try {
     const loader = thesisApi()?.saveFromReport;
     if (typeof loader !== 'function') return null;
-    return unwrapIpcResult<InvestmentThesis>(await loader(symbol));
+    return unwrapIpcResult<InvestmentThesis>(await loader(input));
   } catch {
     return null;
   }
