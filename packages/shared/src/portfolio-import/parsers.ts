@@ -5,7 +5,7 @@
  * user-safe `issues` (spec §103), so a single bad cell cannot sink an
  * import. Confidence tiers (spec §48):
  *   1.0 — symbol unambiguous, quantity and cost both parsed
- *   0.6 — symbol unambiguous, quantity or cost missing (review required)
+ *   0.6 — symbol unambiguous, quantity or cost missing or awaiting confirmation (review required)
  *   0.3 — symbol ambiguous (missing market suffix / unknown market)
  */
 import type { ImportSource, PortfolioImportRow } from '@finagent/core'
@@ -17,10 +17,20 @@ export const SYMBOL_RE = /^[A-Z0-9]{1,8}\.(US|HK|SG|SH|SZ|HAS)$/
 export const BARE_TICKER_RE = /^[A-Z0-9]{1,8}$/
 
 /**
- * A plain decimal with one decorative trailing `%`.
- * Only that `%` is removed; the number is not divided by 100 (`100%` stays 100).
+ * A plain decimal with one trailing `%`, after thousands separators, `$`, and
+ * whitespace are removed. `100%` or `12.5%` may be a ratio or a wrong column,
+ * so it is not a quantity or a cost until a person confirms it.
  */
-const DECORATIVE_TRAILING_PERCENT_RE = /^-?\d+(\.\d+)?%$/
+const TRAILING_PERCENT_NUMBER_RE = /^-?\d+(\.\d+)?%$/
+
+/** Same cleanup `toFiniteNumber` applies before parsing. */
+function stripNumericDecorations(value: string): string {
+  return value.trim().replace(/[,$\s]/g, '')
+}
+
+function isTrailingPercentNumber(value: string): boolean {
+  return TRAILING_PERCENT_NUMBER_RE.test(stripNumericDecorations(value))
+}
 
 export type HeaderField = 'symbol' | 'name' | 'quantity' | 'cost' | 'currency' | 'account'
 
@@ -91,8 +101,8 @@ export function checkSymbol(raw: string): SymbolCheck {
 
 /**
  * Coerce a CSV/paste cell to a finite number. Strings with thousands
- * separators or a leading `$` are handled. A decorative trailing `%` on a
- * plain decimal is removed and is not treated as a weight (`100%` → 100, not 1).
+ * separators or a leading `$` are handled. A trailing `%` is not stripped:
+ * `100%` and `12.5%` stay non-numeric so they cannot be booked as 100 / 12.5.
  * Empty/null/non-numeric → undefined.
  */
 export function toFiniteNumber(value: unknown): number | undefined {
@@ -102,17 +112,12 @@ export function toFiniteNumber(value: unknown): number | undefined {
   if (typeof value !== 'string') {
     return undefined
   }
-  const trimmed = value.trim()
-  if (trimmed === '') {
-    return undefined
-  }
-  const cleaned = trimmed.replace(/[,$\s]/g, '')
+  const cleaned = stripNumericDecorations(value)
   // Number('') is zero, but formatting alone does not supply a numeric value.
   if (cleaned === '') {
     return undefined
   }
-  const numeric = DECORATIVE_TRAILING_PERCENT_RE.test(cleaned) ? cleaned.slice(0, -1) : cleaned
-  const parsed = Number(numeric)
+  const parsed = Number(cleaned)
   return Number.isFinite(parsed) ? parsed : undefined
 }
 
@@ -281,18 +286,29 @@ export function buildRow(fields: ParsedFields): PortfolioImportRow {
     issues.push(symbolCheck.issue)
   }
 
-  const quantity = toFiniteNumber(fields.quantity)
-  if (fields.quantity !== undefined && quantity === undefined) {
-    issues.push(`Invalid quantity "${fields.quantity}"`)
-  } else if (quantity === undefined && !symbolCheck.ambiguous) {
-    issues.push('Quantity missing')
+  let quantity: number | undefined
+  if (fields.quantity !== undefined && isTrailingPercentNumber(fields.quantity)) {
+    // Leave the cell unset. Confirming the draft must not turn `100%` into 100 shares.
+    issues.push(`Quantity "${fields.quantity}" needs confirmation`)
+  } else {
+    quantity = toFiniteNumber(fields.quantity)
+    if (fields.quantity !== undefined && quantity === undefined) {
+      issues.push(`Invalid quantity "${fields.quantity}"`)
+    } else if (quantity === undefined && !symbolCheck.ambiguous) {
+      issues.push('Quantity missing')
+    }
   }
 
-  const costPrice = toFiniteNumber(fields.cost)
-  if (fields.cost !== undefined && costPrice === undefined) {
-    issues.push(`Invalid cost price "${fields.cost}"`)
-  } else if (costPrice === undefined && !symbolCheck.ambiguous) {
-    issues.push('Cost price missing')
+  let costPrice: number | undefined
+  if (fields.cost !== undefined && isTrailingPercentNumber(fields.cost)) {
+    issues.push(`Cost price "${fields.cost}" needs confirmation`)
+  } else {
+    costPrice = toFiniteNumber(fields.cost)
+    if (fields.cost !== undefined && costPrice === undefined) {
+      issues.push(`Invalid cost price "${fields.cost}"`)
+    } else if (costPrice === undefined && !symbolCheck.ambiguous) {
+      issues.push('Cost price missing')
+    }
   }
 
   const confidence = symbolCheck.ambiguous

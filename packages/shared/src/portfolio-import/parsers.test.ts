@@ -79,17 +79,13 @@ describe('toFiniteNumber', () => {
     expect(toFiniteNumber(' 1,234.56 ')).toBe(1234.56)
   })
 
-  it('strips a decorative trailing percent without dividing by 100', () => {
-    expect(toFiniteNumber('100%')).toBe(100)
-    expect(toFiniteNumber('12.5%')).toBe(12.5)
-    expect(toFiniteNumber('-3.25%')).toBe(-3.25)
-    expect(toFiniteNumber('0%')).toBe(0)
-    expect(toFiniteNumber('1,000%')).toBe(1000)
-    expect(toFiniteNumber(' 100 % ')).toBe(100)
-    expect(toFiniteNumber('$12.5%')).toBe(12.5)
+  it('does not coerce a trailing percent into a number', () => {
+    for (const value of ['100%', '12.5%', '-3.25%', '0%', '1,000%', ' 100 % ', '$12.5%']) {
+      expect(toFiniteNumber(value)).toBeUndefined()
+    }
   })
 
-  it('leaves ordinary numbers and non-decorative percents unchanged', () => {
+  it('leaves ordinary numbers and non-numeric percents unscaled', () => {
     expect(toFiniteNumber('100')).toBe(100)
     expect(toFiniteNumber('12.5')).toBe(12.5)
     expect(toFiniteNumber('%')).toBeUndefined()
@@ -151,11 +147,58 @@ describe('parseCsv', () => {
     expect(mapped).toMatchObject({ symbol: 'AAPL.US', quantity: 1000, costPrice: 180.5, issues: [] })
   })
 
-  it('strips a decorative trailing percent on quantity and cost without scaling', () => {
-    const [row] = parseCsv('Symbol,Quantity,Cost\nAAPL.US,10%,100%')
-    expect(row).toMatchObject({ symbol: 'AAPL.US', quantity: 10, costPrice: 100, confidence: 1, issues: [] })
-    const [fraction] = parseCsv('Symbol,Quantity,Cost\nMSFT.US,12.5%,180.5')
-    expect(fraction).toMatchObject({ symbol: 'MSFT.US', quantity: 12.5, costPrice: 180.5, confidence: 1, issues: [] })
+  it('flags 100% and 12.5% quantity and cost for confirmation instead of booking them', () => {
+    const [both] = parseCsv('Symbol,Quantity,Cost\nAAPL.US,100%,12.5%')
+    expect(both.quantity).toBeUndefined()
+    expect(both.costPrice).toBeUndefined()
+    expect(both.confidence).toBe(0.6)
+    expect(both.issues).toEqual([
+      'Quantity "100%" needs confirmation',
+      'Cost price "12.5%" needs confirmation',
+    ])
+
+    const [quantityPercent] = parseCsv('Symbol,Quantity,Cost\nMSFT.US,100%,180.5')
+    expect(quantityPercent.quantity).toBeUndefined()
+    expect(quantityPercent.costPrice).toBe(180.5)
+    expect(quantityPercent.confidence).toBe(0.6)
+    expect(quantityPercent.issues).toEqual(['Quantity "100%" needs confirmation'])
+
+    const [costPercent] = parseCsv('Symbol,Quantity,Cost\n0700.HK,500,12.5%')
+    expect(costPercent.quantity).toBe(500)
+    expect(costPercent.costPrice).toBeUndefined()
+    expect(costPercent.confidence).toBe(0.6)
+    expect(costPercent.issues).toEqual(['Cost price "12.5%" needs confirmation'])
+  })
+
+  it('flags decorated trailing percents and leaves ordinary numbers booked', () => {
+    const [decorated] = parseCsv('Symbol,Quantity,Cost\nAAPL.US," 100 % ","$12.5%"')
+    expect(decorated.quantity).toBeUndefined()
+    expect(decorated.costPrice).toBeUndefined()
+    expect(decorated.issues).toEqual([
+      'Quantity "100 %" needs confirmation',
+      'Cost price "$12.5%" needs confirmation',
+    ])
+    const [thousands] = parseCsv('Symbol,Quantity,Cost\nMSFT.US,"1,000%",180.50')
+    expect(thousands.quantity).toBeUndefined()
+    expect(thousands.costPrice).toBe(180.5)
+    expect(thousands.issues).toEqual(['Quantity "1,000%" needs confirmation'])
+    const [plain] = parseCsv('Symbol,Quantity,Cost\n0700.HK,"1,000","$180.50"')
+    expect(plain).toMatchObject({ quantity: 1000, costPrice: 180.5, confidence: 1, issues: [] })
+    const [signed] = parseCsv('Symbol,Quantity,Cost\nTSLA.US,-3.25%,0%')
+    expect(signed.quantity).toBeUndefined()
+    expect(signed.costPrice).toBeUndefined()
+    expect(signed.issues).toEqual([
+      'Quantity "-3.25%" needs confirmation',
+      'Cost price "0%" needs confirmation',
+    ])
+  })
+
+  it('keeps a percent that is not a plain trailing % invalid', () => {
+    const [row] = parseCsv('Symbol,Quantity,Cost\nAAPL.US,100%%,10%5')
+    expect(row.quantity).toBeUndefined()
+    expect(row.costPrice).toBeUndefined()
+    expect(row.confidence).toBe(0.6)
+    expect(row.issues).toEqual(['Invalid quantity "100%%"', 'Invalid cost price "10%5"'])
   })
 
   it('flags formatting-only quantities and costs without inventing zeros', () => {
@@ -327,11 +370,23 @@ describe('parsePaste (spec §46)', () => {
     }
   })
 
-  it('strips a decorative trailing percent on pasted quantity and cost', () => {
-    const [row] = parsePaste('AAPL.US 10% 100%')
-    expect(row).toMatchObject({ symbol: 'AAPL.US', quantity: 10, costPrice: 100, confidence: 1, issues: [] })
-    const [fraction] = parsePaste('MSFT.US, 12.5%, 180.5')
-    expect(fraction).toMatchObject({ symbol: 'MSFT.US', quantity: 12.5, costPrice: 180.5, confidence: 1, issues: [] })
+  it('flags pasted 100% and 12.5% for confirmation instead of booking them', () => {
+    const [both] = parsePaste('AAPL.US 100% 12.5%')
+    expect(both.quantity).toBeUndefined()
+    expect(both.costPrice).toBeUndefined()
+    expect(both.confidence).toBe(0.6)
+    expect(both.issues).toEqual([
+      'Quantity "100%" needs confirmation',
+      'Cost price "12.5%" needs confirmation',
+    ])
+    const [quantityPercent] = parsePaste('MSFT.US, 12.5%, 180.5')
+    expect(quantityPercent.quantity).toBeUndefined()
+    expect(quantityPercent.costPrice).toBe(180.5)
+    expect(quantityPercent.issues).toEqual(['Quantity "12.5%" needs confirmation'])
+    const [costPercent] = parsePaste('0700.HK, 500, 100%')
+    expect(costPercent.quantity).toBe(500)
+    expect(costPercent.costPrice).toBeUndefined()
+    expect(costPercent.issues).toEqual(['Cost price "100%" needs confirmation'])
   })
 
   it('parses SYMBOL QTY COST', () => {

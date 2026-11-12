@@ -128,6 +128,24 @@ describe('ManualPortfolioRepository', () => {
     ])
   })
 
+  it('does not persist trailing-percent quantity or cost and marks them for confirmation', async () => {
+    const store = tempStore()
+    const draft = createDraft('csv', parseCsv('Symbol,Quantity,Cost\nAAPL.US,100%,12.5%\nMSFT.US,100,12.5%'))
+    expect(draft.warnings).toContain('2 rows need review')
+    expect(validateDraft(draft)).toEqual([
+      'AAPL.US: Quantity "100%" needs confirmation',
+      'AAPL.US: Cost price "12.5%" needs confirmation',
+      'MSFT.US: Cost price "12.5%" needs confirmation',
+    ])
+
+    const created = await new ManualPortfolioRepository(store).create(draftToPortfolioInput(draft, 'Percent import'))
+    const reloaded = await new ManualPortfolioRepository(store).get(created.id)
+    expect(reloaded?.holdings).toEqual([
+      { symbol: 'AAPL.US', name: '' },
+      { symbol: 'MSFT.US', name: '', quantity: 100 },
+    ])
+  })
+
   it('lists nothing before the first create', async () => {
     const repository = new ManualPortfolioRepository(tempStore())
     expect(await repository.list()).toEqual([])
