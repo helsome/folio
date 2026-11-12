@@ -1,6 +1,7 @@
 import { Type } from '@sinclair/typebox';
 import type { CalcIndex } from '@finagent/core';
 import type { FinanceCapability } from '@finagent/core';
+import { calcIndexToFacts, marketCurrencyOf } from '@finagent/core';
 import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
@@ -24,9 +25,16 @@ export function createCompanyValuationCapability(
     async execute(input, ctx) {
       const symbol = normalizeSymbol(input.symbol);
       const index = await fetchers.getCalcIndex(symbol);
+      const fetchedAt = (ctx?.now ?? Date.now)();
+      const facts = calcIndexToFacts(index, {
+        provider: 'longbridge',
+        currency: marketCurrencyOf(symbol),
+        retrievedAt: Math.floor(fetchedAt / 1000),
+      });
       return {
         data: index,
-        provenance: { provider: 'longbridge', fetchedAt: (ctx?.now ?? Date.now)(), stale: false },
+        facts,
+        provenance: { provider: 'longbridge', fetchedAt, stale: false },
         summary: formatCalcIndex(index),
       };
     },

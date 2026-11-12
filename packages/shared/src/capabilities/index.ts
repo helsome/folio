@@ -42,6 +42,11 @@ export {
   type CapabilityFetchers,
   type CapabilityFetchResult,
 } from './fetchers.ts';
+export {
+  resolveCanonicalInstrument,
+  resolveCanonicalInstrumentId,
+  DEFAULT_INSTRUMENT_RESOLVER,
+} from './instruments.ts';
 export { createPhaseOneCapabilities, phaseOneCapabilities } from './manifests/index.ts';
 
 /** All twenty capabilities built from the default (real) Longbridge fetchers. */

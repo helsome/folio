@@ -1,10 +1,12 @@
 import { Type } from '@sinclair/typebox';
 import type { StaticInfo } from '@finagent/core';
 import type { FinanceCapability } from '@finagent/core';
+import { readInstrumentId } from '@finagent/core';
 import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
 import { defaultCapabilityFetchers } from '../fetchers.ts';
+import { resolveCanonicalInstrument } from '../instruments.ts';
 
 export function createCompanyProfileCapability(
   fetchers: CapabilityFetchers = defaultCapabilityFetchers
@@ -28,9 +30,24 @@ export function createCompanyProfileCapability(
         : undefined;
       const info = fetched?.data ?? await fetchers.getStaticInfo(symbol);
       if (fetched) reportProvider?.(fetched.provenance);
+      const prov = fetched?.provenance;
+      const provider = prov?.providerId ?? 'longbridge';
+      const providerName = prov?.providerName ?? 'Longbridge';
+      const canonical = resolveCanonicalInstrument(symbol, prov?.providerId);
+      const instrumentId =
+        readInstrumentId(info) ?? prov?.instrumentId ?? canonical?.instrumentId;
+      const fetchedAt = prov?.fetchedAt ?? (ctx?.now ?? Date.now)();
+      const stale = prov?.stale ?? false;
       return {
         data: info,
-        provenance: { provider: 'longbridge', fetchedAt: (ctx?.now ?? Date.now)(), stale: false },
+        provenance: {
+          provider,
+          providerName,
+          ...(instrumentId ? { instrumentId } : {}),
+          fetchedAt,
+          ...(prov?.delayed !== undefined ? { delayed: prov.delayed } : {}),
+          stale,
+        },
         summary: formatStaticInfo(info),
       };
     },
