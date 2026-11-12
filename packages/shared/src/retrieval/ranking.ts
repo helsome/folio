@@ -172,9 +172,30 @@ function tokens(text: string): Set<string> {
   );
 }
 
+/**
+ * Tokenize text for near-duplicate comparison. Keep Latin words intact, but
+ * split CJK runs into character bigrams because Chinese and Japanese text
+ * commonly has no whitespace between words.
+ */
+function similarityTokens(text: string): Set<string> {
+  const result = new Set<string>();
+  for (const token of normalizeSourceTitle(text).split(' ').filter(Boolean)) {
+    if (/[\p{Script=Han}\p{Script=Hiragana}\p{Script=Katakana}\p{Script=Hangul}]/u.test(token)) {
+      const chars = Array.from(token);
+      if (chars.length === 1) result.add(token);
+      for (let index = 0; index < chars.length - 1; index += 1) {
+        result.add(chars[index] + chars[index + 1]);
+      }
+    } else if (token.length > 1) {
+      result.add(token);
+    }
+  }
+  return result;
+}
+
 function similarity(left: string, right: string): number {
-  const a = tokens(left);
-  const b = tokens(right);
+  const a = similarityTokens(left);
+  const b = similarityTokens(right);
   if (a.size === 0 || b.size === 0) return 0;
   let intersection = 0;
   for (const token of a) if (b.has(token)) intersection += 1;

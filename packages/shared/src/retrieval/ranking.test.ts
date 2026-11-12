@@ -133,6 +133,57 @@ describe('rankRetrievalSources', () => {
     ]));
   });
 
+  it('clusters near-duplicate Chinese excerpts without whitespace tokenization', () => {
+    const result = rankRetrievalSources(
+      [
+        source(
+          'wire',
+          'https://wire.test/a',
+          '英伟达上调季度营收预期',
+          '英伟达因数据中心需求强劲，上调本年度营收预期。英伟达将继续扩大数据中心投入。'
+        ),
+        source(
+          'copy',
+          'https://copy.test/b',
+          '英伟达提高季度营收展望',
+          '英伟达由于数据中心需求强劲，上调本年度营收预期。英伟达将继续扩大数据中心投入。'
+        ),
+      ],
+      { now: NOW }
+    );
+
+    expect(result.clusters).toHaveLength(1);
+    expect(result.independentSourceCount).toBe(1);
+    expect(result.clusters[0].duplicateRelations).toContainEqual({
+      sourceId: 'copy',
+      relation: 'near_duplicate',
+    });
+  });
+
+  it('does not cluster unrelated Chinese excerpts as near duplicates', () => {
+    const result = rankRetrievalSources(
+      [
+        source(
+          'chip',
+          'https://chip.test/a',
+          '英伟达上调季度营收预期',
+          '英伟达因数据中心需求强劲，上调本年度营收预期。英伟达将继续扩大数据中心投入。'
+        ),
+        source(
+          'apple',
+          'https://apple.test/b',
+          '苹果公司公布季度财报',
+          '苹果公司公布季度财报，服务业务增长，iPhone销量下滑。'
+        ),
+      ],
+      { now: NOW }
+    );
+
+    expect(result.clusters).toHaveLength(2);
+    expect(result.independentSourceCount).toBe(2);
+    expect(result.clusters.every((cluster) => cluster.duplicateRelations.length === 0)).toBe(true);
+  });
+
   it('clusters near-duplicate syndicated excerpts', () => {
     const result = rankRetrievalSources(
       [
