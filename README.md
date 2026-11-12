@@ -425,6 +425,7 @@ Folio 处于测试版，当前包通道为 `0.4.0-beta.2`。仓库包含研究�
 - [`docs/release-gates.zh-CN.md`](docs/release-gates.zh-CN.md) — 发布验证清单 · [English](docs/release-gates.md)
 - [`docs/EVALUATION.md`](docs/EVALUATION.md) — Agent 评测、可观测性与实验 · [CI 策略](docs/EVALUATION-CI.md) · [基准集](docs/EVALUATION-BENCHMARK.md)
 - [`docs/design-comparison.md`](docs/design-comparison.md) — 设计稿与当前实现的逐屏对比
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — 贡献指南：认领、commit 规范、PR 测试报告
 
 ## 常见问题
 
@@ -440,7 +441,7 @@ Folio 处于测试版，当前包通道为 `0.4.0-beta.2`。仓库包含研究�
 
 ## 参与贡献
 
-欢迎 Issue 和 Pull Request。提交前请运行：
+欢迎 Issue 和 Pull Request。认领规则、commit 规范、PR 描述、测试报告和截图要求见 [`CONTRIBUTING.md`](CONTRIBUTING.md)。提交前请运行：
 
 ```bash
 bun test

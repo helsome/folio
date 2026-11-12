@@ -425,6 +425,7 @@ Known limitations and release decisions are in [`docs/release-gates.md`](docs/re
 - [`docs/release-gates.md`](docs/release-gates.md) — release validation checklist · [简体中文](docs/release-gates.zh-CN.md)
 - [`docs/EVALUATION.md`](docs/EVALUATION.md) — agent evaluation, observability, and experiments · [CI strategy](docs/EVALUATION-CI.md) · [benchmark](docs/EVALUATION-BENCHMARK.md)
 - [`docs/design-comparison.md`](docs/design-comparison.md) — screen-by-screen comparison of the design source and the current implementation
+- [`CONTRIBUTING.md`](CONTRIBUTING.md) — contributing guide (written in Chinese): claiming, commit messages, and the PR test report
 
 ## FAQ
 
@@ -440,7 +441,7 @@ Known limitations and release decisions are in [`docs/release-gates.md`](docs/re
 
 ## Contributing
 
-Issues and pull requests are welcome. Before opening a change, run:
+Issues and pull requests are welcome. Claiming, commit messages, the PR description, the test report, and screenshot requirements are in [`CONTRIBUTING.md`](CONTRIBUTING.md) (written in Chinese). Before opening a change, run:
 
 ```bash
 bun test
