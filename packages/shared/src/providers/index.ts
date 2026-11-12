@@ -22,6 +22,7 @@ export { healthAll } from './health.ts';
 export { MassiveFinancialDataProvider } from './massive/index.ts';
 export { YahooChartFinancialDataProvider } from './yahoo/index.ts';
 export { TtlCache } from './massive/cache.ts';
+export { fetchEcbConversion } from './ecb-fx.ts';
 export {
   // typed failure model
   classifyFailure,

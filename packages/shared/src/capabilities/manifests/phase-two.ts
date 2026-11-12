@@ -15,6 +15,7 @@ import { defineCapability } from '../define.ts';
 import { normalizeSymbol } from '../validate.ts';
 import type { CapabilityFetchers } from '../fetchers.ts';
 import { defaultCapabilityFetchers } from '../fetchers.ts';
+import { reconcileFinancialReportResults, reconcileFinancialReportResultsWithFx } from '../../providers/financial-report-reconciliation.ts';
 
 // ── market.depth ────────────────────────────────────────────────────────────
 
@@ -186,17 +187,79 @@ export function createCompanyFinancialsCapability(
         })
       ),
     }),
-    async execute(input, ctx) {
+    async execute(input, ctx, reportProvider) {
       const symbol = normalizeSymbol(input.symbol);
-      const report = await fetchers.getFinancialReport(
-        symbol,
-        input.kind ?? 'ALL',
-        input.report
+      const candidateResults = await fetchers.getFinancialReportCandidates?.(
+        symbol, input.kind ?? 'ALL', input.report
       );
+      const policyForMetric = fetchers.getFinancialReconciliationPolicy ?? (() => ({}));
+      const reconciled = candidateResults
+        ? fetchers.getCurrencyConversion
+          ? await reconcileFinancialReportResultsWithFx(
+            candidateResults, policyForMetric, fetchers.getCurrencyConversion
+          )
+          : reconcileFinancialReportResults(candidateResults, policyForMetric)
+        : undefined;
+      // Reuse the existing fetch path for a complete failure so its stable
+      // ProviderFetchError is preserved for callers.
+      const report = reconciled?.selected?.data ?? await fetchers.getFinancialReport(
+        symbol, input.kind ?? 'ALL', input.report
+      );
+      if (reconciled?.selected) reportProvider?.(reconciled.selected.provenance);
+      const conflicts = reconciled?.comparisons.filter(
+        (comparison) => comparison.result.state === 'material-conflict'
+      ) ?? [];
+      const incomparable = reconciled?.comparisons.filter(
+        (comparison) => comparison.result.state === 'incomparable'
+      ) ?? [];
+      const conflictSummary = conflicts.length > 0
+        ? ` Provider disagreement in ${conflicts.length} fact(s): ${conflicts.slice(0, 3)
+          .map(({ metric, period, result }) => `${metric} ${period} (${result.candidates
+            .map((candidate) => `${candidate.provider}=${candidate.value} ${candidate.currency ?? candidate.unit ?? ''}`)
+            .join(' vs ')})`).join('; ')}. Treat these as contested, not agreed facts.`
+        : '';
+      const incomparableSummary = incomparable.length > 0
+        ? ` ${incomparable.length} fact(s) use incompatible instrument, period, currency, unit, or timestamp semantics; do not infer agreement.`
+        : '';
+      const insufficientSummary = reconciled && reconciled.comparisons.some(
+        (comparison) => comparison.result.state === 'insufficient-sources'
+      )
+        ? ' Some facts have only one provider and cannot be cross-checked.'
+        : '';
       return {
         data: report,
-        provenance: { provider: 'longbridge', fetchedAt: (ctx?.now ?? Date.now)(), stale: false },
-        summary: `Financial statements for ${symbol}: ${formatStatementNames(report.statements)}.`,
+        provenance: {
+          provider: reconciled?.selected?.provenance.providerId ?? 'longbridge',
+          ...(reconciled?.selected ? {
+            providerId: reconciled.selected.provenance.providerId,
+            providerName: reconciled.selected.provenance.providerName,
+            ...(reconciled.selected.provenance.marketTime !== undefined
+              ? { marketTime: reconciled.selected.provenance.marketTime } : {}),
+            ...(reconciled.selected.provenance.delayed !== undefined
+              ? { delayed: reconciled.selected.provenance.delayed } : {}),
+            ...(reconciled.selected.provenance.failoverTrail
+              ? { failoverTrail: reconciled.selected.provenance.failoverTrail } : {}),
+          } : {}),
+          fetchedAt: (ctx?.now ?? Date.now)(),
+          stale: reconciled?.selected?.provenance.stale ?? false,
+        },
+        summary: `Financial statements for ${symbol}: ${formatStatementNames(report.statements)}.${conflictSummary}${incomparableSummary}${insufficientSummary}${reconciled ? ' Policy selections are recommendations; returned statement data remains from the reported provider.' : ''}`,
+        ...(reconciled ? {
+          evidence: {
+            reconciliation: {
+              providers: [...new Set(reconciled.comparisons.flatMap(
+                ({ result }) => result.candidates.map((candidate) => candidate.provider)
+              ))],
+              method: 'folio-financial-report/v1; policy selections are recommendations only; optional sourced balance-sheet FX',
+              comparisons: reconciled.comparisons,
+            },
+            lineage: [{
+              kind: 'reconciliation' as const,
+              description: `Compared ${reconciled.comparisons.length} financial facts across providers; ${conflicts.length} material conflicts.`,
+              version: 'folio-financial-report/v1',
+            }],
+          },
+        } : {}),
       };
     },
   });

@@ -71,7 +71,7 @@ export const PROVIDER_DISAGREEMENT_CASES: ProviderDisagreementFixture[] = [
   {
     name: 'no provider priority configured',
     description:
-      'Two comparable provider figures disagree and the policy lists no priority, so the first candidate is retained and named as the fallback.',
+      'Two comparable provider figures disagree and the policy lists no priority, so neither is silently selected.',
     candidates: [
       { provider: 'longbridge', instrument: FIXTURE_INSTRUMENT, value: 100, asOf: 1790951400000, period: '2026-10-02', currency: 'USD', unit: 'USD', adjustment: 'live' },
       { provider: 'polygon', instrument: FIXTURE_INSTRUMENT, value: 120, asOf: 1790951400000, period: '2026-10-02', currency: 'USD', unit: 'USD', adjustment: 'live' },

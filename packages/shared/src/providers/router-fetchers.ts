@@ -16,6 +16,8 @@ import {
   type ProviderResult,
   type ProviderProvenance,
   type Quote,
+  type ReconciliationConversion,
+  type ReconciliationPolicy,
   type StaticInfo,
 } from '@finagent/core';
 import type {
@@ -67,6 +69,7 @@ export class ProviderFetchError extends Error {
 export interface RouterCapabilityFetchers {
   getQuote: (symbol: string) => Promise<Quote>;
   getQuoteResult: (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<Quote>>;
+  getQuoteCandidates: (symbol: string, signal?: AbortSignal) => Promise<ProviderResult<Quote>[]>;
   getKline: (options: GetKlineOptions) => Promise<Kline[]>;
   getKlineResult: (options: GetKlineOptions, signal?: AbortSignal) => Promise<CapabilityFetchResult<Kline[]>>;
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
@@ -90,6 +93,8 @@ export interface RouterCapabilityFetchers {
     kind?: 'IS' | 'BS' | 'CF' | 'ALL',
     report?: string
   ) => Promise<ProviderResult<FinancialReport>[]>;
+  getFinancialReconciliationPolicy?: (metric: string) => Partial<ReconciliationPolicy>;
+  getCurrencyConversion?: (from: string, to: string, asOf: number) => Promise<ReconciliationConversion | undefined>;
   getInstitutionRating: (symbol: string) => Promise<InstitutionRating>;
   getDividends: (symbol: string) => Promise<DividendRecord[]>;
   getEpsForecasts: (symbol: string) => Promise<EpsForecast[]>;
@@ -163,6 +168,8 @@ function cloneProvenance(provenance: ProviderProvenance): ProviderProvenance {
 export interface RouterFetcherOptions {
   /** Resolve user/ticker input to a canonical instrument before adapters run. */
   resolve?: InstrumentQueryResolver;
+  financialReconciliationPolicy?: (metric: string) => Partial<ReconciliationPolicy>;
+  currencyConversion?: (from: string, to: string, asOf: number) => Promise<ReconciliationConversion | undefined>;
 }
 
 function bindSymbolInput(
@@ -199,9 +206,13 @@ export function createRouterFetchers(
 ): RouterCapabilityFetchers {
   const resolve = options.resolve;
   return {
+    ...(options.financialReconciliationPolicy ? { getFinancialReconciliationPolicy: options.financialReconciliationPolicy } : {}),
+    ...(options.currencyConversion ? { getCurrencyConversion: options.currencyConversion } : {}),
     getQuote: (symbol) => fetch(router, 'market.quote', bindSymbolInput(symbol, {}, resolve)),
     getQuoteResult: (symbol, signal) =>
       fetchResult(router, 'market.quote', bindSymbolInput(symbol, {}, resolve), signal),
+    getQuoteCandidates: (symbol, signal) =>
+      router.executeAll<Quote>('market.quote', bindSymbolInput(symbol, {}, resolve), signal),
     getKline: (options) =>
       fetch(router, 'market.kline', bindSymbolInput(options.symbol, { ...options }, resolve)),
     getKlineResult: (options, signal) =>
