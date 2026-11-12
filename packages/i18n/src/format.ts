@@ -121,6 +121,19 @@ export function formatDate(ts: number | undefined, locale?: SupportedLocale): st
   }).format(ts);
 }
 
+/**
+ * Month + day, no year. en: `Nov 21` · zh: `11月21日`.
+ * Compact "when" lines (Today, automation) use this so the string stays short
+ * and follows the app locale instead of the host OS.
+ */
+export function formatShortDate(ts: number | undefined, locale?: SupportedLocale): string {
+  if (ts === undefined || !Number.isFinite(ts) || ts <= 0) return '—';
+  return new Intl.DateTimeFormat(localeOf(locale), {
+    month: 'short',
+    day: 'numeric',
+  }).format(ts);
+}
+
 /** Date + time. */
 export function formatDateTime(ts: number | undefined, locale?: SupportedLocale): string {
   if (ts === undefined || !Number.isFinite(ts) || ts <= 0) return '—';

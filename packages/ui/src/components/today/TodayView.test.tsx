@@ -2,8 +2,14 @@ import { afterAll, beforeAll, describe, expect, it } from 'bun:test'
 import React, { act } from 'react'
 import { createRoot } from 'react-dom/client'
 import { Provider, createStore } from 'jotai'
-import type { PortfolioSnapshot, Quote } from '@finagent/core'
-import { formatCurrency } from '@finagent/i18n'
+import type { AlertTriggerEvent, PortfolioSnapshot, Quote } from '@finagent/core'
+import {
+  formatCurrency,
+  formatShortDate,
+  i18nCurrentLocale,
+  i18nSetCurrentLocale,
+  type SupportedLocale,
+} from '@finagent/i18n'
 import { fallbackClient, FinagentClientProvider, type FinagentClient } from '../../client'
 import { installHappyDom } from '../../test/setupHappyDom'
 import { makeTestI18n, I18nextProvider } from '../../test/i18nTest'
@@ -180,5 +186,77 @@ describe('TodayView', () => {
       root.unmount()
     })
     container.remove()
+  })
+
+  it('formats alert times older than a day in the app locale, not the host locale', async () => {
+    // 2024-11-21 is far outside the 24h relative-time window, so formatWhen
+    // takes the short-date branch. Same guard style as the #293 locale policy:
+    // pin the app locale to one whose output differs from the host OS, and
+    // fail loudly if both supported locales would make the assertion vacuous.
+    const ts = Date.UTC(2024, 10, 21, 9, 20, 0)
+    const host = new Date(ts).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })
+    const saved = i18nCurrentLocale()
+    let locale: SupportedLocale | undefined
+    let expected = ''
+    for (const candidate of ['zh-CN', 'en-US'] as const) {
+      i18nSetCurrentLocale(candidate)
+      const formatted = formatShortDate(ts)
+      if (formatted !== host) {
+        locale = candidate
+        expected = formatted
+        break
+      }
+    }
+    if (!locale) {
+      i18nSetCurrentLocale(saved)
+      throw new Error(
+        `host locale renders ${JSON.stringify(host)} identically to both supported locales — the assertion would be vacuous`,
+      )
+    }
+    expect(expected).not.toContain('2024')
+
+    const store = createStore()
+    const client = clientWithPortfolio()
+    const event: AlertTriggerEvent = {
+      id: 'evt-old',
+      ruleId: 'rule-1',
+      ruleType: 'price_above',
+      symbol: 'NVDA.US',
+      triggeredAt: ts,
+      title: 'NVDA price alert',
+      message: 'crossed the target',
+    }
+    if (client.alerts === undefined) throw new Error('test client is missing alerts')
+    client.alerts.listEvents = async () => ({ ok: true, data: [event] })
+    // makeTestI18n does not sync the formatter locale; formatWhen reads it.
+    i18nSetCurrentLocale(locale)
+
+    const container = document.createElement('div')
+    document.body.appendChild(container)
+    const root = createRoot(container)
+    try {
+      await act(async () => {
+        root.render(
+          <I18nextProvider i18n={makeTestI18n(locale)}>
+            <Provider store={store}>
+              <FinagentClientProvider client={client}><TodayView /></FinagentClientProvider>
+            </Provider>
+          </I18nextProvider>
+        )
+      })
+      await flushAsync()
+
+      const item = Array.from(container.querySelectorAll('li')).find((li) =>
+        li.textContent?.includes('NVDA price alert')
+      )
+      const when = item?.querySelector('span.tnum')
+      expect(when?.textContent).toBe(expected)
+      expect(when?.textContent).not.toBe(host)
+      expect(when?.textContent ?? '').not.toContain('2024')
+    } finally {
+      i18nSetCurrentLocale(saved)
+      await act(async () => { root.unmount() })
+      container.remove()
+    }
   })
 })
