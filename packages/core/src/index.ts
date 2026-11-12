@@ -3,6 +3,7 @@
 import type { SupportedLocale } from './locale.ts';
 import type { FinancialEvidenceEnvelope } from './financial-evidence.ts';
 import type { MarketSource } from './market-data.ts';
+import type { InstrumentProviderAlias } from './instrument.ts';
 
 export type { SupportedLocale, LocalePreference } from './locale.ts';
 
@@ -193,6 +194,15 @@ export interface Run {
   stopReason?: StopReason;
   /** The numbers behind a non-success stop (which budget ran out, which loop fired). */
   stopDetail?: Record<string, unknown>;
+  watchlistContext?: WatchlistContextSnapshot;
+}
+
+export interface WatchlistContextSnapshot {
+  schemaVersion: 1;
+  sourceId: 'default';
+  version: string;
+  capturedAt: number;
+  instruments: Array<{ instrumentId: string; symbol: string; providerAliases?: InstrumentProviderAlias[] }>;
 }
 
 /** Live tool call state, streamed through agent events. */
@@ -444,6 +454,7 @@ export interface AgentRunInput {
   runId: string;
   content: string;
   workspaceContext?: WorkspaceContext;
+  watchlistContext?: WatchlistContextSnapshot;
   /** V8: effective UI locale for new agent responses (spec §41–42). */
   locale?: SupportedLocale;
 }

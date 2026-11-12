@@ -81,6 +81,7 @@ import {
   AlertEventLog,
   AlertRuleRepository,
   buildComparison,
+  captureWatchlistContext,
   CapabilityExecutor,
   computeSkillReadiness,
   createAgentEvaluator,
@@ -235,6 +236,7 @@ interface StartRunRequest {
   sessionId: string;
   content: string;
   workspaceContext?: WorkspaceContext;
+  watchlistSymbols?: string[];
 }
 
 /** Experiment id for runs observed outside explicit evaluation experiments. */
@@ -542,6 +544,9 @@ export class AgentKernelHost {
 
   async startRun(input: unknown): Promise<Run> {
     const request = requireObject(input) as Partial<StartRunRequest>;
+    const watchlistContext = request.watchlistSymbols === undefined
+      ? undefined
+      : captureWatchlistContext(request.watchlistSymbols, this.instrumentResolver, Date.now());
     let workspaceContext: WorkspaceContext | undefined;
     if (request.workspaceContext && typeof request.workspaceContext === 'object') {
       const context = request.workspaceContext as Record<string, unknown>;
@@ -578,7 +583,9 @@ export class AgentKernelHost {
       requireString(request.sessionId, 'sessionId'),
       requireString(request.content, 'content'),
       workspaceContext,
-      await this.effectiveRunLocale()
+      await this.effectiveRunLocale(),
+      undefined,
+      watchlistContext
     );
   }
 

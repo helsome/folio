@@ -13,6 +13,7 @@ import type {
   ToolCallRecord,
   WorkspaceContext,
   SupportedLocale,
+  WatchlistContextSnapshot,
 } from '@finagent/core';
 import type { RunRepository } from '../storage/index.ts';
 import type { SessionManager } from './session-manager.ts';
@@ -198,7 +199,8 @@ export class RunManager {
     content: string,
     workspaceContext?: WorkspaceContext,
     locale?: SupportedLocale,
-    budgetOverrides?: RunBudgetLimits
+    budgetOverrides?: RunBudgetLimits,
+    watchlistContext?: WatchlistContextSnapshot
   ): Promise<Run> {
     const text = content.trim();
     if (!text) {
@@ -215,7 +217,10 @@ export class RunManager {
     // A failed start must release the reservation so the caller can retry.
     this.startingSessionId = sessionId;
     try {
-      return await this.prepareRun(sessionId, text, workspaceContext, locale, budgetOverrides);
+      return await this.prepareRun(
+        sessionId, text, workspaceContext, locale, budgetOverrides,
+        watchlistContext ? structuredClone(watchlistContext) : undefined
+      );
     } finally {
       this.startingSessionId = null;
     }
@@ -226,7 +231,8 @@ export class RunManager {
     text: string,
     workspaceContext?: WorkspaceContext,
     locale?: SupportedLocale,
-    budgetOverrides?: RunBudgetLimits
+    budgetOverrides?: RunBudgetLimits,
+    watchlistContext?: WatchlistContextSnapshot
   ): Promise<Run> {
     const session = await this.sessions.getSession(sessionId);
     if (!session) {
@@ -240,6 +246,7 @@ export class RunManager {
       status: 'running',
       input: text,
       startedAt: now,
+      ...(watchlistContext ? { watchlistContext } : {}),
     };
     await this.runs.create(run);
 
@@ -327,6 +334,7 @@ export class RunManager {
           runId: run.id,
           content: run.input,
           workspaceContext,
+          watchlistContext: run.watchlistContext ? structuredClone(run.watchlistContext) : undefined,
           locale,
         })) {
           this.emit(event, protocol);

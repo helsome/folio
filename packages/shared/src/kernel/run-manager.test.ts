@@ -17,6 +17,8 @@ import { RunRepository } from '../storage/run-repository.ts';
 import { SessionRepository } from '../storage/session-repository.ts';
 import { SessionManager } from './session-manager.ts';
 import { RunManager, type RunManagerOptions } from './run-manager.ts';
+import { captureWatchlistContext } from './watchlist-context.ts';
+import { DEFAULT_INSTRUMENT_CATALOG, InstrumentResolver } from '@finagent/core';
 
 let dir = '';
 let clock = 1000;
@@ -246,6 +248,32 @@ describe('RunManager', () => {
     expect(updated?.status).toBe('idle');
     expect(updated?.messageCount).toBe(2);
     expect(runtime.ensureSessionCalls[0]).toMatchObject({ id: session.id });
+  });
+
+  it('freezes selected watchlists across runtime mutation, disk reload and unrelated sessions', async () => {
+    let received: AgentRunInput['watchlistContext'];
+    const { sessions, runs } = makeKernel(async function* (input) {
+      received = structuredClone(input.watchlistContext);
+      if (input.watchlistContext) input.watchlistContext.instruments.length = 0;
+      yield event(input.sessionId, input.runId, 'run_completed', { answer: 'done', toolCalls: [] });
+    });
+    const session = await sessions.createSession('Selected watchlist');
+    const snapshot = captureWatchlistContext(
+      ['AAPL.US', 'TSLA.US'], new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG), clock
+    );
+    const expected = structuredClone(snapshot);
+    const pending = runs.startRun(session.id, 'Review my watchlist', undefined, undefined, undefined, snapshot);
+    snapshot.instruments.length = 0;
+    const run = await pending;
+    await waitFor(async () => !runs.isRunning());
+    expect(received).toEqual(expected);
+    const reloaded = new RunRepository(new JsonFileStore(dir));
+    expect((await reloaded.get(session.id, run.id))?.watchlistContext).toEqual(expected);
+    const unrelated = await sessions.createSession('Unrelated');
+    const otherRun = await runs.startRun(unrelated.id, 'Hello');
+    await waitFor(async () => !runs.isRunning());
+    expect(received).toBeUndefined();
+    expect((await reloaded.get(unrelated.id, otherRun.id))?.watchlistContext).toBeUndefined();
   });
 
   it('broadcasts the agent event sequence to subscribers', async () => {

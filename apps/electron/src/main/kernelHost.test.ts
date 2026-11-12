@@ -1,4 +1,5 @@
-import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
+import { afterEach, beforeEach, describe, expect, it, mock, spyOn } from 'bun:test';
+import { captureWatchlistContext } from '../../../../packages/shared/src/kernel/watchlist-context.ts';
 import { join } from 'node:path';
 import type { AgentEvent, AutomationRule, AutomationRun } from '@finagent/core';
 
@@ -113,7 +114,7 @@ const fakeSessions = {
 const fakeRuns = {
   subscribe: (_listener: (event: AgentEvent) => void) => () => undefined,
   subscribeStream: (_listener: (sessionId: string, event: unknown) => void) => () => undefined,
-  startRun: async (sessionId: string, content: string) => ({
+  startRun: async (sessionId: string, content: string, ..._options: unknown[]) => ({
     id: 'r1',
     sessionId,
     status: 'running',
@@ -161,6 +162,7 @@ const noopStore = class {
 };
 
 mock.module('@finagent/shared', () => ({
+  captureWatchlistContext,
   HeatmapService,
   parseHeatmapSource,
   AgentKernel: FakeAgentKernel,
@@ -510,6 +512,37 @@ describe('AgentKernelHost', () => {
       code: 'INVALID_ARGUMENT',
     });
     host.dispose();
+  });
+
+  it('resolves explicitly selected watchlists before handing them to the run manager', async () => {
+    const host = new AgentKernelHost();
+    const start = spyOn(fakeRuns, 'startRun');
+    try {
+      await host.startRun({ sessionId: 's1', content: 'Review my watchlist', watchlistSymbols: ['AAPL.US', 'AAPL', 'TSLA.US'] });
+      expect(start.mock.calls[0]?.[5]).toMatchObject({
+        schemaVersion: 1, sourceId: 'default',
+        instruments: [{ instrumentId: 'XNAS:AAPL', symbol: 'AAPL' }, { instrumentId: 'XNAS:TSLA', symbol: 'TSLA' }],
+      });
+      await host.startRun({ sessionId: 's2', content: 'Hello' });
+      expect(start.mock.calls[1]?.[5]).toBeUndefined();
+    } finally {
+      start.mockRestore();
+      host.dispose();
+    }
+  });
+
+  it('rejects invalid watchlist selections before starting a run', async () => {
+    const host = new AgentKernelHost();
+    const start = spyOn(fakeRuns, 'startRun');
+    try {
+      for (const watchlistSymbols of [null, [], ['AAPL.US', 'UNKNOWN.US'], [123]]) {
+        await expect(host.startRun({ sessionId: 's1', content: 'Review', watchlistSymbols })).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+      }
+      expect(start).not.toHaveBeenCalled();
+    } finally {
+      start.mockRestore();
+      host.dispose();
+    }
   });
 
   it('dedupes compare symbols that resolve to the same canonical instrument', async () => {

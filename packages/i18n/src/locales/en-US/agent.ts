@@ -32,6 +32,10 @@ export const agent = {
   context: {
     none: 'No security context',
     clear: 'Clear security context',
+    useWatchlist: 'Use watchlist in this conversation ({{count}})',
+    emptyWatchlist: 'Your watchlist is empty.',
+    watchlistHistory: 'Watchlists used in previous runs',
+    historyFailed: 'Could not load watchlist history. Reopen this conversation to retry.',
   },
   model: {
     label: 'Model',

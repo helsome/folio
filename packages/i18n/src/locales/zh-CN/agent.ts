@@ -30,6 +30,10 @@ export const agent = {
     createSession: '创建新会话',
   },
   context: {
+    useWatchlist: '本会话使用自选（{{count}}）',
+    emptyWatchlist: '自选列表为空。',
+    watchlistHistory: '历史运行使用的自选',
+    historyFailed: '自选历史加载失败，请重新打开本会话以重试。',
     none: '暂无证券上下文',
     clear: '清除证券上下文',
   },

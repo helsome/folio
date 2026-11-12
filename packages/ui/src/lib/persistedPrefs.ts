@@ -23,13 +23,14 @@ function safeLocalStorage(): StorageLike | null {
   }
 }
 
-function readValue<T>(storageKey: string, fallback: T): T {
+function readValue<T>(storageKey: string, fallback: T, validate?: (value: unknown) => boolean): T {
   const storage = safeLocalStorage();
   if (!storage) return fallback;
   try {
     const raw = storage.getItem(storageKey);
     if (raw === null) return fallback;
-    return JSON.parse(raw) as T;
+    const value: unknown = JSON.parse(raw);
+    return !validate || validate(value) ? value as T : fallback;
   } catch {
     return fallback;
   }
@@ -60,9 +61,9 @@ export function writePersisted<T>(key: string, value: T): void {
  * init (localStorage is available in the renderer before first paint), writes
  * on every set. Use only for real preferences/context, never transient state.
  */
-export function persistedAtom<T>(key: string, initial: T): PrimitiveAtom<T> {
+export function persistedAtom<T>(key: string, initial: T, validate?: (value: unknown) => boolean): PrimitiveAtom<T> {
   const storageKey = `${PREFS_PREFIX}${key}`;
-  const base = atom<T>(readValue(storageKey, initial));
+  const base = atom<T>(readValue(storageKey, initial, validate));
   return atom(
     (get) => get(base),
     (_get, set, next: SetStateAction<T>) => {

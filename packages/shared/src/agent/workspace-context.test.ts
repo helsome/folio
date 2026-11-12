@@ -9,6 +9,8 @@ import type { SpawnOptionsWithoutStdio } from 'node:child_process';
 import { PiRuntimeAdapter } from './pi-runtime-adapter.ts';
 import { PiRpcClient } from './pi-rpc-client.ts';
 import type { SkillHub } from '@finagent/skill-hub';
+import { DEFAULT_INSTRUMENT_CATALOG, InstrumentResolver } from '@finagent/core';
+import { captureWatchlistContext } from '../kernel/watchlist-context.ts';
 
 class FakePiProcess extends EventEmitter {
   stdin = new PassThrough();
@@ -38,7 +40,11 @@ class FakePiProcess extends EventEmitter {
   }
 
   private respond(line: Record<string, unknown>) {
-    if (line.type === 'switch_session') {
+    if (line.type === 'get_entries') {
+      this.stdout.write(`${JSON.stringify({
+        id: line.id, type: 'response', command: 'get_entries', success: true, data: { entries: [], leafId: null },
+      })}\n`);
+    } else if (line.type === 'switch_session') {
       this.stdout.write(`${JSON.stringify({
         id: line.id,
         type: 'response',
@@ -80,6 +86,33 @@ function fakeSkillHub(): SkillHub {
 }
 
 describe('WorkspaceContext → prompt', () => {
+  it('includes only the explicitly selected run snapshot in the Pi prompt', async () => {
+    const proc = new FakePiProcess();
+    const adapter = new PiRuntimeAdapter({
+      rpcClient: new PiRpcClient({ spawnProcess: createSpawn(proc) }), sessionDir: '/tmp/ws-test',
+    });
+    for await (const _event of adapter.run({
+      sessionId: 'selected', runId: 'selected-run', content: 'Review my watchlist',
+      watchlistContext: captureWatchlistContext(
+        ['AAPL.US', '0700.HK'], new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG), 1
+      ),
+    })) {}
+    for await (const _event of adapter.run({ sessionId: 'other', runId: 'other-run', content: 'hello' })) {}
+    const prompts = proc.received.filter((line) => line.type === 'prompt');
+    expect(String(prompts[0]?.message)).toContain('<watchlist_context>');
+    expect(String(prompts[0]?.message)).toContain('XNAS:AAPL');
+    expect(String(prompts[0]?.message)).toContain('AAPL.US');
+    expect(String(prompts[0]?.message)).toContain('0700.HK');
+    expect(String(prompts[0]?.message)).toContain('use the matching providerAliases symbol');
+    expect(String(prompts[0]?.message)).toContain('Never pass an instrumentId as a symbol argument');
+    expect(String(prompts[0]?.message)).not.toContain('Use the canonical instrument IDs with registered tools');
+    expect(String(prompts[1]?.message)).not.toContain('watchlist_context');
+    expect(String(prompts[1]?.message)).not.toContain('XNAS:AAPL');
+    expect(String(prompts[1]?.message)).not.toContain('AAPL.US');
+    expect(String(prompts[1]?.message)).not.toContain('0700.HK');
+    await adapter.dispose();
+  });
+
   it('injects active symbol and view into the Pi prompt', async () => {
     const proc = new FakePiProcess();
     const client = new PiRpcClient({ spawnProcess: createSpawn(proc) });

@@ -25,6 +25,7 @@ export interface ElectronAPI {
       sessionId: string;
       content: string;
       workspaceContext?: unknown;
+      watchlistSymbols?: string[];
     }) => Promise<unknown>;
     cancelRun: (input: { sessionId: string; runId: string }) => Promise<unknown>;
     streamReplay: (input: { runId: string; lastSequence: number }) => Promise<unknown>;
@@ -209,6 +210,7 @@ const electronAPI: ElectronAPI = {
       sessionId: string;
       content: string;
       workspaceContext?: unknown;
+      watchlistSymbols?: string[];
     }) => ipcRenderer.invoke('runs:start', input),
     cancelRun: (input: { sessionId: string; runId: string }) => ipcRenderer.invoke('runs:cancel', input),
     streamReplay: (input: { runId: string; lastSequence: number }) =>
