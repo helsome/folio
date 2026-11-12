@@ -130,18 +130,21 @@ export function splitCsvRows(text: string): string[] {
   return rows
 }
 
+/** Separators recognized outside quotes. The first one in the row wins. */
+type CsvDelimiter = ',' | '\t' | ';'
+
 /** Use the first unquoted separator; quoted punctuation belongs to a cell. */
-function csvDelimiter(line: string): ',' | '\t' {
+function csvDelimiter(line: string): CsvDelimiter {
   let inQuotes = false
   for (const ch of line) {
     if (ch === '"') inQuotes = !inQuotes
-    else if (!inQuotes && (ch === ',' || ch === '\t')) return ch
+    else if (!inQuotes && (ch === ',' || ch === '\t' || ch === ';')) return ch
   }
   return ','
 }
 
 /** Split one CSV row using one delimiter, honoring quoted cells. */
-export function splitCsvLine(line: string, delimiter: ',' | '\t' = csvDelimiter(line)): string[] {
+export function splitCsvLine(line: string, delimiter: CsvDelimiter = csvDelimiter(line)): string[] {
   const cells: string[] = []
   let current = ''
   let inQuotes = false
@@ -191,7 +194,7 @@ export interface CsvColumnMap {
 export function resolveCsvColumns(
   firstRow: string,
   headerMapping?: CsvHeaderMapping,
-  delimiter: ',' | '\t' = csvDelimiter(firstRow)
+  delimiter: CsvDelimiter = csvDelimiter(firstRow)
 ): CsvColumnMap {
   const cells = splitCsvLine(firstRow, delimiter).map(normalizeHeaderCell)
   const byIndex = new Map<number, HeaderField>()

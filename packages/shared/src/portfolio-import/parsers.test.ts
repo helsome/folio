@@ -105,6 +105,11 @@ describe('splitCsvLine', () => {
     expect(splitCsvLine('"A, Inc.",AAPL.US')).toEqual(['A, Inc.', 'AAPL.US'])
     expect(splitCsvLine('"said ""hi""",x')).toEqual(['said "hi"', 'x'])
   })
+
+  it('splits semicolon-delimited rows and keeps quoted semicolons in one cell', () => {
+    expect(splitCsvLine('AAPL.US;"Apple; Inc.";10;100.5')).toEqual(['AAPL.US', 'Apple; Inc.', '10', '100.5'])
+    expect(splitCsvLine('AAPL.US;"Apple; ""Inc.""";10;100.5')).toEqual(['AAPL.US', 'Apple; "Inc."', '10', '100.5'])
+  })
 })
 
 describe('parseCsv', () => {
@@ -144,6 +149,34 @@ describe('parseCsv', () => {
     expect(rows[1].confidence).toBe(0.6)
     expect(rows[1].issues).toEqual(['Invalid quantity ","'])
     expect(rows[2]).toMatchObject({ quantity: 500, costPrice: 320, confidence: 1, issues: [] })
+  })
+
+  it('parses semicolon-delimited headers and rows like the comma equivalent', () => {
+    const semicolon = parseCsv('Symbol;Quantity;Cost\nAAPL.US;10;100.5\n0700.HK;500;320')
+    const comma = parseCsv('Symbol,Quantity,Cost\nAAPL.US,10,100.5\n0700.HK,500,320')
+    expect(semicolon).toEqual(comma)
+    expect(semicolon[0]).toMatchObject({
+      symbol: 'AAPL.US',
+      quantity: 10,
+      costPrice: 100.5,
+      confidence: 1,
+      issues: [],
+    })
+    expect(semicolon[1]).toMatchObject({ symbol: '0700.HK', quantity: 500, costPrice: 320, issues: [] })
+  })
+
+  it('does not split semicolons that sit inside quoted fields', () => {
+    const [row] = parseCsv('Symbol;Name;Quantity;Cost\nAAPL.US;"Apple; Inc.";10;100.5')
+    expect(row).toMatchObject({
+      symbol: 'AAPL.US',
+      name: 'Apple; Inc.',
+      quantity: 10,
+      costPrice: 100.5,
+      confidence: 1,
+      issues: [],
+    })
+    const [comma] = parseCsv('Symbol,Name,Quantity,Cost\nAAPL.US,"Apple; Inc.",10,100.5')
+    expect(comma).toMatchObject({ name: 'Apple; Inc.', quantity: 10, costPrice: 100.5, issues: [] })
   })
 
   it('detects English headers and maps columns', () => {
