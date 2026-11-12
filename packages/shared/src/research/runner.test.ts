@@ -187,7 +187,7 @@ describe('ResearchRunner', () => {
     expect(newsBundle.provider).toBe('test');
     expect(selected.map((item) => item.id)).toEqual(['filing', 'wire']);
     expect(selected[0].sourceClass).toBe('regulator');
-    expect(metadata.policyVersion).toBe('folio-retrieval-v1');
+    expect(metadata.policyVersion).toBe('folio-retrieval-v2');
     expect(metadata.independentSourceCount).toBe(2);
     expect(metadata.decisions).toContainEqual({
       sourceId: 'wire-copy',
@@ -203,6 +203,32 @@ describe('ResearchRunner', () => {
       selected: false,
       reason: 'duplicate_of:wire',
     });
+  });
+
+  it('passes differently signed financial figures through to synthesis', async () => {
+    const news = fakeCap('research.news');
+    news.execute = async () => ({
+      data: [
+        { id: 'gain', title: 'Company reports a gain', url: 'https://a.test/1', summary: 'The company reported a change of +10% in quarterly revenue.' },
+        { id: 'loss', title: 'Company reports a loss', url: 'https://b.test/2', summary: 'The company reported a change of -10% in quarterly revenue.' },
+      ],
+      provenance: { provider: 'test', fetchedAt: 1, stale: false },
+    });
+    let observed: Record<string, unknown> = {};
+    const runner = new ResearchRunner({
+      registry: createCapabilityRegistry([news]),
+      synthesizer: {
+        async synthesize(input) {
+          observed = JSON.parse(input.dataBundle) as Record<string, unknown>;
+          return new LocalResearchSynthesizer().synthesize(input);
+        },
+      },
+    });
+    await runner.run({ symbol: 'NVDA.US', runId: 'contradictory-news' });
+    const bundle = observed['research.news'] as { items: Array<{ id: string }> };
+    const ranking = observed['research.news:ranking'] as { independentSourceCount: number };
+    expect(bundle.items.map((item) => item.id)).toEqual(['gain', 'loss']);
+    expect(ranking.independentSourceCount).toBe(2);
   });
 
   it('keeps malformed news payloads inside the untrusted envelope', async () => {

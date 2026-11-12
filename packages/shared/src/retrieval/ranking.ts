@@ -5,7 +5,7 @@
  * signal. Every decision records the policy version and an explainable reason.
  */
 
-export const RETRIEVAL_RANKING_POLICY_VERSION = 'folio-retrieval-v1';
+export const RETRIEVAL_RANKING_POLICY_VERSION = 'folio-retrieval-v2';
 
 export type SourceClass =
   | 'regulator'
@@ -181,6 +181,33 @@ function similarity(left: string, right: string): number {
   return intersection / (a.size + b.size - intersection);
 }
 
+// Similar text can contain materially different financial figures. When both
+// sources provide numbers, require the same numeric facts before clustering
+// by title or fuzzy content. Missing figures alone do not imply a conflict.
+function numericFacts(text: string): Set<string> {
+  const normalized = text.normalize('NFKC').replace(/\u2212/g, '-');
+  const matches = normalized.matchAll(/([+-]?)\s*[$€£¥]?\s*(\d{1,3}(?:,\d{3})+(?:\.\d+)?|\d+(?:\.\d+)?)(?:\s*(%))?/g);
+  return new Set(Array.from(matches, ([, sign, raw, percent]) => {
+    const [integer, fraction = ''] = raw.replace(/,/g, '').split('.');
+    const whole = integer.replace(/^0+(?=\d)/, '');
+    const decimal = fraction.replace(/0+$/, '');
+    const value = whole + (decimal ? `.${decimal}` : '');
+    return (sign === '-' && value !== '0' ? '-' : '') + value + (percent ?? '');
+  }));
+}
+
+function conflictingNumericFacts(left: string | undefined, right: string | undefined): boolean {
+  if (!left || !right) return false;
+  const a = numericFacts(left);
+  const b = numericFacts(right);
+  if (!a.size || !b.size) return false;
+  return a.size !== b.size || [...a].some((value) => !b.has(value));
+}
+
+function sourceNumericText(source: RankedSource): string {
+  return source.source.title + ' ' + (source.source.excerpt ?? '');
+}
+
 function stableHash(value: string): string {
   let hash = 0x811c9dc5;
   for (let index = 0; index < value.length; index += 1) {
@@ -248,6 +275,7 @@ function duplicateRelation(
   threshold: number
 ): DuplicateRelation | undefined {
   if (left.canonicalUrl === right.canonicalUrl) return 'same_url';
+  if (conflictingNumericFacts(sourceNumericText(left), sourceNumericText(right))) return undefined;
   if (
     left.normalizedTitle.length > 0 &&
     left.normalizedTitle === right.normalizedTitle &&
@@ -344,23 +372,42 @@ export function rankRetrievalSources(
       relation: DuplicateRelation;
     }> = [];
     for (const group of groups) {
+      let best: DuplicateRelation | undefined;
       for (const member of group.members) {
         const relation = duplicateRelation(candidate, member, threshold);
-        if (relation) {
-          matches.push({ group, relation });
-          break;
-        }
+        if (relation && (!best || relation === 'same_url')) best = relation;
+        if (best === 'same_url') break;
       }
+      if (best) matches.push({ group, relation: best });
     }
     if (matches.length === 0) {
       groups.push({ members: [candidate], relations: [] });
       continue;
     }
 
-    // A source can bridge existing clusters; merge every matching group.
-    const target = matches[0].group;
+    // An excerpt without figures can match two otherwise conflicting groups.
+    // Do not let such a weak bridge collapse those groups into one source.
+    // URL identity remains authoritative even if a page's content was updated.
+    matches.sort((a, b) => Number(b.relation === 'same_url') - Number(a.relation === 'same_url'));
+    const accepted: typeof matches = [];
+    for (const match of matches) {
+      const conflicts = match.group.members.some((member) =>
+        conflictingNumericFacts(sourceNumericText(candidate), sourceNumericText(member)) ||
+        accepted.some((prior) => prior.group.members.some((other) =>
+          conflictingNumericFacts(sourceNumericText(member), sourceNumericText(other))
+        ))
+      );
+      if (!conflicts || match.relation === 'same_url') accepted.push(match);
+    }
+    if (accepted.length === 0) {
+      groups.push({ members: [candidate], relations: [] });
+      continue;
+    }
+
+    // A source can bridge compatible existing clusters.
+    const target = accepted[0].group;
     target.members.push(candidate);
-    for (const { group, relation } of matches) {
+    for (const { group, relation } of accepted) {
       target.relations.push({ sourceId: candidate.source.id, relation });
       if (group !== target) {
         target.members.push(...group.members);
