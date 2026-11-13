@@ -2,10 +2,12 @@ import type {
   CapabilityRegistry,
   Comparison,
   ComparisonCell,
+  ComparisonPriceHistory,
   ComparisonRow,
 } from '@finagent/core';
 import { CapabilityExecutor, type RunAllSpec } from '../capabilities/executor.ts';
 import { isRecord, toFiniteNumber } from '../guards.ts';
+import { buildRebasedPriceSeries } from './rebase.ts';
 
 const DASH = '\u2014';
 
@@ -116,7 +118,40 @@ export async function buildComparison(
     rows: buildRows(symbols, perSymbol),
     generatedAt: now(),
     errors,
+    priceHistory: buildPriceHistory(symbols, perSymbol),
     ...(sources.names.length > 0 ? { sources: sources.names, delayed: sources.delayed } : {}),
+  };
+}
+
+/**
+ * Normalize close prices to 100 from the earliest exact timestamp shared by
+ * every selected symbol. The union timestamp grid keeps non-trading dates as
+ * explicit nulls so chart consumers can render gaps instead of inventing data.
+ */
+function buildPriceHistory(
+  symbols: string[],
+  perSymbol: Record<string, Record<string, unknown>>
+): ComparisonPriceHistory {
+  const rebased = buildRebasedPriceSeries(symbols.map((symbol) => ({
+    symbol,
+    bars: extractKlines(perSymbol[symbol]?.['market.kline'])
+      .filter((bar) => bar.close > 0)
+      .map(({ timestamp, close }) => ({ timestamp, close })),
+  })));
+
+  if (!rebased.comparable) {
+    return { commonStartTimestamp: null, series: Object.fromEntries(symbols.map((symbol) => [symbol, []])) };
+  }
+
+  return {
+    commonStartTimestamp: rebased.baseTimestamp,
+    series: Object.fromEntries(symbols.map((symbol) => [
+      symbol,
+      rebased.points.map(({ timestamp, values }) => ({
+        timestamp,
+        value: values[symbol] ?? null,
+      })),
+    ])),
   };
 }
 
