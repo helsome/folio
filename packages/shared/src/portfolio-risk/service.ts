@@ -12,9 +12,10 @@ import type {
   RiskSignal,
 } from '@finagent/core';
 import type { CapabilityExecutor, RunOutcome } from '../capabilities/executor.ts';
+import { isCalendarEventInWindow } from '../calendar/window.ts';
 
 const DAY_MS = 24 * 60 * 60 * 1000;
-const EARNINGS_HORIZON_MS = 7 * DAY_MS;
+const EARNINGS_HORIZON_DAYS = 7;
 /** `research.events` accepts at most 10 `--symbol` flags per run (see screening). */
 const CALENDAR_BATCH = 10;
 const NEWS_RECENT_MS = 7 * DAY_MS;
@@ -351,13 +352,12 @@ function buildUpcomingEarningsSignal(
   if (events.length === 0) return null;
 
   const symbols = new Set(allocation.map((a) => a.symbol.toUpperCase()));
-  const horizonEnd = nowMs + EARNINGS_HORIZON_MS;
   const matched = new Set<string>();
 
   for (const event of events) {
     if (!isEarningsEvent(event)) continue;
     const at = toEpochMs(event.date);
-    if (at === undefined || at < nowMs || at > horizonEnd) continue;
+    if (at === undefined || !isCalendarEventInWindow(event, at, nowMs, EARNINGS_HORIZON_DAYS)) continue;
     if (!event.symbol) continue;
     const symbol = event.symbol.trim().toUpperCase();
     if (symbols.has(symbol)) matched.add(symbol);
@@ -530,6 +530,8 @@ interface CalendarEvent {
   symbol?: string;
   type?: string;
   date?: string | number;
+  localDate?: string;
+  market?: string;
 }
 
 function isPortfolioSnapshot(value: unknown): value is PortfolioSnapshot {
