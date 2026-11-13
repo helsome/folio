@@ -1,5 +1,6 @@
 import type { CapabilityProvenance, CapabilityRunStatus } from './capability.ts';
 import type { SupportedLocale } from './locale.ts';
+import type { DocumentEvidence, ResearchSourceType } from './research-document.ts';
 import type { StrategyId } from './strategy.ts';
 
 /**
@@ -27,6 +28,10 @@ export type ResearchVerdict = 'positive' | 'negative' | 'neutral' | 'unavailable
  * underlying fact. LLM prose is never the source of truth — evidence is.
  */
 export interface EvidenceRef {
+  documentId?: string;
+  sourceType?: ResearchSourceType;
+  canonicalUrl?: string;
+  documentEvidence?: DocumentEvidence[];
   capabilityId: string;
   /** CapabilityRunRecord.id of the run this evidence comes from. */
   runId: string;
