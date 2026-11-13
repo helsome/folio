@@ -2,12 +2,12 @@ import { mkdtemp, rm } from 'node:fs/promises'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { afterEach, beforeEach, describe, expect, it } from 'bun:test'
-import type { Kline } from '@finagent/core'
+import type { Kline, ResearchOutcome } from '@finagent/core'
 import { JsonFileStore } from '../storage/json-file-store.ts'
 import { HORIZON_MS } from './engine.ts'
 import { OutcomeRepository } from './repository.ts'
 import { OutcomeService } from './service.ts'
-import { dailyBars, makeOpinion, makeReport, NOW_MS } from './test-helpers.ts'
+import { dailyBars, makeBareReport, makeOpinion, makeReport, NOW_MS } from './test-helpers.ts'
 
 let dir = ''
 let repository: OutcomeRepository
@@ -129,6 +129,81 @@ describe('OutcomeService.evaluateDue', () => {
     const outcomes = await service.evaluateDue(NOW_MS, fetcher)
     expect(outcomes).toHaveLength(3)
     expect(fetches).toBe(2)
+  })
+
+  it('persists each report opinion against its own window of one shared 200-bar history', async () => {
+    const dayMs = 24 * 60 * 60 * 1000
+    const olderCreatedAt = NOW_MS - 40 * dayMs
+    const newerCreatedAt = olderCreatedAt + 5 * dayMs
+    let at = olderCreatedAt
+    const reportService = new OutcomeService({ repository, now: () => at })
+    const older = await reportService.createOpinionFromReport(makeBareReport({ id: 'older', symbol: 'AAPL.US' }))
+    at = newerCreatedAt
+    const newer = await reportService.createOpinionFromReport(makeBareReport({ id: 'newer', symbol: 'AAPL.US' }))
+    expect(older.entryPrice).toBeUndefined()
+    expect(newer.entryPrice).toBeUndefined()
+
+    const history = dailyBars(
+      olderCreatedAt / 1000 - 160 * 24 * 60 * 60,
+      Array.from({ length: 200 }, (_, index) => index < 160 ? 400 : index < 165 ? 100 : 200)
+    ).reverse()
+    const original = history.map((bar) => ({ ...bar }))
+    const fetchedSymbols: string[] = []
+    const outcomes = await reportService.evaluateDue(NOW_MS, async (symbol) => {
+      fetchedSymbols.push(symbol)
+      return history
+    })
+
+    expect(fetchedSymbols).toEqual(['AAPL.US'])
+    expect(outcomes).toHaveLength(2)
+    expect(history).toEqual(original)
+    // Read through a new repository: the real JSON file must contain both windows.
+    const reloaded = new OutcomeRepository(new JsonFileStore(dir))
+    const olderOutcome = await reloaded.getOutcomeByOpinionId(older.id)
+    const newerOutcome = await reloaded.getOutcomeByOpinionId(newer.id)
+    expect(olderOutcome?.entryPrice).toBe(100)
+    expect(olderOutcome?.exitPrice).toBe(200)
+    expect(olderOutcome?.returnPercent).toBe(100)
+    expect(olderOutcome?.maximumDrawdown).toBe(0)
+    expect(newerOutcome?.entryPrice).toBe(200)
+    expect(newerOutcome?.exitPrice).toBe(200)
+    expect(newerOutcome?.returnPercent).toBe(0)
+    expect(newerOutcome?.maximumDrawdown).toBe(0)
+    expect(olderOutcome?.outcomeEngineVersion).toBe('1.0.1')
+    expect(newerOutcome?.outcomeEngineVersion).toBe('1.0.1')
+    expect((await reloaded.getOpinion(older.id))?.entryPrice).toBeUndefined()
+    expect((await reloaded.getOpinion(newer.id))?.entryPrice).toBeUndefined()
+    expect(await reloaded.listDueOpinions(NOW_MS)).toEqual([])
+  })
+
+  it('keeps an already recorded legacy outcome instead of re-evaluating it with the new engine', async () => {
+    const opinion = dueOpinion('legacy', 'AAPL.US', { entryPrice: undefined })
+    const legacy: ResearchOutcome = {
+      id: `outcome-${opinion.id}`,
+      opinionId: opinion.id,
+      horizon: opinion.horizon,
+      evaluatedAt: NOW_MS - 100,
+      entryPrice: 40,
+      exitPrice: 100,
+      returnPercent: 150,
+      directionCorrect: true,
+      maximumDrawdown: 0,
+      status: 'evaluated',
+      outcomeEngineVersion: '1.0.0',
+    }
+    await repository.saveOpinion(opinion)
+    await repository.saveOutcome(legacy)
+    let fetches = 0
+
+    const outcomes = await service.evaluateDue(NOW_MS, async () => {
+      fetches += 1
+      return barsForDue([100, 100])
+    })
+
+    expect(outcomes).toEqual([])
+    expect(fetches).toBe(0)
+    const reloaded = new OutcomeRepository(new JsonFileStore(dir))
+    expect(await reloaded.getOutcomeByOpinionId(opinion.id)).toEqual(legacy)
   })
 
   it('does not evaluate opinions that are not due yet', async () => {

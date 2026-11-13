@@ -53,7 +53,7 @@ export interface ResearchOutcome {
   outcomeEngineVersion: string;
 }
 
-export const OUTCOME_ENGINE_VERSION = '1.0.0';
+export const OUTCOME_ENGINE_VERSION = '1.0.1';
 
 /** Below this sample count, performance views show Observational Only (spec §38). */
 export const MIN_EVALUATED_SAMPLES = 30;

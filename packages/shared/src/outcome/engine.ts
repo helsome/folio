@@ -129,12 +129,12 @@ function unable(
  * Evaluates one opinion against post-creation price history.
  *
  * Entry resolution (documented): `opinion.entryPrice` when snapshotted at
- * creation; otherwise the FIRST history close anchors the entry — never a
- * backfilled quote. Exit is the close of the last bar at-or-before the
+ * creation; otherwise the FIRST in-window close anchors the entry — never a
+ * backfilled quote. The window includes creation and horizon end timestamps.
+ * Exit is the close of the last in-window bar at-or-before the
  * horizon end; when the series is shorter than the horizon, the last
  * available close stands in (an honest measurement of the observable window).
- * When no bar reaches the horizon end at all, the series does not overlap the
- * committed window and the outcome is `unable`/`delisted`.
+ * When no bar overlaps the committed window, the outcome is `unable`/`delisted`.
  */
 export class OutcomeEngine {
   evaluate(
@@ -156,29 +156,24 @@ export class OutcomeEngine {
       )
     }
 
-    const bars = [...history].sort((a, b) => barMs(a) - barMs(b))
+    const end = horizonEndMs(opinion)
+    // A fetch can contain earlier prices and can be shared by several opinions.
+    // Filter into a new array before sorting so each opinion gets its own window.
+    const bars = history
+      .filter((bar) => barMs(bar) >= opinion.createdAt && barMs(bar) <= end)
+      .sort((a, b) => barMs(a) - barMs(b))
+    if (bars.length === 0) {
+      return unable(opinion, 'delisted', opinion.entryPrice, evaluatedAt, version)
+    }
 
-    // Entry: opinion snapshot first, else the first available close.
+    // Entry: opinion snapshot first, else the first in-window close.
     const entry = opinion.entryPrice ?? bars[0].close
     if (typeof entry !== 'number' || !Number.isFinite(entry) || entry <= 0) {
       return unable(opinion, 'entry-unknown', entry, evaluatedAt, version)
     }
 
-    const end = horizonEndMs(opinion)
-
-    // Exit: last bar at-or-before the horizon end. If no bar reaches the
-    // horizon end, the data does not overlap the committed window — there is
-    // no honest exit price (spec §31 never fabricates).
-    let exitIndex = -1
-    for (let i = 0; i < bars.length; i += 1) {
-      if (barMs(bars[i]) <= end) exitIndex = i
-    }
-    if (exitIndex === -1) {
-      return unable(opinion, 'delisted', entry, evaluatedAt, version)
-    }
-
-    const exit = bars[exitIndex].close
-    const windowCloses = bars.slice(0, exitIndex + 1).map((bar) => bar.close)
+    const exit = bars[bars.length - 1].close
+    const windowCloses = bars.map((bar) => bar.close)
     const returnPercent = ((exit - entry) / entry) * 100
 
     const outcome: ResearchOutcome = {
