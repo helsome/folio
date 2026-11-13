@@ -1,5 +1,6 @@
 import { compareSymbolsAtom } from './compareAtoms';
-import { atom } from 'jotai';
+import { atom, type SetStateAction } from 'jotai';
+import { researchSelectionAtom } from './researchSelectionAtoms';
 import type { WorkspaceContext, WorkspaceView } from '@finagent/core';
 import { persistedAtom } from '../lib/persistedPrefs';
 
@@ -12,7 +13,15 @@ import { persistedAtom } from '../lib/persistedPrefs';
 // ---------------------------------------------------------------------------
 
 /** The security the workspace is currently focused on (e.g. "NVDA.US"). */
-export const activeSymbolAtom = atom<string | null>(null);
+const activeSymbolValueAtom = atom<string | null>(null);
+export const activeSymbolAtom = atom(
+  (get) => get(activeSymbolValueAtom),
+  (get, set, next: SetStateAction<string | null>) => {
+    const symbol = typeof next === 'function' ? next(get(activeSymbolValueAtom)) : next;
+    if (get(researchSelectionAtom)?.symbol !== symbol) set(researchSelectionAtom, null);
+    set(activeSymbolValueAtom, symbol);
+  }
+);
 
 /** Which workspace view is visible: security views or app sections. */
 export const activeViewAtom = atom<WorkspaceView>('overview');

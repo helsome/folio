@@ -12,7 +12,7 @@ import { unwrapIpcResult } from '../client/unwrap';
 
 export interface ResearchDiffState {
   loading: boolean;
-  /** The latest diff for the rendered symbol; null when no previous report exists. */
+  /** The selected report's diff; null when no matching comparison is available. */
   diff: ResearchDiff | null;
 }
 
@@ -21,7 +21,7 @@ export const researchDiffAtom = atom<ResearchDiffState>({ loading: false, diff: 
 /** Minimal shape of the electron API surface we consume. */
 interface DiffElectronApi {
   research?: {
-    getDiff?: (input: { symbol: string }) => Promise<unknown>;
+    getDiff?: (input: { symbol: string; reportId?: string }) => Promise<unknown>;
   };
 }
 
@@ -31,15 +31,15 @@ function api(): DiffElectronApi['research'] {
 }
 
 /**
- * Fetch the latest diff for a symbol. Returns undefined when unwired or when
- * the symbol has no previous report (the What Changed section then hides).
+ * Fetch a report's comparison, or the latest report when no id is supplied.
+ * Returns undefined when the channel or matching comparison is unavailable.
  */
-export async function loadResearchDiff(symbol: string): Promise<ResearchDiff | undefined> {
+export async function loadResearchDiff(symbol: string, reportId?: string): Promise<ResearchDiff | undefined> {
   try {
     const research = api();
     if (!research?.getDiff) return undefined;
     return (
-      unwrapIpcResult<ResearchDiff | undefined>(await research.getDiff({ symbol: symbol.toUpperCase() })) ??
+      unwrapIpcResult<ResearchDiff | undefined>(await research.getDiff({ symbol: symbol.toUpperCase(), reportId })) ??
       undefined
     );
   } catch {

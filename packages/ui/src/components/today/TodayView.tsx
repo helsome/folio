@@ -23,7 +23,7 @@ import { watchlistQuotesAreDemoAtom } from '../../atoms/quoteAtoms'
 import { demoCalendarEvents } from '../../demo/demoData'
 import { DemoBadge } from '../primitives/DemoBadge'
 import { analyzePortfolioRiskAtom } from '../../atoms/portfolioRiskAtoms'
-import { loadSymbolReports } from '../../atoms/researchAtoms'
+import { loadSymbolReports, selectedReportIdAtom } from '../../atoms/researchAtoms'
 import { loadTheses } from '../../client/thesis'
 import { useFinagentClient, type FinagentClient } from '../../client'
 import { formatMoney, formatPercent } from '../../lib/money'
@@ -85,6 +85,7 @@ export const TodayView: React.FC = () => {
   const heatmapSource = React.useMemo(() => watchlistHeatmapSource(watchlist), [watchlist])
 
   const setActiveSymbol = useSetAtom(activeSymbolAtom)
+  const setSelectedReportId = useSetAtom(selectedReportIdAtom)
   const setNavSection = useSetAtom(navSectionAtom)
   const setResearchOrigin = useSetAtom(researchOriginAtom)
   const fetchPortfolio = useSetAtom(fetchPortfolioAtom)
@@ -294,6 +295,7 @@ export const TodayView: React.FC = () => {
               type="button"
               onClick={() => {
                 setActiveSymbol(report.symbol)
+                setSelectedReportId(report.id)
                 setResearchOrigin({ from: 'today', label: t('today.continueLabel') })
                 setNavSection('research')
               }}

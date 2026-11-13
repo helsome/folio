@@ -15,6 +15,7 @@ const evidenceRefSchema = z.object({
 export const thesisSchema = z.object({
   id: z.string(),
   symbol: z.string(),
+  sourceReportId: z.string().optional(),
   stance: z.enum(['bullish', 'bearish', 'neutral']),
   summary: z.string(),
   bullCase: z.array(z.string()),
@@ -43,6 +44,7 @@ export function reportToThesis(
   return {
     id: idGen(),
     symbol: report.symbol,
+    sourceReportId: report.id,
     stance: report.stance as ThesisStance,
     summary: report.summary,
     bullCase: [...report.bullCase],

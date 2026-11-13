@@ -1,8 +1,7 @@
 import React, { useEffect, useState } from 'react';
-import { useAtom } from 'jotai';
 import { useTranslation } from 'react-i18next';
 import type { ResearchReport, ResearchSection } from '@finagent/core';
-import { loadResearchDiff, researchDiffAtom } from '../../atoms/diffAtoms';
+import { loadResearchDiff, type ResearchDiffState } from '../../atoms/diffAtoms';
 import { loadResearchReport } from '../../atoms/researchAtoms';
 import { EvidenceList } from './EvidenceList';
 import { ExportMenu } from './ExportMenu';
@@ -29,22 +28,23 @@ export const ResearchReportView: React.FC<{
 }> = ({ report, nextAction }) => {
   const { t } = useTranslation();
   const confidence = Math.round(report.confidence * 100);
-  const [diffState, setDiffState] = useAtom(researchDiffAtom);
+  const [diffState, setDiffState] = useState<ResearchDiffState>({ loading: true, diff: null });
   const [previousReport, setPreviousReport] = useState<ResearchReport | null>(null);
+  const currentDiff = diffState.diff?.symbol === report.symbol && diffState.diff.currentReportId === report.id
+    ? diffState.diff : null;
 
-  // Fetch the latest diff for this symbol; when a previous report exists the
-  // What Changed section renders. Degrades to a hidden section when the
-  // research:getDiff channel is unwired or the symbol has no history.
+  // Fetch the selected report's diff; unavailable comparisons remain explicit.
   useEffect(() => {
     let alive = true;
     setDiffState({ loading: true, diff: null });
     setPreviousReport(null);
-    void loadResearchDiff(report.symbol).then((diff) => {
+    void loadResearchDiff(report.symbol, report.id).then((loaded) => {
       if (!alive) return;
+      const diff = loaded?.symbol === report.symbol && loaded.currentReportId === report.id ? loaded : undefined;
       setDiffState({ loading: false, diff: diff ?? null });
       if (diff) {
         void loadResearchReport(diff.previousReportId).then((prev) => {
-          if (alive && prev) setPreviousReport(prev);
+          if (alive && prev?.symbol === report.symbol && prev.id === diff.previousReportId) setPreviousReport(prev);
         });
       }
     });
@@ -88,11 +88,16 @@ export const ResearchReportView: React.FC<{
         {nextAction}
       </div>
 
-      {diffState.diff && (
+      {currentDiff ? (
         <WhatChangedSection
-          diff={diffState.diff}
-          previousReport={previousReport ?? undefined}
+          diff={currentDiff}
+          previousReport={previousReport?.id === currentDiff.previousReportId ? previousReport : undefined}
         />
+      ) : !diffState.loading && (
+        <section className="rounded-[10px] border mac-list-row p-4" data-testid="what-changed-unavailable">
+          <h4 className="text-[11px] font-semibold uppercase tracking-wide text-foreground">{t('research.whatChanged')}</h4>
+          <p className="mt-3 text-[12px] text-text-muted">{t('research.noReportDiff')}</p>
+        </section>
       )}
 
       <div id="research-signals" className="folio-pilot-report-sections">
