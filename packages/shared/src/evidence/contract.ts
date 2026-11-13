@@ -92,6 +92,7 @@ export function projectFinancialEvidence(
           retrievedAt: envelope.retrievedAt,
           ...(resolvedAsOf !== undefined ? { asOf: resolvedAsOf } : {}),
           stale: envelope.stale,
+          ...(envelope.delayed !== undefined ? { delayed: envelope.delayed } : {}),
         },
         availability: 'available',
         provenance: {
@@ -100,6 +101,7 @@ export function projectFinancialEvidence(
           toolName: envelope.toolName,
           ...(envelope.capabilityId ? { capabilityId: envelope.capabilityId } : {}),
           provider: envelope.provider,
+          envelopeId: envelope.id,
         },
       });
     }
