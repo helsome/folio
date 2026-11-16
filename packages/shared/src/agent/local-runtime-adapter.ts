@@ -29,6 +29,7 @@ export class LocalRuntimeAdapter implements AgentRuntime {
   private readonly backend: LocalFinanceAgentBackend;
   private readonly now: () => number;
   private readonly abortedRunIds = new Set<string>();
+  private readonly activeControllers = new Map<string, AbortController>();
   private sequence = 0;
 
   constructor(options: LocalRuntimeAdapterOptions = {}) {
@@ -54,18 +55,36 @@ export class LocalRuntimeAdapter implements AgentRuntime {
 
   async *run(input: AgentRunInput): AsyncIterable<AgentEvent> {
     this.sequence = 0;
-    const result = await this.backend.send({
-      sessionId: input.sessionId,
-      content: input.content,
-      ...(input.workspaceContext
-        ? { context: input.workspaceContext as unknown as Record<string, unknown> }
-        : {}),
-    });
-
+    const controller = new AbortController();
+    this.activeControllers.set(input.runId, controller);
     if (this.abortedRunIds.delete(input.runId)) {
+      controller.abort(new Error('Run cancelled by user.'));
+    }
+
+    let result: Awaited<ReturnType<LocalFinanceAgentBackend['send']>>;
+    try {
+      result = await this.backend.send({
+        sessionId: input.sessionId,
+        content: input.content,
+        signal: controller.signal,
+        ...(input.workspaceContext
+          ? { context: input.workspaceContext as unknown as Record<string, unknown> }
+          : {}),
+      });
+    } catch (error) {
+      if (!controller.signal.aborted) throw error;
       yield this.emit(input, 'run_failed', {
         error: { code: 'RUN_CANCELLED', message: 'Run cancelled by user.' },
       });
+      this.activeControllers.delete(input.runId);
+      return;
+    }
+
+    if (controller.signal.aborted) {
+      yield this.emit(input, 'run_failed', {
+        error: { code: 'RUN_CANCELLED', message: 'Run cancelled by user.' },
+      });
+      this.activeControllers.delete(input.runId);
       return;
     }
 
@@ -87,9 +106,15 @@ export class LocalRuntimeAdapter implements AgentRuntime {
     yield this.emit(input, 'message_delta', { delta: answer, answer });
     yield this.emit(input, 'message_completed', { answer });
     yield this.emit(input, 'run_completed', { answer, toolCalls });
+    this.activeControllers.delete(input.runId);
   }
 
   async cancel(input: { sessionId: string; runId: string }): Promise<void> {
+    const controller = this.activeControllers.get(input.runId);
+    if (controller) {
+      controller.abort(new Error('Run cancelled by user.'));
+      return;
+    }
     this.abortedRunIds.add(input.runId);
   }
 
