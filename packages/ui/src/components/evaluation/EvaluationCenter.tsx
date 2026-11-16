@@ -113,6 +113,23 @@ export const EvaluationCenter: React.FC = () => {
     [client, details]
   );
 
+  // Stable per-selection loaders. An inline arrow would change identity on every
+  // parent render, and the detail views re-run their load effect whenever
+  // `onLoadDetail` changes — which would issue duplicate IPC calls (and make the
+  // error/retry state non-deterministic). Keyed on the selection instead.
+  const loadSelectedExperimentDetail = useCallback(
+    () =>
+      selectedExperimentId
+        ? loadDetail(selectedExperimentId)
+        : Promise.resolve<EvaluationExperimentDetail | null>(null),
+    [loadDetail, selectedExperimentId]
+  );
+
+  const loadSelectedCaseDetail = useCallback(
+    () => (selectedCase ? loadDetail(selectedCase.experimentId) : Promise.resolve<EvaluationExperimentDetail | null>(null)),
+    [loadDetail, selectedCase]
+  );
+
   // All hooks must run before any conditional early return (React rules):
   // `selectedCase`/`selectedExperimentId` swap this component between the
   // list and the detail views, which must never change the hook count.
@@ -126,7 +143,7 @@ export const EvaluationCenter: React.FC = () => {
       <CaseDetail
         caseRef={selectedCase}
         detail={details[selectedCase.experimentId] ?? null}
-        onLoadDetail={() => void loadDetail(selectedCase.experimentId)}
+        onLoadDetail={loadSelectedCaseDetail}
         onBack={() => setSelectedCase(null)}
       />
     );
@@ -137,7 +154,7 @@ export const EvaluationCenter: React.FC = () => {
       <ExperimentDetail
         experimentId={selectedExperimentId}
         detail={details[selectedExperimentId] ?? null}
-        onLoadDetail={() => void loadDetail(selectedExperimentId)}
+        onLoadDetail={loadSelectedExperimentDetail}
         onBack={() => setSelectedExperimentId(null)}
         onOpenCase={openCase}
       />

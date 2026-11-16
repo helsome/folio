@@ -61,13 +61,16 @@ function resultType(toolCall: EvaluationRun['toolCalls'][number]): string {
 export const CaseDetail: React.FC<{
   caseRef: CaseRef;
   detail: EvaluationExperimentDetail | null;
-  onLoadDetail: () => void;
+  onLoadDetail: () => Promise<EvaluationExperimentDetail | null>;
   onBack: () => void;
 }> = ({ caseRef, detail, onLoadDetail, onBack }) => {
   const { t } = useTranslation();
   const client = useFinagentClient();
-  const [loading, setLoading] = useState(false);
+  // `detail === null` at mount means a load is required: start in the loading
+  // state so the error view can never flash before the first request settles.
+  const [loading, setLoading] = useState(detail === null);
   const [error, setError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
   const [caseDef, setCaseDef] = useState<EvaluationCase | null>(null);
   const [feedback, setFeedback] = useState<'good' | 'bad' | null>(null);
   const [note, setNote] = useState('');
@@ -79,13 +82,26 @@ export const CaseDetail: React.FC<{
 
   useEffect(() => {
     if (detail) return;
+    let cancelled = false;
     setLoading(true);
     setError(null);
     void (async () => {
-      await onLoadDetail();
+      let loaded: EvaluationExperimentDetail | null = null;
+      try {
+        // The parent keeps the real async contract: its promise settles only
+        // once the IPC call has completed (success *or* failure).
+        loaded = await onLoadDetail();
+      } catch {
+        loaded = null;
+      }
+      if (cancelled) return;
+      if (!loaded) setError(t('evaluation.caseError', { id: caseRef.caseId }));
       setLoading(false);
     })();
-  }, [detail, onLoadDetail]);
+    return () => {
+      cancelled = true;
+    };
+  }, [detail, caseRef.caseId, loadAttempt, onLoadDetail, t]);
 
   useEffect(() => {
     let cancelled = false;
@@ -143,7 +159,7 @@ export const CaseDetail: React.FC<{
     }
   };
 
-  if (loading || (detail === null && !error)) {
+  if (loading) {
     return (
       <div className="flex h-full flex-col bg-[#f6f8fb]" data-testid="case-detail">
         <div className="border-b border-[var(--mac-border)] bg-white px-5 py-3">
@@ -168,6 +184,13 @@ export const CaseDetail: React.FC<{
         </div>
         <div className="p-4 text-[12px] text-foreground/48">
           {error ?? t('evaluation.caseError', { id: caseRef.caseId })}
+          <button
+            type="button"
+            onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+            className="ml-2 text-accent underline underline-offset-2"
+          >
+            {t('evaluation.retry')}
+          </button>
         </div>
       </div>
     );

@@ -1,10 +1,22 @@
 import { afterAll, beforeAll, describe, expect, it } from 'bun:test';
 import React, { act } from 'react';
 import { createRoot } from 'react-dom/client';
-import type { AppPreferencesSnapshot } from '@finagent/core';
-import { fallbackClient, FinagentClientProvider, type EvaluationChannel, type FinagentClient } from '../../client';
+import type {
+  AppPreferencesSnapshot,
+  EvaluationExperiment,
+  EvaluationResultRecord,
+  EvaluationRun,
+} from '@finagent/core';
+import {
+  fallbackClient,
+  FinagentClientProvider,
+  type EvaluationChannel,
+  type EvaluationExperimentDetail,
+  type FinagentClient,
+} from '../../client';
 import { I18nProvider } from '../../i18n/I18nProvider';
 import { installHappyDom } from '../../test/setupHappyDom';
+import { CaseDetail } from './CaseDetail';
 import { EvaluationCenter } from './EvaluationCenter';
 import { EvaluationSettingsTab } from '../settings/EvaluationSettingsTab';
 import { TooltipProvider } from '../ui/tooltip';
@@ -235,6 +247,230 @@ describe('EvaluationSettingsTab error copy', () => {
       'your plan does not include this dataset',
     );
     expect(container.textContent ?? '').toContain('your plan does not include this dataset');
+    root.unmount();
+  });
+});
+
+// ── #396: failed detail loads must settle the spinner and show a retry ─────
+//
+// EvaluationCenter used to wrap `onLoadDetail` as `() => void loadDetail(...)`,
+// discarding the promise (and the failure). The children then awaited
+// `undefined`, cleared `error`, and `detail === null && !error` kept the
+// loading branch — spinner included — mounted forever. These cases pin the
+// real parent→child async completion contract: failure *and* a missing record
+// end the loading state with a recoverable error, success renders the detail.
+
+function experimentFixture(overrides: Partial<EvaluationExperiment> = {}): EvaluationExperiment {
+  return {
+    id: 'exp-1',
+    name: 'Smoke Experiment',
+    datasetId: 'smoke',
+    datasetVersion: '1',
+    status: 'completed',
+    mode: 'fixture',
+    config: { mode: 'fixture' },
+    metadata: { timestamp: 1 },
+    startedAt: 1,
+    completedAt: 2,
+    runIds: ['run-1'],
+    resultIds: ['res-1'],
+    summary: {
+      passRate: 1,
+      compositeScore: 1,
+      metricAggregates: [],
+      failureModes: [],
+      totalRuns: 1,
+      completedRuns: 1,
+      validity: 'valid',
+      execution: { requested: 1, started: 1, evaluated: 1, infraFailed: 0, skipped: 0 },
+      validityReasons: [],
+    },
+    ...overrides,
+  };
+}
+
+function runFixture(): EvaluationRun {
+  return {
+    id: 'run-1',
+    experimentId: 'exp-1',
+    caseId: 'case-1',
+    datasetId: 'smoke',
+    status: 'completed',
+    startedAt: 1,
+    completedAt: 2,
+    latencyMs: 5,
+    answer: 'recorded answer',
+    toolCalls: [],
+    failureModes: [],
+  };
+}
+
+function resultFixture(): EvaluationResultRecord {
+  return {
+    id: 'res-1',
+    runId: 'run-1',
+    experimentId: 'exp-1',
+    caseId: 'case-1',
+    scores: [],
+    failureModes: [],
+    verdict: 'pass',
+  };
+}
+
+function experimentDetailFixture(): EvaluationExperimentDetail {
+  return { experiment: experimentFixture(), runs: [runFixture()], results: [resultFixture()] };
+}
+
+function clientWithDetail(getExperiment: EvaluationChannel['getExperiment']): FinagentClient {
+  return {
+    ...fallbackClient,
+    evaluation: {
+      ...fallbackClient.evaluation,
+      listExperiments: async () => ({ ok: true, data: [experimentFixture()] }),
+      listBaselines: async () => ({ ok: true, data: [] }),
+      getExperiment,
+    } as EvaluationChannel,
+  };
+}
+
+async function renderWithClient(client: FinagentClient, element: React.ReactElement) {
+  const container = document.createElement('div');
+  document.body.appendChild(container);
+  const root = createRoot(container);
+  await act(async () => {
+    root.render(
+      <FinagentClientProvider client={client}>
+        <I18nProvider>{element}</I18nProvider>
+      </FinagentClientProvider>
+    );
+  });
+  return { container, root };
+}
+
+/** Drain the IPC microtasks plus the effect/render passes they trigger. */
+async function flushDom(rounds = 4): Promise<void> {
+  for (let i = 0; i < rounds; i += 1) {
+    await act(async () => {
+      await new Promise((resolve) => setTimeout(resolve, 0));
+    });
+  }
+}
+
+function clickButton(container: HTMLElement, label: string): void {
+  const button = Array.from(container.querySelectorAll('button')).find(
+    (entry) => entry.textContent?.trim() === label
+  );
+  expect(button).toBeDefined();
+  button?.click();
+}
+
+function hasSpinner(container: HTMLElement): boolean {
+  return container.querySelector('[class*="animate-spin"]') !== null;
+}
+
+describe('EvaluationCenter detail loading (#396)', () => {
+  it('ends the experiment loading state and offers a retry when getExperiment fails', async () => {
+    let getExperimentCalls = 0;
+    const client = clientWithDetail(async () => {
+      getExperimentCalls += 1;
+      return {
+        ok: false,
+        error: { code: 'STORAGE_READ_FAILED', message: 'STORAGE_READ_FAILED: storage unavailable' },
+      };
+    });
+    const { container, root } = await renderWithClient(client, <EvaluationCenter />);
+    await flushDom();
+    await act(async () => {
+      clickButton(container, 'View Summary');
+    });
+    await flushDom();
+
+    const text = container.textContent ?? '';
+    expect(getExperimentCalls).toBe(1);
+    expect(text).toContain('Experiment exp-1 could not be loaded.');
+    expect(text).not.toContain('Loading experiment');
+    expect(hasSpinner(container)).toBe(false);
+
+    // The error is recoverable: retry re-issues the IPC call and settles again.
+    await act(async () => {
+      clickButton(container, 'Retry');
+    });
+    await flushDom();
+    expect(getExperimentCalls).toBe(2);
+    expect(container.textContent).toContain('Experiment exp-1 could not be loaded.');
+    expect(hasSpinner(container)).toBe(false);
+    root.unmount();
+  });
+
+  it('ends the loading state when getExperiment succeeds without a record', async () => {
+    const client = clientWithDetail(async () => ({ ok: true, data: undefined }));
+    const { container, root } = await renderWithClient(client, <EvaluationCenter />);
+    await flushDom();
+    await act(async () => {
+      clickButton(container, 'View Summary');
+    });
+    await flushDom();
+
+    expect(container.textContent).toContain('Experiment exp-1 could not be loaded.');
+    expect(hasSpinner(container)).toBe(false);
+    root.unmount();
+  });
+
+  it('renders the loaded experiment detail on success', async () => {
+    const client = clientWithDetail(async () => ({ ok: true, data: experimentDetailFixture() }));
+    const { container, root } = await renderWithClient(client, <EvaluationCenter />);
+    await flushDom();
+    await act(async () => {
+      clickButton(container, 'View Summary');
+    });
+    await flushDom();
+
+    expect(container.textContent).toContain('Smoke Experiment');
+    expect(container.querySelector('[data-testid="runs-table"]')).not.toBeNull();
+    expect(hasSpinner(container)).toBe(false);
+    root.unmount();
+  });
+});
+
+describe('CaseDetail loading (#396)', () => {
+  it('ends the loading state and offers a retry when the parent load returns null', async () => {
+    let loadCalls = 0;
+    // Hoisted on purpose so its identity is stable across provider re-renders:
+    // a fresh callback on every render would re-run the load effect and blur
+    // the retry count.
+    const onLoadDetail = async (): Promise<EvaluationExperimentDetail | null> => {
+      loadCalls += 1;
+      return null;
+    };
+    const container = document.createElement('div');
+    document.body.appendChild(container);
+    const root = createRoot(container);
+    await act(async () => {
+      root.render(
+        <FinagentClientProvider client={fallbackClient}>
+          <I18nProvider>
+            <CaseDetail
+              caseRef={{ experimentId: 'exp-1', caseId: 'case-1' }}
+              detail={null}
+              onLoadDetail={onLoadDetail}
+              onBack={() => undefined}
+            />
+          </I18nProvider>
+        </FinagentClientProvider>
+      );
+    });
+    await flushDom();
+
+    expect(container.textContent).toContain('Case case-1 could not be loaded.');
+    expect(hasSpinner(container)).toBe(false);
+
+    const callsBeforeRetry = loadCalls;
+    await act(async () => {
+      clickButton(container, 'Retry');
+    });
+    await flushDom();
+    expect(loadCalls).toBe(callsBeforeRetry + 1);
+    expect(container.textContent).toContain('Case case-1 could not be loaded.');
     root.unmount();
   });
 });

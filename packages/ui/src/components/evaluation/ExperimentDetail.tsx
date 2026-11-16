@@ -48,30 +48,46 @@ const STATUS_KEY: Record<string, string> = {
 export const ExperimentDetail: React.FC<{
   experimentId: string;
   detail: EvaluationExperimentDetail | null;
-  onLoadDetail: () => void;
+  onLoadDetail: () => Promise<EvaluationExperimentDetail | null>;
   onBack: () => void;
   onOpenCase: (caseRef: CaseRef) => void;
 }> = ({ experimentId, detail, onLoadDetail, onBack, onOpenCase }) => {
   const { t } = useTranslation();
   const client = useFinagentClient();
-  const [loading, setLoading] = useState(false);
+  // `detail === null` at mount means a load is required: start in the loading
+  // state so the error view can never flash before the first request settles.
+  const [loading, setLoading] = useState(detail === null);
   const [error, setError] = useState<string | null>(null);
+  const [loadAttempt, setLoadAttempt] = useState(0);
 
   useEffect(() => {
     if (detail) return;
+    let cancelled = false;
     setLoading(true);
     setError(null);
     void (async () => {
-      await onLoadDetail();
+      let loaded: EvaluationExperimentDetail | null = null;
+      try {
+        // The parent keeps the real async contract: its promise settles only
+        // once the IPC call has completed (success *or* failure).
+        loaded = await onLoadDetail();
+      } catch {
+        loaded = null;
+      }
+      if (cancelled) return;
+      if (!loaded) setError(t('evaluation.experimentError', { id: experimentId }));
       setLoading(false);
     })();
-  }, [detail, onLoadDetail]);
+    return () => {
+      cancelled = true;
+    };
+  }, [detail, experimentId, loadAttempt, onLoadDetail, t]);
 
   const openTrace = (url: string): void => {
     void client.openExternal?.(url);
   };
 
-  if (loading || (detail === null && !error)) {
+  if (loading) {
     return (
       <div className="flex h-full flex-col bg-[#f6f8fb]" data-testid="experiment-detail">
         <div className="border-b border-[var(--mac-border)] bg-white px-5 py-3">
@@ -96,6 +112,13 @@ export const ExperimentDetail: React.FC<{
         </div>
         <div className="rounded-[10px] border border-[var(--mac-border)] bg-white p-4 text-[12px] text-foreground/48 shadow-[0_1px_2px_rgba(15,23,42,0.035)]">
           {error ?? t('evaluation.experimentError', { id: experimentId })}
+          <button
+            type="button"
+            onClick={() => setLoadAttempt((attempt) => attempt + 1)}
+            className="ml-2 text-accent underline underline-offset-2"
+          >
+            {t('evaluation.retry')}
+          </button>
         </div>
       </div>
     );
