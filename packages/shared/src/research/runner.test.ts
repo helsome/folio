@@ -121,8 +121,8 @@ describe('ResearchRunner', () => {
         },
         {
           id: 'wire-copy',
-          title: 'NVIDIA announces quarterly results',
-          summary: 'NVIDIA reported quarterly revenue and guidance.',
+          title: 'NVIDIA management provides guidance',
+          summary: 'Management expects accelerating demand next quarter.',
           url: 'https://copy.test/nvidia-results',
           timestamp: 1_700_000_000,
           symbols: ['NVDA.US'],
@@ -132,6 +132,14 @@ describe('ResearchRunner', () => {
           title: 'NVIDIA quarterly report',
           summary: 'Official filing for NVIDIA quarterly results.',
           url: 'https://sec.gov/Archives/edgar/data/1/report',
+          timestamp: 1_700_000_000,
+          symbols: ['NVDA.US'],
+        },
+        {
+          id: 'wire-bridge',
+          title: 'Quarterly revenue bulletin',
+          summary: 'Management expects accelerating demand next quarter.',
+          url: 'https://reuters.com/technology/nvidia-results#top',
           timestamp: 1_700_000_000,
           symbols: ['NVDA.US'],
         },
@@ -177,8 +185,7 @@ describe('ResearchRunner', () => {
     };
     expect(newsBundle.trust).toBe('untrusted');
     expect(newsBundle.provider).toBe('test');
-    expect(selected).toHaveLength(2);
-    expect(selected[0].id).toBe('filing');
+    expect(selected.map((item) => item.id)).toEqual(['filing', 'wire']);
     expect(selected[0].sourceClass).toBe('regulator');
     expect(metadata.policyVersion).toBe('folio-retrieval-v1');
     expect(metadata.independentSourceCount).toBe(2);
@@ -189,6 +196,41 @@ describe('ResearchRunner', () => {
       selected: false,
       reason: 'duplicate_of:wire',
     });
+    expect(metadata.decisions).toContainEqual({
+      sourceId: 'wire-bridge',
+      originalRank: 3,
+      clusterId: expect.any(String),
+      selected: false,
+      reason: 'duplicate_of:wire',
+    });
+  });
+
+  it('keeps distinct news without URLs in the synthesis bundle', async () => {
+    const news = fakeCap('research.news');
+    news.execute = async () => ({
+      data: [
+        { id: 'a', title: 'First company revenue rises', url: '' },
+        { id: 'b', title: 'Second company faces lawsuit', url: '  ' },
+      ],
+      provenance: { provider: 'test', fetchedAt: 1, stale: false },
+    });
+    let observed: Record<string, unknown> = {};
+    const runner = new ResearchRunner({
+      registry: createCapabilityRegistry([news]),
+      synthesizer: {
+        async synthesize(input) {
+          observed = JSON.parse(input.dataBundle) as Record<string, unknown>;
+          return new LocalResearchSynthesizer().synthesize(input);
+        },
+      },
+    });
+
+    await runner.run({ symbol: 'NVDA.US', runId: 'news-without-urls' });
+
+    const bundle = observed['research.news'] as { items: Array<{ id: string }> };
+    const ranking = observed['research.news:ranking'] as { independentSourceCount: number };
+    expect(bundle.items.map((item) => item.id)).toEqual(['a', 'b']);
+    expect(ranking.independentSourceCount).toBe(2);
   });
 
   it('keeps malformed news payloads inside the untrusted envelope', async () => {

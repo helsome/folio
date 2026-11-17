@@ -35,14 +35,8 @@ export const fetchPortfolioAtom = atom(
     try {
       const result = await client.market.getPortfolio();
       if (!result.ok) {
-        const failure = portfolioFailureFromError(result.error);
-        set(portfolioCacheAtom, (cache) => ({
-          ...cache,
-          loading: false,
-          error: failure.message,
-          failure,
-        }));
-        throw new Error(failure.message);
+        // Preserve the IPC code so both returned and thrown failures use the same policy.
+        throw result.error;
       }
 
       const snapshot = result.data;
@@ -72,19 +66,19 @@ export const fetchPortfolioAtom = atom(
       });
       return snapshot;
     } catch (error) {
-      const message = error instanceof Error ? error.message : 'Failed to fetch portfolio';
-      // Provider unavailable (not connected / offline): fall back to the
-      // badged sample portfolio instead of an empty state.
-      const demo = demoPortfolioSnapshot();
+      const failure = portfolioFailureFromError(error);
+      // Keep the onboarding fallback, but never mask a failed live-data request.
+      const isDemo = failure.kind === 'not-connected' || failure.kind === 'no-account-permission';
+      const data = isDemo ? demoPortfolioSnapshot() : null;
       set(portfolioCacheAtom, {
-        data: demo,
-        failure: null,
-        isDemo: true,
-        timestamp: Date.now(),
+        data,
+        failure,
+        isDemo,
+        timestamp: data ? Date.now() : 0,
         loading: false,
-        error: message,
+        error: failure.message,
       });
-      return demo;
+      return data;
     }
   }
 );

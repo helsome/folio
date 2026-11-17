@@ -12,6 +12,7 @@ import { common as enCommon } from '../../../i18n/src/locales/en-US/common'
 import { navigation as enNavigation } from '../../../i18n/src/locales/en-US/navigation'
 import { today as enToday } from '../../../i18n/src/locales/en-US/today'
 import { discover as enDiscover } from '../../../i18n/src/locales/en-US/discover'
+import { compare as enCompare } from '../../../i18n/src/locales/en-US/compare'
 import { portfolio as enPortfolio } from '../../../i18n/src/locales/en-US/portfolio'
 import { events as enEvents } from '../../../i18n/src/locales/en-US/events'
 import { profile as enProfile } from '../../../i18n/src/locales/en-US/profile'
@@ -21,13 +22,14 @@ import { common as zhCommon } from '../../../i18n/src/locales/zh-CN/common'
 import { navigation as zhNavigation } from '../../../i18n/src/locales/zh-CN/navigation'
 import { today as zhToday } from '../../../i18n/src/locales/zh-CN/today'
 import { discover as zhDiscover } from '../../../i18n/src/locales/zh-CN/discover'
+import { compare as zhCompare } from '../../../i18n/src/locales/zh-CN/compare'
 import { portfolio as zhPortfolio } from '../../../i18n/src/locales/zh-CN/portfolio'
 import { events as zhEvents } from '../../../i18n/src/locales/zh-CN/events'
 import { profile as zhProfile } from '../../../i18n/src/locales/zh-CN/profile'
 import { demo as zhDemo } from '../../../i18n/src/locales/zh-CN/demo'
 import { agent as zhAgent } from '../../../i18n/src/locales/zh-CN/agent'
 
-const NAMESPACES = ['common', 'navigation', 'today', 'discover', 'portfolio', 'events', 'profile', 'demo', 'agent'] as const
+const NAMESPACES = ['common', 'navigation', 'today', 'discover', 'compare', 'portfolio', 'events', 'profile', 'demo', 'agent'] as const
 
 const resources = {
   'en-US': {
@@ -35,6 +37,7 @@ const resources = {
     navigation: enNavigation,
     today: enToday,
     discover: enDiscover,
+    compare: enCompare,
     portfolio: enPortfolio,
     events: enEvents,
     profile: enProfile,
@@ -46,6 +49,7 @@ const resources = {
     navigation: zhNavigation,
     today: zhToday,
     discover: zhDiscover,
+    compare: zhCompare,
     portfolio: zhPortfolio,
     events: zhEvents,
     profile: zhProfile,

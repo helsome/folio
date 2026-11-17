@@ -3,7 +3,8 @@ import { useTranslation } from 'react-i18next';
 import type { PortfolioImportDraft, PortfolioImportRow } from '@finagent/core';
 import { Button } from '../primitives/Button';
 import { Input } from '../primitives/Input';
-import { formatCurrency, formatNumber } from '@finagent/i18n';
+import { formatCurrency } from '@finagent/i18n';
+import { formatQuantity } from '../../lib/money';
 
 /**
  * Draft review step of the portfolio import flow (spec §47–48).
@@ -46,7 +47,7 @@ function RowLine({ row }: { row: PortfolioImportRow }) {
       <td className="py-2 pr-3 text-[12px] font-semibold text-foreground">{row.symbol || '—'}</td>
       <td className="py-2 pr-3 text-[12px] text-foreground/60">{row.name ?? '—'}</td>
       <td className="py-2 pr-3 text-right text-[12px] text-foreground/80">
-        {formatNumber(row.quantity, undefined, { maximumFractionDigits: 0 })}
+        {formatQuantity(row.quantity)}
       </td>
       <td className="py-2 pr-3 text-right text-[12px] text-foreground/80">
         {formatCurrency(row.costPrice, row.currency)}

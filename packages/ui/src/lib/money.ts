@@ -60,9 +60,13 @@ export function formatPercent(value: number | undefined): string {
   return formatPercentI18n(value)
 }
 
-/** Share quantity as a grouped integer; undefined → em dash. */
+/** Share quantity with fractional precision; undefined → em dash. */
 export function formatQuantity(value: number | undefined): string {
-  return formatNumber(value, undefined, { maximumFractionDigits: 0 })
+  // Keep sub-precision holdings nonzero without rendering hundreds of zeroes.
+  if (value !== undefined && value !== 0 && Math.abs(value) < 1e-20) {
+    return formatNumber(value, undefined, { notation: 'scientific', maximumSignificantDigits: 21 })
+  }
+  return formatNumber(value, undefined, { maximumSignificantDigits: 21 })
 }
 
 /**

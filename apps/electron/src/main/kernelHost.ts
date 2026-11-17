@@ -94,6 +94,8 @@ import {
   JsonFileStore,
   LocalResearchSynthesizer,
   MarketDataService,
+  HeatmapService,
+  parseHeatmapSource,
   MassiveFinancialDataProvider,
   YahooChartFinancialDataProvider,
   parseImpactJson,
@@ -247,6 +249,13 @@ const OBSERVABILITY_EXPERIMENT_ID = '__observability__';
  */
 const RUN_CANCELLED_CODE = 'RUN_CANCELLED';
 
+/**
+ * Maximum symbols one comparison covers. Matches the Compare workspace picker
+ * (`withComparisonSymbols` in `packages/ui/src/atoms/compareAtoms.ts`), so the
+ * IPC boundary rejects oversized sets instead of rendering an unbounded table.
+ */
+const COMPARE_MAX_SYMBOLS = 4;
+
 interface PendingEvalRun {
   sessionId: string;
   startedAt: number;
@@ -266,6 +275,7 @@ interface PendingEvalRun {
  */
 export class AgentKernelHost {
   private readonly marketData: MarketDataService;
+  private readonly heatmapRequests = new Map<string, AbortController>();
   private readonly kernel: AgentKernel;
   private readonly credentials: CredentialStore;
   private readonly skillHub: SkillHub;
@@ -283,7 +293,7 @@ export class AgentKernelHost {
   private readonly automationRules: AutomationRuleRepository;
   private readonly automationRuns: AutomationRunRepository;
   private automationTimer: ReturnType<typeof setInterval> | null = null;
-  private readonly lastAutomationRunByRule = new Map<string, string>();
+  private readonly claimedAutomationOccurrenceByRule = new Map<string, string>();
   private readonly thesisRepository: ThesisRepository;
   private readonly thesisService: ThesisService;
   private readonly alertRepository: AlertRuleRepository;
@@ -610,6 +620,29 @@ export class AgentKernelHost {
     return this.marketData.getQuote(requireString(symbol, 'symbol').toUpperCase());
   }
 
+  async getHeatmap(input: unknown, owner: number) {
+    const request = requireObject(input);
+    const requestId = requireString(request.requestId, 'requestId');
+    if (requestId.length > 128) throw new Error('Invalid heatmap request id.');
+    const source = parseHeatmapSource(request.source);
+    const key = `${owner}:${requestId}`;
+    this.heatmapRequests.get(key)?.abort();
+    const controller = new AbortController();
+    this.heatmapRequests.set(key, controller);
+    try {
+      return await new HeatmapService({
+        marketData: this.marketData,
+        resolve: (query) => this.instrumentResolver.resolve(query),
+      }).load(source, controller.signal);
+    } finally {
+      if (this.heatmapRequests.get(key) === controller) this.heatmapRequests.delete(key);
+    }
+  }
+
+  cancelHeatmap(requestId: unknown, owner: number) {
+    this.heatmapRequests.get(`${owner}:${requireString(requestId, 'requestId')}`)?.abort();
+  }
+
   getKline(input: unknown) {
     const request = requireObject(input);
     const payload: KlineRequest = {
@@ -798,9 +831,26 @@ export class AgentKernelHost {
     if (!Array.isArray(request.symbols) || request.symbols.length < 2) {
       throw createCodeError('INVALID_ARGUMENT', 'Compare needs at least two symbols.');
     }
-    const symbols = request.symbols.map((entry) =>
-      requireString(entry, 'symbols[]').toUpperCase()
-    );
+    const symbols: string[] = [];
+    const seenInstruments = new Set<string>();
+    for (const entry of request.symbols) {
+      const symbol = requireString(entry, 'symbols[]').trim().toUpperCase();
+      // Aliases of one canonical instrument (AAPL vs AAPL.US) are the same
+      // listing; keep the first spelling so the table never shows duplicate
+      // columns. Unresolvable symbols dedupe on their exact spelling only.
+      const resolution = this.instrumentResolver.resolve(symbol);
+      const identity =
+        resolution.status === 'resolved' ? resolution.instrument.instrumentId : symbol;
+      if (seenInstruments.has(identity)) continue;
+      seenInstruments.add(identity);
+      symbols.push(symbol);
+    }
+    if (symbols.length < 2) {
+      throw createCodeError('INVALID_ARGUMENT', 'Compare needs at least two distinct symbols.');
+    }
+    if (symbols.length > COMPARE_MAX_SYMBOLS) {
+      throw createCodeError('INVALID_ARGUMENT', 'Compare supports at most four symbols.');
+    }
     return buildComparison(symbols, this.registry, { executor: this.executor });
   }
 
@@ -2410,13 +2460,14 @@ export class AgentKernelHost {
       const now = Date.now();
       const todayKey = new Date(now).toDateString();
       for (const rule of runDue(rules, now)) {
-        if (this.lastAutomationRunByRule.get(rule.id) === todayKey) continue;
+        if (this.claimedAutomationOccurrenceByRule.get(rule.id) === todayKey) continue;
+        this.claimedAutomationOccurrenceByRule.set(rule.id, todayKey);
         try {
+          if (!(await this.automationRuns.claimScheduledOccurrence(rule.id, todayKey))) continue;
           const run = await this.executeAutomation(rule);
           await this.automationRuns.record(run);
-          this.lastAutomationRunByRule.set(rule.id, todayKey);
         } catch {
-          // A failing rule never blocks the other rules.
+          // The occurrence remains claimed; retry on its next scheduled date.
         }
       }
     } catch {
@@ -2624,6 +2675,8 @@ export class AgentKernelHost {
   }
 
   async dispose() {
+    for (const controller of this.heatmapRequests.values()) controller.abort();
+    this.heatmapRequests.clear();
     this.alertEngine.stop();
     this.unsubscribe?.();
     this.unsubscribe = null;

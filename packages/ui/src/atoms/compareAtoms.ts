@@ -1,5 +1,9 @@
 import { atom } from 'jotai';
 import type { Comparison } from '@finagent/core';
+import {
+  DEFAULT_COMPARE_VIEW_SETTINGS,
+  type CompareViewSettings,
+} from '../lib/compareViewState';
 
 /**
  * Symbols the Compare workspace is focused on (2–4). This is the single source
@@ -7,6 +11,9 @@ import type { Comparison } from '@finagent/core';
  * cite exactly what is being compared.
  */
 export const compareSymbolsAtom = atom<string[]>([]);
+
+/** Display settings for the current comparison; saved views persist a copy. */
+export const compareViewSettingsAtom = atom<CompareViewSettings>(DEFAULT_COMPARE_VIEW_SETTINGS);
 
 export interface ComparisonState {
   data: Comparison | null;

@@ -47,9 +47,9 @@ const RATING_LABELS: Record<string, string> = {
 };
 
 /**
- * Canonical data contracts consumed from the phase-2 manifests. Absent fields
- * degrade to missing cells; the Longbridge expansion (B) aligns its normalized
- * shapes to these field names.
+ * Financial metrics shown in the table, in percent. Legacy flat payloads use
+ * these names; live FinancialReport payloads supply statement accounts instead.
+ * Absent fields degrade to missing cells.
  */
 interface FinancialReportData {
   revenueGrowth?: number; // % YoY
@@ -173,7 +173,9 @@ function buildRows(
     const quote = isRecord(data['market.quote']) ? data['market.quote'] : undefined;
     const valuation = isRecord(data['company.valuation']) ? data['company.valuation'] : undefined;
     const financials = extractFinancials(data['company.financials']);
-    const dividendYield = extractDividendYield(data['company.dividends']);
+    // Valuation supplies dividend yield in percent, including an explicit zero.
+    const dividendYield = toFiniteNumber(valuation?.dpsRate)
+      ?? extractDividendYield(data['company.dividends']);
     const klines = extractKlines(data['market.kline']);
     const rating = extractRatingLabel(data['company.ratings']);
 
@@ -220,11 +222,47 @@ function row(metric: string): ComparisonRow {
 
 function extractFinancials(data: unknown): FinancialReportData {
   if (!isRecord(data)) return {};
+  const statements = isRecord(data.statements) ? data.statements : undefined;
+  const income = isRecord(statements?.IS) ? statements.IS : undefined;
+  if (income) {
+    const accounts = Array.isArray(income.indicators)
+      ? income.indicators.flatMap((indicator) =>
+          isRecord(indicator) && Array.isArray(indicator.accounts)
+            ? indicator.accounts.filter(isRecord)
+            : []
+        )
+      : [];
+    return {
+      revenueGrowth: latestFinancialMetric(accounts, 'OperatingRevenue', 'yoy'),
+      grossMargin: latestFinancialMetric(accounts, 'GrossMgn', 'value'),
+      roe: latestFinancialMetric(accounts, 'ROE', 'value'),
+    };
+  }
   return {
     revenueGrowth: toFiniteNumber(data.revenueGrowth),
     grossMargin: toFiniteNumber(data.grossMargin),
     roe: toFiniteNumber(data.roe),
   };
+}
+
+/** Use the newest reported period, even when its metric is unavailable. */
+function latestFinancialMetric(
+  accounts: Record<string, unknown>[],
+  field: string,
+  metric: 'value' | 'yoy'
+): number | undefined {
+  const periods: Array<{ fpEnd: number; entry: Record<string, unknown> }> = [];
+  for (const account of accounts) {
+    if (account.field !== field || !Array.isArray(account.values)) continue;
+    for (const entry of account.values) {
+      if (!isRecord(entry)) continue;
+      const fpEnd = toFiniteNumber(entry.fpEnd);
+      if (fpEnd !== undefined) periods.push({ fpEnd, entry });
+    }
+  }
+  const latest = periods.sort((a, b) => b.fpEnd - a.fpEnd)[0]?.entry;
+  // Only an explicit YoY is comparable here; adjacent periods may be quarters.
+  return toFiniteNumber(latest?.[metric]);
 }
 
 function extractDividendYield(data: unknown): number | undefined {

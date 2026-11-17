@@ -201,13 +201,9 @@ function latestAccountYoy(accounts: ReportAccount[], field: string): number | un
   const account = accounts.find((entry) => entry.field === field)
   if (!account) return undefined
   const latest = account.values[0]
-  if (latest?.yoy !== undefined) return latest.yoy
-  // yoy missing on the newest period → compute from the two most recent values.
-  const [newest, previous] = account.values
-  if (newest?.value !== undefined && previous?.value !== undefined && previous.value !== 0) {
-    return ((newest.value - previous.value) / previous.value) * 100
-  }
-  return undefined
+  // Adjacent reports may be consecutive quarters, not matching years. Only
+  // the latest period's explicit YoY supports a year-over-year growth claim.
+  return latest?.yoy
 }
 
 /** ROE / revenue growth / margins from the normalized contract or the live statement. */

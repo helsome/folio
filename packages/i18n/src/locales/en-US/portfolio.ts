@@ -3,6 +3,24 @@ import type { NamespaceResource } from '../keys.ts';
 /** Portfolio slice (spec §31) — account summary, holdings, import, risk. */
 export const portfolio = {
   title: 'Portfolio',
+  heatmap: {
+    title: 'Watchlist / holdings heatmap', legend: 'Daily price change', size: 'Tile size',
+    equal: 'Equal', weighted: 'Market value', map: 'Heatmap', table: 'Table', refresh: 'Refresh heatmap',
+    loading: 'Loading market data…', empty: 'No instruments in this snapshot.', unknown: 'Unknown',
+    current: 'Current', stale: 'Stale', unknownIndustry: 'Unknown industry', instrument: 'Instrument',
+    industry: 'Industry', change: 'Today', weight: 'Weight', source: 'Source', status: 'Session / time',
+    market: 'Market', currency: 'Currency', asOf: 'Market time', delayed: 'Delayed',
+    excluded: 'Not mapped: {{symbols}}', unresolved: 'No canonical instrument match',
+    exclusions: {
+      short: 'Short position: listed in the table; excluded from long-only area and weights.',
+      currency: 'Missing base-currency valuation; portfolio area weighting is unavailable.',
+      'missing-value': 'Missing market value; portfolio area weighting is unavailable.',
+      zero: 'Zero exposure; listed in the table.',
+    },
+    baseCurrency: 'Area is proportional to long-only value in {{currency}}.',
+    snapshotMismatch: 'The watchlist or holdings changed during refresh. Reload the view.',
+    openResearch: 'Open company research', unavailable: 'Heatmap data is unavailable.',
+  },
   totalValue: 'Total Value',
   cash: 'Cash',
   today: 'Today',

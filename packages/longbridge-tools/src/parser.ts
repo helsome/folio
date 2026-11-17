@@ -509,7 +509,7 @@ export function parseFinancialReportResponse(output: string, fallbackSymbol = ''
             fpEnd: toEpochSeconds(v.fp_end) ?? 0,
             period: v.period ?? '',
             year: toOptionalNumber(v.year) ?? 0,
-            value: toOptionalNumber(v.value) ?? 0,
+            value: toOptionalNumber(v.value),
             ratio: v.ratio,
             yoy: v.yoy,
           })),

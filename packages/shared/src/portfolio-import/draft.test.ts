@@ -121,6 +121,21 @@ describe('rowsToHoldings', () => {
     const empty: PortfolioImportRow = { symbol: '', confidence: 0.3, issues: ['Missing symbol'] }
     expect(rowsToHoldings([partial, empty])).toEqual([{ symbol: 'TSLA.US', name: '' }])
   })
+
+  it('does not book trailing-percent quantity or cost and keeps the row for review', () => {
+    const rows = parsePaste('AAPL.US 100% 12.5%\nMSFT.US, 12.5%, 180.5')
+    const draft = createDraft('paste', rows)
+    expect(rowsToHoldings(rows)).toEqual([
+      { symbol: 'AAPL.US', name: '' },
+      { symbol: 'MSFT.US', name: '', costPrice: 180.5 },
+    ])
+    expect(draft.warnings).toContain('2 rows need review')
+    expect(validateDraft(draft)).toEqual([
+      'AAPL.US: Quantity "100%" needs confirmation',
+      'AAPL.US: Cost price "12.5%" needs confirmation',
+      'MSFT.US: Quantity "12.5%" needs confirmation',
+    ])
+  })
 })
 
 describe('draftToPortfolioInput', () => {
