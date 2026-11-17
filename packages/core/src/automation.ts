@@ -42,7 +42,12 @@ export interface AutomationScopeSnapshot {
   symbols: string[];
   /** When this run captured the scope. */
   capturedAt: number;
-  /** Source snapshot timestamp, when supplied by the portfolio provider. */
+  /**
+   * Epoch ms when the portfolio provider fetched this membership snapshot.
+   * The automation runner accepts it only when it falls on the same local
+   * calendar day as the run — a previous day's book cannot support
+   * `no_material_update`. Absent on non-portfolio scopes and on older runs.
+   */
   sourceFetchedAt?: number;
 }
 

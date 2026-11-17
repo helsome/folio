@@ -34,7 +34,17 @@ function quote(lastPrice: number, prevClose: number, symbol = 'AAPL.US'): Quote 
   }
 }
 
-function quoteCapability(quotes: Record<string, Quote>): FinanceCapability<{ symbol: string }, Quote> {
+interface QuoteProvenanceOverride {
+  stale?: boolean
+  delayed?: boolean
+  fetchedAt?: number
+  marketTime?: number
+}
+
+function quoteCapability(
+  quotes: Record<string, Quote>,
+  provenanceBySymbol: Record<string, QuoteProvenanceOverride> = {}
+): FinanceCapability<{ symbol: string }, Quote> {
   return defineCapability<{ symbol: string }, Quote>({
     id: 'market.quote',
     name: 'Quote',
@@ -47,9 +57,16 @@ function quoteCapability(quotes: Record<string, Quote>): FinanceCapability<{ sym
     async execute(input) {
       const found = quotes[input.symbol]
       if (!found) throw new Error(`no quote for ${input.symbol}`)
+      const override = provenanceBySymbol[input.symbol] ?? {}
       return {
         data: found,
-        provenance: { provider: 'test', fetchedAt: 1_700_000_000, stale: false },
+        provenance: {
+          provider: 'test',
+          fetchedAt: override.fetchedAt ?? 1_700_000_000,
+          stale: override.stale ?? false,
+          ...(override.delayed !== undefined ? { delayed: override.delayed } : {}),
+          ...(override.marketTime !== undefined ? { marketTime: override.marketTime } : {}),
+        },
         summary: `${found.symbol} ok`,
       }
     },
@@ -141,10 +158,13 @@ function makeContext(options: {
   diffs?: Record<string, ResearchDiff>
   events?: CalendarEvent[]
   rule?: AutomationRule
+  quoteProvenance?: Record<string, QuoteProvenanceOverride>
 }): ContextResult {
   const researchCalls: string[] = []
   const notifications: NotificationEvent[] = []
-  const caps: FinanceCapability[] = [quoteCapability(options.quotes ?? {})]
+  const caps: FinanceCapability[] = [
+    quoteCapability(options.quotes ?? {}, options.quoteProvenance),
+  ]
   if (options.events !== undefined) caps.push(eventsCapability(options.events))
   const registry = createCapabilityRegistry(caps)
 
@@ -217,7 +237,9 @@ describe('runAutomation scope resolution', () => {
     })
     context.portfolioSnapshot = async () => ({
       symbols: ['aapl.us', 'MSFT.US', 'AAPL.US', '  '],
-      fetchedAt: 1_699_999_000_000,
+      // Same instant as the run clock, so the same-local-day scope rule holds
+      // in every timezone (a fixed UTC pair 16min apart can straddle midnight).
+      fetchedAt: 1_700_000_000_000,
     })
 
     const run = await runAutomation(rule({ type: 'portfolio-daily-brief' }), context)
@@ -227,7 +249,7 @@ describe('runAutomation scope resolution', () => {
       kind: 'portfolio',
       symbols: ['AAPL.US', 'MSFT.US'],
       capturedAt: 1_700_000_000_000,
-      sourceFetchedAt: 1_699_999_000_000,
+      sourceFetchedAt: 1_700_000_000_000,
     })
     expect(run.evaluated).toBe(2)
     expect(run.failures).toEqual([])
@@ -239,7 +261,7 @@ describe('runAutomation scope resolution', () => {
     const { context } = makeContext({ quotes: { 'AAPL.US': quote(100, 100) } })
     context.portfolioSnapshot = async () => ({
       symbols: ['AAPL.US', 'MSFT.US'],
-      fetchedAt: 1_699_999_000_000,
+      fetchedAt: 1_700_000_000_000,
     })
 
     const run = await runAutomation(rule({ type: 'portfolio-daily-brief' }), context)
@@ -266,7 +288,7 @@ describe('runAutomation scope resolution', () => {
     const { context } = makeContext({ quotes: { 'AAPL.US': noBaseline } })
     context.portfolioSnapshot = async () => ({
       symbols: ['AAPL.US'],
-      fetchedAt: 1_699_999_000_000,
+      fetchedAt: 1_700_000_000_000,
     })
 
     const run = await runAutomation(rule({ type: 'portfolio-daily-brief' }), context)
@@ -280,7 +302,7 @@ describe('runAutomation scope resolution', () => {
     const { context } = makeContext({ quotes: { 'AAPL.US': quote(Number.NaN, 100) } })
     context.portfolioSnapshot = async () => ({
       symbols: ['AAPL.US'],
-      fetchedAt: 1_699_999_000_000,
+      fetchedAt: 1_700_000_000_000,
     })
 
     const run = await runAutomation(rule({ type: 'portfolio-daily-brief' }), context)
@@ -519,6 +541,167 @@ describe('runAutomation material filter', () => {
 
     expect(run.failures).toEqual(['AAPL.US: notification failed'])
     expect(run.outcome).toBe('no_material_update')
+  })
+})
+
+describe('runAutomation freshness (#185)', () => {
+  // Local noon on Tue 2023-11-14. Scope cases below build their own clock from
+  // this civil day so the boundary does not depend on the process timezone.
+  const ranAt = new Date(2023, 10, 14, 12, 0, 0, 0).getTime()
+
+  it('records a stale quote as an evaluation failure instead of no material change', async () => {
+    const { context, researchCalls } = makeContext({
+      quotes: { 'AAPL.US': quote(100, 100) },
+      quoteProvenance: {
+        'AAPL.US': { stale: true, fetchedAt: 1_700_000_000_000, marketTime: 1_700_000_000_000 },
+      },
+    })
+    context.watchlistSymbols = async () => ['AAPL.US']
+
+    const run = await runAutomation(rule({}), context)
+
+    expect(run.evaluated).toBe(1)
+    expect(run.materialChanges).toBe(0)
+    expect(run.failures).toEqual(['AAPL.US: quote stale'])
+    expect(run.outcome).toBe('incomplete')
+    expect(researchCalls).toEqual([])
+  })
+
+  it('stays incomplete when a large move comes from a stale quote', async () => {
+    const { context } = makeContext({
+      quotes: { 'AAPL.US': quote(110, 100) },
+      quoteProvenance: { 'AAPL.US': { stale: true, fetchedAt: 1_700_000_000_000 } },
+    })
+    context.watchlistSymbols = async () => ['AAPL.US']
+
+    const run = await runAutomation(rule({}), context)
+
+    expect(run.materialChanges).toBe(1)
+    expect(run.failures).toEqual(['AAPL.US: quote stale'])
+    expect(run.outcome).toBe('incomplete')
+  })
+
+  it('keeps a same-day portfolio snapshot on the no-change path', async () => {
+    // ~12h old, still this local civil day. Usable for today's brief.
+    const earlyToday = new Date(2023, 10, 14, 0, 5, 0, 0).getTime()
+    const { context, researchCalls } = makeContext({
+      quotes: { 'AAPL.US': quote(100, 100) },
+    })
+    context.now = () => ranAt
+    context.portfolioSnapshot = async () => ({
+      symbols: ['AAPL.US'],
+      fetchedAt: earlyToday,
+    })
+
+    const run = await runAutomation(rule({ type: 'portfolio-daily-brief' }), context)
+
+    expect(run.outcome).toBe('no_material_update')
+    expect(run.failures).toEqual([])
+    expect(run.evaluated).toBe(1)
+    expect(researchCalls).toEqual([])
+    expect(run.scopeSnapshot).toMatchObject({
+      kind: 'portfolio',
+      symbols: ['AAPL.US'],
+      sourceFetchedAt: earlyToday,
+    })
+  })
+
+  it('expires a previous-evening portfolio snapshot even though it is younger than 24h', async () => {
+    // 13h old — under a 24h TTL — but the previous local civil day. The daily
+    // brief's scope is today's book, so this must not read as no material change.
+    const previousEvening = new Date(2023, 10, 13, 23, 0, 0, 0).getTime()
+    const ageMs = ranAt - previousEvening
+    expect(ageMs).toBeGreaterThan(0)
+    expect(ageMs).toBeLessThan(24 * 60 * 60 * 1000)
+    expect(new Date(previousEvening).toDateString()).not.toBe(new Date(ranAt).toDateString())
+
+    const { context } = makeContext({ quotes: { 'AAPL.US': quote(100, 100) } })
+    context.now = () => ranAt
+    context.portfolioSnapshot = async () => ({
+      symbols: ['AAPL.US'],
+      fetchedAt: previousEvening,
+    })
+
+    const run = await runAutomation(rule({ type: 'portfolio-daily-brief' }), context)
+
+    expect(run.outcome).toBe('incomplete')
+    expect(run.failures).toEqual(['portfolio snapshot expired'])
+    expect(run.evaluated).toBe(1)
+    expect(run.scopeSnapshot).toMatchObject({
+      kind: 'portfolio',
+      symbols: ['AAPL.US'],
+      sourceFetchedAt: previousEvening,
+    })
+  })
+
+  it('expires a Friday portfolio snapshot used on the following Tuesday', async () => {
+    // Closed-market gap longer than 24h. Holdings have no delayed/stale bit,
+    // so the weekend does not keep Friday's membership current.
+    const fridayAfternoon = new Date(2023, 10, 10, 16, 0, 0, 0).getTime()
+    expect(ranAt - fridayAfternoon).toBeGreaterThan(24 * 60 * 60 * 1000)
+
+    const { context } = makeContext({ quotes: { 'AAPL.US': quote(100, 100) } })
+    context.now = () => ranAt
+    context.portfolioSnapshot = async () => ({
+      symbols: ['AAPL.US'],
+      fetchedAt: fridayAfternoon,
+    })
+
+    const run = await runAutomation(rule({ type: 'portfolio-daily-brief' }), context)
+
+    expect(run.outcome).toBe('incomplete')
+    expect(run.failures).toEqual(['portfolio snapshot expired'])
+    expect(run.scopeSnapshot?.sourceFetchedAt).toBe(fridayAfternoon)
+  })
+
+  it('treats a closed-market delayed quote as fresh when the provider did not mark it stale', async () => {
+    // Quote time is three days behind the run clock (a weekend close). The
+    // runner must not invent a quote TTL from that timestamp.
+    const closed = quote(100, 100)
+    closed.timestamp = 1_700_000_000 - 3 * 86_400
+    const { context, researchCalls } = makeContext({
+      quotes: { 'AAPL.US': closed },
+      quoteProvenance: {
+        'AAPL.US': {
+          stale: false,
+          delayed: true,
+          fetchedAt: 1_700_000_000_000,
+          marketTime: closed.timestamp * 1000,
+        },
+      },
+    })
+    context.watchlistSymbols = async () => ['AAPL.US']
+
+    const run = await runAutomation(rule({}), context)
+
+    expect(run.outcome).toBe('no_material_update')
+    expect(run.failures).toEqual([])
+    expect(run.materialChanges).toBe(0)
+    expect(researchCalls).toEqual([])
+  })
+
+  it('marks a stale-cache downgrade of that same closed-market quote incomplete', async () => {
+    // Same age and delayed flag as the closed-market case. Only
+    // `provenance.stale` flips, which is the provider's downgrade bit.
+    const closed = quote(100, 100)
+    closed.timestamp = 1_700_000_000 - 3 * 86_400
+    const { context } = makeContext({
+      quotes: { 'AAPL.US': closed },
+      quoteProvenance: {
+        'AAPL.US': {
+          stale: true,
+          delayed: true,
+          fetchedAt: 1_700_000_000_000,
+          marketTime: closed.timestamp * 1000,
+        },
+      },
+    })
+    context.watchlistSymbols = async () => ['AAPL.US']
+
+    const run = await runAutomation(rule({}), context)
+
+    expect(run.failures).toEqual(['AAPL.US: quote stale'])
+    expect(run.outcome).toBe('incomplete')
   })
 })
 
