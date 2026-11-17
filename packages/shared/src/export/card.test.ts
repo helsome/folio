@@ -4,6 +4,12 @@ import { reportFixture } from './test-helpers.ts'
 
 const FORBIDDEN = ['portfolio', 'account', 'position', 'holding', 'balance']
 
+function renderedRiskLines(svg: string): string[] {
+  return [...svg.matchAll(/<text x="32" y="(?:310|334|358)"[^>]*>([^<]*)<\/text>/g)].map(
+    (match) => match[1]
+  )
+}
+
 describe('reportToShareCard', () => {
   it('renders symbol, stance, confidence, strategy and Folio footer', () => {
     const { svg, text } = reportToShareCard(reportFixture())
@@ -90,6 +96,33 @@ describe('reportToShareCard', () => {
       expect([...line].length).toBeLessThanOrEqual(28)
     }
     expect(svg).toContain('…')
+  })
+
+  it.each(['AI', 'NVDA'])('keeps the Chinese risk after a %s prefix when truncating', (prefix) => {
+    const risk = `${prefix} 资本支出增长依赖少数云计算客户，若需求增速放缓、出口限制收紧或竞争加剧，可能导致订单推迟、毛利率承压和估值回落，并放大盈利预期下修带来的股价波动。`
+    const { svg, text } = reportToShareCard(reportFixture({ risks: [risk] }))
+    const rendered = renderedRiskLines(svg)
+
+    expect(rendered).toHaveLength(2)
+    expect(rendered[0]).toStartWith(`${prefix} 资本支出增长依赖少数云计算客户`)
+    expect(rendered.join('')).toContain('订单推迟')
+    expect(rendered[1]).toEndWith('…')
+    for (const line of rendered) {
+      const columns = [...line].reduce((width, char) => width + (char.charCodeAt(0) > 127 && char !== '…' ? 2 : 1), 0)
+      expect(columns).toBeLessThanOrEqual(56)
+    }
+    expect(text).toContain(`Key risk: ${risk}`)
+  })
+
+  it('truncates at the actual second line while keeping complete English words', () => {
+    const risk = 'Semiconductor-manufacturing-cost infrastructure-capital-spending cross-border-regulatory-compliance'
+    const { svg, text } = reportToShareCard(reportFixture({ risks: [risk] }))
+
+    expect(renderedRiskLines(svg)).toEqual([
+      'Semiconductor-manufacturing-cost',
+      'infrastructure-capital-spending…',
+    ])
+    expect(text).toContain(`Key risk: ${risk}`)
   })
 
   it('is deterministic — identical reports render identical bytes', () => {

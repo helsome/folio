@@ -6,8 +6,8 @@ import {
   formatCurrency,
   formatSignedCurrency,
   formatPercent,
-  formatNumber,
 } from '@finagent/i18n';
+import { formatQuantity } from '../../lib/money';
 
 interface HoldingRowProps {
   holding: Holding;
@@ -36,7 +36,7 @@ export const HoldingRow: React.FC<HoldingRowProps> = ({ holding, onClick, onRese
           </span>
         </div>
         <div className="mt-1 text-[11px] tabular-nums text-foreground/48">
-          {formatNumber(holding.quantity, undefined, { maximumFractionDigits: 0 })} @{' '}
+          {formatQuantity(holding.quantity)} @{' '}
           {formatCurrency(holding.costPrice, holding.currency)}
         </div>
       </div>

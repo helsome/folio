@@ -1,5 +1,35 @@
 import { describe, expect, it } from 'bun:test';
-import { currencyForSymbol, formatMoney } from './money';
+import { i18nCurrentLocale, i18nSetCurrentLocale } from '@finagent/i18n';
+import { currencyForSymbol, formatMoney, formatQuantity } from './money';
+
+describe('formatQuantity', () => {
+  for (const locale of ['en-US', 'zh-CN'] as const) {
+    it('preserves fractional shares and integer grouping in ' + locale, () => {
+      const previous = i18nCurrentLocale();
+      i18nSetCurrentLocale(locale);
+      try {
+        expect(formatQuantity(0.25)).toBe('0.25');
+        expect(formatQuantity(1.5)).toBe('1.5');
+        expect(formatQuantity(1e-8)).toBe('0.00000001');
+        expect(formatQuantity(1e-20)).toBe('0.00000000000000000001');
+        expect(Number(formatQuantity(1.5e-20))).toBe(1.5e-20);
+        expect(Number(formatQuantity(1.2345678901234567e-20))).toBe(1.2345678901234567e-20);
+        expect(formatQuantity(1e-21)).toBe('1E-21');
+        expect(formatQuantity(-0.25)).toBe('-0.25');
+        expect(formatQuantity(0)).toBe('0');
+        expect(formatQuantity(1_234)).toBe('1,234');
+      } finally {
+        i18nSetCurrentLocale(previous);
+      }
+    });
+  }
+
+  it('keeps unavailable and non-finite quantities unavailable', () => {
+    for (const value of [undefined, NaN, Infinity, -Infinity]) {
+      expect(formatQuantity(value)).toBe('—');
+    }
+  });
+});
 
 describe('currencyForSymbol (renderer mirror of @finagent/shared)', () => {
   it('routes each symbol suffix to its ISO currency', () => {

@@ -49,6 +49,7 @@ import {
   type GetKlineOptions,
   type LongBridgeStatus,
 } from '@finagent/longbridge-tools';
+import type { CapabilityFetchResult } from '../capabilities/fetchers.ts';
 
 export interface MarketDataServiceOptions {
   quoteTTL?: number;
@@ -62,13 +63,15 @@ export interface MarketDataServiceOptions {
 
 export interface MarketDataFetchers {
   getQuote: (symbol: string) => Promise<Quote>;
+  getQuoteResult?: (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<Quote>>;
   getKline: (options: GetKlineOptions) => Promise<Kline[]>;
   getIntraday: (symbol: string) => Promise<IntradayData[]>;
   getPortfolio: () => Promise<PortfolioSnapshot>;
   getLongBridgeStatus: () => Promise<LongBridgeStatus>;
   getStaticInfo: (symbol: string) => Promise<StaticInfo>;
+  getStaticInfoResult?: (symbol: string, signal?: AbortSignal) => Promise<CapabilityFetchResult<StaticInfo>>;
   getCalcIndex: (symbol: string) => Promise<CalcIndex>;
-  getMarketStatus: () => Promise<MarketStatus[]>;
+  getMarketStatus: (signal?: AbortSignal) => Promise<MarketStatus[]>;
   getNews: (symbol: string) => Promise<NewsItem[]>;
   getDepth: (symbol: string) => Promise<Depth>;
   getTrades: (symbol: string, count?: number) => Promise<TradeTick[]>;
@@ -91,6 +94,12 @@ export interface MarketDataFetchers {
 interface CacheEntry<T> {
   data: T;
   expiresAt: number;
+}
+
+interface SharedRequest {
+  controller: AbortController;
+  promise: Promise<unknown>;
+  consumers: number;
 }
 
 const defaultFetchers: MarketDataFetchers = {
@@ -127,6 +136,7 @@ export class MarketDataService {
   private readonly now: () => number;
   private readonly cache = new Map<string, CacheEntry<unknown>>();
   private readonly inFlight = new Map<string, Promise<unknown>>();
+  private readonly sharedRequests = new Map<string, SharedRequest>();
 
   constructor(options: MarketDataServiceOptions = {}) {
     this.quoteTTL = options.quoteTTL ?? 30_000;
@@ -139,7 +149,21 @@ export class MarketDataService {
   }
 
   getQuote(symbol: string) {
-    return this.cached(`quote:${symbol}`, this.quoteTTL, () => this.fetchers.getQuote(symbol));
+    return this.getQuoteResult(symbol).then((result) => result.data);
+  }
+
+  getQuoteResult(symbol: string, signal?: AbortSignal): Promise<CapabilityFetchResult<Quote>> {
+    const fetcher = this.fetchers.getQuoteResult ?? (async (query: string) => {
+      const data = await this.fetchers.getQuote(query);
+      return {
+        data,
+        provenance: {
+          providerId: 'unknown', providerName: 'Unknown', fetchedAt: this.now(),
+          marketTime: data.timestamp * 1000, stale: true,
+        },
+      };
+    });
+    return this.shared(`quote-result:${symbol}`, this.quoteTTL, (abort) => fetcher(symbol, abort), signal);
   }
 
   getKline(options: GetKlineOptions) {
@@ -159,16 +183,19 @@ export class MarketDataService {
     return this.cached('longbridge-status', this.statusTTL, () => this.fetchers.getLongBridgeStatus());
   }
 
-  getStaticInfo(symbol: string) {
-    return this.cached(`static:${symbol}`, this.referenceTTL, () => this.fetchers.getStaticInfo(symbol));
+  getStaticInfo(symbol: string, signal?: AbortSignal) {
+    const fetcher = this.fetchers.getStaticInfoResult
+      ? (abort: AbortSignal) => this.fetchers.getStaticInfoResult!(symbol, abort).then((result) => result.data)
+      : () => this.fetchers.getStaticInfo(symbol);
+    return this.shared(`static:${symbol}`, this.referenceTTL, fetcher, signal);
   }
 
   getCalcIndex(symbol: string) {
     return this.cached(`calc-index:${symbol}`, this.referenceTTL, () => this.fetchers.getCalcIndex(symbol));
   }
 
-  getMarketStatus() {
-    return this.cached('market-status', this.statusTTL, () => this.fetchers.getMarketStatus());
+  getMarketStatus(signal?: AbortSignal) {
+    return this.shared('market-status', this.statusTTL, (abort) => this.fetchers.getMarketStatus(abort), signal);
   }
 
   getNews(symbol: string) {
@@ -245,6 +272,52 @@ export class MarketDataService {
   clear() {
     this.cache.clear();
     this.inFlight.clear();
+  }
+
+  /** Cancel the provider only after its last subscriber leaves. */
+  private shared<T>(key: string, ttl: number, fetcher: (signal: AbortSignal) => Promise<T>, signal?: AbortSignal): Promise<T> {
+    if (signal?.aborted) return Promise.reject(new Error('Request aborted'));
+    const cached = this.cache.get(key) as CacheEntry<T> | undefined;
+    if (cached && cached.expiresAt > this.now()) return Promise.resolve(cached.data);
+    let request = this.sharedRequests.get(key);
+    if (!request) {
+      const controller = new AbortController();
+      request = { controller, consumers: 0, promise: Promise.resolve() };
+      const current = request;
+      current.promise = Promise.resolve().then(() => fetcher(controller.signal)).then((data) => {
+        if (!controller.signal.aborted) this.cache.set(key, { data, expiresAt: this.now() + ttl });
+        return data;
+      }).finally(() => {
+        if (this.sharedRequests.get(key) === current) this.sharedRequests.delete(key);
+      });
+      this.sharedRequests.set(key, current);
+    }
+    const current = request;
+    current.consumers += 1;
+    return new Promise<T>((resolve, reject) => {
+      let done = false;
+      const finish = () => {
+        if (done) return false;
+        done = true;
+        signal?.removeEventListener('abort', abort);
+        current.consumers -= 1;
+        return true;
+      };
+      const abort = () => {
+        if (!finish()) return;
+        if (current.consumers === 0) {
+          current.controller.abort();
+          if (this.sharedRequests.get(key) === current) this.sharedRequests.delete(key);
+        }
+        reject(new Error('Request aborted'));
+      };
+      signal?.addEventListener('abort', abort, { once: true });
+      if (signal?.aborted) abort();
+      current.promise.then(
+        (data) => { if (finish()) resolve(data as T); },
+        (error) => { if (finish()) reject(error); },
+      );
+    });
   }
 
   private async cached<T>(key: string, ttl: number, fetcher: () => Promise<T>): Promise<T> {

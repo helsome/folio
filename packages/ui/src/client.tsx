@@ -32,6 +32,8 @@ import type {
   ProviderHealth,
   ProviderStatus,
   Quote,
+  HeatmapSnapshot,
+  HeatmapSourceSnapshot,
   ResearchDiff,
   ResearchReport,
   PerformanceHorizon,
@@ -196,6 +198,8 @@ export interface FinagentClient {
     getTools: () => Promise<ApiResult<ToolDefinition[]>>;
   };
   market: {
+    getHeatmap?: (input: { requestId: string; source: HeatmapSourceSnapshot }) => Promise<ApiResult<HeatmapSnapshot>>;
+    cancelHeatmap?: (requestId: string) => Promise<ApiResult<void>>;
     getQuote: (symbol: string) => Promise<ApiResult<Quote>>;
     getKline: (request: KlineRequest) => Promise<ApiResult<Kline[]>>;
     getPortfolio: () => Promise<ApiResult<PortfolioSnapshot>>;

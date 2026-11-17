@@ -1,14 +1,43 @@
 import { afterEach, beforeEach, describe, expect, it, mock } from 'bun:test';
 import { join } from 'node:path';
-import type { AgentEvent, AutomationRule } from '@finagent/core';
+import type { AgentEvent, AutomationRule, AutomationRun } from '@finagent/core';
 
 let lastKernelOptions: Record<string, unknown> | null = null;
 let lastMarketData: FakeMarketDataService | null = null;
 let lastAutomationContext: unknown = null;
+/** Symbols the last compareBuild call forwarded to buildComparison. */
+let lastCompareSymbols: unknown = null;
 let forwardedEvents: unknown[] = [];
 /** Evaluation runs handed to EvaluationStore.addRun (observability path). */
 const savedEvalRuns: Array<Record<string, unknown>> = [];
 const routerFetchers = { getQuote: async () => ({ symbol: 'AAPL.US' }) };
+const scheduledRule: AutomationRule = {
+  id: 'scheduled-rule',
+  type: 'watchlist-daily-review',
+  enabled: true,
+  notify: 'material-only',
+  createdAt: 1,
+};
+let scheduledRules: AutomationRule[] = [];
+let recordedAutomationRuns: AutomationRun[] = [];
+const scheduledOccurrences = new Map<string, Set<string>>();
+let automationExecutions = 0;
+function automationRun(): AutomationRun {
+  return {
+    id: `run-${automationExecutions}`,
+    ruleId: 'scheduled-rule',
+    ranAt: Date.now(),
+    evaluated: 0,
+    materialChanges: 0,
+    analyzed: 0,
+    notified: false,
+    failures: [],
+  };
+}
+let runAutomationMock: () => Promise<AutomationRun> = async () => {
+  automationExecutions += 1;
+  return automationRun();
+};
 
 /** Poll until `predicate` holds; the settle path is fire-and-forget (`void`). */
 async function waitFor(predicate: () => boolean, timeoutMs = 1000): Promise<void> {
@@ -31,6 +60,19 @@ class FakeMarketDataService {
   async getKline(input: unknown) {
     return [{ input }];
   }
+
+  async getQuoteResult(symbol: string, _signal?: AbortSignal): Promise<{
+    data: import('@finagent/core').Quote;
+    provenance: import('@finagent/core').ProviderProvenance;
+  }> {
+    return {
+      data: { symbol, lastPrice: 101, change: 1, changePercent: 1, timestamp: Date.now() / 1000, prevClose: 100, high: 101, low: 100, open: 100, volume: 10 },
+      provenance: { providerId: 'fixture', providerName: 'Fixture', instrumentId: 'XNAS:AAPL', fetchedAt: Date.now(), marketTime: Date.now(), stale: false },
+    };
+  }
+
+  async getStaticInfo(symbol: string) { return { symbol, name: 'Apple Inc.' }; }
+  async getMarketStatus() { return [{ market: 'US', status: 'Open' }]; }
 
   async getPortfolio() {
     return {
@@ -82,6 +124,8 @@ const fakeRuns = {
   replayStream: (_runId: string, _lastSequence: number) => ({ recoverable: false, events: [], atEnd: true }),
 };
 
+const { HeatmapService, parseHeatmapSource } = await import('../../../../packages/shared/src/heatmap/service.ts');
+
 class FakeAgentKernel {
   sessions = fakeSessions;
   runs = fakeRuns;
@@ -117,6 +161,8 @@ const noopStore = class {
 };
 
 mock.module('@finagent/shared', () => ({
+  HeatmapService,
+  parseHeatmapSource,
   AgentKernel: FakeAgentKernel,
   MarketDataService: class extends FakeMarketDataService {
     constructor(options?: { fetchers?: unknown }) {
@@ -169,7 +215,10 @@ mock.module('@finagent/shared', () => ({
     analyze = async () => undefined;
   },
   defaultPortfolioRiskSynthesizer: async () => '',
-  buildComparison: async () => undefined,
+  buildComparison: async (symbols: string[]) => {
+    lastCompareSymbols = symbols;
+    return undefined;
+  },
   computeSkillReadiness: () => undefined,
   parseSynthesisJson: (text: string) => JSON.parse(text),
   parseImpactJson: (text: string) => JSON.parse(text),
@@ -250,13 +299,22 @@ mock.module('@finagent/shared', () => ({
     strategyPerformance = async () => [];
   },
   AutomationRuleRepository: class {
-    list = async () => [];
+    list = async () => scheduledRules;
     save = async () => undefined;
     remove = async () => undefined;
   },
   AutomationRunRepository: class {
-    list = async () => [];
-    record = async () => undefined;
+    list = async () => recordedAutomationRuns;
+    record = async (run: AutomationRun) => {
+      recordedAutomationRuns = [run, ...recordedAutomationRuns.filter((existing) => existing.id !== run.id)];
+    };
+    claimScheduledOccurrence = async (ruleId: string, occurrence: string) => {
+      const occurrences = scheduledOccurrences.get(ruleId) ?? new Set<string>();
+      if (occurrences.has(occurrence)) return false;
+      occurrences.add(occurrence);
+      scheduledOccurrences.set(ruleId, occurrences);
+      return true;
+    };
   },
   buildBrief: () => ({
     generatedAt: 0,
@@ -266,18 +324,9 @@ mock.module('@finagent/shared', () => ({
   }),
   runAutomation: async (_rule: unknown, context: unknown) => {
     lastAutomationContext = context;
-    return {
-      id: 'run',
-      ruleId: 'rule',
-      ranAt: 0,
-      evaluated: 0,
-      materialChanges: 0,
-      analyzed: 0,
-      notified: false,
-      failures: [],
-    };
+    return runAutomationMock();
   },
-  runDue: () => [],
+  runDue: () => scheduledRules,
   DEFAULT_BRIEF_HOUR: 16.5,
   THESIS_REVIEW_DAY: 0,
   THESIS_REVIEW_HOUR: 9,
@@ -368,7 +417,16 @@ beforeEach(() => {
   lastKernelOptions = null;
   lastMarketData = null;
   lastAutomationContext = null;
+  lastCompareSymbols = null;
   forwardedEvents = [];
+  scheduledRules = [];
+  recordedAutomationRuns = [];
+  scheduledOccurrences.clear();
+  automationExecutions = 0;
+  runAutomationMock = async () => {
+    automationExecutions += 1;
+    return automationRun();
+  };
   savedEvalRuns.length = 0;
 });
 
@@ -454,6 +512,38 @@ describe('AgentKernelHost', () => {
     host.dispose();
   });
 
+  it('dedupes compare symbols that resolve to the same canonical instrument', async () => {
+    const host = new AgentKernelHost();
+
+    await host.compareBuild({ symbols: ['AAPL.US', 'AAPL', 'MSFT.US'] });
+    expect(lastCompareSymbols).toEqual(['AAPL.US', 'MSFT.US']);
+
+    await host.compareBuild({ symbols: ['nvda.us', ' aapl '] });
+    expect(lastCompareSymbols).toEqual(['NVDA.US', 'AAPL']);
+    host.dispose();
+  });
+
+  it('rejects a compare request that collapses below two distinct symbols', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(host.compareBuild({ symbols: ['AAPL.US', 'AAPL.US'] })).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+    });
+    await expect(host.compareBuild({ symbols: ['TSLA', 'TSLA.US'] })).rejects.toMatchObject({
+      code: 'INVALID_ARGUMENT',
+    });
+    host.dispose();
+  });
+
+  it('rejects more than four compare symbols', async () => {
+    const host = new AgentKernelHost();
+
+    await expect(
+      host.compareBuild({ symbols: ['AAPL.US', 'MSFT.US', 'NVDA.US', 'BABA.US', '9988.HK'] })
+    ).rejects.toMatchObject({ code: 'INVALID_ARGUMENT' });
+    host.dispose();
+  });
+
   it('rejects malformed automation rules before they reach persistence', async () => {
     const host = new AgentKernelHost();
     const valid: AutomationRule = {
@@ -535,6 +625,35 @@ describe('AgentKernelHost', () => {
     const host = new AgentKernelHost();
 
     expect(lastMarketData?.options?.fetchers).toBe(routerFetchers);
+    host.dispose();
+  });
+
+  it('validates heatmap IPC snapshots and binds canonical listing identity', async () => {
+    const host = new AgentKernelHost();
+    const source = { schemaVersion: 1, id: 'watch', revision: 'v1', kind: 'watchlist', capturedAt: Date.now(), entries: [{ symbol: 'AAPL.US' }] };
+    const result = await host.getHeatmap({ requestId: 'test-1', source }, 1);
+    expect(result.tiles[0]?.instrument.instrumentId).toBe('XNAS:AAPL');
+    expect(result.tiles[0]?.workspaceSymbol).toBe('AAPL.US');
+    expect(result.source.revision).toBe('v1');
+    await expect(host.getHeatmap({ requestId: 'test-2', source: { ...source, schemaVersion: 2 } }, 1)).rejects.toThrow('Invalid heatmap');
+    host.dispose();
+  });
+
+  it('isolates heatmap cancellation by renderer owner', async () => {
+    const host = new AgentKernelHost();
+    let providerSignal: AbortSignal | undefined;
+    lastMarketData!.getQuoteResult = (_symbol, signal) => new Promise((_resolve, reject) => {
+      providerSignal = signal;
+      signal?.addEventListener('abort', () => reject(new Error('aborted')), { once: true });
+    });
+    const source = { schemaVersion: 1, id: 'watch', revision: 'v1', kind: 'watchlist', capturedAt: Date.now(), entries: [{ symbol: 'AAPL.US' }] };
+    const pending = host.getHeatmap({ requestId: 'same-id', source }, 10);
+    await waitFor(() => providerSignal !== undefined);
+    host.cancelHeatmap('same-id', 11);
+    expect(providerSignal?.aborted).toBe(false);
+    host.cancelHeatmap('same-id', 10);
+    await expect(pending).rejects.toThrow('aborted');
+    expect(providerSignal?.aborted).toBe(true);
     host.dispose();
   });
 
@@ -623,6 +742,62 @@ describe('AgentKernelHost', () => {
       ok: false,
       error: expect.objectContaining({ code: 'INVALID_ARGUMENT' }),
     });
+    host.dispose();
+  });
+
+  it('does not repeat a scheduled occurrence after the host is recreated', async () => {
+    scheduledRules = [scheduledRule];
+    const firstHost = new AgentKernelHost();
+
+    await firstHost['tickAutomations']();
+    firstHost.dispose();
+
+    const recreatedHost = new AgentKernelHost();
+    await recreatedHost['tickAutomations']();
+
+    expect(automationExecutions).toBe(1);
+    expect(recordedAutomationRuns).toHaveLength(1);
+    recreatedHost.dispose();
+  });
+
+  it('claims a scheduled occurrence before execution to prevent overlap', async () => {
+    scheduledRules = [scheduledRule];
+    let resolveRun: ((run: AutomationRun) => void) | undefined;
+    let signalStarted: (() => void) | undefined;
+    const started = new Promise<void>((resolve) => {
+      signalStarted = resolve;
+    });
+    runAutomationMock = () => {
+      automationExecutions += 1;
+      signalStarted?.();
+      return new Promise((resolve) => {
+        resolveRun = resolve;
+      });
+    };
+    const host = new AgentKernelHost();
+    const firstTick = host['tickAutomations']();
+    await started;
+
+    await host['tickAutomations']();
+    expect(automationExecutions).toBe(1);
+
+    resolveRun?.(automationRun());
+    await firstTick;
+    host.dispose();
+  });
+
+  it('does not retry a failed scheduled occurrence on the next tick', async () => {
+    scheduledRules = [scheduledRule];
+    runAutomationMock = async () => {
+      automationExecutions += 1;
+      throw new Error('execution failed');
+    };
+    const host = new AgentKernelHost();
+
+    await host['tickAutomations']();
+    await host['tickAutomations']();
+
+    expect(automationExecutions).toBe(1);
     host.dispose();
   });
 

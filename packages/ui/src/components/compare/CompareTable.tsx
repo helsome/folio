@@ -1,29 +1,27 @@
 import React from 'react';
 import { useTranslation } from 'react-i18next';
 import type { Comparison } from '@finagent/core';
+import {
+  metricDefinitionForRow,
+  type CompareMetricId,
+  type CompareRowDensity,
+} from '../../lib/compareViewState';
 
 const DASH = '\u2014';
 
-/** Stable metric-id → translation-key map (ids themselves are never translated). */
-const METRIC_KEYS: Record<string, string> = {
-  'Price': 'compare.metrics.price',
-  'Market Cap': 'compare.metrics.marketCap',
-  'PE': 'compare.metrics.pe',
-  'PB': 'compare.metrics.pb',
-  'Revenue Growth': 'compare.metrics.revenueGrowth',
-  'Gross Margin': 'compare.metrics.grossMargin',
-  'ROE': 'compare.metrics.roe',
-  'Dividend Yield': 'compare.metrics.dividendYield',
-  '1M Return': 'compare.metrics.return1m',
-  '3M Return': 'compare.metrics.return3m',
-  '1Y Return': 'compare.metrics.return1y',
-  'Analyst Rating': 'compare.metrics.analystRating',
-  'Momentum': 'compare.metrics.momentum',
-};
-
 /** Comparison table: one metric per row, one column per symbol. */
-export const CompareTable: React.FC<{ comparison: Comparison }> = ({ comparison }) => {
+export const CompareTable: React.FC<{
+  comparison: Comparison;
+  visibleMetricIds: readonly CompareMetricId[];
+  density: CompareRowDensity;
+}> = ({ comparison, visibleMetricIds, density }) => {
   const { t } = useTranslation();
+  const cellPadding = density === 'compact' ? 'py-1.5' : 'py-2.5';
+  const rows = comparison.rows.filter((row) => {
+    const definition = metricDefinitionForRow(row.metric);
+    return definition === undefined || visibleMetricIds.includes(definition.id);
+  });
+
   return (
     <div className="overflow-x-auto rounded-[10px] border border-border bg-surface-raised" data-testid="compare-table">
       <table className="min-w-[540px] w-full border-collapse text-[12px]">
@@ -40,16 +38,16 @@ export const CompareTable: React.FC<{ comparison: Comparison }> = ({ comparison 
           </tr>
         </thead>
         <tbody>
-          {comparison.rows.map((row) => {
-            const key = METRIC_KEYS[row.metric];
-            const label = key !== undefined ? t(key) : row.metric;
+          {rows.map((row) => {
+            const definition = metricDefinitionForRow(row.metric);
+            const label = definition !== undefined ? t(definition.labelKey) : row.metric;
             return (
               <tr key={row.metric} className="border-b border-border/70 last:border-0 hover:bg-surface-hover transition-colors">
-                <td className="whitespace-nowrap px-3.5 py-2.5 font-medium text-foreground/68">{label}</td>
+                <td className={`whitespace-nowrap px-3.5 ${cellPadding} font-medium text-foreground/68`}>{label}</td>
                 {comparison.symbols.map((symbol) => (
                   <td
                     key={symbol}
-                    className={`whitespace-nowrap px-3.5 py-2.5 text-right tabular-nums ${row.cells[symbol]?.missing ? 'text-text-muted' : 'font-medium text-foreground'}`}
+                    className={`whitespace-nowrap px-3.5 ${cellPadding} text-right tabular-nums ${row.cells[symbol]?.missing ? 'text-text-muted' : 'font-medium text-foreground'}`}
                   >
                     {row.cells[symbol]?.display ?? DASH}
                   </td>

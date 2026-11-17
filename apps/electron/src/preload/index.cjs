@@ -62,6 +62,8 @@ var electronAPI = {
     getTools: () => import_electron.ipcRenderer.invoke("agent:getTools")
   },
   market: {
+    getHeatmap: (input) => import_electron.ipcRenderer.invoke("market:getHeatmap", input),
+    cancelHeatmap: (requestId) => import_electron.ipcRenderer.invoke("market:cancelHeatmap", requestId),
     getQuote: (symbol) => import_electron.ipcRenderer.invoke("market:getQuote", symbol),
     getKline: (request) => import_electron.ipcRenderer.invoke("market:getKline", request),
     getPortfolio: () => import_electron.ipcRenderer.invoke("market:getPortfolio"),

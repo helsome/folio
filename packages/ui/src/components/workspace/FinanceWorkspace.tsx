@@ -116,23 +116,23 @@ const SecurityWorkspace: React.FC = () => {
         </Tabs>
       </div>
       <div className="min-h-0 flex-1 overflow-y-auto">
-        <ActiveView view={activeView} />
+        <ActiveView view={activeView} symbol={activeSymbol} />
       </div>
     </div>
   );
 };
 
-const ActiveView: React.FC<{ view: WorkspaceView }> = ({ view }) => {
+const ActiveView: React.FC<{ view: WorkspaceView; symbol: string }> = ({ view, symbol }) => {
   switch (view) {
     case 'chart':
       return <ChartView />;
     case 'financials':
-      return <FinancialsView />;
+      return <FinancialsView key={symbol} />;
     case 'news':
       return <NewsView />;
     case 'overview':
     case 'portfolio':
     default:
-      return <OverviewView />;
+      return <OverviewView key={symbol} />;
   }
 };

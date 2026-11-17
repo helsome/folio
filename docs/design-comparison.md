@@ -124,7 +124,7 @@
 | 表面 | 回退行为 | 代码 |
 |---|---|---|
 | Watchlist / Today Movers | 单只报价失败 → 该股票的示例 Quote（AAPL/TSLA/NVDA/MSFT/AMZN/GOOGL/META 七只，价格对齐设计稿） | `src/demo/demoData.ts` `demoQuote()` + `fetchQuoteAtom` catch 分支 |
-| Portfolio 卡（Today + Portfolio 页） | 快照获取失败或为空 → 个人规模示例组合（4 持仓，市值≈$105K，含成本/浮动盈亏，数字自洽） | `demoPortfolioSnapshot()` + `fetchPortfolioAtom` |
+| Portfolio 卡（Today + Portfolio 页） | 未连接、无权限或空账户 → 带徽标示例组合；超时、解析失败及其他服务错误 → 分类失败态；部分快照保留真实数据。示例回退仍保留连接失败分类 | `demoPortfolioSnapshot()` + `fetchPortfolioAtom` |
 | Upcoming Events（Today + Events 页） | 日历渠道缺失/报错/为空 → 3 条未来事件（财报/宏观/FOMC，日期相对当天生成，永不过期） | `demoCalendarEvents(t)` |
 | Market Pulse | `pulse:snapshot` 缺失/失败 → 示例指数/开闭市/温度/涨跌 mover/个人敞口 | `demoPulseSnapshot()` + `loadPulseAtom` |
 | Daily Brief | buildBrief 渠道缺失/报错 → 2 条示例简报（风险告警 + 板块轮动），随 locale 翻译 | `demoDailyBrief(t)` |

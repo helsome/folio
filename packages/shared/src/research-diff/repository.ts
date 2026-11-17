@@ -1,5 +1,7 @@
 import type { ResearchDiff } from '@finagent/core'
+import { resolve } from 'node:path'
 import type { JsonFileStore } from '../storage/json-file-store.ts'
+import { withWriteLock } from '../storage/write-lock.ts'
 
 /**
  * Research diff persistence. One JSON file under the injected store root
@@ -25,10 +27,12 @@ export class ResearchDiffRepository {
 
   /** Upsert a diff; the persisted list stays sorted newest-first. */
   async save(diff: ResearchDiff): Promise<void> {
-    const file = await this.store.read<DiffsFile>(DIFFS_FILE, { diffs: [] })
-    const next = [diff, ...file.diffs.filter((existing) => existing.id !== diff.id)]
-    next.sort((a, b) => b.generatedAt - a.generatedAt || a.id.localeCompare(b.id))
-    await this.store.write(DIFFS_FILE, { diffs: next })
+    await withWriteLock(resolve(this.store.resolve(DIFFS_FILE)), async () => {
+      const file = await this.store.read<DiffsFile>(DIFFS_FILE, { diffs: [] })
+      const next = [diff, ...file.diffs.filter((existing) => existing.id !== diff.id)]
+      next.sort((a, b) => b.generatedAt - a.generatedAt || a.id.localeCompare(b.id))
+      await this.store.write(DIFFS_FILE, { diffs: next })
+    })
   }
 
   async get(diffId: string): Promise<ResearchDiff | undefined> {

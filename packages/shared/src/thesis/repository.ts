@@ -1,9 +1,16 @@
 import { randomUUID } from 'node:crypto';
+import { resolve } from 'node:path';
 import type { InvestmentThesis, ThesisImpact } from '@finagent/core';
 import { JsonFileStore } from '../storage/json-file-store.ts';
+import { withWriteLock } from '../storage/write-lock.ts';
 import { createCodeError } from '../agent/errors.ts';
 
 const INDEX_FILE = 'index.json';
+
+function fileLockKey(store: JsonFileStore, file: string): string {
+  const path = resolve(store.resolve(file));
+  return process.platform === 'win32' ? path.toLowerCase() : path;
+}
 
 // Thesis ids are opaque names, not relative paths — the same file-name contract
 // the research repositories keep at their store boundary. `JsonFileStore` only
@@ -59,11 +66,16 @@ export class ThesisRepository {
 
   /** Upsert a thesis (body + index entry). */
   async save(thesis: InvestmentThesis): Promise<InvestmentThesis> {
-    await this.store.write(thesisFile(thesis.id), thesis);
-    const index = await this.readIndex();
-    index[thesis.id] = { symbol: thesis.symbol, updatedAt: thesis.updatedAt };
-    await this.writeIndex(index);
-    return thesis;
+    const file = thesisFile(thesis.id);
+    // The body shares the index lock: an overlapping delete must not remove
+    // a saved body before its index entry is published (or vice versa).
+    return withWriteLock(fileLockKey(this.store, INDEX_FILE), async () => {
+      await this.store.write(file, thesis);
+      const index = await this.readIndex();
+      index[thesis.id] = { symbol: thesis.symbol, updatedAt: thesis.updatedAt };
+      await this.writeIndex(index);
+      return thesis;
+    });
   }
 
   async get(id: string): Promise<InvestmentThesis | undefined> {
@@ -89,12 +101,15 @@ export class ThesisRepository {
   }
 
   async delete(id: string): Promise<void> {
-    await this.store.remove(thesisFile(id));
-    const index = await this.readIndex();
-    if (id in index) {
-      delete index[id];
-      await this.writeIndex(index);
-    }
+    const file = thesisFile(id);
+    await withWriteLock(fileLockKey(this.store, INDEX_FILE), async () => {
+      await this.store.remove(file);
+      const index = await this.readIndex();
+      if (id in index) {
+        delete index[id];
+        await this.writeIndex(index);
+      }
+    });
   }
 
   private async resolveAll(ids: string[]): Promise<InvestmentThesis[]> {
@@ -128,9 +143,11 @@ export class ThesisImpactRepository {
 
   async append(impact: ThesisImpact): Promise<void> {
     const file = impactFile(impact.thesisId);
-    const existing = await this.store.read<ThesisImpact[]>(file, []);
-    existing.push(impact);
-    await this.store.write(file, existing);
+    await withWriteLock(fileLockKey(this.store, file), async () => {
+      const existing = await this.store.read<ThesisImpact[]>(file, []);
+      existing.push(impact);
+      await this.store.write(file, existing);
+    });
   }
 
   async list(thesisId: string): Promise<ThesisImpact[]> {

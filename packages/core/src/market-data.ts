@@ -91,7 +91,8 @@ export interface FinancialReportValue {
   /** Display period, e.g. `Q1 2027`. */
   period: string;
   year: number;
-  value: number;
+  /** Absent when the provider has no reported number; an explicit zero stays zero. */
+  value?: number;
   /** Epoch seconds of the filing carrying this value, when the provider supplies it. */
   filedAt?: number;
   ratio?: string;

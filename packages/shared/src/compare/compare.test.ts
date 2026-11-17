@@ -1,7 +1,12 @@
 import { Type } from '@sinclair/typebox';
 import { describe, expect, it } from 'bun:test';
 import type { Comparison, FinanceCapability } from '@finagent/core';
+import { parseCalcIndexResponse, parseDividendResponse, parseFinancialReportResponse } from '@finagent/longbridge-tools';
+import { loadFixtureText } from '../../../longbridge-tools/src/testing/load-fixture.ts';
 import { defineCapability } from '../capabilities/define.ts';
+import { defaultCapabilityFetchers } from '../capabilities/fetchers.ts';
+import { createCompanyValuationCapability } from '../capabilities/manifests/company-valuation.ts';
+import { createCompanyDividendsCapability, createCompanyFinancialsCapability } from '../capabilities/manifests/phase-two.ts';
 import { createCapabilityRegistry } from '../capabilities/registry.ts';
 import { buildComparison } from './service.ts';
 
@@ -50,9 +55,9 @@ function barsWith(overrides: Record<number, number>): Bars {
 
 const FULL_DATA = {
   'market.quote': { symbol: 'AAPL.US', lastPrice: 100.5 },
-  'company.valuation': { symbol: 'AAPL.US', pe: 34.12, pb: 27.86, totalMarketValue: 5.445e12 },
+  'company.valuation': { symbol: 'AAPL.US', pe: 34.12, pb: 27.86, dpsRate: 0.12, totalMarketValue: 5.445e12 },
   'company.financials': { revenueGrowth: 15.2, grossMargin: 62.5, roe: 45.1 },
-  'company.dividends': { dividendYield: 0.12 },
+  'company.dividends': [],
   'market.kline': defaultBars(),
   'company.ratings': { consensus: 'strong_buy' },
 };
@@ -80,6 +85,171 @@ function expectedReturn(bars: Bars, days: number): number {
 }
 
 describe('buildComparison', () => {
+  it('reads financial metrics through the real CLI parser and capability contract', async () => {
+    const report = parseFinancialReportResponse(loadFixtureText('financial-report'), 'NVDA.US');
+    const fetchers = { ...defaultCapabilityFetchers, getFinancialReport: async () => report };
+    const registry = createCapabilityRegistry([createCompanyFinancialsCapability(fetchers)]);
+
+    const comparison = await buildComparison(['NVDA.US'], registry);
+
+    expect(comparison.errors).toEqual({});
+    expect(cell(comparison, 'Revenue Growth', 'NVDA.US')).toEqual({
+      value: 85.22763378875221, display: '85.2%', missing: false,
+    });
+    expect(cell(comparison, 'Gross Margin', 'NVDA.US')).toEqual({
+      value: 74.9335, display: '74.9%', missing: false,
+    });
+    expect(cell(comparison, 'ROE', 'NVDA.US')).toEqual({
+      value: 132.2592, display: '132.3%', missing: false,
+    });
+  });
+
+  for (const value of [0, 12.5]) {
+    it('reads the latest financial period by fpEnd and preserves ' + value + ' percent', async () => {
+      const registry = createCapabilityRegistry([
+        makeCap('company.financials', 'get_financials', () => ({
+          revenueGrowth: 99, grossMargin: 99, roe: 99,
+          statements: { IS: { indicators: [{ accounts: [
+            { field: 'OperatingRevenue', values: [
+              { fpEnd: 100, value: 500, yoy: 99 },
+              { fpEnd: 300, value: 1000, yoy: String(value) },
+              { fpEnd: 200, value: 750, yoy: 99 },
+            ] },
+            ...['GrossMgn', 'ROE'].map((field) => ({ field, values: [
+              { fpEnd: 100, value: 99 },
+              { fpEnd: 300, value },
+              { fpEnd: 200, value: 99 },
+            ] })),
+          ] }] } },
+        })),
+      ]);
+
+      const comparison = await buildComparison(['NVDA.US'], registry);
+
+      for (const metric of ['Revenue Growth', 'Gross Margin', 'ROE']) {
+        expect(cell(comparison, metric, 'NVDA.US')).toEqual({
+          value, display: value.toFixed(1) + '%', missing: false,
+        });
+      }
+    });
+  }
+
+  for (const value of [undefined, NaN, Infinity, -Infinity]) {
+    it('keeps missing latest financial values without using old periods or inferring YoY: ' + String(value), async () => {
+      const registry = createCapabilityRegistry([
+        makeCap('company.financials', 'get_financials', () => ({
+          revenueGrowth: 99, grossMargin: 99, roe: 99,
+          statements: { IS: { indicators: [{ accounts: [
+            { field: 'OperatingRevenue', values: [
+              { fpEnd: 100, value: 500, yoy: 99 },
+              { fpEnd: 300, value: 1000, yoy: value },
+              { fpEnd: 200, value: 750, yoy: 99 },
+            ] },
+            ...['GrossMgn', 'ROE'].map((field) => ({ field, values: [
+              { fpEnd: 100, value: 99 },
+              { fpEnd: 300, value },
+              { fpEnd: 200, value: 99 },
+            ] })),
+          ] }] } },
+        })),
+      ]);
+
+      const comparison = await buildComparison(['NVDA.US'], registry);
+
+      for (const metric of ['Revenue Growth', 'Gross Margin', 'ROE']) {
+        expect(cell(comparison, metric, 'NVDA.US')).toEqual({ missing: true, display: '—' });
+      }
+    });
+  }
+
+  it('preserves zero-valued legacy flat financial metrics', async () => {
+    const registry = createCapabilityRegistry([
+      makeCap('company.financials', 'get_financials', () => ({ revenueGrowth: 0, grossMargin: 0, roe: 0 })),
+    ]);
+
+    const comparison = await buildComparison(['NVDA.US'], registry);
+
+    for (const metric of ['Revenue Growth', 'Gross Margin', 'ROE']) {
+      expect(cell(comparison, metric, 'NVDA.US')).toEqual({ value: 0, display: '0.0%', missing: false });
+    }
+  });
+
+  it('reads dividend yield through the real CLI parser and capability contracts', async () => {
+    const index = parseCalcIndexResponse(loadFixtureText('calc-index'));
+    const dividends = parseDividendResponse(loadFixtureText('dividend'));
+    const fetchers = {
+      ...defaultCapabilityFetchers,
+      getCalcIndex: async () => index,
+      getDividends: async () => dividends,
+    };
+    const registry = createCapabilityRegistry([
+      createCompanyValuationCapability(fetchers),
+      createCompanyDividendsCapability(fetchers),
+    ]);
+
+    const comparison = await buildComparison(['NVDA.US'], registry);
+
+    expect(dividends.length).toBeGreaterThan(0);
+    expect(comparison.errors).toEqual({});
+    expect(cell(comparison, 'Dividend Yield', 'NVDA.US')).toEqual({
+      value: 0.12, display: '0.1%', missing: false,
+    });
+  });
+
+  for (const { value, display } of [
+    { value: 0, display: '0.0%' },
+    { value: 2.5, display: '2.5%' },
+  ]) {
+    it('prefers valuation dividend yield ' + value + ' without changing its percent unit', async () => {
+      const registry = createCapabilityRegistry([
+        makeCap('company.valuation', 'get_valuation', () => ({ dpsRate: value })),
+        makeCap('company.dividends', 'get_dividends', () => ({ dividendYield: 9.9 })),
+      ]);
+
+      const comparison = await buildComparison(['NVDA.US'], registry);
+
+      expect(cell(comparison, 'Dividend Yield', 'NVDA.US')).toEqual({ value, display, missing: false });
+    });
+  }
+
+  it('uses valuation dividend yield without a dividend-history capability', async () => {
+    const registry = createCapabilityRegistry([
+      makeCap('company.valuation', 'get_valuation', () => ({ dpsRate: 2.5 })),
+    ]);
+
+    const comparison = await buildComparison(['NVDA.US'], registry);
+
+    expect(comparison.errors).toEqual({});
+    expect(cell(comparison, 'Dividend Yield', 'NVDA.US')).toEqual({
+      value: 2.5, display: '2.5%', missing: false,
+    });
+  });
+
+  for (const value of [undefined, NaN, Infinity, -Infinity]) {
+    it('keeps dividend yield missing for invalid valuation ' + String(value), async () => {
+      const registry = createCapabilityRegistry([
+        makeCap('company.valuation', 'get_valuation', () => ({ dpsRate: value })),
+        makeCap('company.dividends', 'get_dividends', () => parseDividendResponse(loadFixtureText('dividend'))),
+      ]);
+
+      const comparison = await buildComparison(['NVDA.US'], registry);
+
+      expect(cell(comparison, 'Dividend Yield', 'NVDA.US')).toEqual({ missing: true, display: '—' });
+    });
+  }
+
+  it('preserves the existing explicit dividend-yield fallback', async () => {
+    const registry = createCapabilityRegistry([
+      makeCap('company.dividends', 'get_dividends', () => ({ dividendYield: 0.12 })),
+    ]);
+
+    const comparison = await buildComparison(['NVDA.US'], registry);
+
+    expect(cell(comparison, 'Dividend Yield', 'NVDA.US')).toEqual({
+      value: 0.12, display: '0.1%', missing: false,
+    });
+  });
+
   it('builds a full table with correctly formatted cells', async () => {
     const comparison = await buildComparison(['AAPL.US', 'MSFT.US'], fullRegistry(), { now: () => 1 });
 

@@ -1,6 +1,10 @@
 import { afterEach, describe, expect, it } from 'bun:test'
 import type { FinancialReport, Kline, ProviderResult, Quote, StaticInfo } from '@finagent/core'
-import { DEFAULT_INSTRUMENT_CATALOG } from '@finagent/core'
+import { DEFAULT_INSTRUMENT_CATALOG, InstrumentResolver } from '@finagent/core'
+import { MarketDataService } from '../../agent/market-data-service.ts'
+import { HeatmapService, parseHeatmapSource } from '../../heatmap/service.ts'
+import { ProviderRouter } from '../router.ts'
+import { createRouterFetchers } from '../router-fetchers.ts'
 import { MassiveFinancialDataProvider } from './adapter.ts'
 import { TtlCache } from './cache.ts'
 
@@ -10,7 +14,7 @@ afterEach(() => {
   globalThis.fetch = originalFetch
 })
 
-type FetchResponder = (url: string, init?: RequestInit) => Response
+type FetchResponder = (url: string, init?: RequestInit) => Response | Promise<Response>
 
 function installFetch(responder: FetchResponder): Array<{ url: string; init?: RequestInit }> {
   const calls: Array<{ url: string; init?: RequestInit }> = []
@@ -27,6 +31,23 @@ function jsonResponse(body: unknown, status = 200): Response {
     status,
     headers: { 'content-type': 'application/json' },
   })
+}
+
+function deferred<T>() {
+  let resolve!: (value: T) => void
+  const promise = new Promise<T>((complete) => { resolve = complete })
+  return { promise, resolve }
+}
+
+function quoteResponse(price: number): Response {
+  const payload = snapshotPayload()
+  payload.ticker.lastTrade.p = price
+  return jsonResponse(payload)
+}
+
+function expectPrice(result: ProviderResult<Quote>, price: number): void {
+  expect(result.ok).toBe(true)
+  if (result.ok) expect(result.data.lastPrice).toBe(price)
 }
 
 function makeProvider(
@@ -223,6 +244,7 @@ describe('MassiveFinancialDataProvider', () => {
           locale: 'us',
           primary_exchange: 'XNAS',
           currency_name: 'usd',
+          sic_code: '3571',
           sic_description: 'Electronic Computers',
           homepage_url: 'https://www.apple.com',
         },
@@ -238,7 +260,103 @@ describe('MassiveFinancialDataProvider', () => {
       name: 'Apple Inc.',
       exchange: 'XNAS',
       currency: 'usd',
+      industry: { name: 'Electronic Computers', classification: 'SIC', code: '3571' },
     })
+  })
+
+  it.each([
+    ['absent fields', {}],
+    ['code without a description', { sic_code: '3571' }],
+    ['blank description', { sic_description: '   ', sic_code: '3571' }],
+    ['null description', { sic_description: null, sic_code: '3571' }],
+    ['non-string description', { sic_description: 42, sic_code: '3571' }],
+  ] satisfies Array<[string, Record<string, unknown>]>)('keeps industry unknown for %s', async (_label, fields) => {
+    installFetch(() => jsonResponse({ results: { name: 'Apple Inc.', ...fields } }))
+    const result = await makeProvider('key').execute<StaticInfo>('company.profile', { symbol: 'AAPL.US' })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.industry).toBeUndefined()
+  })
+
+  it('trims industry labels and preserves leading zeros in SIC codes', async () => {
+    installFetch(() => jsonResponse({ results: {
+      sic_description: '  Wheat  ', sic_code: ' 0111 ',
+    } }))
+    const result = await makeProvider('key').execute<StaticInfo>('company.profile', { symbol: 'TEST.US' })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.industry).toEqual({ name: 'Wheat', classification: 'SIC', code: '0111' })
+  })
+
+  it.each([undefined, null, 3571, '', '357', '35x1'])('omits an unavailable or malformed SIC code (%s)', async (code) => {
+    installFetch(() => jsonResponse({ results: {
+      sic_description: 'Electronic Computers', sic_code: code,
+    } }))
+    const result = await makeProvider('key').execute<StaticInfo>('company.profile', { symbol: 'AAPL.US' })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.industry).toEqual({ name: 'Electronic Computers', classification: 'SIC' })
+  })
+
+  it('carries industry through canonical routing and the shared reference cache without extra requests', async () => {
+    const calls = installFetch(() => jsonResponse({ results: {
+      name: 'Apple Inc.', sic_description: 'Electronic Computers', sic_code: '3571',
+    } }))
+    const router = new ProviderRouter()
+    router.register(makeProvider('key'))
+    router.setRouting({ primary: 'massive' })
+    const resolver = new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG)
+    const service = new MarketDataService({ fetchers: createRouterFetchers(router, {
+      resolve: (query) => resolver.resolve(query),
+    }) })
+
+    const [first, concurrent] = await Promise.all([
+      service.getStaticInfo('AAPL.US'), service.getStaticInfo('AAPL.US'),
+    ])
+    const cached = await service.getStaticInfo('AAPL.US')
+
+    expect(first.instrumentId).toBe('XNAS:AAPL')
+    expect(first.industry).toEqual({ name: 'Electronic Computers', classification: 'SIC', code: '3571' })
+    expect(concurrent).toEqual(first)
+    expect(cached).toEqual(first)
+    expect(calls).toHaveLength(1)
+    expect(new URL(calls[0].url).pathname).toBe('/v3/reference/tickers/AAPL')
+  })
+
+  it('loads heatmap through the real router/cache while keeping portfolio valuations out of HTTP', async () => {
+    const calls = installFetch((url) => jsonResponse(url.includes('/v3/reference/')
+      ? { results: { name: 'Apple Inc.', sic_description: 'Electronic Computers', sic_code: '3571' } }
+      : snapshotPayload()))
+    const router = new ProviderRouter()
+    router.register(makeProvider('fixture-key'))
+    router.setRouting({ primary: 'massive' })
+    const resolver = new InstrumentResolver(DEFAULT_INSTRUMENT_CATALOG)
+    const resolve = (query: string) => resolver.resolve(query)
+    const market = new MarketDataService({ fetchers: createRouterFetchers(router, { resolve }) })
+    await market.getQuote('AAPL.US')
+    await market.getStaticInfo('AAPL.US')
+    const result = await new HeatmapService({ marketData: market, resolve }).load(parseHeatmapSource({
+      schemaVersion: 1, kind: 'portfolio', id: 'local-account', revision: 'v1', capturedAt: Date.now(),
+      baseCurrency: 'USD', valuationCurrency: 'USD',
+      entries: [{ symbol: 'AAPL.US', holding: { quantity: 17, marketValueBase: 2047, currency: 'USD' } }],
+    }))
+    expect(result.tiles[0]?.instrument.instrumentId).toBe('XNAS:AAPL')
+    expect(result.tiles[0]?.industry?.code).toBe('3571')
+    expect(result.tiles[0]?.valueBase).toBe(2047)
+    expect(result.tiles[0]?.weight).toBe(1)
+    expect(result.tiles[0]?.state).toBe('stale')
+    expect(result.tiles[0]?.provenance?.providerId).toBe('massive')
+    expect(calls).toHaveLength(2)
+    for (const call of calls) {
+      expect([...new URL(call.url).searchParams.keys()]).toEqual(['apiKey'])
+      expect(call.init?.body).toBeUndefined()
+      expect(call.url).not.toContain('2047')
+      expect(call.url).not.toContain('local-account')
+    }
+    expect('entries' in result.source).toBe(false)
   })
 
   it('loads three current financial statement endpoints and preserves period and filing dates', async () => {
@@ -364,6 +482,96 @@ describe('MassiveFinancialDataProvider', () => {
     expect(second.ok).toBe(true)
     expect(calls).toHaveLength(1)
   })
+
+  for (const firstResponse of ['old', 'new'] as const) {
+    it('keeps the cleared cache fresh when the ' + firstResponse + ' response finishes first', async () => {
+      const oldResponse = deferred<Response>()
+      const oldFetchStarted = deferred<void>()
+      let endpoint = 'https://old.example.test'
+      let apiKey = 'old-fake-key'
+      const calls = installFetch((url) => {
+        if (new URL(url).origin === 'https://old.example.test') {
+          oldFetchStarted.resolve(undefined)
+          return oldResponse.promise
+        }
+        return quoteResponse(200)
+      })
+      const provider = new MassiveFinancialDataProvider({
+        getApiKey: async () => apiKey,
+        getEndpoint: async () => endpoint,
+      })
+      const pending = provider.execute<Quote>('market.quote', { symbol: 'AAPL.US' })
+      await oldFetchStarted.promise
+
+      apiKey = 'new-fake-key'
+      endpoint = 'https://new.example.test'
+      provider.clearCache()
+      let previous: ProviderResult<Quote>
+      let current: ProviderResult<Quote>
+      if (firstResponse === 'old') {
+        oldResponse.resolve(quoteResponse(100))
+        previous = await pending
+        current = await provider.execute<Quote>('market.quote', { symbol: 'AAPL.US' })
+      } else {
+        current = await provider.execute<Quote>('market.quote', { symbol: 'AAPL.US' })
+        oldResponse.resolve(quoteResponse(100))
+        previous = await pending
+      }
+      const cached = await provider.execute<Quote>('market.quote', { symbol: 'AAPL.US' })
+
+      expectPrice(previous, 100)
+      expectPrice(current, 200)
+      expectPrice(cached, 200)
+      expect(calls.map(({ url }) => new URL(url).origin)).toEqual([
+        'https://old.example.test', 'https://new.example.test',
+      ])
+    })
+  }
+
+  for (const configRead of ['API key', 'endpoint'] as const) {
+    it('invalidates requests already awaiting their ' + configRead, async () => {
+      const configStarted = deferred<void>()
+      const oldConfig = deferred<string>()
+      let firstKey = true
+      let firstEndpoint = true
+      const calls = installFetch((url) => {
+        const parsed = new URL(url)
+        const old = parsed.origin === 'https://old.example.test'
+          || parsed.searchParams.get('apiKey') === 'old-fake-key'
+        return quoteResponse(old ? 100 : 200)
+      })
+      const provider = new MassiveFinancialDataProvider({
+        getApiKey: async () => {
+          if (configRead === 'API key' && firstKey) {
+            firstKey = false
+            configStarted.resolve(undefined)
+            return oldConfig.promise
+          }
+          return 'new-fake-key'
+        },
+        getEndpoint: async () => {
+          if (configRead === 'endpoint' && firstEndpoint) {
+            firstEndpoint = false
+            configStarted.resolve(undefined)
+            return oldConfig.promise
+          }
+          return 'https://new.example.test'
+        },
+      })
+      const pending = provider.execute<Quote>('market.quote', { symbol: 'AAPL.US' })
+      await configStarted.promise
+      provider.clearCache()
+      oldConfig.resolve(configRead === 'API key' ? 'old-fake-key' : 'https://old.example.test')
+      const previous = await pending
+      const current = await provider.execute<Quote>('market.quote', { symbol: 'AAPL.US' })
+      const cached = await provider.execute<Quote>('market.quote', { symbol: 'AAPL.US' })
+
+      expectPrice(previous, 100)
+      expectPrice(current, 200)
+      expectPrice(cached, 200)
+      expect(calls).toHaveLength(2)
+    })
+  }
 
   it('refetches after the cache TTL expires', async () => {
     const calls = installFetch(() => jsonResponse(snapshotPayload()))

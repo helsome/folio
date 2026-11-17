@@ -162,17 +162,15 @@ export function wrapText(text: string, maxColumns: number): string[] {
   return lines
 }
 
-/** `text` clipped so its display width does not exceed `maxColumns`. */
+/** Clip at CJK/word boundaries so a Latin word is never cut in half. */
 function clampToColumns(text: string, maxColumns: number): string {
-  let width = 0
-  let end = 0
-  for (const char of text) {
-    const next = width + (isFullWidth(char) ? 2 : 1)
-    if (next > maxColumns) break
-    width = next
-    end += char.length
+  let clipped = ''
+  for (const atom of atomize(text)) {
+    const next = clipped ? clipped + atom.lead + atom.text : atom.text
+    if (displayWidth(next) > maxColumns) break
+    clipped = next
   }
-  return text.slice(0, end)
+  return clipped
 }
 
 /** Column budget of the risk block: two card lines of `RISK_LINE_COLUMNS`. */
@@ -184,13 +182,16 @@ const ELLIPSIS = '…'
 function keyRiskLines(report: ResearchReport): string[] {
   const risk = report.risks[0]
   if (!risk) return []
-  let body = risk
-  if (displayWidth(body) > RISK_MAX_COLUMNS) {
-    // Reserve the ellipsis so the trimmed text still fits the two-line budget.
-    const clipped = clampToColumns(body, RISK_MAX_COLUMNS - displayWidth(ELLIPSIS))
-    body = clipped.replace(/\s+\S*$/, '') + ELLIPSIS
-  }
-  return wrapText(body, RISK_LINE_COLUMNS)
+  const lines = wrapText(risk, RISK_LINE_COLUMNS)
+  if (lines.length === 0) return []
+  if (lines.length <= 2 && displayWidth(risk) <= RISK_MAX_COLUMNS) return lines
+
+  // Bound the actual wrapped lines: CJK breaks need no whitespace, while Latin
+  // words may leave unused columns that make a total-width budget insufficient.
+  const visible = lines.slice(0, 2)
+  const last = visible.length - 1
+  visible[last] = clampToColumns(visible[last], RISK_LINE_COLUMNS - displayWidth(ELLIPSIS)) + ELLIPSIS
+  return visible
 }
 
 export function reportToShareCard(report: ResearchReport): ShareCard {
