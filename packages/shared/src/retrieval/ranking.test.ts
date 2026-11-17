@@ -42,6 +42,15 @@ describe('normalizeSourceTitle', () => {
 });
 
 describe('rankRetrievalSources', () => {
+  it('does not treat missing URLs as the same source', () => {
+    const result = rankRetrievalSources([
+      source('a', '', 'First company revenue rises'),
+      source('b', '  ', 'Second company faces lawsuit'),
+    ], { now: NOW });
+    expect(result.independentSourceCount).toBe(2);
+    expect(result.selected.map((item) => item.source.id)).toEqual(['a', 'b']);
+  });
+
   it('clusters tracking variants as one independent source', () => {
     const result = rankRetrievalSources(
       [
