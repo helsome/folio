@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'bun:test';
 import type { ToolCall } from '@finagent/core';
+import { reconcileFinancialFacts } from '@finagent/core';
 import {
   buildFinancialEvidence,
   computeEnvelopeId,
@@ -152,5 +153,64 @@ describe('asOf unit normalization (issue #181)', () => {
     const tool = call();
     const envelope = buildFinancialEvidence({ sessionId: 'session-1', runId: 'run-1', toolCalls: [tool] })[0];
     expect(envelope.asOf).toBe(110);
+  });
+});
+
+describe('reconciliation persistence', () => {
+  it('keeps a historical providers/method record without inventing a conflict', () => {
+    const [record] = buildFinancialEvidence({
+      sessionId: 's',
+      runId: 'r',
+      toolCalls: [call({
+        result: {
+          data: { symbol: 'AAPL.US', lastPrice: 210.5 },
+          provenance: { providerId: 'longbridge', fetchedAt: 120, stale: false },
+          evidence: { reconciliation: { providers: ['longbridge', 'massive'], method: 'priority' } },
+        },
+      })],
+    });
+    expect(record.reconciliation).toEqual({ providers: ['longbridge', 'massive'], method: 'priority' });
+    expect(record.values.find((value) => value.metric === 'lastPrice')?.normalizedValue).toBe(210.5);
+  });
+
+  it('stores a material conflict with both candidates and does not average the selected price', () => {
+    const reconciliation = reconcileFinancialFacts(
+      [
+        { provider: 'longbridge', value: 100, currency: 'USD', unit: 'price' },
+        { provider: 'massive', value: 300, currency: 'USD', unit: 'price' },
+      ],
+      { version: 'financial-facts.v1', relativeTolerance: 0.01, providerPriority: ['massive'] }
+    );
+    const [record] = buildFinancialEvidence({
+      sessionId: 's',
+      runId: 'r',
+      toolCalls: [call({
+        result: {
+          data: { symbol: 'AAPL.US', lastPrice: 210, currency: 'USD' },
+          provenance: { providerId: 'massive', fetchedAt: 120, marketTime: 100, stale: false, delayed: true },
+          evidence: {
+            currencies: { lastPrice: 'USD' },
+            units: { lastPrice: 'price' },
+            reconciliation,
+          },
+        },
+      })],
+    });
+    const lastPrice = record.values.find((value) => value.metric === 'lastPrice');
+    expect(lastPrice?.normalizedValue).toBe(210);
+    expect(lastPrice?.normalizedValue).not.toBe(200);
+    expect(record.reconciliation).toMatchObject({
+      state: 'material-conflict',
+      method: 'financial-facts.v1',
+      selectedProvider: 'massive',
+      discrepancy: 200,
+      providers: ['longbridge', 'massive'],
+    });
+    expect(record.reconciliation?.candidates).toEqual([
+      { provider: 'longbridge', value: 100, currency: 'USD', unit: 'price' },
+      { provider: 'massive', value: 300, currency: 'USD', unit: 'price' },
+    ]);
+    expect(record.reconciliation?.reason).toContain('never averaged');
+    expect(JSON.stringify(record.reconciliation)).not.toContain('apiKey');
   });
 });
