@@ -584,7 +584,9 @@ function mapQuote(symbol: string, payload: unknown): Quote {
   const changePercent =
     toFinite(ticker.todaysChangePerc) ?? (prevClose === 0 ? 0 : (change / prevClose) * 100)
 
-  const tradeTimeMs = toFinite(lastTrade.t)
+  // Snapshot trade timestamps are nanoseconds; minute timestamps are milliseconds.
+  const tradeTimeNs = toFinite(lastTrade.t)
+  const tradeTimeMs = tradeTimeNs !== undefined ? tradeTimeNs / 1_000_000 : undefined
   const minTimeMs = toFinite(ticker.min?.t)
   const updatedNs = toFinite(ticker.updated)
   const marketTimeMs =

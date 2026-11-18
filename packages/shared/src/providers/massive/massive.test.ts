@@ -64,7 +64,8 @@ function snapshotPayload() {
       day: { c: 120.4229, h: 121.85, l: 119.9, o: 121.09, v: 42527868 },
       min: { c: 120.4229, t: 1699559040000 },
       prevDay: { c: 120.44, h: 120.69, l: 119.32, o: 119.5, v: 45223491 },
-      lastTrade: { p: 120.42, s: 100, t: 1699559040000 },
+      // Snapshot trades use nanoseconds; minute aggregates use milliseconds.
+      lastTrade: { p: 120.42, s: 100, t: 1699559040123456000 },
       todaysChange: -0.0171,
       todaysChangePerc: -0.014,
       updated: 1699559040000000000,
@@ -149,7 +150,7 @@ describe('MassiveFinancialDataProvider', () => {
         ticker: {
           day: { c: 120.42, v: 1000 },
           prevDay: { c: 120.44 },
-          lastTrade: { p: 120.42, t: 1699559040000 },
+          lastTrade: { p: 120.42, t: 1699559040000000000 },
         },
       })
     )
@@ -164,6 +165,23 @@ describe('MassiveFinancialDataProvider', () => {
     expect(result.data.prevClose).toBe(120.44)
     expect(result.data.lastPrice).toBe(120.42)
     expect(result.data.change).toBeCloseTo(-0.02, 5)
+  })
+
+  it.each([
+    ['minute milliseconds', { min: { t: 1699558980123 }, updated: 1699558920000000000 }, 1699558980],
+    ['updated nanoseconds', { min: {}, updated: 1699558920123456000 }, 1699558920],
+  ] as const)('preserves %s when the last trade has no timestamp', async (_label, times, expected) => {
+    const payload = snapshotPayload()
+    installFetch(() => jsonResponse({
+      ...payload,
+      ticker: { ...payload.ticker, lastTrade: { p: 120.42 }, ...times },
+    }))
+    const result = await makeProvider('key').execute<Quote>('market.quote', { symbol: 'AAPL.US' })
+
+    expect(result.ok).toBe(true)
+    if (!result.ok) return
+    expect(result.data.timestamp).toBe(expected)
+    expect(result.provenance.marketTime).toBe(expected * 1000)
   })
 
   it('maps daily aggregates to ascending Kline[]', async () => {
@@ -348,6 +366,8 @@ describe('MassiveFinancialDataProvider', () => {
     expect(result.tiles[0]?.valueBase).toBe(2047)
     expect(result.tiles[0]?.weight).toBe(1)
     expect(result.tiles[0]?.state).toBe('stale')
+    expect(result.tiles[0]?.changePercent).toBe(-0.014)
+    expect(result.tiles[0]?.provenance?.marketTime).toBe(1699559040000)
     expect(result.tiles[0]?.provenance?.providerId).toBe('massive')
     expect(calls).toHaveLength(2)
     for (const call of calls) {
