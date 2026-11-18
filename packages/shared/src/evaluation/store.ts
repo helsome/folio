@@ -10,7 +10,9 @@ import type {
   TraceReference,
 } from '@finagent/core';
 import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import type { JsonFileStore } from '../storage/json-file-store.ts';
+import { withWriteLock } from '../storage/write-lock.ts';
 import { DEFAULT_EVALUATION_SETTINGS, sanitizeSettings } from './settings.ts';
 
 export interface TraceLinkRecord {
@@ -58,9 +60,12 @@ const FILE = 'evaluation/store.json';
 /** Single-file JSON store following the repo's JsonFileStore convention. */
 export class EvaluationStore {
   private readonly store: JsonFileStore;
+  private readonly writeLockKey: string;
 
   constructor(store: JsonFileStore) {
     this.store = store;
+    const path = resolve(store.resolve(FILE));
+    this.writeLockKey = process.platform === 'win32' ? path.toLowerCase() : path;
   }
 
   private async load(): Promise<StoreShape> {
@@ -79,8 +84,14 @@ export class EvaluationStore {
     };
   }
 
-  private async save(shape: StoreShape): Promise<void> {
-    await this.store.write(FILE, shape);
+  /** Every collection shares one file, so serialize the whole read-modify-write cycle. */
+  private async mutate<T>(change: (shape: StoreShape) => T): Promise<T> {
+    return withWriteLock(this.writeLockKey, async () => {
+      const shape = await this.load();
+      const result = change(shape);
+      await this.store.write(FILE, shape);
+      return result;
+    });
   }
 
   // ── settings ────────────────────────────────────────────────────────────
@@ -109,10 +120,10 @@ export class EvaluationStore {
   }
 
   async saveSettings(settings: EvaluationSettings): Promise<EvaluationSettings> {
-    const shape = await this.load();
-    shape.settings = sanitizeSettings({ ...settings, updatedAt: Date.now() });
-    await this.save(shape);
-    return shape.settings;
+    return this.mutate((shape) => {
+      shape.settings = sanitizeSettings({ ...settings, updatedAt: Date.now() });
+      return shape.settings;
+    });
   }
 
   // ── datasets ────────────────────────────────────────────────────────────
@@ -122,14 +133,14 @@ export class EvaluationStore {
   }
 
   async putDataset(dataset: EvaluationDataset): Promise<void> {
-    const shape = await this.load();
-    const index = shape.datasets.findIndex((d) => d.id === dataset.id);
-    if (index >= 0) {
-      shape.datasets[index] = dataset;
-    } else {
-      shape.datasets.push(dataset);
-    }
-    await this.save(shape);
+    return this.mutate((shape) => {
+      const index = shape.datasets.findIndex((d) => d.id === dataset.id);
+      if (index >= 0) {
+        shape.datasets[index] = dataset;
+      } else {
+        shape.datasets.push(dataset);
+      }
+    });
   }
 
   // ── experiments ─────────────────────────────────────────────────────────
@@ -144,26 +155,26 @@ export class EvaluationStore {
   }
 
   async createExperiment(experiment: EvaluationExperiment): Promise<void> {
-    const shape = await this.load();
-    shape.experiments.push(experiment);
-    await this.save(shape);
+    return this.mutate((shape) => {
+      shape.experiments.push(experiment);
+    });
   }
 
   async updateExperiment(experiment: EvaluationExperiment): Promise<void> {
-    const shape = await this.load();
-    const index = shape.experiments.findIndex((e) => e.id === experiment.id);
-    if (index < 0) throw new Error(`Experiment ${experiment.id} not found.`);
-    shape.experiments[index] = experiment;
-    await this.save(shape);
+    return this.mutate((shape) => {
+      const index = shape.experiments.findIndex((e) => e.id === experiment.id);
+      if (index < 0) throw new Error(`Experiment ${experiment.id} not found.`);
+      shape.experiments[index] = experiment;
+    });
   }
 
   // ── runs & results ──────────────────────────────────────────────────────
 
   async addRun(run: EvaluationRun): Promise<void> {
-    const shape = await this.load();
-    shape.runs.push(run);
-    if (shape.runs.length > 5000) shape.runs.splice(0, shape.runs.length - 5000);
-    await this.save(shape);
+    return this.mutate((shape) => {
+      shape.runs.push(run);
+      if (shape.runs.length > 5000) shape.runs.splice(0, shape.runs.length - 5000);
+    });
   }
 
   async listRuns(experimentId?: string): Promise<EvaluationRun[]> {
@@ -172,9 +183,9 @@ export class EvaluationStore {
   }
 
   async addResult(result: EvaluationResultRecord): Promise<void> {
-    const shape = await this.load();
-    shape.results.push(result);
-    await this.save(shape);
+    return this.mutate((shape) => {
+      shape.results.push(result);
+    });
   }
 
   async listResults(experimentId?: string): Promise<EvaluationResultRecord[]> {
@@ -189,23 +200,23 @@ export class EvaluationStore {
   }
 
   async createBaseline(baseline: EvaluationBaseline): Promise<void> {
-    const shape = await this.load();
-    shape.baselines.push(baseline);
-    await this.save(shape);
+    return this.mutate((shape) => {
+      shape.baselines.push(baseline);
+    });
   }
 
   // ── trace links (spec §52) ──────────────────────────────────────────────
 
   async recordTraceLink(link: TraceLinkRecord): Promise<void> {
-    const shape = await this.load();
-    const existing = shape.traceLinks.findIndex((l) => l.runId === link.runId);
-    if (existing >= 0) {
-      shape.traceLinks[existing] = link;
-    } else {
-      shape.traceLinks.push(link);
-    }
-    if (shape.traceLinks.length > 10_000) shape.traceLinks.splice(0, shape.traceLinks.length - 10_000);
-    await this.save(shape);
+    return this.mutate((shape) => {
+      const existing = shape.traceLinks.findIndex((l) => l.runId === link.runId);
+      if (existing >= 0) {
+        shape.traceLinks[existing] = link;
+      } else {
+        shape.traceLinks.push(link);
+      }
+      if (shape.traceLinks.length > 10_000) shape.traceLinks.splice(0, shape.traceLinks.length - 10_000);
+    });
   }
 
   async lookupTraceLink(runId: string): Promise<TraceLinkRecord | undefined> {
@@ -215,9 +226,9 @@ export class EvaluationStore {
   // ── human feedback (spec §82) ───────────────────────────────────────────
 
   async addFeedback(feedback: HumanFeedback): Promise<void> {
-    const shape = await this.load();
-    shape.feedback.push(feedback);
-    await this.save(shape);
+    return this.mutate((shape) => {
+      shape.feedback.push(feedback);
+    });
   }
 
   async listFeedback(): Promise<HumanFeedback[]> {
