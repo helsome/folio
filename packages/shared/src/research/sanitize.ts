@@ -157,14 +157,16 @@ export function hasInjectionFlags(item: NewsItem): boolean {
  * synthesis prose, so a planted command never persists into the report.
  */
 export function scrubInjectedPhrases(text: string): { text: string; scrubbed: boolean } {
-  const sentences = text.split(/(?<=[.!?。！？])\s*/);
+  // Keep original separators: a period may belong to a decimal, symbol or URL,
+  // so rejoining retained fragments must not introduce spaces into the prose.
+  const sentences = text.split(/(?<=[.!?。！？])/);
   let scrubbed = false;
   const kept = sentences.filter((sentence) => {
     const hit = INSTRUCTION_PHRASES.some((pattern) => pattern.test(sentence));
     if (hit) scrubbed = true;
     return !hit;
   });
-  return { text: kept.join(' ').trim(), scrubbed };
+  return { text: kept.join('').trim(), scrubbed };
 }
 
 function isSafeHttpUrl(value: string): boolean {
