@@ -221,6 +221,7 @@ var electronAPI = {
   },
   export: {
     markdown: (input) => import_electron.ipcRenderer.invoke("export:markdown", input),
+    json: (input) => import_electron.ipcRenderer.invoke("export:json", input),
     shareCard: (input) => import_electron.ipcRenderer.invoke("export:shareCard", input)
   },
   evaluation: {

@@ -1,13 +1,13 @@
 import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import type { ResearchReport } from '@finagent/core';
-import { loadExportMarkdown, loadShareCard } from '../../atoms/exportAtoms';
+import { loadExportJson, loadExportMarkdown, loadShareCard } from '../../atoms/exportAtoms';
 
 /**
  * Export & share menu for a research report (spec §54–55).
  *
- * Four actions, all fed exclusively by the report's own content rendered
- * main-side: Copy Markdown, Download .md, Copy share text, Download share
+ * Export actions use the stored report rendered main-side:
+ * Copy Markdown, Download .md/.json, Copy share text, Download share
  * card (.svg). Never touches portfolio/account data — the shared renderers
  * only see the report (see packages/shared/src/export/privacy.ts).
  */
@@ -16,11 +16,12 @@ interface ExportMenuProps {
   report: ResearchReport;
 }
 
-type MenuAction = 'markdown-copy' | 'markdown-download' | 'share-copy' | 'share-download';
+type MenuAction = 'markdown-copy' | 'markdown-download' | 'json-download' | 'share-copy' | 'share-download';
 
 const MENU_ITEMS: ReadonlyArray<{ id: MenuAction; labelKey: string; testId: string }> = [
   { id: 'markdown-copy', labelKey: 'copyMarkdown', testId: 'export-copy-markdown' },
   { id: 'markdown-download', labelKey: 'downloadMarkdown', testId: 'export-download-markdown' },
+  { id: 'json-download', labelKey: 'downloadJson', testId: 'export-download-json' },
   { id: 'share-copy', labelKey: 'copyShareText', testId: 'export-copy-share-text' },
   { id: 'share-download', labelKey: 'downloadShareCard', testId: 'export-download-card' },
 ];
@@ -96,6 +97,10 @@ export const ExportMenu: React.FC<ExportMenuProps> = ({ report }) => {
 
   const handleAction = (action: MenuAction): void => {
     void runAction(action, async () => {
+      if (action === 'json-download') {
+        const json = await loadExportJson(report.id);
+        return downloadFile(`${safeFileName(report)}-research.json`, json, 'application/json');
+      }
       if (action === 'markdown-copy' || action === 'markdown-download') {
         const markdown = await loadExportMarkdown(report.id);
         if (markdown == null) return false;

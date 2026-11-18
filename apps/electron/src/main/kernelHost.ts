@@ -132,6 +132,7 @@ import {
   parseCsv,
   parsePaste,
   reportToMarkdown,
+  reportToJson,
   reportToShareCard,
   redactForShare,
   computeSkillCalibrations,
@@ -2377,6 +2378,13 @@ export class AgentKernelHost {
     const report = await this.researchService.getReport(requireString(request.reportId, 'reportId'));
     if (!report) throw createCodeError('REPORT_NOT_FOUND', 'Unknown research report.');
     return reportToMarkdown(redactForShare(report));
+  }
+
+  async exportJson(input: unknown): Promise<string> {
+    const request = requireObject(input);
+    const report = await this.researchService.getReport(requireString(request.reportId, 'reportId'));
+    if (!report) throw createCodeError('REPORT_NOT_FOUND', 'Unknown research report.');
+    return reportToJson(report);
   }
 
   async exportShareCard(input: unknown): Promise<ShareCard> {
