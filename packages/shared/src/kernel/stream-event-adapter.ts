@@ -83,6 +83,10 @@ export function toStreamEvents(
           },
         },
       ];
+    case 'tool_retried':
+      // Runtime-only signal for the runaway detector; the UI stream already has
+      // the tool_started frame for this call.
+      return [];
     case 'message_completed':
       return [{ ...base, ...messageish, type: 'message_completed', payload: {} }];
     case 'run_completed':

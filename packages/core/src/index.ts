@@ -214,6 +214,7 @@ export type AgentEventType =
   | 'message_completed'
   | 'tool_started'
   | 'tool_completed'
+  | 'tool_retried'
   | 'run_completed'
   | 'run_failed';
 
@@ -233,6 +234,7 @@ export type AgentEvent =
   | AgentEventBase & { type: 'message_completed'; payload: MessageCompletedPayload }
   | AgentEventBase & { type: 'tool_started'; payload: ToolStartedPayload }
   | AgentEventBase & { type: 'tool_completed'; payload: ToolCompletedPayload }
+  | AgentEventBase & { type: 'tool_retried'; payload: ToolRetriedPayload }
   | AgentEventBase & { type: 'run_completed'; payload: RunCompletedPayload }
   | AgentEventBase & { type: 'run_failed'; payload: RunFailedPayload };
 
@@ -273,6 +275,11 @@ export interface ToolCompletedPayload {
   toolCall: ToolCall;
 }
 
+/** Emitted when a tool starts again right after its previous execution errored. */
+export interface ToolRetriedPayload {
+  toolCall: ToolCall;
+}
+
 /**
  * Token — and, when the provider reports it, cost — usage of one model call.
  * Providers shape this differently, so the runtime adapter normalizes it before
@@ -307,6 +314,7 @@ export type AgentEventPayload =
   | MessageDeltaPayload
   | ToolStartedPayload
   | ToolCompletedPayload
+  | ToolRetriedPayload
   | MessageCompletedPayload
   | RunCompletedPayload
   | RunFailedPayload;

@@ -30,6 +30,7 @@ import {
 } from './run-budget.ts';
 import {
   createRunawayState,
+  observeRetry,
   observeSearchQuery,
   observeToolCall,
   runawayStop,
@@ -472,6 +473,15 @@ export class RunManager {
       const search = observeSearchQuery(active.runaway, searchQuery, this.runawayPolicy);
       active.runaway = search.state;
       if (search.detection.detected) stop = runawayStop(search.detection);
+    }
+
+    // A tool retrying right after its previous execution errored feeds the
+    // retry-storm detector: the observer is deterministic and window-based, so
+    // retries spread over time never trip it while a burst does (#17).
+    if (stop === undefined && event.type === 'tool_retried') {
+      const retry = observeRetry(active.runaway, this.now(), this.runawayPolicy);
+      active.runaway = retry.state;
+      if (retry.detection.detected) stop = runawayStop(retry.detection);
     }
 
     if (stop === undefined) return false;
