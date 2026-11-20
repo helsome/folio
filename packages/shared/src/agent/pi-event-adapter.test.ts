@@ -48,3 +48,49 @@ describe('PiEventAdapter provider usage (#17)', () => {
     expect(completed?.payload).not.toHaveProperty('usage');
   });
 });
+
+describe('PiEventAdapter tool retry signal (#17)', () => {
+  it('emits tool_retried when the same tool starts again right after an error', () => {
+    const a = adapter();
+    a.consume({ type: 'tool_execution_start', toolCallId: 't1', name: 'get_quote', args: { symbol: 'AAPL.US' } });
+    a.consume({ type: 'tool_execution_end', toolCallId: 't1', name: 'get_quote', error: 'provider 5xx' });
+
+    const events = a.consume({ type: 'tool_execution_start', toolCallId: 't2', name: 'get_quote', args: { symbol: 'AAPL.US' } });
+
+    expect(events.map((event) => event.type)).toEqual(['tool_started', 'tool_retried']);
+    const retried = events.find((event) => event.type === 'tool_retried');
+    expect(retried?.payload).toMatchObject({ toolCall: { toolName: 'get_quote', status: 'running' } });
+  });
+
+  it('does not mark a retry when the previous execution succeeded', () => {
+    const a = adapter();
+    a.consume({ type: 'tool_execution_start', toolCallId: 't1', name: 'get_quote' });
+    a.consume({ type: 'tool_execution_end', toolCallId: 't1', name: 'get_quote', result: 'ok' });
+
+    const events = a.consume({ type: 'tool_execution_start', toolCallId: 't2', name: 'get_quote' });
+
+    expect(events.map((event) => event.type)).toEqual(['tool_started']);
+  });
+
+  it('tracks the last error per tool name, not globally', () => {
+    const a = adapter();
+    a.consume({ type: 'tool_execution_start', toolCallId: 't1', name: 'get_quote' });
+    a.consume({ type: 'tool_execution_end', toolCallId: 't1', name: 'get_quote', error: 'boom' });
+
+    const events = a.consume({ type: 'tool_execution_start', toolCallId: 't2', name: 'web_search' });
+
+    expect(events.map((event) => event.type)).toEqual(['tool_started']);
+  });
+
+  it('stops marking retries once the tool succeeds again', () => {
+    const a = adapter();
+    a.consume({ type: 'tool_execution_start', toolCallId: 't1', name: 'get_quote' });
+    a.consume({ type: 'tool_execution_end', toolCallId: 't1', name: 'get_quote', error: 'boom' });
+    a.consume({ type: 'tool_execution_start', toolCallId: 't2', name: 'get_quote' });
+    a.consume({ type: 'tool_execution_end', toolCallId: 't2', name: 'get_quote', result: 'ok' });
+
+    const events = a.consume({ type: 'tool_execution_start', toolCallId: 't3', name: 'get_quote' });
+
+    expect(events.map((event) => event.type)).toEqual(['tool_started']);
+  });
+});

@@ -769,6 +769,74 @@ describe('RunManager budgets and runaway detection (#17)', () => {
       stopDetail: { key: 'inputTokens', limit: 800, used: 900 },
     });
   });
+
+  it('stops when tool retries burst within the window and reports retry_storm', async () => {
+    const { sessions, runs, runtime } = makeKernel(
+      async function* (input) {
+        let sequence = 1;
+        const toolCall = (id: string, attempt: number, status: 'running' | 'error') => ({
+          id,
+          toolName: 'get_quote',
+          // Different args per attempt so the repeated-tool-call detector, which
+          // matches identical calls, stays out of the way of the retry detector.
+          args: { symbol: 'AAPL.US', attempt },
+          startedAt: clock,
+          ...(status === 'error'
+            ? { completedAt: clock, status: 'error' as const, error: { code: 'PI_TOOL_ERROR', message: 'boom' } }
+            : { status: 'running' as const }),
+        });
+        for (let i = 1; i <= 3; i += 1) {
+          yield event(input.sessionId, input.runId, 'tool_started', { toolCall: toolCall(`t${i}a`, i, 'running') }, sequence++);
+          yield event(input.sessionId, input.runId, 'tool_completed', { toolCall: toolCall(`t${i}b`, i, 'error') }, sequence++);
+          yield event(input.sessionId, input.runId, 'tool_retried', { toolCall: toolCall(`t${i}c`, i + 1, 'running') }, sequence++);
+        }
+        yield event(input.sessionId, input.runId, 'run_completed', { answer: 'done', toolCalls: [] }, sequence++);
+      },
+      { runaway: { retryThreshold: 3, retryWindowMs: 60_000 } }
+    );
+    const session = await sessions.createSession('Retry storm');
+
+    const run = await runs.startRun(session.id, 'q');
+    await waitFor(async () => !runs.isRunning());
+
+    expect(runtime.cancelCalls).toHaveLength(1);
+    const persisted = await sessions.getRun(session.id, run.id);
+    expect(persisted).toMatchObject({ status: 'cancelled', stopReason: 'retry_storm' });
+    expect(persisted?.stopDetail).toMatchObject({ signal: 'retry_storm', retriesInWindow: 3, windowMs: 60_000 });
+  });
+
+  it('lets a run finish when tool retries stay under the threshold', async () => {
+    const { sessions, runs, runtime } = makeKernel(
+      async function* (input) {
+        let sequence = 1;
+        const toolCall = (id: string, attempt: number, status: 'running' | 'error') => ({
+          id,
+          toolName: 'get_quote',
+          args: { symbol: 'AAPL.US', attempt },
+          startedAt: clock,
+          ...(status === 'error'
+            ? { completedAt: clock, status: 'error' as const, error: { code: 'PI_TOOL_ERROR', message: 'boom' } }
+            : { status: 'running' as const }),
+        });
+        for (let i = 1; i <= 2; i += 1) {
+          yield event(input.sessionId, input.runId, 'tool_started', { toolCall: toolCall(`t${i}a`, i, 'running') }, sequence++);
+          yield event(input.sessionId, input.runId, 'tool_completed', { toolCall: toolCall(`t${i}b`, i, 'error') }, sequence++);
+          yield event(input.sessionId, input.runId, 'tool_retried', { toolCall: toolCall(`t${i}c`, i + 1, 'running') }, sequence++);
+        }
+        yield event(input.sessionId, input.runId, 'run_completed', { answer: 'done', toolCalls: [] }, sequence++);
+      },
+      { runaway: { retryThreshold: 3, retryWindowMs: 60_000 } }
+    );
+    const session = await sessions.createSession('Retry ok');
+
+    const run = await runs.startRun(session.id, 'q');
+    await waitFor(async () => !runs.isRunning());
+
+    expect(runtime.cancelCalls).toEqual([]);
+    const persisted = await sessions.getRun(session.id, run.id);
+    expect(persisted).toMatchObject({ status: 'completed', answer: 'done' });
+    expect(persisted?.stopReason).toBeUndefined();
+  });
 });
 
 async function waitFor(predicate: () => Promise<boolean>, timeoutMs = 2000) {

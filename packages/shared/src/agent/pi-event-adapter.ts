@@ -28,6 +28,8 @@ export class PiEventAdapter {
   private readonly now: () => number;
   private sequence = 0;
   private readonly toolCalls = new Map<string, ToolCall>();
+  /** Last execution outcome per tool name, so a re-run after an error can be marked as a retry. */
+  private readonly lastToolError = new Map<string, boolean>();
   private answer = '';
   private messageStarted = false;
 
@@ -44,7 +46,13 @@ export class PiEventAdapter {
     if (type === 'tool_execution_start') {
       const toolCall = parseToolStart(event, this.now);
       this.toolCalls.set(toolCall.id, toolCall);
-      return [this.emit('tool_started', { toolCall })];
+      const events: AgentEvent[] = [this.emit('tool_started', { toolCall })];
+      // A run of the same tool right after its previous execution errored is a
+      // retry: surfaced explicitly so the runaway detector can count retries.
+      if (this.lastToolError.get(toolCall.toolName) === true) {
+        events.push(this.emit('tool_retried', { toolCall }));
+      }
+      return events;
     }
 
     if (type === 'tool_execution_end') {
@@ -56,7 +64,9 @@ export class PiEventAdapter {
         existing.result = toolCall.result;
         existing.error = toolCall.error;
       }
-      return [this.emit('tool_completed', { toolCall: existing ?? toolCall })];
+      const final = existing ?? toolCall;
+      this.lastToolError.set(final.toolName, final.status === 'error');
+      return [this.emit('tool_completed', { toolCall: final })];
     }
 
     if (type === 'message_update') {
