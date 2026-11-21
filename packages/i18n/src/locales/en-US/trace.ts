@@ -89,6 +89,7 @@ export const trace = {
   footer: {
     completed: 'Completed · {{seconds}}s · {{steps}} steps',
     failed: 'Failed · {{tools}} tools',
+    cancelled: 'Cancelled · {{tools}} tools',
     stopped: 'Stopped early · {{reason}} · {{tools}} tools{{detail}}',
     stopReasons: {
       budget_exhausted: 'budget exhausted',

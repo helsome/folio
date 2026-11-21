@@ -2,7 +2,7 @@ import React, { useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ArrowUp, ChevronLeft, ChevronRight, Square, Sparkles } from 'lucide-react';
 import { useAtom, useAtomValue, useSetAtom } from 'jotai';
-import type { ApiError, FolioTrace, PortfolioSnapshot, Quote, ToolCall } from '@finagent/core';
+import type { ApiError, FolioTrace, PortfolioSnapshot, Quote, Run, StopReason, ToolCall } from '@finagent/core';
 import {
   activeMessagesAtom,
   activeSessionIdAtom,
@@ -380,28 +380,59 @@ export const AgentPanel: React.FC = () => {
  * Completed/failed run footer with the secondary Trace affordance (V9.1 §12).
  * The semantic activity above remains the primary experience.
  */
-const RunFooter: React.FC<{
+export const RunFooter: React.FC<{
   lastRun: LastRunSummary | null;
   activeSessionId: string | null;
   onOpenTrace: () => void;
 }> = ({ lastRun, activeSessionId, onOpenTrace }) => {
   const { t } = useTranslation();
+  const client = useFinagentClient();
+  // #17: a guard stop writes its stop_reason only onto the persisted Run record
+  // — the event stream carries RUN_CANCELLED for every safeguard stop — so once
+  // the run settles, read the record back and surface why it actually stopped.
+  const [persistedStop, setPersistedStop] = useState<Pick<Run, 'stopReason' | 'stopDetail'> | null>(null);
+  const terminal = lastRun !== null && lastRun.status !== 'running' && lastRun.sessionId === activeSessionId;
+  useEffect(() => {
+    if (!terminal || !lastRun) {
+      setPersistedStop(null);
+      return;
+    }
+    let released = false;
+    void client.kernel
+      .listRuns(lastRun.sessionId)
+      .then((result) => {
+        if (released || !result.ok) return;
+        const run = result.data.find((candidate) => candidate.id === lastRun.runId);
+        if (run) setPersistedStop({ stopReason: run.stopReason, stopDetail: run.stopDetail });
+      })
+      .catch(() => undefined);
+    return () => {
+      released = true;
+    };
+  }, [terminal, lastRun?.runId, lastRun?.sessionId, client]);
   if (!lastRun || lastRun.status === 'running' || lastRun.sessionId !== activeSessionId) return null;
   const durationSec =
     lastRun.completedAt != null && lastRun.completedAt >= lastRun.startedAt
       ? Math.max(0, Math.round((lastRun.completedAt - lastRun.startedAt) / 100) / 10)
       : undefined;
   const failed = lastRun.status === 'failed';
-  const stopReason = isGuardStopReason(lastRun.stopReason) ? lastRun.stopReason : undefined;
+  // The event-stream projection can never carry a guard stop reason (every
+  // safeguard stop surfaces as RUN_CANCELLED), so the persisted record wins.
+  const stopReason = isGuardStopReason(lastRun.stopReason ?? persistedStop?.stopReason)
+    ? (lastRun.stopReason ?? persistedStop?.stopReason)!
+    : undefined;
+  const stopDetail = lastRun.stopDetail ?? persistedStop?.stopDetail;
   const summary = stopReason
     ? t('trace.footer.stopped', {
         reason: t(`trace.footer.stopReasons.${stopReason}`),
-        detail: formatStopDetail(lastRun.stopDetail),
+        detail: formatStopDetail(stopDetail),
         tools: lastRun.toolCount,
       })
     : failed
       ? t('trace.footer.failed', { tools: lastRun.toolCount })
-      : t('trace.footer.completed', { seconds: durationSec ?? 0, steps: lastRun.toolCount });
+      : lastRun.status === 'cancelled'
+        ? t('trace.footer.cancelled', { tools: lastRun.toolCount })
+        : t('trace.footer.completed', { seconds: durationSec ?? 0, steps: lastRun.toolCount });
   return (
     <div
       data-testid="run-footer"
@@ -423,9 +454,9 @@ const RunFooter: React.FC<{
   );
 };
 
-const GUARD_STOP_REASONS = new Set<GuardStopReason>(['budget_exhausted', 'loop_detected', 'retry_storm']);
+const GUARD_STOP_REASONS = new Set<string>(['budget_exhausted', 'loop_detected', 'retry_storm']);
 
-function isGuardStopReason(reason: LastRunSummary['stopReason']): reason is GuardStopReason {
+function isGuardStopReason(reason: StopReason | undefined): reason is GuardStopReason {
   return reason !== undefined && GUARD_STOP_REASONS.has(reason);
 }
 
@@ -435,6 +466,9 @@ function formatStopDetail(detail: LastRunSummary['stopDetail']): string {
   }
   if (detail?.tool && detail.count !== undefined) {
     return ` · ${detail.tool} ×${detail.count}`;
+  }
+  if (detail?.retriesInWindow !== undefined) {
+    return ` · ${detail.retriesInWindow} retries`;
   }
   return '';
 }

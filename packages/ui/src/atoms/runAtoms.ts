@@ -59,6 +59,7 @@ export interface GuardStopDetail {
   signal?: string;
   tool?: string;
   count?: number;
+  retriesInWindow?: number;
 }
 
 /**
