@@ -125,6 +125,76 @@ describe('AlertEngine dedup', () => {
     expect(events.length).toBe(2);
     expect(events[1].payload).toEqual({ items: [{ id: 'b', title: 'Bravo' }] });
   });
+
+  it('delivers late and same-second headlines once across engine restarts', async () => {
+    const store = tempStore();
+    let nowMs = 1_700_000_000_000;
+    const clock = () => nowMs;
+    const repository = new AlertRuleRepository(store, clock);
+    await repository.save({
+      id: 'late-news', createdAt: nowMs, enabled: true, cooldownMinutes: 0,
+      symbol: 'NVDA.US', type: 'new_news',
+    });
+    let items = [
+      { id: 'a', title: 'Alpha', summary: '', url: '', timestamp: nowMs / 1000 - 60, symbols: [] },
+    ];
+    const registry = makeRegistry({ 'research.news': () => items });
+    const events: AlertTriggerEvent[] = [];
+    const eventLog = new AlertEventLog(store);
+    const makeEngine = (repo: AlertRuleRepository) => new AlertEngine({
+      registry, repository: repo, eventLog, now: clock, onTrigger: (event) => events.push(event),
+    });
+
+    await makeEngine(repository).tick();
+    expect(events).toHaveLength(1);
+    nowMs += 60_000;
+    await makeEngine(repository).tick();
+    expect(events).toHaveLength(1);
+
+    // Provider delivers a new story after the last check, but its publication
+    // time is older than that check. A wall-clock cursor loses it forever.
+    items = [...items, {
+      id: 'b', title: 'Bravo', summary: '', url: '', timestamp: (nowMs - 30_000) / 1000, symbols: [],
+    }];
+    await makeEngine(new AlertRuleRepository(store, clock)).tick();
+    expect(events).toHaveLength(2);
+    expect(events[1].payload).toEqual({ items: [{ id: 'b', title: 'Bravo' }] });
+
+    items = [...items, {
+      id: 'c', title: 'Charlie', summary: '', url: '', timestamp: (nowMs - 30_000) / 1000, symbols: [],
+    }];
+    await makeEngine(new AlertRuleRepository(store, clock)).tick();
+    expect(events).toHaveLength(3);
+    expect(events[2].payload).toEqual({ items: [{ id: 'c', title: 'Charlie' }] });
+    await makeEngine(new AlertRuleRepository(store, clock)).tick();
+    expect(events).toHaveLength(3);
+  });
+
+  it('seeds a legacy rule without replaying old news, then accepts a late new ID', async () => {
+    const store = tempStore();
+    const nowMs = 1_700_000_060_000;
+    const repository = new AlertRuleRepository(store, () => nowMs);
+    await repository.save({
+      id: 'legacy-news', createdAt: nowMs - 60_000, enabled: true, cooldownMinutes: 0,
+      lastCheckedAt: nowMs - 30_000, symbol: 'NVDA.US', type: 'new_news',
+    });
+    const old = { id: 'old', title: 'Old', summary: '', url: '', timestamp: (nowMs - 60_000) / 1000, symbols: [] };
+    let items = [old];
+    const events: AlertTriggerEvent[] = [];
+    const engine = new AlertEngine({
+      registry: makeRegistry({ 'research.news': () => items }), repository,
+      eventLog: new AlertEventLog(store), now: () => nowMs,
+      onTrigger: (event) => events.push(event),
+    });
+    await engine.tick();
+    expect(events).toHaveLength(0);
+    expect((await repository.getRuleSnapshot('legacy-news')).seenNewsIds).toEqual(['old']);
+
+    items = [...items, { ...old, id: 'late', title: 'Late', timestamp: (nowMs - 45_000) / 1000 }];
+    await engine.tick();
+    expect(events).toHaveLength(1);
+    expect(events[0].payload).toEqual({ items: [{ id: 'late', title: 'Late' }] });
+  });
 });
 
 describe('AlertEngine fault isolation', () => {

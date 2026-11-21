@@ -39,7 +39,8 @@ export interface AlertEngineOptions {
  * per-rule try/catch (one bad rule never kills the tick) and honors:
  *
  * - cooldown: skip when `lastTriggeredAt + cooldownMinutes` has not elapsed;
- * - dedup: `lastCheckedAt` advances after every evaluation (news/event cursor);
+ * - dedup: `lastCheckedAt` records evaluation time; news IDs live in the
+ *   per-rule snapshot so delayed publications are not skipped;
  * - market-hours: price/weight/drawdown rules skip while the relevant market is
  *   closed, but evaluate anyway when `market.status` is unavailable.
  */
