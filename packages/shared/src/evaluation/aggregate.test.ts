@@ -554,4 +554,49 @@ describe('compareToBaseline / gatePassed (spec §76-77)', () => {
     expect(regressions.every((r) => r.baseline === null && r.passed)).toBe(true);
     expect(gatePassed(regressions)).toBe(true);
   });
+
+  // `EvaluationMetric.higherIsBetter` is part of the metric contract: `latency`
+  // and `tool_error_rate` are declared `false`. Regression direction must follow
+  // that declaration, otherwise a slower/error-ier run reads as "ok" and an
+  // improvement reads as "REGRESSION" in the eval harness gate table.
+  function latencySummary(score: number) {
+    const runs = [makeRun({ id: 'run-1' })];
+    const results = [makeResult([makeScore('latency', score)], { id: 'result-1', runId: 'run-1' })];
+    return summarizeExperiment(runs, results, []);
+  }
+
+  function latencyRegression(baselineScore: number, currentScore: number) {
+    const latencyBaseline = makeBaseline({
+      metrics: makeBaselineMetrics({ latency: baselineScore }),
+      thresholds: {},
+    });
+    return compareToBaseline(latencySummary(currentScore), latencyBaseline).find(
+      (r) => r.metric === 'latency'
+    );
+  }
+
+  it('flags a lower-is-better metric that got worse', () => {
+    // latency 0.600 → 1.000 is +0.400, past the 0.2 default max delta.
+    const latency = latencyRegression(0.6, 1.0);
+    expect(EVALUATION_METRICS.find((m) => m.id === 'latency')?.higherIsBetter).toBe(false);
+    expect(latency?.delta).toBeCloseTo(0.4, 10);
+    expect(latency?.maxDelta).toBe(0.2);
+    expect(latency?.passed).toBe(false);
+  });
+
+  it('does not flag a lower-is-better metric that improved', () => {
+    // latency 1.000 → 0.600 is -0.400: better, not a regression.
+    const latency = latencyRegression(1.0, 0.6);
+    expect(latency?.delta).toBeCloseTo(-0.4, 10);
+    expect(latency?.passed).toBe(true);
+  });
+
+  it('keeps higher-is-better direction unchanged', () => {
+    // task_completion 1.000 → 0.700 is still a regression (control case).
+    const [tm] = compareToBaseline(summaryWith(0.7), baseline).filter(
+      (r) => r.metric === 'task_completion'
+    );
+    expect(tm.delta).toBeCloseTo(-0.3, 10);
+    expect(tm.passed).toBe(false);
+  });
 });
